@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from typing import Optional
 from uuid import uuid4
@@ -51,6 +52,14 @@ class OutcomeIn(BaseModel):
 @app.on_event("startup")
 def startup():
     init_db()
+    if os.getenv("VEYRA_AUTO_SEED", "").lower() in {"1", "true", "yes"}:
+        db = next(get_db())
+        try:
+            has_investigation = db.scalar(select(Investigation.id).limit(1))
+            if not has_investigation:
+                reset_demo(db)
+        finally:
+            db.close()
 
 
 @app.post("/demo/reset")

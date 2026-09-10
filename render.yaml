@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: veyra-demo-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: VEYRA_AUTO_SEED
+        value: "true"
+
+  - type: web
+    name: veyra-demo
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://veyra-demo-api.onrender.com
