@@ -62,6 +62,21 @@ def startup():
             db.close()
 
 
+@app.get("/")
+def root():
+    return {
+        "service": "veyra-demo-api",
+        "status": "ok",
+        "docs": "/docs",
+        "demo_investigation": "/investigations/inv-120-robots-bad-rollout",
+    }
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.post("/demo/reset")
 def demo_reset(db: Session = Depends(get_db)):
     return reset_demo(db)
