@@ -33,17 +33,17 @@ Open:
 
 ## Demo Scenario
 
-The seed data creates a 120-robot AMR rollout.
+The seed data creates a six-robot manipulation-policy test.
 
-- 14:02: all 120 robots have a healthy state snapshot.
-- 14:04: application v2.4 is deployed to all 120 robots.
-- 14:06: Network Profile C is applied to the rollout subset.
-- 14:11: the first abnormal navigation signal appears.
-- 14:18: 37 affected robots are detected.
-- 14:26: the customer ticket arrives.
-- 37 robots show the signal; 83 remain healthy.
-- 21 healthy robots share the same Network Profile C exposure and should be watched.
-- A delayed edge-buffer event can later arrive with an event_time before the ticket but a later known_at timestamp.
+- 14:02: all six robots have a healthy state snapshot.
+- 14:04: policy v0.9 is rolled out to all six robots.
+- 14:06: calibration C and gripper firmware 7.3 are applied to a subset.
+- 14:11: the first grip pose drift signal appears.
+- 14:18: two affected robots are detected.
+- 14:26: an engineer note records human discovery.
+- Two robots show the signal; four remain stable.
+- One stable robot shares the same calibration/firmware exposure and should be watched.
+- A delayed edge-buffer event can later arrive with an event_time before the engineer note but a later known_at timestamp.
 - Runtime producers only need to provide `event_time`; Veyra assigns `known_at` and `ingested_at` when evidence enters the reconstruction layer.
 
 Veyra reconstructs last-known healthy state, what changed before the incident, where else the same pattern appears, affected-vs-healthy comparison, Decision Package, sealed package and operational memory.
@@ -54,11 +54,11 @@ The product loop is:
 
 The intended live-demo line is:
 
-> Software changed everywhere. The failure did not.
+> Same model. Same task. Different behavior.
 
 The ending:
 
-> The first incident took 42 minutes to understand. The second took 42 seconds.
+> The first run took 42 minutes to understand. The next run took 42 seconds.
 
 ## Boundaries
 

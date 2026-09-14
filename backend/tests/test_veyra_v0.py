@@ -22,12 +22,12 @@ def test_reconstruction_calculates_lkg_first_abnormal_and_latency():
     response = client.post(f"/investigations/{investigation_id}/reconstruct")
     assert response.status_code == 200
     data = response.json()
-    assert data["last_known_healthy"]["id"] == "AMR-001-healthy-1402"
-    assert data["first_abnormal_evidence"]["id"] == "AMR-001-nav-drift"
-    assert data["human_discovery"]["id"] == "AMR-001-ticket-1426"
+    assert data["last_known_healthy"]["id"] == "R03-healthy-run"
+    assert data["first_abnormal_evidence"]["id"] == "R03-grip-drift"
+    assert data["human_discovery"]["id"] == "R03-engineer-note-1426"
     assert data["detection_latency"] == "0h15m"
-    assert data["current_state"]["application_version"] == "2.4"
-    assert data["current_state"]["network_profile"] == "C"
+    assert data["current_state"]["application_version"] == "policy-v0.9"
+    assert data["current_state"]["configuration"] == "camera-cal-C"
     assert data["current_state"]["health"] == "degraded"
 
 
@@ -36,18 +36,18 @@ def test_comparison_groups_affected_and_unaffected_peers():
     response = client.get(f"/investigations/{investigation_id}/comparison")
     assert response.status_code == 200
     data = response.json()
-    assert data["same_change"] == 120
-    assert data["same_signal"] == 37
-    assert data["no_signal"] == 83
-    assert "AMR-001" in data["affected_assets"]
-    assert "AMR-038" in data["unaffected_assets"]
-    assert data["potentially_exposed"][0]["asset_id"] == "AMR-038"
+    assert data["same_change"] == 6
+    assert data["same_signal"] == 2
+    assert data["no_signal"] == 4
+    assert "R03" in data["affected_assets"]
+    assert "R06" in data["unaffected_assets"]
+    assert data["potentially_exposed"][0]["asset_id"] == "R06"
     table = {row["context"]: row for row in data["table"]}
-    assert table["Application v2.4"] == {"context": "Application v2.4", "affected": "37/37", "unaffected": "83/83"}
-    assert table["Warehouse-east config"] == {"context": "Warehouse-east config", "affected": "29/37", "unaffected": "31/83"}
-    assert table["Motor firmware 7.2"] == {"context": "Motor firmware 7.2", "affected": "37/37", "unaffected": "21/83"}
-    assert table["Private 5G"] == {"context": "Private 5G", "affected": "25/37", "unaffected": "55/83"}
-    assert table["Network Profile C"] == {"context": "Network Profile C", "affected": "37/37", "unaffected": "21/83"}
+    assert table["Policy v0.9"] == {"context": "Policy v0.9", "affected": "2/2", "unaffected": "4/4"}
+    assert table["Camera calibration C"] == {"context": "Camera calibration C", "affected": "2/2", "unaffected": "1/4"}
+    assert table["Gripper firmware 7.3"] == {"context": "Gripper firmware 7.3", "affected": "2/2", "unaffected": "1/4"}
+    assert table["Low-light test cell"] == {"context": "Low-light test cell", "affected": "1/2", "unaffected": "2/4"}
+    assert table["End-effector G2"] == {"context": "End-effector G2", "affected": "2/2", "unaffected": "2/4"}
 
 
 def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
@@ -59,7 +59,7 @@ def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     assert len(digest) == 64
     assert sealed["signature"]
     late = client.post("/demo/late-evidence").json()
-    assert late["comparison"]["same_signal"] == 38
+    assert late["comparison"]["same_signal"] == 3
     assert late["late_evidence"]["event_time"] == "2026-09-03T14:09:00Z"
     assert late["late_evidence"]["known_at"] == "2026-09-03T14:31:00Z"
     assert late["late_evidence"]["ingested_at"] == "2026-09-03T14:31:04Z"
@@ -72,7 +72,7 @@ def test_runtime_event_only_needs_event_time():
     response = client.post(
         "/events",
         json={
-            "asset_id": "AMR-001",
+            "asset_id": "R03",
             "event_type": "heartbeat",
             "event_time": "2026-09-03T14:40:00",
             "source": "edge_agent",
@@ -89,7 +89,7 @@ def test_runtime_event_only_needs_event_time():
 
 def test_outcome_becomes_operational_memory():
     investigation_id = reset()
-    response = client.post(f"/investigations/{investigation_id}/outcome", json={"outcome": "Network profile N7 held pending site review"})
+    response = client.post(f"/investigations/{investigation_id}/outcome", json={"outcome": "Calibration C held pending targeted low-light runs"})
     assert response.status_code == 200
     memory = client.get(f"/memory/similar?investigation_id={investigation_id}").json()
-    assert memory["similar_cases"][0]["outcome"] == "Network profile N7 held pending site review"
+    assert memory["similar_cases"][0]["outcome"] == "Calibration C held pending targeted low-light runs"

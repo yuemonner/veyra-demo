@@ -25,15 +25,15 @@ export default async function Page() {
         <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Cinematic demo</Link><Link className="button" href="/demo-control">Presenter controls</Link></div></div>
         <section className="hero">
           <span className="eyebrow">Operational context for Physical AI.</span>
-          <h1>120 robots. One bad rollout. 90 seconds.</h1>
-          <p>When 120 robots deploy, 37 should not be allowed to silently fail. Today, they do.</p>
+          <h1>6 robots. One model update. 90 seconds.</h1>
+          <p>Six robots run the same manipulation policy. Two start behaving differently.</p>
           <p><b>Veyra reconstructs what changed, where else it appears, and what the team knew before acting.</b></p>
           <div className="hero-actions"><Link className="button primary" href="/cinematic">Start cinematic demo</Link><Link className="button" href={active ? `/investigations/${active.id}` : "/demo-control"}>{active ? "Open live system" : "Initialize demo"}</Link></div>
         </section>
         <div className="grid three">
-          <article className="panel metric"><span>Fleet</span><strong>{assets.length || "120"}</strong><p>robots updated.</p></article>
-          <article className="panel metric"><span>Affected</span><strong>37</strong><p>behaving differently.</p></article>
-          <article className="panel metric"><span>Healthy</span><strong>83</strong><p>same deployment, no signal.</p></article>
+          <article className="panel metric"><span>Test set</span><strong>{assets.length || "6"}</strong><p>robots updated.</p></article>
+          <article className="panel metric"><span>Affected</span><strong>2</strong><p>grip pose drift.</p></article>
+          <article className="panel metric"><span>Stable</span><strong>4</strong><p>same policy, no signal.</p></article>
         </div>
         <section className="investigation panel">
           <span className="eyebrow">Backend v0 live</span>

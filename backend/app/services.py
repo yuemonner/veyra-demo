@@ -63,24 +63,21 @@ def reset_demo(db: Session) -> dict[str, Any]:
         db.execute(delete(model))
     assets = [
         Asset(
-            id=f"AMR-{i:03d}",
-            name=f"AMR-{i:03d}",
-            asset_type="AMR",
-            family="AMR-X",
-            site=f"Site {((i - 1) % 8) + 1}",
-            environment="warehouse",
+            id=f"R{i:02d}",
+            name=f"R{i:02d}",
+            asset_type="Manipulation Robot",
+            family="MR-Lab",
+            site="Test Cell A" if i <= 3 else "Test Cell B",
+            environment="real-world test lab",
         )
-        for i in range(1, 121)
+        for i in range(1, 7)
     ]
     db.add_all(assets)
-    affected_ids = {f"AMR-{i:03d}" for i in range(1, 38)}
+    affected_ids = {"R03", "R05"}
     for a in assets:
-        asset_num = int(a.id.split("-")[1])
-        # 37 robots show the signal; 21 more share the same network exposure without symptoms yet.
-        profile_c = a.id in affected_ids or 38 <= asset_num <= 58
-        network_profile = "C" if profile_c else "A"
-        configuration = "warehouse-east" if asset_num <= 29 or 38 <= asset_num <= 68 else "warehouse-standard"
-        firmware = "motor-fw-7.2" if asset_num <= 58 else "motor-fw-7.1"
+        asset_num = int(a.id[1:])
+        lighting = "low-light-bin" if asset_num in {2, 3, 4} else "standard-light"
+        end_effector = "gripper-G2" if asset_num in {3, 4, 5, 6} else "gripper-G1"
         db.add(
             evidence(
                 a.id,
@@ -90,15 +87,15 @@ def reset_demo(db: Session) -> dict[str, Any]:
                 "edge_agent",
                 "OBSERVED",
                 {
-                    "application_version": "2.3",
-                    "firmware_version": firmware,
-                    "configuration": configuration,
-                    "network_profile": network_profile,
-                    "connection_type": "private-5g" if asset_num % 3 else "wifi",
+                    "application_version": "policy-v0.8",
+                    "firmware_version": "gripper-fw-7.2",
+                    "configuration": "camera-cal-B",
+                    "network_profile": lighting,
+                    "connection_type": end_effector,
                     "process_health": "healthy",
                     "health": "healthy",
                 },
-                f"{a.id}-healthy-1402",
+                f"{a.id}-healthy-run",
             )
         )
         db.add(
@@ -107,23 +104,23 @@ def reset_demo(db: Session) -> dict[str, Any]:
                 "deployment",
                 4,
                 1,
-                "deployment_system",
+                "policy_registry",
                 "OBSERVED",
-                {"application_version": "2.4", "previous_application_version": "2.3", "deployment_id": "deploy-nav-240", "rollout_size": 120},
-                f"{a.id}-deploy-240",
+                {"application_version": "policy-v0.9", "previous_application_version": "policy-v0.8", "deployment_id": "policy-manip-09", "rollout_size": 6},
+                f"{a.id}-policy-09",
             )
         )
-    for aid in sorted(affected_ids):
+    for aid in ["R03", "R05", "R06"]:
         db.add(
             evidence(
                 aid,
                 "configuration_change",
                 6,
                 1,
-                "config_service",
+                "calibration_registry",
                 "OBSERVED",
-                {"network_profile": "C", "previous_network_profile": "A"},
-                f"{aid}-profile-c",
+                {"configuration": "camera-cal-C", "previous_configuration": "camera-cal-B", "firmware_version": "gripper-fw-7.3"},
+                f"{aid}-cal-c-fw-73",
             )
         )
     for index, aid in enumerate(sorted(affected_ids)):
@@ -133,25 +130,25 @@ def reset_demo(db: Session) -> dict[str, Any]:
                 "telemetry_anomaly",
                 11 + (index % 8),
                 1,
-                "telemetry",
+                "run_telemetry",
                 "OBSERVED",
-                {"signal": "navigation_drift", "process_health": "degraded", "severity": "review", "deviation_cm": 18 + (index % 11)},
-                f"{aid}-nav-drift",
+                {"signal": "grip_pose_drift", "process_health": "degraded", "severity": "review", "offset_mm": 11 + (index * 4)},
+                f"{aid}-grip-drift",
             )
         )
     db.add(
         evidence(
-            "AMR-001",
+            "R03",
             "human_discovery",
             26,
             0,
-            "customer_ticket",
+            "engineer_note",
             "HUMAN_ASSERTED",
-            {"observation": "Customer reports navigation degradation after morning rollout", "reported_by": "fleet_customer"},
-            "AMR-001-ticket-1426",
+            {"observation": "Engineer observes grip pose drifting after policy v0.9 in repeated real-world runs", "reported_by": "manipulation_engineer"},
+            "R03-engineer-note-1426",
         )
     )
-    inv = Investigation(id="inv-120-robots-bad-rollout", asset_id="AMR-001", trigger_id="AMR-001-nav-drift", title="Navigation degradation after deployment")
+    inv = Investigation(id="inv-120-robots-bad-rollout", asset_id="R03", trigger_id="R03-grip-drift", title="Grip pose divergence after policy update")
     db.add(inv)
     db.commit()
     return {"assets": len(assets), "affected": len(affected_ids), "investigation_id": inv.id}
@@ -180,6 +177,8 @@ def latest_state(db: Session, asset_id: str, at: datetime, known_at: Optional[da
                 state["configuration"] = payload.get("configuration")
             if payload.get("network_profile") is not None:
                 state["network_profile"] = payload.get("network_profile")
+            if payload.get("firmware_version") is not None:
+                state["firmware_version"] = payload.get("firmware_version")
         if ev.event_type in ["state_snapshot", "telemetry_anomaly"]:
             for key in STATE_KEYS:
                 if payload.get(key) is not None:
@@ -213,11 +212,11 @@ def reconstruct(db: Session, investigation_id: str, knowledge_time: Optional[dat
         delta = human_discovery.event_time - first_abnormal.event_time
         detection_latency = f"{delta.seconds // 3600}h{(delta.seconds % 3600) // 60:02d}m"
     current = latest_state(db, inv.asset_id, trigger.event_time, known_at)
-    required = ["application_version", "configuration", "network_profile", "process_health"]
+    required = ["application_version", "configuration", "firmware_version", "process_health"]
     gaps = [f for f in required if not current.get(f)]
     if not human_discovery:
         gaps.append("human discovery context")
-    for contextual_gap in ["site network profile validation", "operator intervention rationale"]:
+    for contextual_gap in ["targeted low-light demonstrations for calibration C", "engineer workaround rationale"]:
         if contextual_gap not in gaps:
             gaps.append(contextual_gap)
     return {
@@ -250,11 +249,11 @@ def compare(db: Session, investigation_id: str) -> dict[str, Any]:
             (affected if anomalies else unaffected).append(asset.id)
     table = []
     dimensions = [
-        ("Application v2.4", "application_version", "2.4"),
-        ("Warehouse-east config", "configuration", "warehouse-east"),
-        ("Motor firmware 7.2", "firmware_version", "motor-fw-7.2"),
-        ("Private 5G", "connection_type", "private-5g"),
-        ("Network Profile C", "network_profile", "C"),
+        ("Policy v0.9", "application_version", "policy-v0.9"),
+        ("Camera calibration C", "configuration", "camera-cal-C"),
+        ("Gripper firmware 7.3", "firmware_version", "gripper-fw-7.3"),
+        ("Low-light test cell", "network_profile", "low-light-bin"),
+        ("End-effector G2", "connection_type", "gripper-G2"),
     ]
     for label, key, expected in dimensions:
         affected_count = sum(1 for aid in affected if latest_state(db, aid, trigger.event_time).get(key) == expected)
@@ -269,14 +268,13 @@ def compare(db: Session, investigation_id: str) -> dict[str, Any]:
         "unaffected_assets": unaffected,
         "table": table,
         "interpretation": [
-            "Application v2.4 was deployed to all 120 robots, so software rollout alone does not explain the split.",
-            "Warehouse-east config, motor firmware 7.2 and Private 5G are plausible but not perfect separators.",
-            "Network Profile C appears on every currently affected robot and on 21 known-healthy robots that should be watched.",
+            "Policy v0.9 ran on all six robots, so the model update alone does not explain the split.",
+            "Camera calibration C and gripper firmware 7.3 appear on the affected robots and one healthy robot that should be watched.",
+            "Low-light conditions and end-effector family are plausible but imperfect separators.",
             "This narrows the investigation; it does not establish cause.",
         ],
         "potentially_exposed": [
-            {"asset_id": f"AMR-{i:03d}", "reason": "Shares Network Profile C exposure without a matching signal yet."}
-            for i in range(38, 59)
+            {"asset_id": "R06", "reason": "Shares calibration C and gripper firmware 7.3 exposure without a matching signal yet."}
         ],
     }
 
@@ -301,7 +299,7 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
         "first_abnormal_evidence": rec["first_abnormal_evidence"],
         "machine_state": rec["current_state"],
         "peer_comparison": comp,
-        "supporting_evidence": ["deployment record", "profile change", "telemetry anomaly", "customer ticket"],
+        "supporting_evidence": ["policy registry", "calibration record", "run telemetry", "engineer note"],
         "missing_evidence": rec["evidence_gaps"],
         "current_interpretation": comp["interpretation"],
         "human_decision": None,
@@ -357,14 +355,14 @@ def serialize_evidence(ev: Optional[Evidence]) -> Optional[dict[str, Any]]:
 
 def inject_late_evidence(db: Session) -> dict[str, Any]:
     ev = evidence(
-        "AMR-038",
+        "R06",
         "telemetry_anomaly",
         9,
         22,
         "delayed_edge_buffer",
         "OBSERVED",
-        {"signal": "navigation_drift", "process_health": "degraded", "severity": "review", "deviation_cm": 27, "note": "event_time before customer ticket; known later"},
-        "AMR-038-delayed-nav-drift",
+        {"signal": "grip_pose_drift", "process_health": "degraded", "severity": "review", "offset_mm": 9, "note": "event_time before engineer note; known later"},
+        "R06-delayed-grip-drift",
         ingested_delay_seconds=4,
     )
     if not db.get(Evidence, ev.id):
@@ -380,7 +378,7 @@ def similar_memory(db: Session, investigation_id: str) -> dict[str, Any]:
         "similar_cases": [
             {
                 "investigation_id": o.investigation_id,
-                "match_reason": "same deployment family, navigation drift signal, profile-specific split",
+                "match_reason": "same policy-update family, grip pose drift signal, calibration-specific split",
                 "outcome": o.outcome,
                 "recorded_at": iso(o.recorded_at),
             }

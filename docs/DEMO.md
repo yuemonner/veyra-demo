@@ -2,25 +2,25 @@
 
 ## Opening
 
-> Everyone here is building better robots. I want to show what happens the morning after you deploy them.
+> Everyone here is building better robots. I want to show what happens before fleet scale, when six real robots already start behaving differently.
 
 Open `/cinematic`:
 
-> A deployment just went out to 120 robots. 37 are starting to behave differently.
+> Six robots ran the same manipulation policy. Two are starting to behave differently.
 
-## 1. Live Failure
+## 1. Live Divergence
 
 Show the fleet map and event sequence:
 
 - 14:02: healthy state snapshot
-- 14:04: v2.4 deployed to all 120
-- 14:11: first abnormal navigation signal
-- 14:18: 37 affected robots detected
-- 14:26: customer ticket arrives
+- 14:04: policy v0.9 rolled out to all six robots
+- 14:11: first grip pose drift signal
+- 14:18: two affected robots detected
+- 14:26: engineer note recorded
 
 Say:
 
-> Veyra saw the pattern 7 minutes before the customer ticket. The question is not just what log line looks strange. The question is what the affected robots have in common.
+> Veyra reconstructs the pattern before the team has to hold the whole run in its head. The question is not just what log line looks strange. The question is what the affected robots have in common.
 
 ## 2. Compare
 
@@ -28,14 +28,14 @@ Click `Compare affected vs healthy`.
 
 Say:
 
-> Software changed everywhere. The failure did not.
+> Same model. Same task. Different behavior.
 
 Show:
 
-- Same change: 120
-- Same signal: 37
-- No signal: 83
-- Network Profile C is the clean separator
+- Same policy: 6
+- Same signal: 2
+- No signal: 4
+- Calibration C plus gripper firmware 7.3 is the highest-priority lead
 
 Say:
 
@@ -47,7 +47,7 @@ Click `Generate Decision Package`.
 
 Say:
 
-> Instead of asking the team to open deployment history, telemetry, config state, customer tickets and peer machines, Veyra assembles one package around the decision.
+> Instead of asking the team to open policy history, run telemetry, calibration state, engineer notes and peer robot runs, Veyra assembles one package around the decision.
 
 Seal it:
 
@@ -67,8 +67,8 @@ Record the outcome.
 
 Say:
 
-> Forty-seven days later, a similar context appears. Veyra can surface the prior action and outcome.
+> Twelve days later, a similar context appears. Veyra can surface the prior action and outcome.
 
 Close:
 
-> The first incident took 42 minutes to understand. The second took 42 seconds. Every machine decision should make the next one better.
+> The first run took 42 minutes to understand. The next run took 42 seconds. Every real-world run should make the next one smarter.
