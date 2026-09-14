@@ -64,7 +64,7 @@ export default function InvestigationClient({ id }: { id: string }) {
     if (!pkg) return;
     try {
       await postJson(`/investigations/${investigationId}/decision`, {
-        decision: "Pause policy v0.9 on robots with calibration C and gripper firmware 7.3",
+        decision: "Pause v0.9 on robots with calibration C and gripper firmware 7.3",
         owner: "Robotics Engineering",
         rationale: "Policy v0.9 ran everywhere, while the affected runs share calibration C and gripper firmware 7.3 with one exposed robot to watch.",
         package_id: pkg.id,
@@ -91,8 +91,8 @@ export default function InvestigationClient({ id }: { id: string }) {
   async function outcome() {
     try {
       await postJson(`/investigations/${investigationId}/outcome`, {
-        outcome: "Calibration C plus gripper firmware 7.3 held; affected robots recovered after targeted rollback",
-        payload: { previous_action: "Pause policy v0.9 on calibration C + firmware 7.3 robots", recovery_minutes: 18, days_later: 12 },
+        outcome: "Calibration C and gripper firmware 7.3 held; affected robots recovered after targeted rollback",
+        payload: { previous_action: "Pause v0.9 on robots with calibration C and firmware 7.3", recovery_minutes: 18, days_later: 12 },
       });
       setMemory(await getJson(`/memory/similar?investigation_id=${investigationId}`));
       setStage("memory");
@@ -191,7 +191,7 @@ function LiveFailure({ rec, comparison, detectionLead, onCompare, onPackage }: a
       <div className="grid four">
         <Metric label="14:02:11" value="Policy v0.9" note="test rollout started" />
         <Metric label="14:04:37" value="6/6" note="robots updated" />
-        <Metric label="14:11:08" value="First signal" note={rec?.first_abnormal_evidence?.payload?.signal || "grip pose drift"} />
+        <Metric label="14:11:08" value="First known signal" note={rec?.first_abnormal_evidence?.payload?.signal || "grip pose drift"} />
         <Metric label="14:18:42" value="2 affected" note="pattern detected before review" />
         <Metric label="14:26:03" value="Engineer note" note="human discovery recorded" />
       </div>
@@ -221,7 +221,7 @@ function CompareStage({ comparison, onPackage }: any) {
       </table>
       <div className="callout">
         <b>What the evidence narrows</b>
-        <p>Policy v0.9 is shared across both groups. Calibration C and gripper firmware 7.3 concentrate in the affected runs, with one exposed robot to watch. This narrows the investigation; it does not establish cause.</p>
+        <p>Policy v0.9 is shared across both groups. Calibration C and gripper firmware 7.3 co-occur across the affected runs. R06 shares the same combination without a known signal at decision time. This narrows the investigation; it does not establish cause.</p>
       </div>
       <button className="button primary" onClick={onPackage}>Generate Decision Package</button>
     </article>
@@ -245,15 +245,15 @@ function PackageStage({ pkg, rec, comparison, onGenerate, onSeal }: any) {
         <PackageItem title="Machine state" value={rec?.current_state?.health || "degraded"} />
         <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 2} / ${comparison?.same_change ?? 6}`} />
         <PackageItem title="Observed" value="engineer note recorded at 14:26" />
-        <PackageItem title="Inferred" value="calibration C + gripper firmware 7.3 is the highest-priority lead" />
+        <PackageItem title="Inferred" value="calibration C and gripper firmware 7.3 co-occur across affected runs" />
         <PackageItem title="Human asserted" value="engineer suspects calibration mismatch after policy update" />
         <PackageItem title="Missing evidence" value={(pkg.package.missing_evidence || []).join(" · ")} />
-        <PackageItem title="Human action" value={pkg.sealed ? "Pause policy v0.9 on calibration C + firmware 7.3 robots" : "not recorded yet"} />
+        <PackageItem title="Human action" value={pkg.sealed ? "Pause v0.9 on robots with calibration C and firmware 7.3" : "not recorded yet"} />
         <PackageItem title="Outcome" value="pending" />
       </div>
       <div className="callout">
         <b>What this package rules in / rules out</b>
-        <p>Policy-wide issue: not supported by current peer comparison. Calibration/firmware interaction: plausible. Environment contribution: still unresolved. More low-light demonstrations: current evidence supports collecting them.</p>
+        <p>Policy-wide issue: not supported by current peer comparison. Calibration/firmware interaction: plausible. Environment contribution: still unresolved. More low-light validation runs: current evidence supports collecting them.</p>
       </div>
       {pkg.sealed && <Signature pkg={pkg} />}
     </article>
@@ -278,7 +278,7 @@ function LateEvidenceStage({ pkg, comparison, onSeal, onOutcome }: any) {
       <p>Veyra updates what we know now, not what the team knew then.</p>
       <div className="grid three">
         <Metric label="Decision-time view" value="2" note="affected in sealed package" />
-        <Metric label="Current view" value={`${comparison?.same_signal ?? 3}`} note="affected after delayed evidence" />
+        <Metric label="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 3)}`} note="affected after delayed evidence" />
         <Metric label="Sealed package" value="Unchanged" note="new evidence cannot rewrite old context" />
       </div>
       {pkg?.sealed ? <Signature pkg={pkg} /> : <button className="button lime" onClick={onSeal}>Seal package first</button>}
@@ -298,7 +298,7 @@ function MemoryStage({ memory, onOutcome }: any) {
           <p>R04 begins showing grip pose drift after a new policy test.</p>
           <div className="callout">
             <b>Similar operational pattern found</b>
-            <p>Previous case: 12 days ago. Shared pattern: policy update + calibration C + grip pose drift. Previous human action: pause v0.9 on calibration C plus gripper firmware 7.3 robots. Outcome: recovered after targeted rollback. Different this time: low-light bin appears on the affected run.</p>
+            <p>Previous case: 12 days ago. Shared pattern: policy update + calibration C + grip pose drift. Previous human action: pause v0.9 on robots with calibration C and firmware 7.3. Outcome: recovered after targeted rollback. Different this time: low-light bin appears on the affected run.</p>
           </div>
           <div className="ending">
             <b>The first run took 42 minutes to understand.</b>

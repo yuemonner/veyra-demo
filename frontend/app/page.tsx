@@ -19,7 +19,7 @@ export default async function Page() {
       <aside className="sidebar">
         <div className="brand"><span className="mark">V</span> Veyra</div>
         <nav className="nav"><Link className="active" href="/">Overview</Link><Link href={active ? `/investigations/${active.id}` : "/"}>Investigations</Link><Link href="/demo-control">Demo Control</Link></nav>
-        <div className="boundary">We do not touch your robots, code or stack. Veyra turns cloud-visible fleet evidence into review context.</div>
+        <div className="boundary">We do not touch your robots, code or stack. Veyra turns machine evidence into review context.</div>
       </aside>
       <main className="main">
         <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Cinematic demo</Link><Link className="button" href="/demo-control">Presenter controls</Link></div></div>

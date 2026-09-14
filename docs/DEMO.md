@@ -35,7 +35,8 @@ Show:
 - Same policy: 6
 - Same signal: 2
 - No signal: 4
-- Calibration C plus gripper firmware 7.3 is the highest-priority lead
+- Calibration C and gripper firmware 7.3 co-occur across affected runs
+- R06 shares the same combination without a known signal at decision time
 
 Say:
 

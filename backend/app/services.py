@@ -216,7 +216,7 @@ def reconstruct(db: Session, investigation_id: str, knowledge_time: Optional[dat
     gaps = [f for f in required if not current.get(f)]
     if not human_discovery:
         gaps.append("human discovery context")
-    for contextual_gap in ["targeted low-light demonstrations for calibration C", "engineer workaround rationale"]:
+    for contextual_gap in ["targeted low-light validation runs for calibration C", "engineer workaround rationale"]:
         if contextual_gap not in gaps:
             gaps.append(contextual_gap)
     return {
@@ -269,7 +269,8 @@ def compare(db: Session, investigation_id: str) -> dict[str, Any]:
         "table": table,
         "interpretation": [
             "Policy v0.9 ran on all six robots, so the model update alone does not explain the split.",
-            "Camera calibration C and gripper firmware 7.3 appear on the affected robots and one healthy robot that should be watched.",
+            "Camera calibration C and gripper firmware 7.3 co-occur across the affected runs.",
+            "R06 shares the same combination without a known signal at decision time.",
             "Low-light conditions and end-effector family are plausible but imperfect separators.",
             "This narrows the investigation; it does not establish cause.",
         ],
