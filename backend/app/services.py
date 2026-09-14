@@ -271,7 +271,7 @@ def compare(db: Session, investigation_id: str) -> dict[str, Any]:
             "Policy v0.9 ran on all six robots, so the model update alone does not explain the split.",
             "Camera calibration C and gripper firmware 7.3 co-occur across the affected runs.",
             "R06 shares the same combination without a known signal at decision time.",
-            "Low-light conditions and end-effector family are plausible but imperfect separators.",
+            "Low-light bin is present in 3/6 runs, but did not differentiate affected from stable robots at decision time.",
             "This narrows the investigation; it does not establish cause.",
         ],
         "potentially_exposed": [
@@ -362,7 +362,14 @@ def inject_late_evidence(db: Session) -> dict[str, Any]:
         22,
         "delayed_edge_buffer",
         "OBSERVED",
-        {"signal": "grip_pose_drift", "process_health": "degraded", "severity": "review", "offset_mm": 9, "note": "event_time before engineer note; known later"},
+        {
+            "signal": "grip_pose_drift",
+            "process_health": "degraded",
+            "severity": "review",
+            "offset_mm": 9,
+            "source_detail": "post-run telemetry re-analysis",
+            "note": "R06 post-run telemetry was re-analyzed at 14:31; grip pose drift was present at 14:09:11.",
+        },
         "R06-delayed-grip-drift",
         ingested_delay_seconds=4,
     )

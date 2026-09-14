@@ -126,7 +126,7 @@ export default function InvestigationClient({ id }: { id: string }) {
           <button className={stage === "memory" ? "active" : ""} onClick={() => setStage("memory")}>12 days later</button>
           <Link className="nav-link-strong" href="/demo-control">Demo Control</Link>
         </nav>
-        <div className="boundary">Read-only. No robot, code or stack control path.</div>
+        <div className="boundary">Machine evidence becomes review context.</div>
       </aside>
 
       <main className="main">
@@ -221,7 +221,7 @@ function CompareStage({ comparison, onPackage }: any) {
       </table>
       <div className="callout">
         <b>What the evidence narrows</b>
-        <p>Policy v0.9 is shared across both groups. Calibration C and gripper firmware 7.3 co-occur across the affected runs. R06 shares the same combination without a known signal at decision time. This narrows the investigation; it does not establish cause.</p>
+        <p>Policy v0.9 is shared across both groups. Calibration C and gripper firmware 7.3 co-occur across the affected runs. R06 shares the same combination without a known signal at decision time. Low-light bin is present in 3/6 runs, but did not differentiate affected vs stable at decision time. This narrows the investigation; it does not establish cause.</p>
       </div>
       <button className="button primary" onClick={onPackage}>Generate Decision Package</button>
     </article>
@@ -266,8 +266,9 @@ function LateEvidenceStage({ pkg, comparison, onSeal, onOutcome }: any) {
       <span className="eyebrow">Delayed evidence</span>
       <h2>Late evidence reveals R06 had already shown the signal at 14:09.</h2>
       <p>This happened before the decision. The team learned about it after.</p>
+      <p className="evidence-detail">Late evidence: R06 post-run telemetry was re-analyzed at 14:31; grip pose drift was present at 14:09:11.</p>
       <div className="time-rail">
-        <div><b>14:09</b><span>event_time</span><small>happened in runtime</small></div>
+        <div><b>14:09</b><span>event_time</span><small>post-run telemetry shows drift</small></div>
         <i />
         <div><b>14:27</b><span>decision sealed</span><small>known evidence only</small></div>
         <i />
@@ -296,13 +297,13 @@ function MemoryStage({ memory, onOutcome }: any) {
       <p>R04 begins showing grip pose drift after a new policy test.</p>
       <div className="callout">
         <b>{hasMemory ? "Operational Memory match" : "Operational Memory preview"}</b>
-        <p>Previous case: 12 days ago. Shared pattern: policy update + calibration C + grip pose drift. Previous human action: pause v0.9 on robots with calibration C and firmware 7.3. Outcome: recovered after targeted rollback. Different this time: low-light bin appears on the affected run.</p>
+        <p>Previous case: 12 days ago. Shared pattern: policy update + calibration C + grip pose drift. Previous human action: pause v0.9 on robots with calibration C and firmware 7.3. Outcome: recovered after targeted rollback. Different this time: low-light bin now coincides with the policy-update window.</p>
       </div>
       <div className="package-grid memory-grid">
         <PackageItem title="What carried forward" value="calibration C + firmware 7.3 co-occurred across affected runs" />
         <PackageItem title="What worked before" value="pause v0.9 on the exposed subset" />
         <PackageItem title="What was missing" value="targeted low-light validation runs" />
-        <PackageItem title="What differs now" value="low-light bin appears on R04" />
+        <PackageItem title="What differs now" value="low-light bin now coincides with the policy-update window" />
       </div>
       {!hasMemory && <button className="button primary" onClick={onOutcome}>Record outcome into memory</button>}
       <div className="ending">
@@ -315,7 +316,7 @@ function MemoryStage({ memory, onOutcome }: any) {
 }
 
 function Signature({ pkg }: { pkg: DecisionPackage }) {
-  return <div className="panel good signature"><span className="eyebrow">Sealed Decision Package</span><p>Later evidence updates the current investigation. The decision-time package remains sealed.</p><p className="hash">SHA-256 {pkg.digest}</p><p className="hash">Ed25519 {pkg.signature?.slice(0, 48)}...</p></div>;
+  return <div className="panel good signature"><span className="eyebrow">Sealed Decision Package</span><p>Later evidence updates the current investigation. The decision-time package remains sealed.</p><p className="hash hash-large">SHA-256 {pkg.digest}</p><p className="signature-note">Hash recorded at 14:27:00 · tamper-evident</p><p className="hash">Ed25519 {pkg.signature?.slice(0, 48)}...</p></div>;
 }
 
 function PackageItem({ title, value }: { title: string; value: string }) {
