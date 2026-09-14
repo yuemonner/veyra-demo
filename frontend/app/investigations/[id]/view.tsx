@@ -124,7 +124,7 @@ export default function InvestigationClient({ id }: { id: string }) {
           <button className={stage === "package" ? "active" : ""} onClick={() => setStage("package")}>Decision Package</button>
           <button className={stage === "late" ? "active" : ""} onClick={() => setStage("late")}>Delayed evidence</button>
           <button className={stage === "memory" ? "active" : ""} onClick={() => setStage("memory")}>12 days later</button>
-          <Link href="/demo-control">Demo Control</Link>
+          <Link className="nav-link-strong" href="/demo-control">Demo Control</Link>
         </nav>
         <div className="boundary">Read-only. No robot, code or stack control path.</div>
       </aside>
@@ -292,23 +292,24 @@ function MemoryStage({ memory, onOutcome }: any) {
   return (
     <article className="panel final-stage">
       <span className="eyebrow">12 days later</span>
-      <h2>{hasMemory ? "Similar operational pattern found." : "No prior outcome recorded yet."}</h2>
-      {hasMemory ? (
-        <>
-          <p>R04 begins showing grip pose drift after a new policy test.</p>
-          <div className="callout">
-            <b>Similar operational pattern found</b>
-            <p>Previous case: 12 days ago. Shared pattern: policy update + calibration C + grip pose drift. Previous human action: pause v0.9 on robots with calibration C and firmware 7.3. Outcome: recovered after targeted rollback. Different this time: low-light bin appears on the affected run.</p>
-          </div>
-          <div className="ending">
-            <b>The first run took 42 minutes to understand.</b>
-            <b>The next run took 42 seconds.</b>
-            <span>Every real-world run should make the next one smarter.</span>
-          </div>
-        </>
-      ) : (
-        <><p>Record the outcome to turn the sealed package into reusable operational memory.</p><button className="button primary" onClick={onOutcome}>Record outcome</button></>
-      )}
+      <h2>Similar operational pattern found.</h2>
+      <p>R04 begins showing grip pose drift after a new policy test.</p>
+      <div className="callout">
+        <b>{hasMemory ? "Operational Memory match" : "Operational Memory preview"}</b>
+        <p>Previous case: 12 days ago. Shared pattern: policy update + calibration C + grip pose drift. Previous human action: pause v0.9 on robots with calibration C and firmware 7.3. Outcome: recovered after targeted rollback. Different this time: low-light bin appears on the affected run.</p>
+      </div>
+      <div className="package-grid memory-grid">
+        <PackageItem title="What carried forward" value="calibration C + firmware 7.3 co-occurred across affected runs" />
+        <PackageItem title="What worked before" value="pause v0.9 on the exposed subset" />
+        <PackageItem title="What was missing" value="targeted low-light validation runs" />
+        <PackageItem title="What differs now" value="low-light bin appears on R04" />
+      </div>
+      {!hasMemory && <button className="button primary" onClick={onOutcome}>Record outcome into memory</button>}
+      <div className="ending">
+        <b>The first run took 42 minutes to understand.</b>
+        <b>The next run took 42 seconds.</b>
+        <span>Every real-world run should make the next one smarter.</span>
+      </div>
     </article>
   );
 }
