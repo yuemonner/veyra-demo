@@ -54,6 +54,20 @@ export default async function Page() {
           </div>
         </section>
         <section className="investigation panel">
+          <span className="eyebrow">Strategic wedge</span>
+          <h2>Copy the proven market motion. Own the next abstraction.</h2>
+          <p>Veyra starts with the workflow buyers already understand: incident reconstruction, historical comparison, support and engineering review. Then it carries the record forward into decision, action and outcome.</p>
+          <div className="backend-grid">
+            <b>Validated workflow: connected smart crane</b>
+            <b>Not robotics-native only</b>
+            <b>Industrial machines</b>
+            <b>Robot cells</b>
+            <b>Autonomous systems</b>
+            <b>Smart equipment</b>
+            <b>Production systems</b>
+          </div>
+        </section>
+        <section className="investigation panel">
           <span className="eyebrow">Current investigation</span>
           <h2>{active?.asset_id || "AMR-001"} · {active?.title || "Start the backend and reset demo data"}</h2>
           <p>Evidence → Belief → Decision → Action → Outcome.</p>

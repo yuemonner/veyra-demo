@@ -48,6 +48,12 @@ The seed data creates a six-robot manipulation-policy test.
 
 Veyra reconstructs last-known healthy state, what changed before the incident, where else the same pattern appears, affected-vs-healthy comparison, Decision Package, substantiation checks, sealed decision record and outcome-linked precedent.
 
+Strategic framing:
+
+> Copy the proven market motion. Own the next abstraction.
+
+Veyra starts with incident reconstruction, historical comparison and support/R&D workflow, then expands beyond robotics-native tooling into connected industrial machines, smart cranes, robot cells, autonomous systems, smart equipment and production systems. The smart-crane workflow validation is the proof that this is not limited to ROS or robotics-native stacks.
+
 The product loop is:
 
 > Evidence → Belief → Decision → Action → Outcome
