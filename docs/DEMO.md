@@ -2,74 +2,115 @@
 
 ## Opening
 
-> Everyone here is building better robots. I want to show what happens before fleet scale, when six real robots already start behaving differently.
+Open `/cinematic`.
 
-Open `/cinematic`:
+> Six robots. One model update. Ninety seconds.
+>
+> This is what Physical AI looks like before fleet scale: repeated real-world runs, constant change and fragmented context.
 
-> Six robots ran the same manipulation policy. Two are starting to behave differently.
+## 1. Signal
 
-## 1. Live Divergence
+Show the six robot run:
 
-Show the fleet map and event sequence:
-
-- 14:02: healthy state snapshot
-- 14:04: policy v0.9 rolled out to all six robots
-- 14:11: first grip pose drift signal
-- 14:18: two affected robots detected
-- 14:26: engineer note recorded
-
-Say:
-
-> Veyra reconstructs the pattern before the team has to hold the whole run in its head. The question is not just what log line looks strange. The question is what the affected robots have in common.
-
-## 2. Compare
-
-Click `Compare affected vs healthy`.
+- 14:02:11 policy v0.9 test rollout started
+- 14:04:37 all six robots updated
+- 14:11:08 first known grip pose drift signal
+- 14:18:42 two affected robots detected
+- 14:26:03 engineer note recorded
 
 Say:
 
 > Same model. Same task. Different behavior.
 
+## 2. Where Else
+
+Show the scope view:
+
+- two robots show the pattern
+- one more robot shares the same calibration and gripper firmware
+- three robots stay stable under other combinations
+
+Say:
+
+> The first useful question is scope. Where else is the same pattern appearing, and which exposed run deserves attention now?
+
+## 3. Compare
+
+Show the decision-time comparison:
+
+- Policy v0.9 ran on all six robots
+- Camera calibration C and gripper firmware 7.3 co-occur across the affected runs
+- R06 shares the same combination and appeared stable at decision time
+- Low-light bin was ambient in the decision-time comparison
+
+Say:
+
+> This narrows the investigation while keeping root cause open.
+
+## 4. Decision
+
+Generate the Decision Package.
+
 Show:
 
-- Same policy: 6
-- Same signal: 2
-- No signal: 4
-- Calibration C and gripper firmware 7.3 co-occur across affected runs
-- R06 shares the same combination without a known signal at decision time
+- evidence available
+- open questions
+- team action
+- follow-up
+- decision state saved at 14:27
 
 Say:
 
-> This narrows the investigation. It does not claim root cause.
+> The team pauses v0.9 on robots with calibration C and gripper firmware 7.3. Veyra preserves the evidence, action scope and open questions around that decision.
 
-## 3. Decision Package
+## 5. Late Evidence
 
-Click `Generate Decision Package`.
+Inject delayed evidence.
 
-Say:
+Show:
 
-> Instead of asking the team to open policy history, run telemetry, calibration state, engineer notes and peer robot runs, Veyra assembles one package around the decision.
-
-Seal it:
-
-> This preserves what was known when the team chose an action.
-
-## 4. Delayed Evidence
-
-Click `Inject delayed evidence`.
+- 14:09 event_time: R06 post-run telemetry shows drift
+- 14:27 decision state saved with two affected robots
+- 14:31 known_at: delayed evidence becomes knowable
+- 14:31:04 ingested_at: evidence reaches Veyra
 
 Say:
 
-> New evidence can change what we believe now. It cannot rewrite what the team knew when it made the decision.
+> Veyra updates what we know now, not what the team knew then.
 
-## 5. Operational Memory
+## 6. Outcome
 
-Record the outcome.
+Show the follow-up result:
+
+- R03 recovered after rollback
+- R05 recovered after rollback
+- R06 later confirmed affected
+- no recurrence on reverted robots during the follow-up window
 
 Say:
 
-> Twelve days later, a similar context appears. Veyra can surface the prior action and outcome.
+> Veyra links the action to what actually happened.
 
-Close:
+## 7. Similar Previous Case
 
-> The first run took 42 minutes to understand. The next run took 42 seconds. Every real-world run should make the next one smarter.
+Move twelve days forward.
+
+Show:
+
+- matched context
+- previous action
+- previous outcome
+- missing evidence from last time
+- what differs this time
+
+Say:
+
+> The investigation starts with what worked before. Every operational decision makes the next one smarter.
+
+## Close
+
+End on:
+
+> Today: six robots in a lab. Tomorrow: cranes, robot cells and autonomous machines in production.
+>
+> Veyra becomes the operational intelligence system for Physical AI.

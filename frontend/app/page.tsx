@@ -19,15 +19,15 @@ export default async function Page() {
       <aside className="sidebar">
         <div className="brand"><span className="mark">V</span> Veyra</div>
         <nav className="nav"><Link className="active" href="/">Overview</Link><Link href={active ? `/investigations/${active.id}` : "/"}>Investigations</Link><Link href="/demo-control">Demo Control</Link></nav>
-        <div className="boundary">We do not touch your robots, code or stack. Veyra turns machine evidence into decision records.</div>
+        <div className="boundary">Read-only beside your existing stack. Machine control remains in customer systems.</div>
       </aside>
       <main className="main">
         <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Cinematic demo</Link><Link className="button" href="/demo-control">Presenter controls</Link></div></div>
         <section className="hero">
-          <span className="eyebrow">Decision infrastructure for Physical AI.</span>
+          <span className="eyebrow">Operational intelligence for Physical AI.</span>
           <h1>6 robots. One model update. 90 seconds.</h1>
           <p>Six robots run the same manipulation policy. Two start behaving differently.</p>
-          <p><b>Veyra reconstructs what changed, what the team knew, who approved action, and what happened next.</b></p>
+          <p><b>Veyra reconstructs what changed, what the team did, and what happened next — so the next decision starts with what the last one taught you.</b></p>
           <div className="hero-actions"><Link className="button primary" href="/cinematic">Start cinematic demo</Link><Link className="button" href={active ? `/investigations/${active.id}` : "/demo-control"}>{active ? "Open live system" : "Initialize demo"}</Link></div>
         </section>
         <div className="grid three">
@@ -38,7 +38,7 @@ export default async function Page() {
         <section className="investigation panel">
           <span className="eyebrow">Backend v0 live</span>
           <h2>Product core behind the demo</h2>
-          <p>The cinematic story and live investigation run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed before an incident, finding where else the same pattern appears, comparing affected and healthy machines, deterministic Decision Package generation, sealed decision-time snapshots, human identity and signature, standalone verification, outcome linking and Decision Precedent.</p>
+          <p>The cinematic story and live investigation run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed before an incident, finding where else the same pattern appears, comparing affected and healthy machines, deterministic Decision Package generation, decision-time state, outcome linking and similar-case retrieval.</p>
           <div className="backend-grid">
             <b>Evidence → Belief → Decision → Action → Outcome</b>
             <b>source evidence ingestion</b>
@@ -47,24 +47,10 @@ export default async function Page() {
             <b>reconstruct what changed before an incident</b>
             <b>find where else the same pattern appears</b>
             <b>compare affected vs healthy machines</b>
-            <b>sealed Decision Package + hash</b>
-            <b>human identity + signature</b>
-            <b>standalone verification</b>
+            <b>decision-time state</b>
+            <b>team action</b>
+            <b>outcome linking</b>
             <b>outcome-linked precedent</b>
-          </div>
-        </section>
-        <section className="investigation panel">
-          <span className="eyebrow">Strategic wedge</span>
-          <h2>Copy the proven market motion. Own the next abstraction.</h2>
-          <p>Veyra starts with the workflow buyers already understand: incident reconstruction, historical comparison, support and engineering review. Then it carries the record forward into decision, action and outcome.</p>
-          <div className="backend-grid">
-            <b>Validated workflow: connected smart crane</b>
-            <b>Not robotics-native only</b>
-            <b>Industrial machines</b>
-            <b>Robot cells</b>
-            <b>Autonomous systems</b>
-            <b>Smart equipment</b>
-            <b>Production systems</b>
           </div>
         </section>
         <section className="investigation panel">

@@ -11,7 +11,7 @@ EVIDENCE
   -> PRECEDENT
 ```
 
-Veyra is not a telemetry graph. It is a decision graph for physical systems.
+Veyra models operational decisions across physical systems.
 
 ## Deterministic Reconstruction
 
@@ -25,7 +25,7 @@ The backend calculates:
 - current machine state
 - evidence gaps
 
-The frontend displays API results. It does not hard-code the investigation answers.
+The frontend displays API results from the backend reconstruction services.
 
 ## Evidence Timing
 
@@ -56,15 +56,15 @@ known_at: 14:31
 ingested_at: 14:31:04
 ```
 
-A Decision Package sealed at 14:27 cannot be backfilled with evidence that only became knowable at 14:31, even when that evidence describes something that happened at 14:09.
+A Decision Package sealed at 14:27 preserves the evidence knowable at that moment. Evidence that becomes knowable at 14:31 updates the current investigation as a later record.
 
 ## Append-only Evidence
 
-Evidence records are append-only. Historical records may be superseded by later records, but not mutated.
+Evidence records are append-only. Later records supersede historical records through versioning.
 
-## AI Boundary
+## Reconstruction Boundary
 
-Correct architecture:
+Core architecture:
 
 ```text
 Raw operational data
@@ -73,12 +73,12 @@ Raw operational data
   -> LLM explanation
 ```
 
-Incorrect architecture:
+Deferred architecture:
 
 ```text
 raw logs
   -> LLM
-  -> guessed root cause
+  -> unsupported root-cause claim
 ```
 
 ## Sealed Decision Package
@@ -102,7 +102,7 @@ V0 uses:
 - independent trusted timestamp
 - standalone verification endpoint
 
-The seal proves that the package snapshot was not silently rewritten after the decision.
+The seal proves that the package snapshot stayed intact after the decision.
 
 The product artifact is:
 

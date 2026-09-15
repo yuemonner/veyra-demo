@@ -76,7 +76,7 @@ export default function InvestigationClient({ id }: { id: string }) {
       const sealed = await postJson<DecisionPackage>(`/decision-packages/${pkg.id}/seal`);
       setPkg(sealed);
       setVerification(await getJson<Verification>(`/decision-packages/${sealed.id}/verify`));
-      setNotice("Decision Package sealed. Later evidence cannot rewrite this snapshot.");
+      setNotice("Decision Package saved. Later evidence leaves this snapshot intact.");
     } catch (error) {
       reportError("Decision Package sealing", error);
     }
@@ -226,7 +226,7 @@ function CompareStage({ comparison, onPackage }: any) {
       </table>
       <div className="callout">
         <b>What the evidence narrows</b>
-        <p>Policy v0.9 is shared across both groups. Calibration C and gripper firmware 7.3 co-occur across the affected runs. R06 shares the same combination without a known signal at decision time. Low-light bin is present in 3/6 runs, but did not differentiate affected vs stable at decision time. This narrows the investigation; it does not establish cause.</p>
+        <p>Policy v0.9 is shared across both groups. Calibration C and gripper firmware 7.3 co-occur across the affected runs. R06 shares the same combination and appeared stable at decision time. Low-light bin was ambient in the decision-time comparison. This narrows the investigation; root cause remains open.</p>
       </div>
       <button className="button primary" onClick={onPackage}>Generate Decision Package</button>
     </article>
@@ -240,7 +240,7 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
   return (
     <article className="panel">
       <div className="package-head">
-        <div><span className="eyebrow">Decision Package</span><h2>Decision system of record</h2><p>A decision made on Monday should not be rewritable on Tuesday. This package locks what the team knew, who approved action, and what must be checked later.</p></div>
+        <div><span className="eyebrow">Decision Package</span><h2>Decision-time state</h2><p>This package preserves what the team knew, what they chose to do, and what must be checked afterward.</p></div>
         <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Sealed" : "Record decision + seal"}</button>
       </div>
       <div className="package-grid">
@@ -256,7 +256,7 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
         <PackageItem title="Approval policy" value={pkg.package.approval_policy?.name || "Physical system rollout review"} />
         <PackageItem title="Substantiation" value={pkg.package.decision_substantiation?.status || "incomplete"} />
         <PackageItem title="Human identity" value={pkg.package.human_decision?.identity || "pending named owner"} />
-        <PackageItem title="Human action" value={pkg.package.human_decision?.decision || "not recorded yet"} />
+        <PackageItem title="Human action" value={pkg.package.human_decision?.decision || "pending"} />
         <PackageItem title="Outcome" value="pending" />
       </div>
       <div className="callout warning">
@@ -268,7 +268,7 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
       </div>
       <div className="callout">
         <b>What this package rules in / rules out</b>
-        <p>Policy-wide issue: not supported by current peer comparison. Calibration/firmware interaction: plausible. Environment contribution: still unresolved. More low-light validation runs: current evidence supports collecting them.</p>
+        <p>Policy-wide issue: weak support in current peer comparison. Calibration/firmware interaction: plausible. Environment contribution: still unresolved. More low-light validation runs: current evidence supports collecting them.</p>
       </div>
       {pkg.sealed && <Signature pkg={pkg} verification={verification} />}
     </article>
@@ -295,7 +295,7 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
       <div className="grid three">
         <Metric label="Decision-time view" value="2" note="affected in sealed package" />
         <Metric label="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 3)}`} note="affected after delayed evidence" />
-        <Metric label="Sealed package" value="Unchanged" note="new evidence cannot rewrite old context" />
+        <Metric label="Saved package" value="Unchanged" note="new evidence leaves old context intact" />
       </div>
       {pkg?.sealed ? <Signature pkg={pkg} verification={verification} /> : <button className="button lime" onClick={onSeal}>Seal package first</button>}
       <button className="button primary" onClick={onOutcome}>Record outcome</button>
@@ -322,8 +322,7 @@ function MemoryStage({ memory, onOutcome }: any) {
       </div>
       {!hasMemory && <button className="button primary" onClick={onOutcome}>Record outcome into memory</button>}
       <div className="ending">
-        <b>The first run took 42 minutes to understand.</b>
-        <b>The next run took 42 seconds.</b>
+        <b>First-time reconstruction becomes precedent lookup.</b>
         <span>Every real-world run should make the next one smarter.</span>
       </div>
     </article>
