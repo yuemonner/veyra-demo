@@ -7,6 +7,7 @@ import { getJson, postJson } from "../../../lib/api";
 type Reconstruction = any;
 type Comparison = any;
 type DecisionPackage = { id: string; sealed: boolean; digest?: string; signature?: string; public_key?: string; package: any };
+type Verification = { valid: boolean; digest_matches: boolean; signature_valid: boolean; trusted_timestamp: string; timestamp_authority: string; verification_mode: string };
 
 const DEMO_ID = "inv-120-robots-bad-rollout";
 
@@ -15,6 +16,7 @@ export default function InvestigationClient({ id }: { id: string }) {
   const [rec, setRec] = useState<Reconstruction | null>(null);
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [pkg, setPkg] = useState<DecisionPackage | null>(null);
+  const [verification, setVerification] = useState<Verification | null>(null);
   const [memory, setMemory] = useState<any>(null);
   const [stage, setStage] = useState("live");
   const [notice, setNotice] = useState("Ready.");
@@ -40,6 +42,7 @@ export default function InvestigationClient({ id }: { id: string }) {
     try {
       await postJson("/demo/reset");
       setPkg(null);
+      setVerification(null);
       setMemory(null);
       setStage("live");
       setNotice("Scenario reset. 2 robots are known affected at decision time.");
@@ -53,6 +56,7 @@ export default function InvestigationClient({ id }: { id: string }) {
     try {
       const next = await postJson<DecisionPackage>(`/investigations/${investigationId}/decision-package`);
       setPkg(next);
+      setVerification(null);
       setStage("package");
       setNotice("Decision Package generated from backend evidence.");
     } catch (error) {
@@ -71,6 +75,7 @@ export default function InvestigationClient({ id }: { id: string }) {
       });
       const sealed = await postJson<DecisionPackage>(`/decision-packages/${pkg.id}/seal`);
       setPkg(sealed);
+      setVerification(await getJson<Verification>(`/decision-packages/${sealed.id}/verify`));
       setNotice("Decision Package sealed. Later evidence cannot rewrite this snapshot.");
     } catch (error) {
       reportError("Decision Package sealing", error);
@@ -171,8 +176,8 @@ export default function InvestigationClient({ id }: { id: string }) {
 
         {stage === "live" && <LiveFailure rec={rec} comparison={comparison} detectionLead={detectionLead} onCompare={() => setStage("compare")} onPackage={generatePackage} />}
         {stage === "compare" && <CompareStage comparison={comparison} onPackage={generatePackage} />}
-        {stage === "package" && <PackageStage pkg={pkg} rec={rec} comparison={comparison} onGenerate={generatePackage} onSeal={seal} />}
-        {stage === "late" && <LateEvidenceStage pkg={pkg} comparison={comparison} onSeal={seal} onOutcome={outcome} />}
+        {stage === "package" && <PackageStage pkg={pkg} verification={verification} rec={rec} comparison={comparison} onGenerate={generatePackage} onSeal={seal} />}
+        {stage === "late" && <LateEvidenceStage pkg={pkg} verification={verification} comparison={comparison} onSeal={seal} onOutcome={outcome} />}
         {stage === "memory" && <MemoryStage memory={memory} onOutcome={outcome} />}
       </main>
     </div>
@@ -228,14 +233,14 @@ function CompareStage({ comparison, onPackage }: any) {
   );
 }
 
-function PackageStage({ pkg, rec, comparison, onGenerate, onSeal }: any) {
+function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }: any) {
   if (!pkg) {
     return <article className="panel"><span className="eyebrow">Decision Package</span><h2>No package generated yet.</h2><p>Generate the package to assemble trigger, last healthy state, changes, peer comparison, missing context and decision snapshot.</p><button className="button primary" onClick={onGenerate}>Generate Decision Package</button></article>;
   }
   return (
     <article className="panel">
       <div className="package-head">
-        <div><span className="eyebrow">Decision Package</span><h2>Evidence snapshot for human action</h2><p>A decision made on Monday should not be rewritable on Tuesday. This package locks what the team knew at the moment they knew it.</p></div>
+        <div><span className="eyebrow">Decision Package</span><h2>Decision system of record</h2><p>A decision made on Monday should not be rewritable on Tuesday. This package locks what the team knew, who approved action, and what must be checked later.</p></div>
         <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Sealed" : "Record decision + seal"}</button>
       </div>
       <div className="package-grid">
@@ -248,19 +253,21 @@ function PackageStage({ pkg, rec, comparison, onGenerate, onSeal }: any) {
         <PackageItem title="Inferred" value="calibration C and gripper firmware 7.3 co-occur across affected runs" />
         <PackageItem title="Human asserted" value="engineer suspects calibration mismatch after policy update" />
         <PackageItem title="Missing evidence" value={(pkg.package.missing_evidence || []).join(" · ")} />
-        <PackageItem title="Human action" value={pkg.sealed ? "Pause v0.9 on robots with calibration C and firmware 7.3" : "not recorded yet"} />
+        <PackageItem title="Approval policy" value={pkg.package.approval_policy?.name || "Physical system rollout review"} />
+        <PackageItem title="Human identity" value={pkg.package.human_decision?.identity || "pending named owner"} />
+        <PackageItem title="Human action" value={pkg.package.human_decision?.decision || "not recorded yet"} />
         <PackageItem title="Outcome" value="pending" />
       </div>
       <div className="callout">
         <b>What this package rules in / rules out</b>
         <p>Policy-wide issue: not supported by current peer comparison. Calibration/firmware interaction: plausible. Environment contribution: still unresolved. More low-light validation runs: current evidence supports collecting them.</p>
       </div>
-      {pkg.sealed && <Signature pkg={pkg} />}
+      {pkg.sealed && <Signature pkg={pkg} verification={verification} />}
     </article>
   );
 }
 
-function LateEvidenceStage({ pkg, comparison, onSeal, onOutcome }: any) {
+function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }: any) {
   return (
     <article className="panel dramatic">
       <span className="eyebrow">Delayed evidence</span>
@@ -282,7 +289,7 @@ function LateEvidenceStage({ pkg, comparison, onSeal, onOutcome }: any) {
         <Metric label="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 3)}`} note="affected after delayed evidence" />
         <Metric label="Sealed package" value="Unchanged" note="new evidence cannot rewrite old context" />
       </div>
-      {pkg?.sealed ? <Signature pkg={pkg} /> : <button className="button lime" onClick={onSeal}>Seal package first</button>}
+      {pkg?.sealed ? <Signature pkg={pkg} verification={verification} /> : <button className="button lime" onClick={onSeal}>Seal package first</button>}
       <button className="button primary" onClick={onOutcome}>Record outcome</button>
     </article>
   );
@@ -315,8 +322,8 @@ function MemoryStage({ memory, onOutcome }: any) {
   );
 }
 
-function Signature({ pkg }: { pkg: DecisionPackage }) {
-  return <div className="panel good signature"><span className="eyebrow">Sealed Decision Package</span><p>Later evidence updates the current investigation. The decision-time package remains sealed.</p><p className="hash hash-large">SHA-256 {pkg.digest}</p><p className="signature-note">Hash recorded at 14:27:00 · tamper-evident</p><p className="hash">Ed25519 {pkg.signature?.slice(0, 48)}...</p></div>;
+function Signature({ pkg, verification }: { pkg: DecisionPackage; verification?: Verification | null }) {
+  return <div className="panel good signature"><span className="eyebrow">Sealed Decision Package</span><p>Later evidence updates the current investigation. The decision-time package remains sealed.</p><p className="hash hash-large">SHA-256 {pkg.digest}</p><p className="signature-note">Hash recorded at 14:27:00 · tamper-evident · {pkg.package?._seal?.timestamp_authority || "timestamp authority"}</p><p className="hash">Ed25519 {pkg.signature?.slice(0, 48)}...</p><div className="verify-grid"><PackageItem title="Standalone verification" value={verification?.valid ? "valid digest + valid signature" : "ready with public key"} /><PackageItem title="Human owner" value={pkg.package?.human_decision?.owner || "Robotics Engineering"} /><PackageItem title="Decision scope" value={(pkg.package?.action_scope?.affected || []).join(" · ") || "affected machines"} /></div></div>;
 }
 
 function PackageItem({ title, value }: { title: string; value: string }) {

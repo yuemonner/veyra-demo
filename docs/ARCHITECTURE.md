@@ -3,14 +3,15 @@
 ## Product Loop
 
 ```text
-CAPTURE
-  -> RECONSTRUCT
-  -> COMPARE
-  -> DECISION PACKAGE
-  -> HUMAN DECISION
+EVIDENCE
+  -> BELIEF
+  -> DECISION
+  -> ACTION
   -> OUTCOME
-  -> OPERATIONAL MEMORY
+  -> PRECEDENT
 ```
+
+Veyra is not a telemetry graph. It is a decision graph for physical systems.
 
 ## Deterministic Reconstruction
 
@@ -89,5 +90,16 @@ V0 uses:
 - canonical JSON
 - SHA-256 digest
 - Ed25519 signature
+- named human owner
+- independent trusted timestamp
+- standalone verification endpoint
 
 The seal proves that the package snapshot was not silently rewritten after the decision.
+
+The product artifact is:
+
+```text
+Evidence -> Belief -> Decision -> Action -> Outcome
+```
+
+That record becomes precedent for the next similar operational decision.

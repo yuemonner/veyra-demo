@@ -53,11 +53,28 @@ def test_comparison_groups_affected_and_unaffected_peers():
 def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     investigation_id = reset()
     package = client.post(f"/investigations/{investigation_id}/decision-package").json()
+    client.post(
+        f"/investigations/{investigation_id}/decision",
+        json={
+            "decision": "Pause v0.9 on robots with calibration C and gripper firmware 7.3",
+            "owner": "Robotics Engineering",
+            "rationale": "Affected runs share calibration C and gripper firmware 7.3.",
+            "package_id": package["id"],
+        },
+    )
     sealed = client.post(f"/decision-packages/{package['id']}/seal").json()
     assert sealed["sealed"] is True
+    assert sealed["package"]["human_decision"]["owner"] == "Robotics Engineering"
+    assert sealed["package"]["_seal"]["trusted_timestamp"] == "2026-09-03T14:27:00Z"
+    assert sealed["package"]["_seal"]["timestamp_authority"] == "Veyra demo timestamp authority"
     digest = sealed["digest"]
     assert len(digest) == 64
     assert sealed["signature"]
+    verified = client.get(f"/decision-packages/{package['id']}/verify").json()
+    assert verified["valid"] is True
+    assert verified["digest_matches"] is True
+    assert verified["signature_valid"] is True
+    assert verified["verification_mode"] == "standalone"
     late = client.post("/demo/late-evidence").json()
     assert late["comparison"]["same_signal"] == 3
     assert late["late_evidence"]["event_time"] == "2026-09-03T14:09:00Z"

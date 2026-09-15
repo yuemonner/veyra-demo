@@ -7,12 +7,16 @@ from typing import Any, Optional
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models import Asset, Decision, DecisionPackage, Evidence, Investigation, Outcome
 
 BASE = datetime(2026, 9, 3, 14, 0, 0)
+DEMO_DECISION_TIME = BASE + timedelta(minutes=27)
+TIMESTAMP_AUTHORITY = "Veyra demo timestamp authority"
 STATE_KEYS = [
     "application_version",
     "firmware_version",
@@ -304,6 +308,16 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
         "missing_evidence": rec["evidence_gaps"],
         "current_interpretation": comp["interpretation"],
         "human_decision": None,
+        "approval_policy": {
+            "name": "Physical system rollout review",
+            "version": "v0.3",
+            "required": ["decision owner", "evidence package", "action scope", "outcome follow-up"],
+        },
+        "action_scope": {
+            "affected": comp["affected_assets"],
+            "watch": [item["asset_id"] for item in comp["potentially_exposed"]],
+            "stable_comparison": comp["unaffected_assets"],
+        },
         "outcome": None,
     }
     dp = DecisionPackage(id=f"pkg-{uuid.uuid4().hex[:10]}", investigation_id=investigation_id, version=1, package=package)
@@ -313,14 +327,49 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
     return dp
 
 
+def attach_human_decision(db: Session, decision: Decision) -> None:
+    if not decision.package_id:
+        return
+    dp = db.get(DecisionPackage, decision.package_id)
+    if not dp or dp.sealed:
+        return
+    package = dict(dp.package or {})
+    package["human_decision"] = {
+        "decision": decision.decision,
+        "owner": decision.owner,
+        "identity": f"human:{decision.owner.lower().replace(' ', '-')}",
+        "rationale": decision.rationale,
+        "decided_at": iso(DEMO_DECISION_TIME),
+        "signature_intent": "approved for action by named human owner",
+    }
+    package["outcome_follow_up"] = {
+        "required": True,
+        "due_after": "48h",
+        "question": "Did the intervention work, and what changed afterward?",
+    }
+    dp.package = package
+    db.add(dp)
+
+
+def seal_body(dp: DecisionPackage) -> dict[str, Any]:
+    package = dict(dp.package or {})
+    package.pop("_seal", None)
+    return {
+        "version": dp.version,
+        "trusted_timestamp": iso(DEMO_DECISION_TIME),
+        "timestamp_authority": TIMESTAMP_AUTHORITY,
+        "package": package,
+    }
+
+
 def seal_package(db: Session, package_id: str) -> DecisionPackage:
     dp = db.get(DecisionPackage, package_id)
     if not dp:
         raise ValueError("package not found")
     if dp.sealed:
         return dp
-    sealed_at = datetime.utcnow()
-    body = {"version": dp.version, "sealed_at": iso(sealed_at), "package": dp.package}
+    sealed_at = DEMO_DECISION_TIME
+    body = seal_body(dp)
     canonical = json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
     digest = hashlib.sha256(canonical).hexdigest()
     private_key = Ed25519PrivateKey.generate()
@@ -331,9 +380,50 @@ def seal_package(db: Session, package_id: str) -> DecisionPackage:
     dp.digest = digest
     dp.signature = base64.b64encode(signature).decode()
     dp.public_key = base64.b64encode(public_key).decode()
+    package = dict(dp.package or {})
+    package["_seal"] = {
+        "canonicalization": "json.sort_keys.compact",
+        "digest_algorithm": "SHA-256",
+        "signature_algorithm": "Ed25519",
+        "trusted_timestamp": iso(DEMO_DECISION_TIME),
+        "timestamp_authority": TIMESTAMP_AUTHORITY,
+        "standalone_verification": "Use the public key, canonical body and signature to verify this package outside Veyra.",
+    }
+    dp.package = package
     db.commit()
     db.refresh(dp)
     return dp
+
+
+def verify_package(db: Session, package_id: str) -> dict[str, Any]:
+    dp = db.get(DecisionPackage, package_id)
+    if not dp:
+        raise ValueError("package not found")
+    if not dp.sealed or not dp.digest or not dp.signature or not dp.public_key:
+        return {"package_id": package_id, "sealed": bool(dp.sealed), "valid": False, "reason": "package is not sealed"}
+    canonical = json.dumps(seal_body(dp), sort_keys=True, separators=(",", ":")).encode()
+    digest = hashlib.sha256(canonical).hexdigest()
+    digest_matches = digest == dp.digest
+    signature_valid = False
+    try:
+        public_key = Ed25519PublicKey.from_public_bytes(base64.b64decode(dp.public_key.encode()))
+        public_key.verify(base64.b64decode(dp.signature.encode()), canonical)
+        signature_valid = True
+    except (InvalidSignature, ValueError):
+        signature_valid = False
+    return {
+        "package_id": package_id,
+        "sealed": True,
+        "valid": digest_matches and signature_valid,
+        "digest_matches": digest_matches,
+        "signature_valid": signature_valid,
+        "digest": dp.digest,
+        "public_key": dp.public_key,
+        "trusted_timestamp": iso(DEMO_DECISION_TIME),
+        "timestamp_authority": TIMESTAMP_AUTHORITY,
+        "canonicalization": "json.sort_keys.compact",
+        "verification_mode": "standalone",
+    }
 
 
 def serialize_evidence(ev: Optional[Evidence]) -> Optional[dict[str, Any]]:

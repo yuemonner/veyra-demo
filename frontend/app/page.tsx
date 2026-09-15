@@ -19,15 +19,15 @@ export default async function Page() {
       <aside className="sidebar">
         <div className="brand"><span className="mark">V</span> Veyra</div>
         <nav className="nav"><Link className="active" href="/">Overview</Link><Link href={active ? `/investigations/${active.id}` : "/"}>Investigations</Link><Link href="/demo-control">Demo Control</Link></nav>
-        <div className="boundary">We do not touch your robots, code or stack. Veyra turns machine evidence into review context.</div>
+        <div className="boundary">We do not touch your robots, code or stack. Veyra turns machine evidence into decision records.</div>
       </aside>
       <main className="main">
         <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Cinematic demo</Link><Link className="button" href="/demo-control">Presenter controls</Link></div></div>
         <section className="hero">
-          <span className="eyebrow">Operational context for Physical AI.</span>
+          <span className="eyebrow">Decision infrastructure for Physical AI.</span>
           <h1>6 robots. One model update. 90 seconds.</h1>
           <p>Six robots run the same manipulation policy. Two start behaving differently.</p>
-          <p><b>Veyra reconstructs what changed, where else it appears, and what the team knew before acting.</b></p>
+          <p><b>Veyra reconstructs what changed, what the team knew, who approved action, and what happened next.</b></p>
           <div className="hero-actions"><Link className="button primary" href="/cinematic">Start cinematic demo</Link><Link className="button" href={active ? `/investigations/${active.id}` : "/demo-control"}>{active ? "Open live system" : "Initialize demo"}</Link></div>
         </section>
         <div className="grid three">
@@ -38,23 +38,25 @@ export default async function Page() {
         <section className="investigation panel">
           <span className="eyebrow">Backend v0 live</span>
           <h2>Product core behind the demo</h2>
-          <p>The cinematic story and live investigation run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed before an incident, finding where else the same pattern appears, comparing affected and healthy machines, Decision Package generation, sealed decision-time snapshots, human decision recording, outcome linking and Operational Memory.</p>
+          <p>The cinematic story and live investigation run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed before an incident, finding where else the same pattern appears, comparing affected and healthy machines, deterministic Decision Package generation, sealed decision-time snapshots, human identity and signature, standalone verification, outcome linking and Decision Precedent.</p>
           <div className="backend-grid">
-            <b>Evidence → What changed → Where else → Compare → Decision → Outcome → Memory</b>
+            <b>Evidence → Belief → Decision → Action → Outcome</b>
             <b>source evidence ingestion</b>
             <b>canonical evidence model</b>
             <b>event_time / known_at / ingested_at</b>
             <b>reconstruct what changed before an incident</b>
             <b>find where else the same pattern appears</b>
             <b>compare affected vs healthy machines</b>
-            <b>sealed Decision Package</b>
-            <b>outcome-linked memory</b>
+            <b>sealed Decision Package + hash</b>
+            <b>human identity + signature</b>
+            <b>standalone verification</b>
+            <b>outcome-linked precedent</b>
           </div>
         </section>
         <section className="investigation panel">
           <span className="eyebrow">Current investigation</span>
           <h2>{active?.asset_id || "AMR-001"} · {active?.title || "Start the backend and reset demo data"}</h2>
-          <p>Evidence → What changed → Where else → Compare → Decision → Outcome → Memory.</p>
+          <p>Evidence → Belief → Decision → Action → Outcome.</p>
           <Link className="button primary" href={active ? `/investigations/${active.id}` : "/demo-control"}>{active ? "Open Investigation" : "Initialize Demo"}</Link>
         </section>
       </main>

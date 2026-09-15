@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db, init_db
 from app.models import Asset, Decision, DecisionPackage, Evidence, Investigation, Outcome
-from app.services import build_package, compare, inject_late_evidence, reconstruct, reset_demo, seal_package, serialize_evidence, similar_memory
+from app.services import attach_human_decision, build_package, compare, inject_late_evidence, reconstruct, reset_demo, seal_package, serialize_evidence, similar_memory, verify_package
 
 app = FastAPI(title="Veyra V0", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -162,10 +162,16 @@ def seal_decision_package(package_id: str, db: Session = Depends(get_db)):
     return seal_package(db, package_id)
 
 
+@app.get("/decision-packages/{package_id}/verify")
+def verify_decision_package(package_id: str, db: Session = Depends(get_db)):
+    return verify_package(db, package_id)
+
+
 @app.post("/investigations/{investigation_id}/decision")
 def record_decision(investigation_id: str, body: DecisionIn, db: Session = Depends(get_db)):
     decision = Decision(id=f"dec-{uuid4().hex[:10]}", investigation_id=investigation_id, decision=body.decision, owner=body.owner, rationale=body.rationale, decided_at=datetime.utcnow(), package_id=body.package_id)
     db.add(decision)
+    attach_human_decision(db, decision)
     db.commit()
     return decision
 
