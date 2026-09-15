@@ -297,6 +297,15 @@ def summarize_values(values: list[Any]) -> str:
 def build_package(db: Session, investigation_id: str) -> DecisionPackage:
     rec = reconstruct(db, investigation_id)
     comp = compare(db, investigation_id)
+    unknowns = rec["evidence_gaps"]
+    substantiation_checks = [
+        {"name": "affected population scoped", "status": "supported", "evidence": f"{len(comp['affected_assets'])} affected, {len(comp['unaffected_assets'])} stable comparison runs"},
+        {"name": "exposed-but-stable systems identified", "status": "supported", "evidence": ", ".join(item["asset_id"] for item in comp["potentially_exposed"]) or "none"},
+        {"name": "decision owner assigned", "status": "missing", "evidence": "no named human owner until decision is recorded"},
+        {"name": "unknowns explicitly preserved", "status": "supported", "evidence": "; ".join(unknowns[:2])},
+        {"name": "inference boundary checked", "status": "warning", "evidence": "calibration/firmware interaction is plausible, not established cause"},
+        {"name": "outcome follow-up required", "status": "missing", "evidence": "no outcome record yet"},
+    ]
     package = {
         "trigger": rec["trigger"],
         "last_known_healthy": rec["last_known_healthy"],
@@ -317,6 +326,12 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
             "affected": comp["affected_assets"],
             "watch": [item["asset_id"] for item in comp["potentially_exposed"]],
             "stable_comparison": comp["unaffected_assets"],
+        },
+        "decision_substantiation": {
+            "question": "Are we allowed and justified to take the operational action yet?",
+            "status": "incomplete",
+            "summary": "Decision package incomplete. Action cannot yet be fully substantiated until owner, unknowns and outcome follow-up are recorded.",
+            "checks": substantiation_checks,
         },
         "outcome": None,
     }
@@ -347,6 +362,18 @@ def attach_human_decision(db: Session, decision: Decision) -> None:
         "due_after": "48h",
         "question": "Did the intervention work, and what changed afterward?",
     }
+    if package.get("decision_substantiation"):
+        checks = list(package["decision_substantiation"].get("checks", []))
+        for check in checks:
+            if check["name"] == "decision owner assigned":
+                check["status"] = "supported"
+                check["evidence"] = decision.owner
+        package["decision_substantiation"] = {
+            **package["decision_substantiation"],
+            "status": "actionable_with_open_follow_up",
+            "summary": "Human owner recorded. Action is supported for the scoped population, with unresolved evidence gaps and required outcome follow-up.",
+            "checks": checks,
+        }
     dp.package = package
     db.add(dp)
 

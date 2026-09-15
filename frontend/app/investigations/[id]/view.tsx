@@ -254,9 +254,17 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
         <PackageItem title="Human asserted" value="engineer suspects calibration mismatch after policy update" />
         <PackageItem title="Missing evidence" value={(pkg.package.missing_evidence || []).join(" · ")} />
         <PackageItem title="Approval policy" value={pkg.package.approval_policy?.name || "Physical system rollout review"} />
+        <PackageItem title="Substantiation" value={pkg.package.decision_substantiation?.status || "incomplete"} />
         <PackageItem title="Human identity" value={pkg.package.human_decision?.identity || "pending named owner"} />
         <PackageItem title="Human action" value={pkg.package.human_decision?.decision || "not recorded yet"} />
         <PackageItem title="Outcome" value="pending" />
+      </div>
+      <div className="callout warning">
+        <b>{pkg.package.decision_substantiation?.question || "Are we allowed and justified to act yet?"}</b>
+        <p>{pkg.package.decision_substantiation?.summary || "Decision package incomplete."}</p>
+        <ul className="check-list">
+          {(pkg.package.decision_substantiation?.checks || []).map((check: any) => <li key={check.name}><span>{check.status}</span><b>{check.name}</b><small>{check.evidence}</small></li>)}
+        </ul>
       </div>
       <div className="callout">
         <b>What this package rules in / rules out</b>

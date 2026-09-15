@@ -53,6 +53,8 @@ def test_comparison_groups_affected_and_unaffected_peers():
 def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     investigation_id = reset()
     package = client.post(f"/investigations/{investigation_id}/decision-package").json()
+    assert package["package"]["decision_substantiation"]["status"] == "incomplete"
+    assert package["package"]["decision_substantiation"]["question"] == "Are we allowed and justified to take the operational action yet?"
     client.post(
         f"/investigations/{investigation_id}/decision",
         json={
@@ -65,6 +67,7 @@ def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     sealed = client.post(f"/decision-packages/{package['id']}/seal").json()
     assert sealed["sealed"] is True
     assert sealed["package"]["human_decision"]["owner"] == "Robotics Engineering"
+    assert sealed["package"]["decision_substantiation"]["status"] == "actionable_with_open_follow_up"
     assert sealed["package"]["_seal"]["trusted_timestamp"] == "2026-09-03T14:27:00Z"
     assert sealed["package"]["_seal"]["timestamp_authority"] == "Veyra demo timestamp authority"
     digest = sealed["digest"]

@@ -85,6 +85,14 @@ raw logs
 
 When a human decision is recorded, the Decision Package can be sealed.
 
+Before and after that decision, Veyra also maintains a substantiation state:
+
+```text
+Are we allowed and justified to take this operational action yet?
+```
+
+V0 checks affected scope, exposed-but-stable systems, named decision owner, preserved unknowns, inference boundaries and outcome follow-up.
+
 V0 uses:
 
 - canonical JSON

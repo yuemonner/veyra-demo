@@ -4,7 +4,7 @@ Decision infrastructure for Physical AI.
 
 Veyra reconstructs machine evidence into sealed decision records: what happened, what was knowable, who approved action, what changed afterward and what the next decision should inherit.
 
-This repo is a production-shaped live demo scenario. Ingestion, reconstruction, comparison, deterministic Decision Package generation, human decision recording, sealing, standalone verification and outcome-linked precedent run through the backend.
+This repo is a production-shaped live demo scenario. Ingestion, reconstruction, comparison, deterministic Decision Package generation, decision substantiation, human decision recording, sealing, standalone verification and outcome-linked precedent run through the backend.
 
 ## Run
 
@@ -46,7 +46,7 @@ The seed data creates a six-robot manipulation-policy test.
 - A delayed edge-buffer event can later arrive with an event_time before the engineer note but a later known_at timestamp.
 - Runtime producers only need to provide `event_time`; Veyra assigns `known_at` and `ingested_at` when evidence enters the reconstruction layer.
 
-Veyra reconstructs last-known healthy state, what changed before the incident, where else the same pattern appears, affected-vs-healthy comparison, Decision Package, sealed decision record and outcome-linked precedent.
+Veyra reconstructs last-known healthy state, what changed before the incident, where else the same pattern appears, affected-vs-healthy comparison, Decision Package, substantiation checks, sealed decision record and outcome-linked precedent.
 
 The product loop is:
 
