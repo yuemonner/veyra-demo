@@ -1,116 +1,125 @@
 # 90 Second Demo Script
 
-## Opening
-
 Open `/cinematic`.
 
-> Six robots. One model update. Ninety seconds.
+The demo is an Operational Case:
+
+```text
+Signal
+  -> What changed
+  -> Where else
+  -> Decision state
+  -> Team action
+  -> Outcome
+  -> Reuse next time
+```
+
+## Opening
+
+> Six machines. One software update. Something changed.
 >
-> This is what Physical AI looks like before fleet scale: repeated real-world runs, constant change and fragmented context.
+> See what changed. Decide what to do. Know whether it worked. Reuse it next time.
 
 ## 1. Signal
 
-Show the six robot run:
+Show:
 
-- 14:02:11 policy v0.9 test rollout started
-- 14:04:37 all six robots updated
-- 14:11:08 first known grip pose drift signal
-- 14:18:42 two affected robots detected
-- 14:26:03 engineer note recorded
-
-Say:
-
-> Same model. Same task. Different behavior.
-
-## 2. Where Else
-
-Show the scope view:
-
-- two robots show the pattern
-- one more robot shares the same calibration and gripper firmware
-- three robots stay stable under other combinations
+- 6 machines
+- same software release
+- R03 and R05 abnormal
+- R01, R02, R04 and R06 healthy
 
 Say:
 
-> The first useful question is scope. Where else is the same pattern appearing, and which exposed run deserves attention now?
+> Two machines started behaving differently after the same update.
 
-## 3. Compare
+## 2. What Changed
 
-Show the decision-time comparison:
+Show the reconstructed context:
 
-- Policy v0.9 ran on all six robots
-- Camera calibration C and gripper firmware 7.3 co-occur across the affected runs
-- R06 shares the same combination and appeared stable at decision time
-- Low-light bin was ambient in the decision-time comparison
+- software release v0.8 -> v0.9
+- camera calibration B -> C
+- gripper firmware 7.2 -> 7.3
+- grip pose drift
+- engineer note at 14:26
+- hardware fault unconfirmed
 
 Say:
 
-> This narrows the investigation while keeping root cause open.
+> Veyra reconstructs the operational context around the case: machine state, software/config changes and human observation.
 
-## 4. Decision
-
-Generate the Decision Package.
+## 3. Where Else
 
 Show:
 
-- evidence available
-- open questions
-- team action
-- follow-up
-- decision state saved at 14:27
+- 17 machines share the same software version across active test groups
+- 5 share the same configuration profile
+- 2 are currently affected
+- R06 shares the exposure and appears healthy at decision time
 
 Say:
 
-> The team pauses v0.9 on robots with calibration C and gripper firmware 7.3. Veyra preserves the evidence, action scope and open questions around that decision.
+> The question becomes scope. Where else does this pattern appear, and which exposed machines should the team watch?
 
-## 5. Late Evidence
-
-Inject delayed evidence.
+## 4. Decision State
 
 Show:
 
-- 14:09 event_time: R06 post-run telemetry shows drift
-- 14:27 decision state saved with two affected robots
-- 14:31 known_at: delayed evidence becomes knowable
-- 14:31:04 ingested_at: evidence reaches Veyra
+- Known at 14:27: R03 and R05 affected, same config profile, both updated today, hardware fault unconfirmed
+- Unknown at 14:27: whether R06 will show the same issue, whether rollback will recover both machines
+- event_time / known_at / ingested_at
 
 Say:
 
-> Veyra updates what we know now, not what the team knew then.
+> Veyra preserves what the team knew when the decision was made.
+
+## 5. Team Action
+
+Show:
+
+- pause rollout to remaining machines
+- roll back R03 and R05
+- monitor R06
+- notify customer support
+- hold field dispatch
+- owner: Operations Lead
+
+Say:
+
+> The investigation becomes an operational record.
 
 ## 6. Outcome
 
-Show the follow-up result:
+Show:
 
 - R03 recovered after rollback
 - R05 recovered after rollback
-- R06 later confirmed affected
-- no recurrence on reverted robots during the follow-up window
+- field visit avoided
+- follow-up window clean for 24 hours
+- three days later, R06 shows the same pattern
+- current affected population updates to 3
 
 Say:
 
-> Veyra links the action to what actually happened.
+> New evidence updates the case without rewriting the original decision.
 
-## 7. Similar Previous Case
-
-Move twelve days forward.
+## 7. Twelve Days Later
 
 Show:
 
-- matched context
-- previous action
-- previous outcome
-- missing evidence from last time
-- what differs this time
+- similar case happened 12 days ago
+- rollout was paused
+- rollback recovered affected machines
+- field dispatch was avoided
+- one additional affected machine appeared later
+- suggested next step: check configuration profile before dispatching a technician
 
 Say:
 
-> The investigation starts with what worked before. Every operational decision makes the next one smarter.
+> The company is no longer solving the same problem from zero.
 
 ## Close
 
-End on:
-
-> Today: six robots in a lab. Tomorrow: cranes, robot cells and autonomous machines in production.
+> Every operational case should make the next one smarter.
 >
-> Veyra becomes the operational intelligence system for Physical AI.
+> Operational intelligence for Physical AI.

@@ -25,9 +25,9 @@ export default async function Page() {
         <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Cinematic demo</Link><Link className="button" href="/demo-control">Presenter controls</Link></div></div>
         <section className="hero">
           <span className="eyebrow">Operational intelligence for Physical AI.</span>
-          <h1>6 robots. One model update. 90 seconds.</h1>
-          <p>Six robots run the same manipulation policy. Two start behaving differently.</p>
-          <p><b>Veyra reconstructs what changed, what the team did, and what happened next — so the next decision starts with what the last one taught you.</b></p>
+          <h1>From issue to action to outcome.</h1>
+          <p>Six machines run the same software update. Two start behaving differently.</p>
+          <p><b>See what changed. Decide what to do. Know whether it worked. Reuse it next time.</b></p>
           <div className="hero-actions"><Link className="button primary" href="/cinematic">Start cinematic demo</Link><Link className="button" href={active ? `/investigations/${active.id}` : "/demo-control"}>{active ? "Open live system" : "Initialize demo"}</Link></div>
         </section>
         <div className="grid three">
@@ -38,17 +38,17 @@ export default async function Page() {
         <section className="investigation panel">
           <span className="eyebrow">Backend v0 live</span>
           <h2>Product core behind the demo</h2>
-          <p>The cinematic story and live investigation run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed before an incident, finding where else the same pattern appears, comparing affected and healthy machines, deterministic Decision Package generation, decision-time state, outcome linking and similar-case retrieval.</p>
+          <p>The cinematic story and live investigation run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed, finding where else the pattern appears, comparing affected and healthy machines, deterministic Decision Package generation, action recording, outcome linking and similar-case retrieval.</p>
           <div className="backend-grid">
-            <b>Evidence → Belief → Decision → Action → Outcome</b>
+            <b>Evidence → Decision state → Action → Outcome → Learning</b>
             <b>source evidence ingestion</b>
             <b>canonical evidence model</b>
             <b>event_time / known_at / ingested_at</b>
-            <b>reconstruct what changed before an incident</b>
+            <b>reconstruct what changed around a case</b>
             <b>find where else the same pattern appears</b>
             <b>compare affected vs healthy machines</b>
-            <b>decision-time state</b>
-            <b>team action</b>
+            <b>decision state</b>
+            <b>team action record</b>
             <b>outcome linking</b>
             <b>outcome-linked precedent</b>
           </div>
@@ -56,7 +56,7 @@ export default async function Page() {
         <section className="investigation panel">
           <span className="eyebrow">Current investigation</span>
           <h2>{active?.asset_id || "AMR-001"} · {active?.title || "Start the backend and reset demo data"}</h2>
-          <p>Evidence → Belief → Decision → Action → Outcome.</p>
+          <p>Operational Case: evidence, decision state, action, outcome and reusable learning.</p>
           <Link className="button primary" href={active ? `/investigations/${active.id}` : "/demo-control"}>{active ? "Open Investigation" : "Initialize Demo"}</Link>
         </section>
       </main>

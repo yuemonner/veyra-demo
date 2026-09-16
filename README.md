@@ -2,9 +2,9 @@
 
 Operational intelligence for Physical AI.
 
-Veyra reconstructs what changed, what the team did and what happened next, so the next machine decision starts with prior operational context.
+See what changed. Decide what to do. Know whether it worked. Reuse it next time.
 
-This repo is a production-shaped live demo scenario. Ingestion, reconstruction, comparison, deterministic Decision Package generation, decision-time state, outcome linking and similar-case retrieval run through the backend.
+This repo is a production-shaped live demo scenario. Ingestion, reconstruction, comparison, deterministic Decision Package generation, decision state, team action recording, outcome linking and similar-case retrieval run through the backend.
 
 ## Run
 
@@ -46,19 +46,19 @@ The seed data creates a six-robot manipulation-policy test.
 - A delayed edge-buffer event can later arrive with an event_time before the engineer note but a later known_at timestamp.
 - Runtime producers only need to provide `event_time`; Veyra assigns `known_at` and `ingested_at` when evidence enters the reconstruction layer.
 
-Veyra reconstructs last-known healthy state, what changed before the incident, where else the same pattern appears, affected-vs-healthy comparison, Decision Package, team action, outcome and similar previous case.
+Veyra reconstructs last-known healthy state, what changed around the case, where else the same pattern appears, affected-vs-healthy comparison, decision state, team action, outcome and similar previous case.
 
 The product loop is:
 
-> What changed → Where else → Team action → Outcome → Next decision
+> Signal → What changed → Where else → Decision state → Team action → Outcome → Reuse next time
 
 The intended live-demo line is:
 
-> Same model. Same task. Different behavior.
+> From issue to action to outcome.
 
 The ending:
 
-> Every operational decision makes the next one smarter.
+> Every operational case should make the next one smarter.
 
 ## Boundaries
 
