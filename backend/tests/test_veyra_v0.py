@@ -23,11 +23,11 @@ def test_reconstruction_calculates_lkg_first_abnormal_and_latency():
     assert response.status_code == 200
     data = response.json()
     assert data["last_known_healthy"]["id"] == "R03-healthy-run"
-    assert data["first_abnormal_evidence"]["id"] == "R03-grip-drift"
+    assert data["first_abnormal_evidence"]["id"] == "R03-module-unhealthy"
     assert data["human_discovery"]["id"] == "R03-engineer-note-1426"
     assert data["detection_latency"] == "0h15m"
-    assert data["current_state"]["application_version"] == "policy-v0.9"
-    assert data["current_state"]["configuration"] == "camera-cal-C"
+    assert data["current_state"]["application_version"] == "app-0.36"
+    assert data["current_state"]["configuration"] == "device-profile-C17"
     assert data["current_state"]["health"] == "degraded"
 
 
@@ -36,18 +36,18 @@ def test_comparison_groups_affected_and_unaffected_peers():
     response = client.get(f"/investigations/{investigation_id}/comparison")
     assert response.status_code == 200
     data = response.json()
-    assert data["same_change"] == 6
+    assert data["same_change"] == 7
     assert data["same_signal"] == 2
-    assert data["no_signal"] == 4
+    assert data["no_signal"] == 5
     assert "R03" in data["affected_assets"]
     assert "R06" in data["unaffected_assets"]
     assert data["potentially_exposed"][0]["asset_id"] == "R06"
     table = {row["context"]: row for row in data["table"]}
-    assert table["Policy v0.9"] == {"context": "Policy v0.9", "affected": "2/2", "unaffected": "4/4"}
-    assert table["Camera calibration C"] == {"context": "Camera calibration C", "affected": "2/2", "unaffected": "1/4"}
-    assert table["Gripper firmware 7.3"] == {"context": "Gripper firmware 7.3", "affected": "2/2", "unaffected": "1/4"}
-    assert table["Low-light test cell"] == {"context": "Low-light test cell", "affected": "1/2", "unaffected": "2/4"}
-    assert table["End-effector G2"] == {"context": "End-effector G2", "affected": "2/2", "unaffected": "2/4"}
+    assert table["Application 0.36"] == {"context": "Application 0.36", "affected": "2/2", "unaffected": "5/5"}
+    assert table["Device profile C17"] == {"context": "Device profile C17", "affected": "2/2", "unaffected": "1/5"}
+    assert table["Module firmware 4.9"] == {"context": "Module firmware 4.9", "affected": "2/2", "unaffected": "1/5"}
+    assert table["Site network profile N7"] == {"context": "Site network profile N7", "affected": "2/2", "unaffected": "1/5"}
+    assert table["Cellular-only"] == {"context": "Cellular-only", "affected": "2/2", "unaffected": "2/5"}
 
 
 def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
@@ -60,9 +60,9 @@ def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     client.post(
         f"/investigations/{investigation_id}/decision",
         json={
-            "decision": "Pause v0.9 on robots with calibration C and gripper firmware 7.3",
+            "decision": "Remote restart affected machines and hold field dispatch",
             "owner": "Robotics Engineering",
-            "rationale": "Affected runs share calibration C and gripper firmware 7.3.",
+            "rationale": "Affected machines share module firmware 4.9, device profile C17 and site network profile N7.",
             "package_id": package["id"],
         },
     )
@@ -96,19 +96,19 @@ def test_decision_context_tracks_options_observability_actions_and_late_review_f
     client.post(
         f"/investigations/{investigation_id}/decision",
         json={
-            "decision": "Pause v0.9 on robots with calibration C and gripper firmware 7.3",
+            "decision": "Remote restart affected machines and hold field dispatch",
             "owner": "Robotics Engineering",
-            "rationale": "Affected runs share calibration C and gripper firmware 7.3.",
+            "rationale": "Affected machines share module firmware 4.9, device profile C17 and site network profile N7.",
             "package_id": package["id"],
         },
     )
     context = client.get(f"/investigations/{investigation_id}/decision-context").json()
     assert context["observability_state"]["status"] == "partial"
     assert any(option["selected"] for option in context["options_considered"])
-    assert context["executed_actions"][0]["action_type"] == "rollback_and_pause_rollout"
+    assert context["executed_actions"][0]["action_type"] == "remote_fix_and_hold_rollout"
     assert context["evidence_snapshots"]
     assert context["decision_records"][0]["immutable"] is True
-    assert context["decision_records"][0]["chosen_option"]["option_type"] in {"rollback", "pause_rollout"}
+    assert context["decision_records"][0]["chosen_option"]["option_type"] in {"remote_fix", "pause_rollout"}
     decision_record_digest = context["decision_records"][0]["digest"]
     client.post("/demo/late-evidence")
     context_after_late = client.get(f"/investigations/{investigation_id}/decision-context").json()
@@ -141,17 +141,17 @@ def test_outcome_becomes_operational_memory():
     response = client.post(
         f"/investigations/{investigation_id}/outcome",
         json={
-            "outcome": "Calibration C held pending targeted low-light runs after rollback",
+            "outcome": "Remote restart restored connectivity; field visit avoided; rollout held pending review",
             "payload": {"recovery_minutes": 18, "field_visit": False, "engineering_hours_saved": 3},
         },
     )
     assert response.status_code == 200
     memory = client.get(f"/memory/similar?investigation_id={investigation_id}").json()
-    assert memory["similar_cases"][0]["outcome"] == "Calibration C held pending targeted low-light runs after rollback"
+    assert memory["similar_cases"][0]["outcome"] == "Remote restart restored connectivity; field visit avoided; rollout held pending review"
     assert memory["precedent_comparison"]["evidence_strength"] == "precedent, not causal proof"
     precedent = client.get(f"/precedents/compare?investigation_id={investigation_id}").json()
-    assert precedent["response_history"]["rollback"]["cases"] >= 1
-    assert precedent["response_history"]["rollback"]["attribution"] == "observed"
+    assert precedent["response_history"]["remote_fix"]["cases"] >= 1
+    assert precedent["response_history"]["remote_fix"]["attribution"] == "observed"
     assert precedent["cost_comparison"][0]["field_visit"] is False
-    rollback_row = [row for row in precedent["outcome_comparison"] if row["action"] == "rollback"][0]
-    assert rollback_row["attribution"] == "observed"
+    remote_fix_row = [row for row in precedent["outcome_comparison"] if row["action"] == "remote_fix"][0]
+    assert remote_fix_row["attribution"] == "observed"

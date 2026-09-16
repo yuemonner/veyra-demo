@@ -45,9 +45,9 @@ function CinematicDemoInner() {
     if (pkg?.sealed) return pkg;
     const next = await postJson<DecisionPackage>(`/investigations/${INVESTIGATION_ID}/decision-package`);
     await postJson(`/investigations/${INVESTIGATION_ID}/decision`, {
-      decision: "Pause v0.9 on robots with calibration C and gripper firmware 7.3",
+      decision: "Remote restart affected machines and hold field dispatch",
       owner: "Operations Lead",
-      rationale: "R03 and R05 are affected after the same update. R06 shares the same configuration and firmware exposure and needs monitoring.",
+      rationale: "R03 and R05 are affected after the same deployment. R06 shares the same firmware, profile and site network exposure and needs monitoring.",
       package_id: next.id,
     });
     const sealed = await postJson<DecisionPackage>(`/decision-packages/${next.id}/seal`);
@@ -63,9 +63,9 @@ function CinematicDemoInner() {
 
   async function recordOutcome() {
     await postJson(`/investigations/${INVESTIGATION_ID}/outcome`, {
-      outcome: "R03 and R05 recovered after rollback; R06 later confirmed affected; field visit was avoided",
+      outcome: "R03 and R05 recovered after remote restart; R06 later confirmed affected; field visit was avoided",
       payload: {
-        previous_action: "Pause rollout to the exposed subset; roll back R03 and R05; monitor R06",
+        previous_action: "Remote restart affected machines; hold field dispatch; monitor R06",
         recovery_minutes: 41,
         days_later: 12,
       },
@@ -140,7 +140,7 @@ function OpenScene({ onNext }: { onNext: () => void }) {
   return (
     <section className="cinema-scene center">
       <span className="eyebrow">Operational Case · Physical AI</span>
-      <h1>One update. Six machines. Two behave differently.</h1>
+      <h1>One deployment. Seven machines. Two start dropping offline.</h1>
       <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and outcome.</p>
       <button className="button lime" onClick={onNext}>Start case</button>
     </section>
@@ -150,16 +150,16 @@ function OpenScene({ onNext }: { onNext: () => void }) {
 function SignalScene({ affected, healthy, onNext }: { affected: number; healthy: number; onNext: () => void }) {
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="1 · Signal" title="Two machines started behaving differently after the same update." subtitle="The team needs to understand what changed before deciding what to do." />
+      <SceneTitle eyebrow="1 · Signal" title="Two machines started dropping offline after the same deployment." subtitle="The team needs to understand what changed before deciding whether to fix remotely or dispatch someone onsite." />
       <CinematicFleet affected={affected} />
       <div className="cinema-events">
-        <EventLine time="14:02" label="software release v0.9 begins" />
-        <EventLine time="14:04" label="6/6 machines updated" />
+        <EventLine time="14:02" label="application 0.36 deployment begins" />
+        <EventLine time="14:04" label="7/7 machines updated" />
         <EventLine time="14:11" label="first known signal on R03" />
         <EventLine time="14:18" label="R05 shows the same signal" />
         <EventLine time="14:26" label="engineer note recorded" />
       </div>
-      <HeroLine text={`${affected} abnormal · ${healthy} healthy · same release`} />
+      <HeroLine text={`${affected} unhealthy · ${healthy} healthy · same release`} />
       <button className="button primary" onClick={onNext}>What changed?</button>
     </section>
   );
@@ -168,14 +168,14 @@ function SignalScene({ affected, healthy, onNext }: { affected: number; healthy:
 function ChangedScene({ onNext }: { onNext: () => void }) {
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="2 · What changed?" title="What changed around the failure?" subtitle="The system reconstructs machine state, software changes and human observations around the case." />
+      <SceneTitle eyebrow="2 · What changed?" title="What changed around the connectivity failure?" subtitle="The system reconstructs machine state, software changes, configuration and human observations around the case." />
       <div className="decision-card">
-        <div><span>Software</span><b>policy v0.8 → v0.9</b></div>
-        <div><span>Configuration</span><b>camera calibration B → C</b></div>
-        <div><span>Firmware</span><b>gripper 7.2 → 7.3</b></div>
-        <div><span>Machine state</span><b>grip pose drift</b></div>
+        <div><span>Application</span><b>app 0.35 → 0.36</b></div>
+        <div><span>Device profile</span><b>C16 → C17</b></div>
+        <div><span>Module firmware</span><b>4.8 → 4.9</b></div>
+        <div><span>Machine state</span><b>module unhealthy · reconnect failures</b></div>
         <div><span>Human context</span><b>engineer note at 14:26</b></div>
-        <div><span>Recent service</span><b>hardware fault unconfirmed</b></div>
+        <div><span>Site context</span><b>firewall state unconfirmed</b></div>
       </div>
       <HeroLine text="Three relevant changes occurred before the first known failure. Cause is not yet established." />
       <button className="button primary" onClick={onNext}>Scope the issue</button>
@@ -189,16 +189,16 @@ function WhereElseScene({ comparison, onNext }: { comparison: Comparison | null;
     <section className="cinema-scene">
       <SceneTitle eyebrow="3 · Scope" title="Which machines share the same exposure?" subtitle="The case moves from one issue to operational scope." />
       <div className="site-grid">
-        <div><span>Current cell</span><b>6 machines</b><small>same software release</small></div>
-        <div><span>Same software</span><b>17 machines</b><small>across active test groups</small></div>
-        <div><span>Same config profile</span><b>5 machines</b><small>camera calibration C</small></div>
+        <div><span>Current group</span><b>7 machines</b><small>same application release</small></div>
+        <div><span>Same application</span><b>7 machines</b><small>app 0.36</small></div>
+        <div><span>Same exposed profile</span><b>3 machines</b><small>profile C17 · firmware 4.9</small></div>
         <div><span>Currently affected</span><b>{comparison?.same_signal ?? 2}</b><small>R03 · R05</small></div>
       </div>
       <table className="table cinema-table">
         <thead><tr><th>Context</th><th>Affected</th><th>Healthy</th></tr></thead>
-        <tbody>{rows.map((row) => <tr className={row.context === "Camera calibration C" || row.context === "Gripper firmware 7.3" ? "highlight-row" : ""} key={row.context}><td>{row.context}</td><td>{row.affected}</td><td>{row.unaffected}</td></tr>)}</tbody>
+        <tbody>{rows.map((row) => <tr className={row.context === "Device profile C17" || row.context === "Module firmware 4.9" || row.context === "Site network profile N7" ? "highlight-row" : ""} key={row.context}><td>{row.context}</td><td>{row.affected}</td><td>{row.unaffected}</td></tr>)}</tbody>
       </table>
-      <p className="scene-footnote">Calibration C and firmware 7.3 are shared by both affected machines, while R06 has the same exposure without a known failure at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
+      <p className="scene-footnote">Profile C17, module firmware 4.9 and site network N7 are shared by both affected machines, while R06 has the same exposure without a known issue at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
       <button className="button primary" onClick={onNext}>Decision</button>
     </section>
   );
@@ -210,10 +210,10 @@ function DecisionStateScene({ pkg, onNext }: { pkg: DecisionPackage | null; onNe
       <SceneTitle eyebrow="4 · Decision" title="What did the team actually know at 14:27?" subtitle="The case separates known evidence from open questions before the team acts." />
       <div className="split-count">
         <div><strong>What the team knew at 14:27</strong><span>R03 affected · R05 affected · R06 no known issue</span></div>
-        <div><strong>What Veyra knows now</strong><span>R06 had an earlier signal that became available later</span></div>
+        <div><strong>What Veyra knows now</strong><span>R06 had earlier reconnect failures that became available later</span></div>
       </div>
       <div className="time-rail cinematic-rail">
-        <div><b>14:09</b><span>event_time</span><small>R06 signal existed in post-run telemetry</small></div>
+        <div><b>14:09</b><span>event_time</span><small>R06 reconnect failures existed in edge buffer</small></div>
         <i />
         <div><b>14:27</b><span>decision point</span><small>2 affected known to the team</small></div>
         <i />
@@ -233,8 +233,8 @@ function ActionScene({ onNext }: { onNext: () => void }) {
     <section className="cinema-scene">
       <SceneTitle eyebrow="5 · Team action" title="The team chooses a response." subtitle="Veyra keeps the decision, the executed action and the evidence available at the time together." />
       <div className="decision-card">
-        <div><span>Decision</span><b>Pause rollout to remaining machines</b></div>
-        <div><span>Executed</span><b>Roll back R03 and R05</b></div>
+        <div><span>Decision</span><b>Remote fix before dispatch</b></div>
+        <div><span>Executed</span><b>Remote restart R03 and R05</b></div>
         <div><span>Watch</span><b>Monitor R06</b></div>
         <div><span>Customer</span><b>Notify support</b></div>
         <div><span>Field</span><b>Hold dispatch</b></div>
@@ -251,8 +251,8 @@ function OutcomeScene({ comparison, onNext }: { comparison: Comparison | null; o
     <section className="cinema-scene">
       <SceneTitle eyebrow="6 · Outcome" title="Did the action work?" subtitle="A few hours later, and then three days later, the case keeps updating." />
       <div className="outcome-grid">
-        <div><span>R03</span><b>recovered after rollback</b></div>
-        <div><span>R05</span><b>recovered after rollback</b></div>
+        <div><span>R03</span><b>recovered after remote restart</b></div>
+        <div><span>R05</span><b>recovered after remote restart</b></div>
         <div><span>Field visit</span><b>avoided</b></div>
         <div><span>Follow-up window</span><b>clean for 24 hours</b></div>
         <div><span>Rollout</span><b>paused, then resumed</b></div>
@@ -273,12 +273,12 @@ function MemoryScene({ memoryReady, onNext }: { memoryReady: boolean; onNext: ()
       <h1>A similar pattern appears again.</h1>
       <div className="memory-card">
         <p><b>Previous case</b></p>
-        <p>Same software release.</p>
-        <p>Same calibration C exposure.</p>
-        <p>Rollback recovered 2/2 affected machines.</p>
+        <p>Same application release.</p>
+        <p>Same profile C17 and module firmware 4.9 exposure.</p>
+        <p>Remote restart restored 2/2 affected machines.</p>
         <p>No field visit was required.</p>
         <p>One additional exposed machine failed later.</p>
-        <p>Previous action available: rollback affected machine and hold rollout.</p>
+        <p>Previous action available: remote restart, hold dispatch and monitor exposed machines.</p>
       </div>
       <HeroLine text="The company is no longer solving the same problem from zero." />
       <div className="future-strip"><span>{memoryReady ? "Operational Case" : "Case preview"}</span><b>Evidence → decision state → action → outcome → reusable learning</b></div>
@@ -305,7 +305,7 @@ function EndScene() {
 }
 
 function CinematicFleet({ affected }: { affected: number }) {
-  return <div className="cinema-fleet">{Array.from({ length: 6 }).map((_, index) => <span key={index} className={index < affected ? "robot-dot affected" : "robot-dot"} />)}</div>;
+  return <div className="cinema-fleet">{Array.from({ length: 7 }).map((_, index) => <span key={index} className={index < affected ? "robot-dot affected" : "robot-dot"} />)}</div>;
 }
 
 function SceneTitle({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) {

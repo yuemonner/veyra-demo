@@ -61,7 +61,7 @@ function InvestigationInner({ id }: { id: string }) {
       setDecisionContext(null);
       setPrecedent(null);
       setStage("overview");
-      setNotice("Scenario reset. 2 robots are known affected at decision time.");
+      setNotice("Scenario reset. 2 machines are known affected at decision time.");
       await refresh();
     } catch (error) {
       reportError("Scenario reset", error);
@@ -86,9 +86,9 @@ function InvestigationInner({ id }: { id: string }) {
     if (!pkg) return;
     try {
       await postJson(`/investigations/${investigationId}/decision`, {
-        decision: "Pause v0.9 on robots with calibration C and gripper firmware 7.3",
+        decision: "Remote restart affected machines and hold field dispatch",
         owner: "Robotics Engineering",
-        rationale: "Policy v0.9 ran everywhere, while the affected runs share calibration C and gripper firmware 7.3 with one exposed robot to watch.",
+        rationale: "Application 0.36 ran everywhere, while affected machines share module firmware 4.9, device profile C17 and site network profile N7 with one exposed machine to watch.",
         package_id: pkg.id,
       });
       const sealed = await postJson<DecisionPackage>(`/decision-packages/${pkg.id}/seal`);
@@ -108,7 +108,7 @@ function InvestigationInner({ id }: { id: string }) {
       await refresh();
       setDecisionContext(await getJson(`/investigations/${investigationId}/decision-context`));
       setStage("outcome");
-      setNotice("Delayed run evidence arrived with event_time before the engineer note.");
+      setNotice("Delayed module-health evidence arrived with event_time before the engineer note.");
     } catch (error) {
       reportError("Delayed evidence injection", error);
     }
@@ -117,8 +117,8 @@ function InvestigationInner({ id }: { id: string }) {
   async function outcome() {
     try {
       await postJson(`/investigations/${investigationId}/outcome`, {
-        outcome: "Calibration C and gripper firmware 7.3 held; affected robots recovered after targeted rollback",
-        payload: { previous_action: "Pause v0.9 on robots with calibration C and firmware 7.3", recovery_minutes: 18, days_later: 12, attribution_level: "observed", attribution_rationale: "Recovery was observed after rollback. Rollback is not treated as proven causal." },
+        outcome: "Remote restart restored connectivity; field visit avoided; rollout held pending review",
+        payload: { previous_action: "Remote restart R03 and R05; hold field dispatch; monitor R06", recovery_minutes: 18, days_later: 12, field_visit: false, engineering_hours_saved: 3, attribution_level: "observed", attribution_rationale: "Connectivity recovery was observed after remote restart. Remote restart is not treated as proven causal." },
       });
       setMemory(await getJson(`/memory/similar?investigation_id=${investigationId}`));
       setPrecedent(await getJson(`/precedents/compare?investigation_id=${investigationId}`));
@@ -130,7 +130,7 @@ function InvestigationInner({ id }: { id: string }) {
   }
 
   const affected = comparison?.same_signal ?? 2;
-  const healthy = comparison?.no_signal ?? 4;
+  const healthy = comparison?.no_signal ?? 5;
   const lateEvidenceVisible = affected > 2;
   const detectionLead = useMemo(() => {
     if (!rec?.human_discovery?.event_time || !rec?.first_abnormal_evidence?.event_time) return "before engineer note";
@@ -170,7 +170,7 @@ function InvestigationInner({ id }: { id: string }) {
 
       <main className="main">
         <div className="topbar">
-          <span className="eyebrow">Operational case · 6 machines · software release v0.9 · 2 affected</span>
+          <span className="eyebrow">Operational case · 7 machines · application release 0.36 · 2 known affected</span>
           {presenter && <div className="demo-controls">
             <Link className="button" href="/cinematic">Cinematic story</Link>
             <button className="button" onClick={refresh}>Refresh</button>
@@ -191,7 +191,7 @@ function InvestigationInner({ id }: { id: string }) {
                 <b>{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
                 {lateEvidenceVisible && <b>2 decision-time</b>}
                 <b>{healthy} healthy</b>
-                <b>6 updated</b>
+                <b>7 updated</b>
               </div>
               <div className="hero-actions">
                 <button className="button primary" onClick={() => setStage("overview")}>Open case</button>
@@ -205,12 +205,12 @@ function InvestigationInner({ id }: { id: string }) {
               <span className="eyebrow">Operational case</span>
               <strong>{stageLabel[stage]}</strong>
             </div>
-            <p>R03 / R05 anomaly after release v0.9</p>
+            <p>R03 / R05 connectivity degradation after app 0.36</p>
             <div className="case-pills">
               <b>{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
               {lateEvidenceVisible && <b>2 decision-time</b>}
               <b>{healthy} healthy</b>
-              <b>6 updated</b>
+              <b>7 updated</b>
             </div>
           </section>
         )}
@@ -246,22 +246,22 @@ function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: a
   return (
     <>
       <div className="fleet-map" aria-label="fleet status">
-        {Array.from({ length: 6 }).map((_, i) => {
+        {Array.from({ length: 7 }).map((_, i) => {
           const affected = i < (comparison?.same_signal ?? 2);
           return <span key={i} className={affected ? "dot bad" : "dot good"} title={`R${String(i + 1).padStart(2, "0")}`} />;
         })}
       </div>
       <div className="grid four">
-        <Metric label="14:02:11" value="Policy v0.9" note="test rollout started" />
-        <Metric label="14:04:37" value="6/6" note="robots updated" />
-        <Metric label="14:11:08" value="First known signal" note={rec?.first_abnormal_evidence?.payload?.signal || "grip pose drift"} />
+        <Metric label="14:02:11" value="App 0.36" note="deployment started" />
+        <Metric label="14:04:37" value="7/7" note="machines updated" />
+        <Metric label="14:11:08" value="First known signal" note={rec?.first_abnormal_evidence?.payload?.signal || "module unhealthy"} />
         <Metric label="14:18:42" value="2 affected" note="pattern detected before review" />
         <Metric label="14:26:03" value="Engineer note" note="human discovery recorded" />
       </div>
       <article className="panel dramatic">
-        <span className="eyebrow">Repeated real-world testing</span>
-        <h2>Same policy. Same task. Different behavior.</h2>
-        <p>Every robot ran policy v0.9. Only two began showing grip pose drift. The question is no longer whether something failed; it is what changed around the robots that diverged.</p>
+        <span className="eyebrow">Post-deployment operations</span>
+        <h2>Same deployment. Different connectivity behavior.</h2>
+        <p>Every machine received app 0.36. Only two began showing module unhealthy and repeated reconnects. The team needs to decide whether this is application, firmware, site network or device-specific before sending someone onsite.</p>
         <div className="hero-actions"><button className="button primary" onClick={onChanges}>What changed?</button><button className="button" onClick={onPackage}>Review case</button></div>
       </article>
     </>
@@ -274,12 +274,12 @@ function ChangesStage({ onScope }: { onScope: () => void }) {
       <span className="eyebrow">Changes</span>
       <h2>What changed around the failure?</h2>
       <div className="package-grid">
-        <PackageItem title="Software" value="policy v0.8 to v0.9" />
-        <PackageItem title="Calibration" value="camera calibration B to C" />
-        <PackageItem title="Firmware" value="gripper 7.2 to 7.3" />
-        <PackageItem title="Machine state" value="grip pose drift" />
+        <PackageItem title="Application" value="app 0.35 to 0.36" />
+        <PackageItem title="Device profile" value="profile C16 to C17" />
+        <PackageItem title="Module firmware" value="module 4.8 to 4.9" />
+        <PackageItem title="Machine state" value="module unhealthy, repeated reconnects" />
         <PackageItem title="Human context" value="engineer note at 14:26" />
-        <PackageItem title="Recent service" value="hardware fault unconfirmed" />
+        <PackageItem title="Site context" value="firewall and network state unconfirmed" />
       </div>
       <div className="callout">
         <b>Three relevant changes occurred before the first known failure.</b>
@@ -297,9 +297,9 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
       <span className="eyebrow">Scope</span>
       <h2>Where else does this pattern appear?</h2>
       <div className="grid three">
-        <Metric label="Same policy" value={`${comparison?.same_change ?? 6}`} note="robots on policy v0.9" />
-        <Metric label="Same signal" value={`${comparison?.same_signal ?? 2}`} note="grip pose drift detected" />
-        <Metric label="No signal" value={`${comparison?.no_signal ?? 4}`} note="updated but stable" />
+        <Metric label="Same app" value={`${comparison?.same_change ?? 7}`} note="machines on app 0.36" />
+        <Metric label="Same signal" value={`${comparison?.same_signal ?? 2}`} note="module unhealthy detected" />
+        <Metric label="No signal" value={`${comparison?.no_signal ?? 5}`} note="updated but stable" />
       </div>
       <table className="table focus-table">
         <thead><tr><th>Context</th><th>Signal present</th><th>No signal</th></tr></thead>
@@ -307,7 +307,7 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
       </table>
       <div className="callout">
         <b>What the evidence narrows</b>
-        <p>Policy v0.9 is shared across both groups. Calibration C and gripper firmware 7.3 are shared by both affected machines, while R06 has the same exposure without a known failure at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
+        <p>Application 0.36 is shared across both groups. Device profile C17, module firmware 4.9 and site network profile N7 are shared by the affected machines, while R06 has the same exposure without a known issue at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
       </div>
       <div className="callout">
         <b>Decision comparison</b>
@@ -317,7 +317,7 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
         <thead><tr><th>Option</th><th>Prior outcome</th><th>Attribution</th></tr></thead>
         <tbody>
           {(outcomeRows.length ? outcomeRows : [
-            { action: "rollback", outcome: "no outcome recorded", attribution: "not observed" },
+            { action: "remote_fix", outcome: "no outcome recorded", attribution: "not observed" },
             { action: "monitor", outcome: "not yet observed", attribution: "not observed" },
             { action: "dispatch", outcome: "not supported by current evidence", attribution: "not supported" },
           ]).map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome || row.status}</td><td>{row.attribution}</td></tr>)}
@@ -342,15 +342,15 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
         <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Sealed" : "Record decision"}</button>
       </div>
       <div className="package-grid">
-        <PackageItem title="Trigger" value="grip pose drift after policy update" />
+        <PackageItem title="Trigger" value="module unhealthy after deployment" />
         <PackageItem title="Last known healthy" value={short(rec?.last_known_healthy?.event_time)} />
-        <PackageItem title="Recent changes" value="policy v0.8 to v0.9 · calibration B to C · gripper firmware 7.2 to 7.3" />
+        <PackageItem title="Recent changes" value="app 0.35 to 0.36 · profile C16 to C17 · module firmware 4.8 to 4.9" />
         <PackageItem title="Machine state" value={rec?.current_state?.health || "degraded"} />
-        <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 2} / ${comparison?.same_change ?? 6}`} />
+        <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 2} / ${comparison?.same_change ?? 7}`} />
         <PackageItem title="Observability status" value={`${observability?.status || "partial"} at decision time`} />
         <PackageItem title="Observed" value="engineer note recorded at 14:26" />
-        <PackageItem title="Inferred" value="calibration C and gripper firmware 7.3 co-occur across affected runs" />
-        <PackageItem title="Human asserted" value="engineer suspects calibration mismatch after policy update" />
+        <PackageItem title="Inferred" value="profile C17, module firmware 4.9 and network N7 co-occur across affected machines" />
+        <PackageItem title="Human asserted" value="engineer suspects site network or module firmware setting" />
         <PackageItem title="Missing evidence" value={(pkg.package.missing_evidence || []).join(" · ")} />
         <PackageItem title="Approval policy" value={pkg.package.approval_policy?.name || "Physical system rollout review"} />
         <PackageItem title="Substantiation" value={pkg.package.decision_substantiation?.status || "incomplete"} />
@@ -405,7 +405,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
       </div>
       <div className="callout">
         <b>What this package rules in / rules out</b>
-        <p>Policy-wide issue: weak support in current peer comparison. Calibration and firmware interaction: plausible. Environment contribution: still unresolved. More low-light validation runs: current evidence supports collecting them.</p>
+        <p>Application-wide issue: weak support in current peer comparison. Firmware/profile issue: plausible. Site network issue: still unresolved. Field dispatch: current evidence is insufficient to support it.</p>
       </div>
       {pkg.sealed && <Signature pkg={pkg} verification={verification} />}
     </article>
@@ -422,8 +422,8 @@ function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
       <h2>The team chooses a response.</h2>
       <p>Veyra keeps the decision, the action that was actually executed, and the evidence available at the time together.</p>
       <div className="package-grid">
-        <PackageItem title="Decision" value="pause rollout" />
-        <PackageItem title="Executed" value="rollback R03 and R05" />
+        <PackageItem title="Decision" value="remote fix before dispatch" />
+        <PackageItem title="Executed" value="remote restart R03 and R05" />
         <PackageItem title="Watch" value="monitor R06" />
         <PackageItem title="Customer" value="notify support" />
         <PackageItem title="Field" value="hold dispatch" />
@@ -442,14 +442,14 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
     <article className="panel dramatic">
       <span className="eyebrow">Outcome</span>
       <h2>Did the action work?</h2>
-      <p>R03 and R05 recover after rollback. R06 later shows the same pattern.</p>
+      <p>R03 and R05 recover after remote restart. R06 later shows the same pattern.</p>
       <div className="callout warning">
         <b>New decision-relevant evidence arrived</b>
         <p>The original decision record remains unchanged. The current case view is updated and flagged for review.</p>
       </div>
-      <p className="evidence-detail">Late evidence: R06 post-run telemetry was re-analyzed at 14:31; grip pose drift was present at 14:09:11.</p>
+      <p className="evidence-detail">Late evidence: R06 module-health buffer was uploaded at 14:31; reconnect failures were present at 14:09:11.</p>
       <div className="time-rail">
-        <div><b>14:09</b><span>event_time</span><small>post-run telemetry shows drift</small></div>
+        <div><b>14:09</b><span>event_time</span><small>module-health buffer shows reconnect failures</small></div>
         <i />
         <div><b>14:27</b><span>decision sealed</span><small>known evidence only</small></div>
         <i />
@@ -482,7 +482,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
     <article className="panel final-stage">
       <span className="eyebrow">12 days later</span>
       <h2>A similar pattern appears again.</h2>
-      <p>R12 begins showing grip pose drift after a new software test.</p>
+      <p>R12 begins showing reconnect failures after a new deployment.</p>
       <div className="callout">
         <b>{hasMemory ? "Similar previous case" : "Reusable case preview"}</b>
         <p>Use the previous case as operational precedent. It records what conditions were present, what the team did and what outcome followed.</p>
@@ -490,15 +490,15 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
       <div className="precedent-stack">
         <div>
           <span className="eyebrow">Previous conditions</span>
-          <b>v0.9 · Calibration C · Firmware 7.3</b>
+          <b>App 0.36 · Profile C17 · Module firmware 4.9</b>
         </div>
         <div>
           <span className="eyebrow">Previous action</span>
-          <b>Rollout paused · R03/R05 rolled back</b>
+          <b>Remote restart · rollout held · field dispatch avoided</b>
         </div>
         <div>
           <span className="eyebrow">Observed outcome</span>
-          <b>Both recovered · no field visit · R06 later showed same pattern</b>
+          <b>Connectivity restored · no field visit · R06 later showed same pattern</b>
         </div>
       </div>
       <div className="package-grid memory-grid">
@@ -511,14 +511,14 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
         <thead><tr><th>Action</th><th>Observed outcome</th><th>Attribution</th></tr></thead>
         <tbody>
           {(rows.length ? rows : [
-            { action: "rollback", outcome: "record outcome first", attribution: "not observed" },
+            { action: "remote_fix", outcome: "record outcome first", attribution: "not observed" },
             { action: "dispatch", outcome: "not supported by current evidence", attribution: "not supported" },
           ]).map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome || row.status}</td><td>{row.attribution}</td></tr>)}
         </tbody>
       </table>
       <div className="callout">
         <b>Before dispatching a technician</b>
-        <p>Compare the current machine against the previous exposed group and check whether the same software and calibration combination is present.</p>
+        <p>Compare the current machine against the previous exposed group and check whether the same application, firmware, profile and site network pattern is present.</p>
       </div>
       {!hasMemory && <button className="button primary" onClick={onOutcome}>Link outcome first</button>}
       <div className="ending">

@@ -103,19 +103,19 @@ def reset_demo(db: Session) -> dict[str, Any]:
         Asset(
             id=f"R{i:02d}",
             name=f"R{i:02d}",
-            asset_type="Manipulation Robot",
-            family="MR-Lab",
-            site="Test Cell A" if i <= 3 else "Test Cell B",
-            environment="real-world test lab",
+            asset_type="Connected Machine",
+            family="Smart Equipment",
+            site="Customer Site A" if i <= 3 else "Customer Site B",
+            environment="deployed customer environment",
         )
-        for i in range(1, 7)
+        for i in range(1, 8)
     ]
     db.add_all(assets)
     affected_ids = {"R03", "R05"}
     for a in assets:
         asset_num = int(a.id[1:])
-        lighting = "low-light-bin" if asset_num in {2, 3, 4} else "standard-light"
-        end_effector = "gripper-G2" if asset_num in {3, 4, 5, 6} else "gripper-G1"
+        network_profile = "site-network-N7" if asset_num in {3, 5, 6} else "site-network-standard"
+        connection_type = "cellular-only" if asset_num in {2, 3, 5, 6} else "wired-backhaul"
         db.add(
             evidence(
                 a.id,
@@ -125,11 +125,11 @@ def reset_demo(db: Session) -> dict[str, Any]:
                 "edge_agent",
                 "OBSERVED",
                 {
-                    "application_version": "policy-v0.8",
-                    "firmware_version": "gripper-fw-7.2",
-                    "configuration": "camera-cal-B",
-                    "network_profile": lighting,
-                    "connection_type": end_effector,
+                    "application_version": "app-0.35",
+                    "firmware_version": "module-fw-4.8",
+                    "configuration": "device-profile-C16",
+                    "network_profile": network_profile,
+                    "connection_type": connection_type,
                     "process_health": "healthy",
                     "health": "healthy",
                 },
@@ -142,10 +142,10 @@ def reset_demo(db: Session) -> dict[str, Any]:
                 "deployment",
                 4,
                 1,
-                "policy_registry",
+                "deployment_manifest",
                 "OBSERVED",
-                {"application_version": "policy-v0.9", "previous_application_version": "policy-v0.8", "deployment_id": "policy-manip-09", "rollout_size": 6},
-                f"{a.id}-policy-09",
+                {"application_version": "app-0.36", "previous_application_version": "app-0.35", "deployment_id": "app-connectivity-036", "rollout_size": 7},
+                f"{a.id}-app-036",
             )
         )
     for aid in ["R03", "R05", "R06"]:
@@ -155,10 +155,10 @@ def reset_demo(db: Session) -> dict[str, Any]:
                 "configuration_change",
                 6,
                 1,
-                "calibration_registry",
+                "config_registry",
                 "OBSERVED",
-                {"configuration": "camera-cal-C", "previous_configuration": "camera-cal-B", "firmware_version": "gripper-fw-7.3"},
-                f"{aid}-cal-c-fw-73",
+                {"configuration": "device-profile-C17", "previous_configuration": "device-profile-C16", "firmware_version": "module-fw-4.9", "network_profile": "site-network-N7"},
+                f"{aid}-profile-c17-fw-49",
             )
         )
     for index, aid in enumerate(sorted(affected_ids)):
@@ -168,10 +168,10 @@ def reset_demo(db: Session) -> dict[str, Any]:
                 "telemetry_anomaly",
                 11 + (index % 8),
                 1,
-                "run_telemetry",
+                "module_health",
                 "OBSERVED",
-                {"signal": "grip_pose_drift", "process_health": "degraded", "severity": "review", "offset_mm": 11 + (index * 4)},
-                f"{aid}-grip-drift",
+                {"signal": "module_unhealthy_reconnect_failures", "process_health": "degraded", "severity": "review", "reconnect_failures": 6 + (index * 3)},
+                f"{aid}-module-unhealthy",
             )
         )
     db.add(
@@ -182,11 +182,11 @@ def reset_demo(db: Session) -> dict[str, Any]:
             0,
             "engineer_note",
             "HUMAN_ASSERTED",
-            {"observation": "Engineer observes grip pose drifting after policy v0.9 in repeated real-world runs", "reported_by": "manipulation_engineer"},
+            {"observation": "Engineer observes repeated reconnects and module unhealthy state after app 0.36 rollout", "reported_by": "support_engineer"},
             "R03-engineer-note-1426",
         )
     )
-    inv = Investigation(id="inv-120-robots-bad-rollout", asset_id="R03", trigger_id="R03-grip-drift", title="Grip pose divergence after policy update")
+    inv = Investigation(id="inv-120-robots-bad-rollout", asset_id="R03", trigger_id="R03-module-unhealthy", title="Connectivity degradation after deployment")
     db.add(inv)
     db.commit()
     seed_decision_primitives(db, inv.id)
@@ -200,8 +200,8 @@ def seed_decision_primitives(db: Session, investigation_id: str) -> None:
         DecisionOption(
             id=f"opt-{uuid.uuid4().hex[:10]}",
             investigation_id=investigation_id,
-            option_type="rollback",
-            label="Roll back R03 and R05, monitor R06",
+            option_type="remote_fix",
+            label="Remote restart R03 and R05, hold field dispatch",
             expected_cost={"engineering_hours": 1.5, "field_visit": False, "rollout_delay_minutes": 45},
             expected_risk={"risk": "medium", "reason": "R06 remains exposed but has no known issue at decision time"},
             historical_support={"status": "none_yet", "summary": "No prior outcome in this workspace"},
@@ -210,25 +210,25 @@ def seed_decision_primitives(db: Session, investigation_id: str) -> None:
             id=f"opt-{uuid.uuid4().hex[:10]}",
             investigation_id=investigation_id,
             option_type="monitor",
-            label="Continue test run under observation",
+            label="Continue monitoring without intervention",
             expected_cost={"engineering_hours": 0.5, "field_visit": False, "rollout_delay_minutes": 0},
-            expected_risk={"risk": "high", "reason": "Affected machines may continue degrading before cause is established"},
+            expected_risk={"risk": "high", "reason": "Affected machines may continue dropping offline before site conditions are understood"},
             historical_support={"status": "weak", "summary": "No recovery evidence yet"},
         ),
         DecisionOption(
             id=f"opt-{uuid.uuid4().hex[:10]}",
             investigation_id=investigation_id,
             option_type="dispatch",
-            label="Send field technician",
+            label="Dispatch field engineer",
             expected_cost={"engineering_hours": 0.5, "field_visit": True, "estimated_cost_usd": 1200},
-            expected_risk={"risk": "low", "reason": "Fast physical inspection, but current evidence does not yet justify dispatch"},
+            expected_risk={"risk": "low", "reason": "Fast local inspection, but current evidence does not yet justify the visit"},
             historical_support={"status": "not_supported", "summary": "No hardware fault confirmed"},
         ),
         DecisionOption(
             id=f"opt-{uuid.uuid4().hex[:10]}",
             investigation_id=investigation_id,
             option_type="pause_rollout",
-            label="Pause rollout to exposed machines",
+            label="Hold rollout to exposed machines",
             expected_cost={"engineering_hours": 1.0, "field_visit": False, "rollout_delay_minutes": 60},
             expected_risk={"risk": "low", "reason": "Contains exposed group while preserving investigation time"},
             historical_support={"status": "reasonable", "summary": "Matches current evidence boundary"},
@@ -241,11 +241,11 @@ def seed_decision_primitives(db: Session, investigation_id: str) -> None:
             investigation_id=investigation_id,
             assessed_at=DEMO_DECISION_TIME,
             status="partial",
-            connected_sources=["policy_registry", "calibration_registry", "run_telemetry", "engineer_note"],
+            connected_sources=["deployment_manifest", "config_registry", "module_health", "engineer_note"],
             freshness={
-                "policy_registry": "fresh",
-                "calibration_registry": "fresh",
-                "run_telemetry": "partial",
+                "deployment_manifest": "fresh",
+                "config_registry": "fresh",
+                "module_health": "partial",
                 "engineer_note": "fresh",
             },
             completeness={
@@ -254,7 +254,7 @@ def seed_decision_primitives(db: Session, investigation_id: str) -> None:
                 "R06": "no known issue at decision time",
             },
             delayed_sources=["edge_buffer"],
-            missing_windows=["targeted low-light validation", "R06 post-run telemetry not known at 14:27"],
+            missing_windows=["customer-site firewall state", "exact disconnect reason", "R06 module-health buffer not known at 14:27"],
         )
     )
     db.commit()
@@ -322,7 +322,7 @@ def reconstruct(db: Session, investigation_id: str, knowledge_time: Optional[dat
     gaps = [f for f in required if not current.get(f)]
     if not human_discovery:
         gaps.append("human discovery context")
-    for contextual_gap in ["targeted low-light validation runs for calibration C", "engineer workaround rationale"]:
+    for contextual_gap in ["customer-site firewall state", "exact disconnect reason", "local module logs during reconnect window", "engineer workaround rationale"]:
         if contextual_gap not in gaps:
             gaps.append(contextual_gap)
     return {
@@ -355,11 +355,11 @@ def compare(db: Session, investigation_id: str) -> dict[str, Any]:
             (affected if anomalies else unaffected).append(asset.id)
     table = []
     dimensions = [
-        ("Policy v0.9", "application_version", "policy-v0.9"),
-        ("Camera calibration C", "configuration", "camera-cal-C"),
-        ("Gripper firmware 7.3", "firmware_version", "gripper-fw-7.3"),
-        ("Low-light test cell", "network_profile", "low-light-bin"),
-        ("End-effector G2", "connection_type", "gripper-G2"),
+        ("Application 0.36", "application_version", "app-0.36"),
+        ("Device profile C17", "configuration", "device-profile-C17"),
+        ("Module firmware 4.9", "firmware_version", "module-fw-4.9"),
+        ("Site network profile N7", "network_profile", "site-network-N7"),
+        ("Cellular-only", "connection_type", "cellular-only"),
     ]
     for label, key, expected in dimensions:
         affected_count = sum(1 for aid in affected if latest_state(db, aid, trigger.event_time).get(key) == expected)
@@ -374,14 +374,14 @@ def compare(db: Session, investigation_id: str) -> dict[str, Any]:
         "unaffected_assets": unaffected,
         "table": table,
         "interpretation": [
-            "Policy v0.9 ran on all six robots, so the model update alone does not explain the split.",
-            "Camera calibration C and gripper firmware 7.3 co-occur across the affected runs.",
-            "R06 shares the same combination without a known signal at decision time.",
-            "Low-light bin is present in 3/6 runs, but did not differentiate affected from stable robots at decision time.",
+            "Application 0.36 ran on all seven machines, so the application update alone does not explain the split.",
+            "Device profile C17, module firmware 4.9 and site network profile N7 co-occur across the affected machines.",
+            "R06 shares the same exposure without a known issue at decision time.",
+            "Cellular-only connectivity is present in both affected and healthy machines, so it is not sufficient on its own.",
             "This narrows the investigation; it does not establish cause.",
         ],
         "potentially_exposed": [
-            {"asset_id": "R06", "reason": "Shares calibration C and gripper firmware 7.3 exposure without a matching signal yet."}
+            {"asset_id": "R06", "reason": "Shares device profile C17, module firmware 4.9 and site network profile N7 without a known issue at decision time."}
         ],
     }
 
@@ -404,11 +404,11 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
     options = list(db.scalars(select(DecisionOption).where(DecisionOption.investigation_id == investigation_id).order_by(DecisionOption.option_type)))
     observability = db.scalar(select(ObservabilityState).where(ObservabilityState.investigation_id == investigation_id).order_by(ObservabilityState.assessed_at.desc()).limit(1))
     substantiation_checks = [
-        {"name": "affected population scoped", "status": "supported", "evidence": f"{len(comp['affected_assets'])} affected, {len(comp['unaffected_assets'])} stable comparison runs"},
+        {"name": "affected population scoped", "status": "supported", "evidence": f"{len(comp['affected_assets'])} affected, {len(comp['unaffected_assets'])} healthy comparison machines"},
         {"name": "exposed-but-stable systems identified", "status": "supported", "evidence": ", ".join(item["asset_id"] for item in comp["potentially_exposed"]) or "none"},
         {"name": "decision owner assigned", "status": "missing", "evidence": "no named human owner until decision is recorded"},
         {"name": "unknowns explicitly preserved", "status": "supported", "evidence": "; ".join(unknowns[:2])},
-        {"name": "inference boundary checked", "status": "warning", "evidence": "calibration/firmware interaction is plausible, not established cause"},
+        {"name": "inference boundary checked", "status": "warning", "evidence": "firmware/profile/network exposure is plausible, not established cause"},
         {"name": "outcome follow-up required", "status": "missing", "evidence": "no outcome record yet"},
     ]
     package = {
@@ -418,7 +418,7 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
         "first_abnormal_evidence": rec["first_abnormal_evidence"],
         "machine_state": rec["current_state"],
         "peer_comparison": comp,
-        "supporting_evidence": ["policy registry", "calibration record", "run telemetry", "engineer note"],
+        "supporting_evidence": ["deployment manifest", "configuration record", "module health telemetry", "engineer note"],
         "missing_evidence": rec["evidence_gaps"],
         "current_interpretation": comp["interpretation"],
         "human_decision": None,
@@ -467,7 +467,7 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
 def attach_human_decision(db: Session, decision: Decision) -> None:
     options_for_record = []
     for option in db.scalars(select(DecisionOption).where(DecisionOption.investigation_id == decision.investigation_id)):
-        option.selected = option.option_type in {"rollback", "pause_rollout"}
+        option.selected = option.option_type in {"remote_fix", "pause_rollout"}
         option.decision_id = decision.id
         options_for_record.append(serialize_option(option))
         db.add(option)
@@ -480,11 +480,11 @@ def attach_human_decision(db: Session, decision: Decision) -> None:
             id=f"act-{uuid.uuid4().hex[:10]}",
             investigation_id=decision.investigation_id,
             decision_id=decision.id,
-            action_type="rollback_and_pause_rollout",
+            action_type="remote_fix_and_hold_rollout",
             owner=decision.owner,
             executed_at=DEMO_DECISION_TIME + timedelta(minutes=4),
-            scope={"rollback": ["R03", "R05"], "watch": ["R06"], "held_rollout": ["calibration C", "gripper firmware 7.3"]},
-            payload={"customer_support": "informed", "field_dispatch": "held"},
+            scope={"remote_restart": ["R03", "R05"], "watch": ["R06"], "held_rollout": ["device profile C17", "module firmware 4.9"]},
+            payload={"customer_support": "informed", "field_dispatch": "held", "remote_fix": "module reconnect and restart"},
         )
     )
     snapshot = db.scalar(select(EvidenceSnapshot).where(EvidenceSnapshot.investigation_id == decision.investigation_id).order_by(EvidenceSnapshot.snapshot_time.desc()).limit(1))
@@ -755,14 +755,14 @@ def inject_late_evidence(db: Session) -> dict[str, Any]:
         "delayed_edge_buffer",
         "OBSERVED",
         {
-            "signal": "grip_pose_drift",
+            "signal": "module_unhealthy_reconnect_failures",
             "process_health": "degraded",
             "severity": "review",
-            "offset_mm": 9,
-            "source_detail": "post-run telemetry re-analysis",
-            "note": "R06 post-run telemetry was re-analyzed at 14:31; grip pose drift was present at 14:09:11.",
+            "reconnect_failures": 5,
+            "source_detail": "delayed edge buffer upload",
+            "note": "R06 module-health buffer was uploaded at 14:31; reconnect failures were present at 14:09:11.",
         },
-        "R06-delayed-grip-drift",
+        "R06-delayed-module-unhealthy",
         ingested_delay_seconds=4,
     )
     if not db.get(Evidence, ev.id):
@@ -771,10 +771,10 @@ def inject_late_evidence(db: Session) -> dict[str, Any]:
     investigation_id = "inv-120-robots-bad-rollout"
     latest_decision = db.scalar(select(Decision).where(Decision.investigation_id == investigation_id).order_by(Decision.decided_at.desc()).limit(1))
     latest_record = db.scalar(select(DecisionRecord).where(DecisionRecord.investigation_id == investigation_id).order_by(DecisionRecord.decision_time.desc()).limit(1))
-    if not db.get(LateEvidence, "late-R06-delayed-grip-drift"):
+    if not db.get(LateEvidence, "late-R06-delayed-module-unhealthy"):
         db.add(
             LateEvidence(
-                id="late-R06-delayed-grip-drift",
+                id="late-R06-delayed-module-unhealthy",
                 investigation_id=investigation_id,
                 evidence_id=ev.id,
                 decision_id=latest_decision.id if latest_decision else None,
@@ -827,9 +827,9 @@ def record_cost_impact(db: Session, outcome: Outcome) -> CostImpact:
         id=f"attr-{uuid.uuid4().hex[:10]}",
         investigation_id=outcome.investigation_id,
         outcome_id=outcome.id,
-        action_type="rollback_and_pause_rollout",
+        action_type="remote_fix_and_hold_rollout",
         attribution_level=payload.get("attribution_level", "observed"),
-        rationale=payload.get("attribution_rationale", "Recovery was observed after rollback. The rollback is not treated as proven causal."),
+        rationale=payload.get("attribution_rationale", "Connectivity recovery was observed after remote restart. The restart is not treated as proven causal."),
         evidence={
             "recovery_observed_after_action": True,
             "causal_proof": False,
@@ -846,9 +846,9 @@ def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
     cost_rows = list(db.scalars(select(CostImpact).where(CostImpact.investigation_id == investigation_id)))
     attributions = list(db.scalars(select(OutcomeAttribution).where(OutcomeAttribution.investigation_id == investigation_id)))
     response_history = {
-        "rollback": {
-            "cases": len([o for o in outcomes if "rollback" in (o.outcome or "").lower() or "rollback" in json.dumps(o.payload or {}).lower()]),
-            "observed_outcome": "affected machines recovered in the demo case" if outcomes else "no outcome recorded",
+        "remote_fix": {
+            "cases": len([o for o in outcomes if "remote" in (o.outcome or "").lower() or "restart" in json.dumps(o.payload or {}).lower()]),
+            "observed_outcome": "connectivity restored without a field visit" if outcomes else "no outcome recorded",
             "attribution": attributions[0].attribution_level if attributions else "not_observed",
         },
         "monitor": {"cases": 0, "observed_outcome": "not yet observed"},
@@ -860,10 +860,10 @@ def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
         "query": {
             "question": "In similar conditions, what responses were tried and what happened?",
             "state": {
-                "policy": "policy-v0.9",
-                "configuration": "camera-cal-C",
-                "firmware": "gripper-fw-7.3",
-                "signal": "grip_pose_drift",
+                "application": "app-0.36",
+                "configuration": "device-profile-C17",
+                "firmware": "module-fw-4.9",
+                "signal": "module_unhealthy_reconnect_failures",
             },
         },
         "similar_state": {
@@ -873,7 +873,7 @@ def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
         },
         "response_history": response_history,
         "outcome_comparison": [
-            {"action": "rollback", "cases": response_history["rollback"]["cases"], "outcome": response_history["rollback"]["observed_outcome"], "attribution": response_history["rollback"]["attribution"]},
+            {"action": "remote_fix", "cases": response_history["remote_fix"]["cases"], "outcome": response_history["remote_fix"]["observed_outcome"], "attribution": response_history["remote_fix"]["attribution"]},
             {"action": "monitor", "cases": response_history["monitor"]["cases"], "outcome": response_history["monitor"]["observed_outcome"], "attribution": "not_observed"},
             {"action": "dispatch", "cases": response_history["dispatch"]["cases"], "outcome": response_history["dispatch"]["observed_outcome"], "attribution": "not_supported"},
             {"action": "pause_rollout", "cases": response_history["pause_rollout"]["cases"], "outcome": response_history["pause_rollout"]["observed_outcome"], "attribution": "observed"},
@@ -912,7 +912,7 @@ def similar_memory(db: Session, investigation_id: str) -> dict[str, Any]:
         "similar_cases": [
             {
                 "investigation_id": o.investigation_id,
-                "match_reason": "same policy-update family, grip pose drift signal, calibration-specific split",
+                "match_reason": "same post-deployment connectivity degradation, module-health signal and firmware/profile split",
                 "outcome": o.outcome,
                 "recorded_at": iso(o.recorded_at),
             }

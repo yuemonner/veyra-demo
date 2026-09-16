@@ -25,15 +25,15 @@ export default async function Page() {
         <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Review cinematic case</Link><Link className="button" href="/product-demo">Open live product</Link></div></div>
         <section className="hero">
           <span className="eyebrow">Operational intelligence for Physical AI.</span>
-          <h1>One update. Six machines. Two behave differently.</h1>
+          <h1>One deployment. Seven machines. Two start dropping offline.</h1>
           <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and outcome.</p>
           <p><b>See what changed. Decide what to do. Know whether it worked. Reuse it next time.</b></p>
           <div className="hero-actions"><Link className="button primary" href="/product-demo">Open live product</Link><Link className="button" href="/cinematic">Review cinematic case</Link></div>
         </section>
         <div className="grid three">
-          <article className="panel metric"><span>Test set</span><strong>{assets.length || "6"}</strong><p>robots updated.</p></article>
-          <article className="panel metric"><span>Affected</span><strong>2</strong><p>grip pose drift.</p></article>
-          <article className="panel metric"><span>Stable</span><strong>4</strong><p>same policy, no signal.</p></article>
+          <article className="panel metric"><span>Machine group</span><strong>{assets.length || "7"}</strong><p>machines updated.</p></article>
+          <article className="panel metric"><span>Affected</span><strong>2</strong><p>module unhealthy.</p></article>
+          <article className="panel metric"><span>Stable</span><strong>5</strong><p>same app, no signal.</p></article>
         </div>
         <section className="investigation panel">
           <span className="eyebrow">Backend v0 live</span>
