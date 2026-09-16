@@ -317,6 +317,7 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
         <PackageItem title="Recent changes" value="policy v0.8 to v0.9 · calibration B to C · gripper firmware 7.2 to 7.3" />
         <PackageItem title="Machine state" value={rec?.current_state?.health || "degraded"} />
         <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 2} / ${comparison?.same_change ?? 6}`} />
+        <PackageItem title="Observability status" value="partial at decision time" />
         <PackageItem title="Observed" value="engineer note recorded at 14:26" />
         <PackageItem title="Inferred" value="calibration C and gripper firmware 7.3 co-occur across affected runs" />
         <PackageItem title="Human asserted" value="engineer suspects calibration mismatch after policy update" />
@@ -330,6 +331,26 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
       <div className="split-count">
         <div><strong>What the team knew at 14:27</strong><span>R03 affected · R05 affected · R06 no known issue</span></div>
         <div><strong>What Veyra knows now</strong><span>R06 had an earlier signal that became available later</span></div>
+      </div>
+      <div className="evidence-columns">
+        <div className="evidence-card">
+          <span className="eyebrow">Evidence available at decision time</span>
+          <ul>
+            <li>R03 affected</li>
+            <li>R05 affected</li>
+            <li>R06 no known issue</li>
+            <li>Telemetry completeness: partial</li>
+          </ul>
+        </div>
+        <div className="evidence-card">
+          <span className="eyebrow">Later evidence</span>
+          <ul>
+            <li>R06 event_time: 14:09</li>
+            <li>Ingested: 14:31</li>
+            <li>Arrived after decision</li>
+            <li>Review required</li>
+          </ul>
+        </div>
       </div>
       <div className="callout warning">
         <b>{pkg.package.decision_substantiation?.question || "Is the team ready to act on this case?"}</b>
@@ -378,6 +399,10 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
       <span className="eyebrow">Outcome</span>
       <h2>Did the action work?</h2>
       <p>R03 and R05 recover after rollback. R06 later shows the same pattern.</p>
+      <div className="callout warning">
+        <b>New decision-relevant evidence arrived</b>
+        <p>The original decision record remains unchanged. The current case view is updated and flagged for review.</p>
+      </div>
       <p className="evidence-detail">Late evidence: R06 post-run telemetry was re-analyzed at 14:31; grip pose drift was present at 14:09:11.</p>
       <div className="time-rail">
         <div><b>14:09</b><span>event_time</span><small>post-run telemetry shows drift</small></div>
@@ -415,13 +440,27 @@ function MemoryStage({ memory, onOutcome }: any) {
       <p>R12 begins showing grip pose drift after a new software test.</p>
       <div className="callout">
         <b>{hasMemory ? "Similar previous case" : "Reusable case preview"}</b>
-        <p>Under similar conditions, rollout was paused, rollback recovered the affected machines, field dispatch was avoided, and one additional affected machine appeared later.</p>
+        <p>Use the previous case as operational precedent. It records what conditions were present, what the team did and what outcome followed.</p>
+      </div>
+      <div className="precedent-stack">
+        <div>
+          <span className="eyebrow">Previous conditions</span>
+          <b>v0.9 · Calibration C · Firmware 7.3</b>
+        </div>
+        <div>
+          <span className="eyebrow">Previous action</span>
+          <b>Rollout paused · R03/R05 rolled back</b>
+        </div>
+        <div>
+          <span className="eyebrow">Observed outcome</span>
+          <b>Both recovered · no field visit · R06 later showed same pattern</b>
+        </div>
       </div>
       <div className="package-grid memory-grid">
-        <PackageItem title="Previous case" value="same software release and calibration C exposure" />
-        <PackageItem title="Previous action" value="pause rollout and roll back affected machines" />
-        <PackageItem title="Previous outcome" value="rollback recovered 2 of 2 affected machines" />
-        <PackageItem title="Later learning" value="one additional exposed machine failed later" />
+        <PackageItem title="Evidence strength" value="precedent, not causal proof" />
+        <PackageItem title="Previously successful" value="not yet validated as causal" />
+        <PackageItem title="What to reuse" value="check prior conditions before field dispatch" />
+        <PackageItem title="What to verify" value="whether the same evidence pattern holds now" />
       </div>
       <div className="callout">
         <b>Before dispatching a technician</b>
