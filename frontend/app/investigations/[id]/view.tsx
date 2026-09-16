@@ -133,7 +133,8 @@ function InvestigationInner({ id }: { id: string }) {
       <aside className="sidebar">
         <div className="brand"><span className="mark">V</span> Veyra</div>
         <nav className="nav">
-          <Link href="/">Overview</Link>
+          <Link href="/">Home</Link>
+          <span className="nav-section-label">Case</span>
           <button className={stage === "overview" ? "active" : ""} onClick={() => setStage("overview")}>Overview</button>
           <button className={stage === "changes" ? "active" : ""} onClick={() => setStage("changes")}>Changes</button>
           <button className={stage === "scope" ? "active" : ""} onClick={() => setStage("scope")}>Scope</button>
