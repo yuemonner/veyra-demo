@@ -118,6 +118,22 @@ class ExecutedAction(Base):
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
+class DecisionRecord(Base):
+    __tablename__ = "decision_records"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    decision_id: Mapped[str] = mapped_column(String, ForeignKey("decisions.id"), index=True)
+    package_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("decision_packages.id"), nullable=True, index=True)
+    decision_time: Mapped[datetime] = mapped_column(DateTime, index=True)
+    owner: Mapped[str] = mapped_column(String)
+    chosen_option: Mapped[dict] = mapped_column(JSON, default=dict)
+    options_considered: Mapped[list] = mapped_column(JSON, default=list)
+    evidence_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
+    observability_state: Mapped[dict] = mapped_column(JSON, default=dict)
+    immutable: Mapped[bool] = mapped_column(Boolean, default=True)
+    digest: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+
 class Outcome(Base):
     __tablename__ = "outcomes"
     id: Mapped[str] = mapped_column(String, primary_key=True)
@@ -125,6 +141,17 @@ class Outcome(Base):
     outcome: Mapped[str] = mapped_column(String)
     recorded_at: Mapped[datetime] = mapped_column(DateTime)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class OutcomeAttribution(Base):
+    __tablename__ = "outcome_attributions"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    outcome_id: Mapped[str] = mapped_column(String, ForeignKey("outcomes.id"), index=True)
+    action_type: Mapped[str] = mapped_column(String, index=True)
+    attribution_level: Mapped[str] = mapped_column(String, default="observed")
+    rationale: Mapped[str] = mapped_column(Text)
+    evidence: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class CostImpact(Base):

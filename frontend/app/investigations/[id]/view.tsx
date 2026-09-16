@@ -28,6 +28,8 @@ function InvestigationInner({ id }: { id: string }) {
   const [pkg, setPkg] = useState<DecisionPackage | null>(null);
   const [verification, setVerification] = useState<Verification | null>(null);
   const [memory, setMemory] = useState<any>(null);
+  const [decisionContext, setDecisionContext] = useState<any>(null);
+  const [precedent, setPrecedent] = useState<any>(null);
   const [stage, setStage] = useState("overview");
   const [notice, setNotice] = useState("Ready.");
 
@@ -41,6 +43,8 @@ function InvestigationInner({ id }: { id: string }) {
       setRec(await postJson(`/investigations/${investigationId}/reconstruct`));
       setComparison(await getJson(`/investigations/${investigationId}/comparison`));
       setMemory(await getJson(`/memory/similar?investigation_id=${investigationId}`));
+      setDecisionContext(await getJson(`/investigations/${investigationId}/decision-context`));
+      setPrecedent(await getJson(`/precedents/compare?investigation_id=${investigationId}`));
     } catch (error) {
       reportError("Refresh", error);
     }
@@ -54,6 +58,8 @@ function InvestigationInner({ id }: { id: string }) {
       setPkg(null);
       setVerification(null);
       setMemory(null);
+      setDecisionContext(null);
+      setPrecedent(null);
       setStage("overview");
       setNotice("Scenario reset. 2 robots are known affected at decision time.");
       await refresh();
@@ -66,6 +72,8 @@ function InvestigationInner({ id }: { id: string }) {
     try {
       const next = await postJson<DecisionPackage>(`/investigations/${investigationId}/decision-package`);
       setPkg(next);
+      setDecisionContext(await getJson(`/investigations/${investigationId}/decision-context`));
+      setPrecedent(await getJson(`/precedents/compare?investigation_id=${investigationId}`));
       setVerification(null);
       setStage("decision");
       setNotice("Decision Package generated from backend evidence.");
@@ -86,6 +94,8 @@ function InvestigationInner({ id }: { id: string }) {
       const sealed = await postJson<DecisionPackage>(`/decision-packages/${pkg.id}/seal`);
       setPkg(sealed);
       setVerification(await getJson<Verification>(`/decision-packages/${sealed.id}/verify`));
+      setDecisionContext(await getJson(`/investigations/${investigationId}/decision-context`));
+      setPrecedent(await getJson(`/precedents/compare?investigation_id=${investigationId}`));
       setNotice("Operational Case updated with team action and decision state.");
     } catch (error) {
       reportError("Decision Package sealing", error);
@@ -96,6 +106,7 @@ function InvestigationInner({ id }: { id: string }) {
     try {
       await postJson("/demo/late-evidence");
       await refresh();
+      setDecisionContext(await getJson(`/investigations/${investigationId}/decision-context`));
       setStage("outcome");
       setNotice("Delayed run evidence arrived with event_time before the engineer note.");
     } catch (error) {
@@ -107,9 +118,10 @@ function InvestigationInner({ id }: { id: string }) {
     try {
       await postJson(`/investigations/${investigationId}/outcome`, {
         outcome: "Calibration C and gripper firmware 7.3 held; affected robots recovered after targeted rollback",
-        payload: { previous_action: "Pause v0.9 on robots with calibration C and firmware 7.3", recovery_minutes: 18, days_later: 12 },
+        payload: { previous_action: "Pause v0.9 on robots with calibration C and firmware 7.3", recovery_minutes: 18, days_later: 12, attribution_level: "observed", attribution_rationale: "Recovery was observed after rollback. Rollback is not treated as proven causal." },
       });
       setMemory(await getJson(`/memory/similar?investigation_id=${investigationId}`));
+      setPrecedent(await getJson(`/precedents/compare?investigation_id=${investigationId}`));
       setStage("history");
       setNotice("Outcome linked. This case can now be reused by the next similar review.");
     } catch (error) {
@@ -220,11 +232,11 @@ function InvestigationInner({ id }: { id: string }) {
 
         {stage === "overview" && <LiveFailure rec={rec} comparison={comparison} detectionLead={detectionLead} onChanges={() => setStage("changes")} onPackage={generatePackage} />}
         {stage === "changes" && <ChangesStage onScope={() => setStage("scope")} />}
-        {stage === "scope" && <CompareStage comparison={comparison} onPackage={generatePackage} />}
-        {stage === "decision" && <PackageStage pkg={pkg} verification={verification} rec={rec} comparison={comparison} onGenerate={generatePackage} onSeal={seal} />}
+        {stage === "scope" && <CompareStage comparison={comparison} precedent={precedent} onPackage={generatePackage} />}
+        {stage === "decision" && <PackageStage pkg={pkg} verification={verification} rec={rec} comparison={comparison} decisionContext={decisionContext} onGenerate={generatePackage} onSeal={seal} />}
         {stage === "action" && <ActionStage pkg={pkg} onGenerate={generatePackage} onSeal={seal} onOutcome={() => setStage("outcome")} />}
         {stage === "outcome" && <LateEvidenceStage pkg={pkg} verification={verification} comparison={comparison} onSeal={seal} onOutcome={outcome} />}
-        {stage === "history" && <MemoryStage memory={memory} onOutcome={outcome} />}
+        {stage === "history" && <MemoryStage memory={memory} precedent={precedent} onOutcome={outcome} />}
       </main>
     </div>
   );
@@ -278,7 +290,8 @@ function ChangesStage({ onScope }: { onScope: () => void }) {
   );
 }
 
-function CompareStage({ comparison, onPackage }: any) {
+function CompareStage({ comparison, precedent, onPackage }: any) {
+  const outcomeRows = precedent?.outcome_comparison || [];
   return (
     <article className="panel">
       <span className="eyebrow">Scope</span>
@@ -296,15 +309,32 @@ function CompareStage({ comparison, onPackage }: any) {
         <b>What the evidence narrows</b>
         <p>Policy v0.9 is shared across both groups. Calibration C and gripper firmware 7.3 are shared by both affected machines, while R06 has the same exposure without a known failure at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
       </div>
+      <div className="callout">
+        <b>Decision comparison</b>
+        <p>Similar conditions are evaluated by response history, outcome and attribution strength.</p>
+      </div>
+      <table className="table focus-table">
+        <thead><tr><th>Option</th><th>Prior outcome</th><th>Attribution</th></tr></thead>
+        <tbody>
+          {(outcomeRows.length ? outcomeRows : [
+            { action: "rollback", outcome: "no outcome recorded", attribution: "not observed" },
+            { action: "monitor", outcome: "not yet observed", attribution: "not observed" },
+            { action: "dispatch", outcome: "not supported by current evidence", attribution: "not supported" },
+          ]).map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome || row.status}</td><td>{row.attribution}</td></tr>)}
+        </tbody>
+      </table>
       <button className="button primary" onClick={onPackage}>Review case</button>
     </article>
   );
 }
 
-function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }: any) {
+function PackageStage({ pkg, verification, rec, comparison, decisionContext, onGenerate, onSeal }: any) {
   if (!pkg) {
     return <article className="panel"><span className="eyebrow">Operational case</span><h2>No case package generated yet.</h2><p>Open the case package to assemble trigger, last healthy state, changes, peer comparison, missing context, decision state and outcome follow-up.</p><button className="button primary" onClick={onGenerate}>Open case package</button></article>;
   }
+  const record = decisionContext?.decision_records?.[0];
+  const options = decisionContext?.options_considered || pkg.package.options_considered || [];
+  const observability = decisionContext?.observability_state || pkg.package.observability_state;
   return (
     <article className="panel">
       <div className="package-head">
@@ -317,7 +347,7 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
         <PackageItem title="Recent changes" value="policy v0.8 to v0.9 · calibration B to C · gripper firmware 7.2 to 7.3" />
         <PackageItem title="Machine state" value={rec?.current_state?.health || "degraded"} />
         <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 2} / ${comparison?.same_change ?? 6}`} />
-        <PackageItem title="Observability status" value="partial at decision time" />
+        <PackageItem title="Observability status" value={`${observability?.status || "partial"} at decision time`} />
         <PackageItem title="Observed" value="engineer note recorded at 14:26" />
         <PackageItem title="Inferred" value="calibration C and gripper firmware 7.3 co-occur across affected runs" />
         <PackageItem title="Human asserted" value="engineer suspects calibration mismatch after policy update" />
@@ -328,6 +358,20 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
         <PackageItem title="Human action" value={pkg.package.human_decision?.decision || "pending"} />
         <PackageItem title="Outcome" value="pending" />
       </div>
+      <div className="callout">
+        <b>Decision record</b>
+        <p>{record ? "Evidence snapshot, options, chosen option, owner and observability state are locked into an immutable decision-time record." : "Record the decision to lock evidence snapshot, options, chosen option, owner and observability state."}</p>
+      </div>
+      <div className="package-grid">
+        <PackageItem title="Decision time" value={decisionContext?.decision_time?.slice(11, 16) || "14:27"} />
+        <PackageItem title="Owner" value={record?.owner || pkg.package.human_decision?.owner || "pending"} />
+        <PackageItem title="Chosen option" value={record?.chosen_option?.label || "pending"} />
+        <PackageItem title="Record digest" value={record?.digest?.slice(0, 16) || "pending"} />
+      </div>
+      <table className="table focus-table">
+        <thead><tr><th>Option</th><th>Expected cost</th><th>Expected risk</th><th>Status</th></tr></thead>
+        <tbody>{options.map((option: any) => <tr key={option.id || option.option_type}><td>{option.label}</td><td>{summarizeObject(option.expected_cost)}</td><td>{option.expected_risk?.risk || option.expected_risk?.reason || "unknown"}</td><td>{option.selected ? "chosen" : "available"}</td></tr>)}</tbody>
+      </table>
       <div className="split-count">
         <div><strong>What the team knew at 14:27</strong><span>R03 affected · R05 affected · R06 no known issue</span></div>
         <div><strong>What Veyra knows now</strong><span>R06 had an earlier signal that became available later</span></div>
@@ -431,8 +475,9 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
   );
 }
 
-function MemoryStage({ memory, onOutcome }: any) {
+function MemoryStage({ memory, precedent, onOutcome }: any) {
   const hasMemory = memory?.similar_cases?.length > 0;
+  const rows = precedent?.outcome_comparison || memory?.precedent_comparison?.outcome_comparison || [];
   return (
     <article className="panel final-stage">
       <span className="eyebrow">12 days later</span>
@@ -458,10 +503,19 @@ function MemoryStage({ memory, onOutcome }: any) {
       </div>
       <div className="package-grid memory-grid">
         <PackageItem title="Evidence strength" value="precedent, not causal proof" />
-        <PackageItem title="Previously successful" value="not yet validated as causal" />
+        <PackageItem title="Previously successful" value="observed after action" />
         <PackageItem title="What to reuse" value="check prior conditions before field dispatch" />
         <PackageItem title="What to verify" value="whether the same evidence pattern holds now" />
       </div>
+      <table className="table focus-table">
+        <thead><tr><th>Action</th><th>Observed outcome</th><th>Attribution</th></tr></thead>
+        <tbody>
+          {(rows.length ? rows : [
+            { action: "rollback", outcome: "record outcome first", attribution: "not observed" },
+            { action: "dispatch", outcome: "not supported by current evidence", attribution: "not supported" },
+          ]).map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome || row.status}</td><td>{row.attribution}</td></tr>)}
+        </tbody>
+      </table>
       <div className="callout">
         <b>Before dispatching a technician</b>
         <p>Compare the current machine against the previous exposed group and check whether the same software and calibration combination is present.</p>
@@ -485,6 +539,11 @@ function PackageItem({ title, value }: { title: string; value: string }) {
 
 function Metric({ label, value, note }: { label: string; value: string; note: string }) {
   return <article className="panel metric"><span>{label}</span><strong>{value || "—"}</strong><p>{note}</p></article>;
+}
+
+function summarizeObject(value: any) {
+  if (!value || typeof value !== "object") return value || "—";
+  return Object.entries(value).map(([key, item]) => `${key}: ${item}`).join(" · ");
 }
 
 function short(value?: string) {

@@ -107,9 +107,13 @@ def test_decision_context_tracks_options_observability_actions_and_late_review_f
     assert any(option["selected"] for option in context["options_considered"])
     assert context["executed_actions"][0]["action_type"] == "rollback_and_pause_rollout"
     assert context["evidence_snapshots"]
+    assert context["decision_records"][0]["immutable"] is True
+    assert context["decision_records"][0]["chosen_option"]["option_type"] in {"rollback", "pause_rollout"}
+    decision_record_digest = context["decision_records"][0]["digest"]
     client.post("/demo/late-evidence")
     context_after_late = client.get(f"/investigations/{investigation_id}/decision-context").json()
     assert context_after_late["review_flags"][0]["flag_type"] == "late_decision_relevant_evidence"
+    assert context_after_late["decision_records"][0]["digest"] == decision_record_digest
 
 
 def test_runtime_event_only_needs_event_time():
@@ -147,4 +151,7 @@ def test_outcome_becomes_operational_memory():
     assert memory["precedent_comparison"]["evidence_strength"] == "precedent, not causal proof"
     precedent = client.get(f"/precedents/compare?investigation_id={investigation_id}").json()
     assert precedent["response_history"]["rollback"]["cases"] >= 1
+    assert precedent["response_history"]["rollback"]["attribution"] == "observed"
     assert precedent["cost_comparison"][0]["field_visit"] is False
+    rollback_row = [row for row in precedent["outcome_comparison"] if row["action"] == "rollback"][0]
+    assert rollback_row["attribution"] == "observed"

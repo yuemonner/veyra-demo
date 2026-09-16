@@ -18,6 +18,7 @@ from app.models import (
     Decision,
     DecisionOption,
     DecisionPackage,
+    DecisionRecord,
     Evidence,
     EvidenceSnapshot,
     ExecutedAction,
@@ -25,6 +26,7 @@ from app.models import (
     LateEvidence,
     ObservabilityState,
     Outcome,
+    OutcomeAttribution,
     PrecedentComparison,
     ReviewFlag,
 )
@@ -83,7 +85,9 @@ def reset_demo(db: Session) -> dict[str, Any]:
         ReviewFlag,
         LateEvidence,
         CostImpact,
+        OutcomeAttribution,
         Outcome,
+        DecisionRecord,
         ExecutedAction,
         ObservabilityState,
         DecisionOption,
@@ -461,9 +465,11 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
 
 
 def attach_human_decision(db: Session, decision: Decision) -> None:
+    options_for_record = []
     for option in db.scalars(select(DecisionOption).where(DecisionOption.investigation_id == decision.investigation_id)):
         option.selected = option.option_type in {"rollback", "pause_rollout"}
         option.decision_id = decision.id
+        options_for_record.append(serialize_option(option))
         db.add(option)
     observability = db.scalar(select(ObservabilityState).where(ObservabilityState.investigation_id == decision.investigation_id).order_by(ObservabilityState.assessed_at.desc()).limit(1))
     if observability:
@@ -481,6 +487,39 @@ def attach_human_decision(db: Session, decision: Decision) -> None:
             payload={"customer_support": "informed", "field_dispatch": "held"},
         )
     )
+    snapshot = db.scalar(select(EvidenceSnapshot).where(EvidenceSnapshot.investigation_id == decision.investigation_id).order_by(EvidenceSnapshot.snapshot_time.desc()).limit(1))
+    chosen = [item for item in options_for_record if item["selected"]]
+    record_body = {
+        "decision_id": decision.id,
+        "decision_time": iso(DEMO_DECISION_TIME),
+        "owner": decision.owner,
+        "chosen_option": chosen,
+        "options_considered": options_for_record,
+        "evidence_snapshot": {
+            "id": snapshot.id if snapshot else None,
+            "known_state": snapshot.known_state if snapshot else {},
+            "unknowns": snapshot.unknowns if snapshot else [],
+        },
+        "observability_state": serialize_observability(observability),
+    }
+    record_digest = hashlib.sha256(json.dumps(record_body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    if not db.scalar(select(DecisionRecord.id).where(DecisionRecord.decision_id == decision.id).limit(1)):
+        db.add(
+            DecisionRecord(
+                id=f"drec-{uuid.uuid4().hex[:10]}",
+                investigation_id=decision.investigation_id,
+                decision_id=decision.id,
+                package_id=decision.package_id,
+                decision_time=DEMO_DECISION_TIME,
+                owner=decision.owner,
+                chosen_option=chosen[0] if chosen else {},
+                options_considered=options_for_record,
+                evidence_snapshot=record_body["evidence_snapshot"],
+                observability_state=record_body["observability_state"] or {},
+                immutable=True,
+                digest=record_digest,
+            )
+        )
     if not decision.package_id:
         return
     dp = db.get(DecisionPackage, decision.package_id)
@@ -551,6 +590,7 @@ def decision_context(db: Session, investigation_id: str) -> dict[str, Any]:
     actions = list(db.scalars(select(ExecutedAction).where(ExecutedAction.investigation_id == investigation_id).order_by(ExecutedAction.executed_at.desc())))
     snapshots = list(db.scalars(select(EvidenceSnapshot).where(EvidenceSnapshot.investigation_id == investigation_id).order_by(EvidenceSnapshot.snapshot_time.desc())))
     flags = list(db.scalars(select(ReviewFlag).where(ReviewFlag.investigation_id == investigation_id).order_by(ReviewFlag.created_at.desc())))
+    records = list(db.scalars(select(DecisionRecord).where(DecisionRecord.investigation_id == investigation_id).order_by(DecisionRecord.decision_time.desc())))
     return {
         "investigation_id": investigation_id,
         "decision_time": iso(DEMO_DECISION_TIME),
@@ -593,6 +633,22 @@ def decision_context(db: Session, investigation_id: str) -> dict[str, Any]:
         "review_flags": [
             {"id": item.id, "flag_type": item.flag_type, "severity": item.severity, "reason": item.reason, "status": item.status}
             for item in flags
+        ],
+        "decision_records": [
+            {
+                "id": item.id,
+                "decision_id": item.decision_id,
+                "package_id": item.package_id,
+                "decision_time": iso(item.decision_time),
+                "owner": item.owner,
+                "chosen_option": item.chosen_option,
+                "options_considered": item.options_considered,
+                "evidence_snapshot": item.evidence_snapshot,
+                "observability_state": item.observability_state,
+                "immutable": item.immutable,
+                "digest": item.digest,
+            }
+            for item in records
         ],
     }
 
@@ -714,6 +770,7 @@ def inject_late_evidence(db: Session) -> dict[str, Any]:
         db.commit()
     investigation_id = "inv-120-robots-bad-rollout"
     latest_decision = db.scalar(select(Decision).where(Decision.investigation_id == investigation_id).order_by(Decision.decided_at.desc()).limit(1))
+    latest_record = db.scalar(select(DecisionRecord).where(DecisionRecord.investigation_id == investigation_id).order_by(DecisionRecord.decision_time.desc()).limit(1))
     if not db.get(LateEvidence, "late-R06-delayed-grip-drift"):
         db.add(
             LateEvidence(
@@ -739,7 +796,12 @@ def inject_late_evidence(db: Session) -> dict[str, Any]:
             )
         )
         db.commit()
-    return {"late_evidence": serialize_evidence(ev), "comparison": compare(db, investigation_id), "review_required": True}
+    return {
+        "late_evidence": serialize_evidence(ev),
+        "comparison": compare(db, investigation_id),
+        "review_required": True,
+        "decision_record_unchanged": latest_record.digest if latest_record else None,
+    }
 
 
 def record_cost_impact(db: Session, outcome: Outcome) -> CostImpact:
@@ -761,6 +823,20 @@ def record_cost_impact(db: Session, outcome: Outcome) -> CostImpact:
         },
     )
     db.add(impact)
+    attribution = OutcomeAttribution(
+        id=f"attr-{uuid.uuid4().hex[:10]}",
+        investigation_id=outcome.investigation_id,
+        outcome_id=outcome.id,
+        action_type="rollback_and_pause_rollout",
+        attribution_level=payload.get("attribution_level", "observed"),
+        rationale=payload.get("attribution_rationale", "Recovery was observed after rollback. The rollback is not treated as proven causal."),
+        evidence={
+            "recovery_observed_after_action": True,
+            "causal_proof": False,
+            "recurrence_window": payload.get("recurrence_window", "24h clean for R03/R05; R06 later showed same pattern"),
+        },
+    )
+    db.add(attribution)
     return impact
 
 
@@ -768,10 +844,12 @@ def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
     comp = compare(db, investigation_id)
     outcomes = list(db.scalars(select(Outcome).order_by(Outcome.recorded_at.desc())))
     cost_rows = list(db.scalars(select(CostImpact).where(CostImpact.investigation_id == investigation_id)))
+    attributions = list(db.scalars(select(OutcomeAttribution).where(OutcomeAttribution.investigation_id == investigation_id)))
     response_history = {
         "rollback": {
             "cases": len([o for o in outcomes if "rollback" in (o.outcome or "").lower() or "rollback" in json.dumps(o.payload or {}).lower()]),
             "observed_outcome": "affected machines recovered in the demo case" if outcomes else "no outcome recorded",
+            "attribution": attributions[0].attribution_level if attributions else "not_observed",
         },
         "monitor": {"cases": 0, "observed_outcome": "not yet observed"},
         "dispatch": {"cases": 0, "observed_outcome": "not supported by current evidence"},
@@ -795,9 +873,10 @@ def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
         },
         "response_history": response_history,
         "outcome_comparison": [
-            {"action": "rollback", "status": response_history["rollback"]["observed_outcome"]},
-            {"action": "monitor", "status": response_history["monitor"]["observed_outcome"]},
-            {"action": "dispatch", "status": response_history["dispatch"]["observed_outcome"]},
+            {"action": "rollback", "cases": response_history["rollback"]["cases"], "outcome": response_history["rollback"]["observed_outcome"], "attribution": response_history["rollback"]["attribution"]},
+            {"action": "monitor", "cases": response_history["monitor"]["cases"], "outcome": response_history["monitor"]["observed_outcome"], "attribution": "not_observed"},
+            {"action": "dispatch", "cases": response_history["dispatch"]["cases"], "outcome": response_history["dispatch"]["observed_outcome"], "attribution": "not_supported"},
+            {"action": "pause_rollout", "cases": response_history["pause_rollout"]["cases"], "outcome": response_history["pause_rollout"]["observed_outcome"], "attribution": "observed"},
         ],
         "cost_comparison": [
             {
