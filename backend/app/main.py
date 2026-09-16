@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db, init_db
 from app.models import Asset, Decision, DecisionPackage, Evidence, Investigation, Outcome
-from app.services import attach_human_decision, build_package, compare, inject_late_evidence, reconstruct, reset_demo, seal_package, serialize_evidence, similar_memory, verify_package
+from app.services import attach_human_decision, build_package, compare, decision_context, inject_late_evidence, precedent_comparison, reconstruct, record_cost_impact, reset_demo, seal_package, serialize_evidence, similar_memory, verify_package
 
 app = FastAPI(title="Veyra V0", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -157,6 +157,11 @@ def decision_package(investigation_id: str, db: Session = Depends(get_db)):
     return build_package(db, investigation_id)
 
 
+@app.get("/investigations/{investigation_id}/decision-context")
+def investigation_decision_context(investigation_id: str, db: Session = Depends(get_db)):
+    return decision_context(db, investigation_id)
+
+
 @app.post("/decision-packages/{package_id}/seal")
 def seal_decision_package(package_id: str, db: Session = Depends(get_db)):
     return seal_package(db, package_id)
@@ -180,6 +185,7 @@ def record_decision(investigation_id: str, body: DecisionIn, db: Session = Depen
 def record_outcome(investigation_id: str, body: OutcomeIn, db: Session = Depends(get_db)):
     outcome = Outcome(id=f"out-{uuid4().hex[:10]}", investigation_id=investigation_id, outcome=body.outcome, recorded_at=datetime.utcnow(), payload=body.payload)
     db.add(outcome)
+    record_cost_impact(db, outcome)
     db.commit()
     return outcome
 
@@ -187,3 +193,8 @@ def record_outcome(investigation_id: str, body: OutcomeIn, db: Session = Depends
 @app.get("/memory/similar")
 def memory_similar(investigation_id: str, db: Session = Depends(get_db)):
     return similar_memory(db, investigation_id)
+
+
+@app.get("/precedents/compare")
+def precedents_compare(investigation_id: str, db: Session = Depends(get_db)):
+    return precedent_comparison(db, investigation_id)

@@ -66,6 +66,58 @@ class Decision(Base):
     package_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("decision_packages.id"), nullable=True)
 
 
+class EvidenceSnapshot(Base):
+    __tablename__ = "evidence_snapshots"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    decision_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("decisions.id"), nullable=True, index=True)
+    snapshot_time: Mapped[datetime] = mapped_column(DateTime, index=True)
+    evidence_ids: Mapped[list] = mapped_column(JSON, default=list)
+    known_state: Mapped[dict] = mapped_column(JSON, default=dict)
+    unknowns: Mapped[list] = mapped_column(JSON, default=list)
+    observability_state: Mapped[dict] = mapped_column(JSON, default=dict)
+    sealed_digest: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+
+
+class DecisionOption(Base):
+    __tablename__ = "decision_options"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    decision_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("decisions.id"), nullable=True, index=True)
+    option_type: Mapped[str] = mapped_column(String, index=True)
+    label: Mapped[str] = mapped_column(String)
+    expected_cost: Mapped[dict] = mapped_column(JSON, default=dict)
+    expected_risk: Mapped[dict] = mapped_column(JSON, default=dict)
+    historical_support: Mapped[dict] = mapped_column(JSON, default=dict)
+    selected: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ObservabilityState(Base):
+    __tablename__ = "observability_states"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    decision_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("decisions.id"), nullable=True, index=True)
+    assessed_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    status: Mapped[str] = mapped_column(String, default="partial")
+    connected_sources: Mapped[list] = mapped_column(JSON, default=list)
+    freshness: Mapped[dict] = mapped_column(JSON, default=dict)
+    completeness: Mapped[dict] = mapped_column(JSON, default=dict)
+    delayed_sources: Mapped[list] = mapped_column(JSON, default=list)
+    missing_windows: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class ExecutedAction(Base):
+    __tablename__ = "executed_actions"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    decision_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("decisions.id"), nullable=True, index=True)
+    action_type: Mapped[str] = mapped_column(String, index=True)
+    owner: Mapped[str] = mapped_column(String)
+    executed_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    scope: Mapped[dict] = mapped_column(JSON, default=dict)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
 class Outcome(Base):
     __tablename__ = "outcomes"
     id: Mapped[str] = mapped_column(String, primary_key=True)
@@ -73,3 +125,52 @@ class Outcome(Base):
     outcome: Mapped[str] = mapped_column(String)
     recorded_at: Mapped[datetime] = mapped_column(DateTime)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class CostImpact(Base):
+    __tablename__ = "cost_impacts"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    outcome_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("outcomes.id"), nullable=True, index=True)
+    recovery_time_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    downtime_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    field_visit: Mapped[bool] = mapped_column(Boolean, default=False)
+    engineering_hours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    rollout_delay_minutes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    customer_escalation: Mapped[bool] = mapped_column(Boolean, default=False)
+    estimated_cost: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class LateEvidence(Base):
+    __tablename__ = "late_evidence"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    evidence_id: Mapped[str] = mapped_column(String, ForeignKey("evidence.id"), index=True)
+    decision_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("decisions.id"), nullable=True, index=True)
+    materiality: Mapped[str] = mapped_column(String, default="review_required")
+    review_status: Mapped[str] = mapped_column(String, default="open")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ReviewFlag(Base):
+    __tablename__ = "review_flags"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    decision_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("decisions.id"), nullable=True, index=True)
+    flag_type: Mapped[str] = mapped_column(String, index=True)
+    severity: Mapped[str] = mapped_column(String, default="review")
+    reason: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String, default="open")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PrecedentComparison(Base):
+    __tablename__ = "precedent_comparisons"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    query: Mapped[dict] = mapped_column(JSON, default=dict)
+    similar_state: Mapped[dict] = mapped_column(JSON, default=dict)
+    response_history: Mapped[dict] = mapped_column(JSON, default=dict)
+    outcome_comparison: Mapped[dict] = mapped_column(JSON, default=dict)
+    cost_comparison: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

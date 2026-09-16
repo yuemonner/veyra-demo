@@ -55,6 +55,8 @@ def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     package = client.post(f"/investigations/{investigation_id}/decision-package").json()
     assert package["package"]["decision_substantiation"]["status"] == "incomplete"
     assert package["package"]["decision_substantiation"]["question"] == "Are we allowed and justified to take the operational action yet?"
+    assert package["package"]["observability_state"]["status"] == "partial"
+    assert len(package["package"]["options_considered"]) == 4
     client.post(
         f"/investigations/{investigation_id}/decision",
         json={
@@ -80,11 +82,34 @@ def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     assert verified["verification_mode"] == "standalone"
     late = client.post("/demo/late-evidence").json()
     assert late["comparison"]["same_signal"] == 3
+    assert late["review_required"] is True
     assert late["late_evidence"]["event_time"] == "2026-09-03T14:09:00Z"
     assert late["late_evidence"]["known_at"] == "2026-09-03T14:31:00Z"
     assert late["late_evidence"]["ingested_at"] == "2026-09-03T14:31:04Z"
     sealed_again = client.post(f"/decision-packages/{package['id']}/seal").json()
     assert sealed_again["digest"] == digest
+
+
+def test_decision_context_tracks_options_observability_actions_and_late_review_flags():
+    investigation_id = reset()
+    package = client.post(f"/investigations/{investigation_id}/decision-package").json()
+    client.post(
+        f"/investigations/{investigation_id}/decision",
+        json={
+            "decision": "Pause v0.9 on robots with calibration C and gripper firmware 7.3",
+            "owner": "Robotics Engineering",
+            "rationale": "Affected runs share calibration C and gripper firmware 7.3.",
+            "package_id": package["id"],
+        },
+    )
+    context = client.get(f"/investigations/{investigation_id}/decision-context").json()
+    assert context["observability_state"]["status"] == "partial"
+    assert any(option["selected"] for option in context["options_considered"])
+    assert context["executed_actions"][0]["action_type"] == "rollback_and_pause_rollout"
+    assert context["evidence_snapshots"]
+    client.post("/demo/late-evidence")
+    context_after_late = client.get(f"/investigations/{investigation_id}/decision-context").json()
+    assert context_after_late["review_flags"][0]["flag_type"] == "late_decision_relevant_evidence"
 
 
 def test_runtime_event_only_needs_event_time():
@@ -109,7 +134,17 @@ def test_runtime_event_only_needs_event_time():
 
 def test_outcome_becomes_operational_memory():
     investigation_id = reset()
-    response = client.post(f"/investigations/{investigation_id}/outcome", json={"outcome": "Calibration C held pending targeted low-light runs"})
+    response = client.post(
+        f"/investigations/{investigation_id}/outcome",
+        json={
+            "outcome": "Calibration C held pending targeted low-light runs after rollback",
+            "payload": {"recovery_minutes": 18, "field_visit": False, "engineering_hours_saved": 3},
+        },
+    )
     assert response.status_code == 200
     memory = client.get(f"/memory/similar?investigation_id={investigation_id}").json()
-    assert memory["similar_cases"][0]["outcome"] == "Calibration C held pending targeted low-light runs"
+    assert memory["similar_cases"][0]["outcome"] == "Calibration C held pending targeted low-light runs after rollback"
+    assert memory["precedent_comparison"]["evidence_strength"] == "precedent, not causal proof"
+    precedent = client.get(f"/precedents/compare?investigation_id={investigation_id}").json()
+    assert precedent["response_history"]["rollback"]["cases"] >= 1
+    assert precedent["cost_comparison"][0]["field_visit"] is False
