@@ -116,7 +116,7 @@ function CinematicDemoInner() {
         <div className="brand"><span className="mark">V</span> Veyra</div>
         <div className="mode-switch">
           {(["Presenter", "Auto"] as const).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{item}</button>)}
-          <Link href={`/investigations/${INVESTIGATION_ID}`}>Live</Link>
+          <Link href="/product-demo">Live product</Link>
           <button onClick={reset}>Reset</button>
         </div>
       </div>}
@@ -292,13 +292,14 @@ function EndScene() {
     <section className="cinema-scene center end-frame">
       <h1>A company should not solve the same machine problem twice.</h1>
       <p>Veyra turns each operational case into evidence for the next one.</p>
+      <p>Now run the same scenario in the live product.</p>
       <p>Operational intelligence for Physical AI.</p>
       <div className="unlock-row">
         <div><span>See</span><b>what changed</b></div>
         <div><span>Decide</span><b>what to do</b></div>
         <div><span>Learn</span><b>whether it worked</b></div>
       </div>
-      <Link className="button lime" href={`/investigations/${INVESTIGATION_ID}`}>Open case</Link>
+      <Link className="button lime" href="/product-demo">Open live product</Link>
     </section>
   );
 }

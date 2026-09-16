@@ -18,17 +18,17 @@ export default async function Page() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand"><span className="mark">V</span> Veyra</div>
-        <nav className="nav"><Link className="active" href="/">Overview</Link><Link href={active ? `/investigations/${active.id}` : "/"}>Live system</Link><Link href="/cinematic">Cinematic story</Link></nav>
+        <nav className="nav"><Link className="active" href="/">Overview</Link><Link href="/product-demo">Live product</Link><Link href="/cinematic">Cinematic story</Link></nav>
         <div className="boundary">Read-only beside your existing stack. Machine control remains in customer systems.</div>
       </aside>
       <main className="main">
-        <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Review cinematic case</Link><Link className="button" href={active ? `/investigations/${active.id}` : "/demo-control"}>Open case</Link></div></div>
+        <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Review cinematic case</Link><Link className="button" href="/product-demo">Open live product</Link></div></div>
         <section className="hero">
           <span className="eyebrow">Operational intelligence for Physical AI.</span>
           <h1>One update. Six machines. Two behave differently.</h1>
           <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and outcome.</p>
           <p><b>See what changed. Decide what to do. Know whether it worked. Reuse it next time.</b></p>
-          <div className="hero-actions"><Link className="button primary" href={active ? `/investigations/${active.id}` : "/demo-control"}>{active ? "Open case" : "Initialize case"}</Link><Link className="button" href="/cinematic">Review cinematic case</Link></div>
+          <div className="hero-actions"><Link className="button primary" href="/product-demo">Open live product</Link><Link className="button" href="/cinematic">Review cinematic case</Link></div>
         </section>
         <div className="grid three">
           <article className="panel metric"><span>Test set</span><strong>{assets.length || "6"}</strong><p>robots updated.</p></article>
@@ -57,7 +57,7 @@ export default async function Page() {
           <span className="eyebrow">Current investigation</span>
           <h2>{active?.asset_id || "AMR-001"} · {active?.title || "Start the backend and reset demo data"}</h2>
           <p>Operational Case: evidence, decision state, action, outcome and reusable learning.</p>
-          <Link className="button primary" href={active ? `/investigations/${active.id}` : "/demo-control"}>{active ? "Open Investigation" : "Initialize Demo"}</Link>
+          <Link className="button primary" href="/product-demo">Open live product</Link>
         </section>
       </main>
     </div>
