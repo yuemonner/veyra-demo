@@ -18,17 +18,17 @@ export default async function Page() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand"><span className="mark">V</span> Veyra</div>
-        <nav className="nav"><Link className="active" href="/">Overview</Link><Link href={active ? `/investigations/${active.id}` : "/"}>Investigations</Link><Link href="/demo-control">Demo Control</Link></nav>
+        <nav className="nav"><Link className="active" href="/">Overview</Link><Link href={active ? `/investigations/${active.id}` : "/"}>Live system</Link><Link href="/cinematic">Cinematic story</Link></nav>
         <div className="boundary">Read-only beside your existing stack. Machine control remains in customer systems.</div>
       </aside>
       <main className="main">
-        <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Cinematic demo</Link><Link className="button" href="/demo-control">Presenter controls</Link></div></div>
+        <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Review cinematic case</Link><Link className="button" href={active ? `/investigations/${active.id}` : "/demo-control"}>Open case</Link></div></div>
         <section className="hero">
           <span className="eyebrow">Operational intelligence for Physical AI.</span>
-          <h1>From issue to action to outcome.</h1>
-          <p>Six machines run the same software update. Two start behaving differently.</p>
+          <h1>One update. Six machines. Two behave differently.</h1>
+          <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and outcome.</p>
           <p><b>See what changed. Decide what to do. Know whether it worked. Reuse it next time.</b></p>
-          <div className="hero-actions"><Link className="button primary" href="/cinematic">Start cinematic demo</Link><Link className="button" href={active ? `/investigations/${active.id}` : "/demo-control"}>{active ? "Open live system" : "Initialize demo"}</Link></div>
+          <div className="hero-actions"><Link className="button primary" href={active ? `/investigations/${active.id}` : "/demo-control"}>{active ? "Open case" : "Initialize case"}</Link><Link className="button" href="/cinematic">Review cinematic case</Link></div>
         </section>
         <div className="grid three">
           <article className="panel metric"><span>Test set</span><strong>{assets.length || "6"}</strong><p>robots updated.</p></article>

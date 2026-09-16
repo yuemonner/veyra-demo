@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { getJson, postJson } from "../../../lib/api";
 
 type Reconstruction = any;
@@ -12,13 +13,22 @@ type Verification = { valid: boolean; digest_matches: boolean; signature_valid: 
 const DEMO_ID = "inv-120-robots-bad-rollout";
 
 export default function InvestigationClient({ id }: { id: string }) {
+  return (
+    <Suspense fallback={<div className="shell"><main className="main"><section className="hero"><h1>Loading operational case...</h1></section></main></div>}>
+      <InvestigationInner id={id} />
+    </Suspense>
+  );
+}
+
+function InvestigationInner({ id }: { id: string }) {
   const investigationId = id || DEMO_ID;
+  const presenter = useSearchParams().get("presenter") === "1";
   const [rec, setRec] = useState<Reconstruction | null>(null);
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [pkg, setPkg] = useState<DecisionPackage | null>(null);
   const [verification, setVerification] = useState<Verification | null>(null);
   const [memory, setMemory] = useState<any>(null);
-  const [stage, setStage] = useState("live");
+  const [stage, setStage] = useState("overview");
   const [notice, setNotice] = useState("Ready.");
 
   function reportError(action: string, error: unknown) {
@@ -44,7 +54,7 @@ export default function InvestigationClient({ id }: { id: string }) {
       setPkg(null);
       setVerification(null);
       setMemory(null);
-      setStage("live");
+      setStage("overview");
       setNotice("Scenario reset. 2 robots are known affected at decision time.");
       await refresh();
     } catch (error) {
@@ -57,7 +67,7 @@ export default function InvestigationClient({ id }: { id: string }) {
       const next = await postJson<DecisionPackage>(`/investigations/${investigationId}/decision-package`);
       setPkg(next);
       setVerification(null);
-      setStage("package");
+      setStage("decision");
       setNotice("Decision Package generated from backend evidence.");
     } catch (error) {
       reportError("Decision Package generation", error);
@@ -86,7 +96,7 @@ export default function InvestigationClient({ id }: { id: string }) {
     try {
       await postJson("/demo/late-evidence");
       await refresh();
-      setStage("late");
+      setStage("outcome");
       setNotice("Delayed run evidence arrived with event_time before the engineer note.");
     } catch (error) {
       reportError("Delayed evidence injection", error);
@@ -100,7 +110,7 @@ export default function InvestigationClient({ id }: { id: string }) {
         payload: { previous_action: "Pause v0.9 on robots with calibration C and firmware 7.3", recovery_minutes: 18, days_later: 12 },
       });
       setMemory(await getJson(`/memory/similar?investigation_id=${investigationId}`));
-      setStage("memory");
+      setStage("history");
       setNotice("Outcome linked. This case can now be reused by the next similar review.");
     } catch (error) {
       reportError("Outcome recording", error);
@@ -124,34 +134,36 @@ export default function InvestigationClient({ id }: { id: string }) {
         <div className="brand"><span className="mark">V</span> Veyra</div>
         <nav className="nav">
           <Link href="/">Overview</Link>
-          <button className={stage === "live" ? "active" : ""} onClick={() => setStage("live")}>Signal</button>
-          <button className={stage === "compare" ? "active" : ""} onClick={() => setStage("compare")}>Where else?</button>
-          <button className={stage === "package" ? "active" : ""} onClick={() => setStage("package")}>Decision state</button>
-          <button className={stage === "late" ? "active" : ""} onClick={() => setStage("late")}>Outcome update</button>
-          <button className={stage === "memory" ? "active" : ""} onClick={() => setStage("memory")}>Reuse next time</button>
-          <Link className="nav-link-strong" href="/demo-control">Demo Control</Link>
+          <button className={stage === "overview" ? "active" : ""} onClick={() => setStage("overview")}>Overview</button>
+          <button className={stage === "changes" ? "active" : ""} onClick={() => setStage("changes")}>Changes</button>
+          <button className={stage === "scope" ? "active" : ""} onClick={() => setStage("scope")}>Scope</button>
+          <button className={stage === "decision" ? "active" : ""} onClick={() => setStage("decision")}>Decision</button>
+          <button className={stage === "action" ? "active" : ""} onClick={() => setStage("action")}>Actions</button>
+          <button className={stage === "outcome" ? "active" : ""} onClick={() => setStage("outcome")}>Outcome</button>
+          <button className={stage === "history" ? "active" : ""} onClick={() => setStage("history")}>History</button>
+          {presenter && <Link className="nav-link-strong" href="/demo-control">Demo Control</Link>}
         </nav>
         <div className="boundary">Machine evidence becomes review context.</div>
       </aside>
 
       <main className="main">
         <div className="topbar">
-          <span className="eyebrow">Operational Case · 6 machines · one software update</span>
-          <div className="demo-controls">
+          <span className="eyebrow">Operational case · 6 machines · software release v0.9 · 2 affected</span>
+          {presenter && <div className="demo-controls">
             <Link className="button" href="/cinematic">Cinematic story</Link>
             <button className="button" onClick={refresh}>Refresh</button>
             <button className="button" onClick={resetScenario}>Reset scenario</button>
             <button className="button" onClick={lateEvidence}>Inject delayed evidence</button>
-          </div>
+          </div>}
         </div>
 
         <section className="hero demo-hero">
-          <span className="eyebrow">Real-world test run</span>
-          <h1>From issue to action to outcome.</h1>
-          <p>Six machines run the same software update. Two start behaving differently.</p>
+          <span className="eyebrow">Operational case</span>
+          <h1>Two machines started behaving differently after the same update.</h1>
+          <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and outcome.</p>
           <div className="hero-actions">
-            <button className="button primary" onClick={() => setStage("live")}>Start walkthrough</button>
-            <button className="button lime" onClick={generatePackage}>Generate Operational Case</button>
+            <button className="button primary" onClick={() => setStage("overview")}>Open case</button>
+            <button className="button lime" onClick={generatePackage}>Review case</button>
           </div>
         </section>
 
@@ -174,17 +186,19 @@ export default function InvestigationClient({ id }: { id: string }) {
           <b>Outcome memory</b>
         </section>
 
-        {stage === "live" && <LiveFailure rec={rec} comparison={comparison} detectionLead={detectionLead} onCompare={() => setStage("compare")} onPackage={generatePackage} />}
-        {stage === "compare" && <CompareStage comparison={comparison} onPackage={generatePackage} />}
-        {stage === "package" && <PackageStage pkg={pkg} verification={verification} rec={rec} comparison={comparison} onGenerate={generatePackage} onSeal={seal} />}
-        {stage === "late" && <LateEvidenceStage pkg={pkg} verification={verification} comparison={comparison} onSeal={seal} onOutcome={outcome} />}
-        {stage === "memory" && <MemoryStage memory={memory} onOutcome={outcome} />}
+        {stage === "overview" && <LiveFailure rec={rec} comparison={comparison} detectionLead={detectionLead} onChanges={() => setStage("changes")} onPackage={generatePackage} />}
+        {stage === "changes" && <ChangesStage onScope={() => setStage("scope")} />}
+        {stage === "scope" && <CompareStage comparison={comparison} onPackage={generatePackage} />}
+        {stage === "decision" && <PackageStage pkg={pkg} verification={verification} rec={rec} comparison={comparison} onGenerate={generatePackage} onSeal={seal} />}
+        {stage === "action" && <ActionStage pkg={pkg} onGenerate={generatePackage} onSeal={seal} onOutcome={() => setStage("outcome")} />}
+        {stage === "outcome" && <LateEvidenceStage pkg={pkg} verification={verification} comparison={comparison} onSeal={seal} onOutcome={outcome} />}
+        {stage === "history" && <MemoryStage memory={memory} onOutcome={outcome} />}
       </main>
     </div>
   );
 }
 
-function LiveFailure({ rec, comparison, detectionLead, onCompare, onPackage }: any) {
+function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: any) {
   return (
     <>
       <div className="fleet-map" aria-label="fleet status">
@@ -204,16 +218,38 @@ function LiveFailure({ rec, comparison, detectionLead, onCompare, onPackage }: a
         <span className="eyebrow">Repeated real-world testing</span>
         <h2>Same policy. Same task. Different behavior.</h2>
         <p>Every robot ran policy v0.9. Only two began showing grip pose drift. The question is no longer whether something failed; it is what changed around the robots that diverged.</p>
-        <div className="hero-actions"><button className="button primary" onClick={onCompare}>Where else?</button><button className="button" onClick={onPackage}>Build Operational Case</button></div>
+        <div className="hero-actions"><button className="button primary" onClick={onChanges}>What changed?</button><button className="button" onClick={onPackage}>Review case</button></div>
       </article>
     </>
+  );
+}
+
+function ChangesStage({ onScope }: { onScope: () => void }) {
+  return (
+    <article className="panel">
+      <span className="eyebrow">Changes</span>
+      <h2>What changed around the failure?</h2>
+      <div className="package-grid">
+        <PackageItem title="Software" value="policy v0.8 to v0.9" />
+        <PackageItem title="Calibration" value="camera calibration B to C" />
+        <PackageItem title="Firmware" value="gripper 7.2 to 7.3" />
+        <PackageItem title="Machine state" value="grip pose drift" />
+        <PackageItem title="Human context" value="engineer note at 14:26" />
+        <PackageItem title="Recent service" value="hardware fault unconfirmed" />
+      </div>
+      <div className="callout">
+        <b>Three relevant changes occurred before the first known failure.</b>
+        <p>Cause is not yet established. The case now needs scope and comparison before the team acts.</p>
+      </div>
+      <button className="button primary" onClick={onScope}>Scope the issue</button>
+    </article>
   );
 }
 
 function CompareStage({ comparison, onPackage }: any) {
   return (
     <article className="panel">
-      <span className="eyebrow">Where else?</span>
+      <span className="eyebrow">Scope</span>
       <h2>Where else does this pattern appear?</h2>
       <div className="grid three">
         <Metric label="Same policy" value={`${comparison?.same_change ?? 6}`} note="robots on policy v0.9" />
@@ -226,27 +262,27 @@ function CompareStage({ comparison, onPackage }: any) {
       </table>
       <div className="callout">
         <b>What the evidence narrows</b>
-        <p>Policy v0.9 is shared across both groups. Calibration C and gripper firmware 7.3 co-occur across the affected runs. R06 shares the same combination and appeared stable at decision time. Low-light bin was ambient in the decision-time comparison. This narrows the investigation; root cause remains open.</p>
+        <p>Policy v0.9 is shared across both groups. Calibration C and gripper firmware 7.3 are shared by both affected machines, while R06 has the same exposure without a known failure at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
       </div>
-      <button className="button primary" onClick={onPackage}>Build Operational Case</button>
+      <button className="button primary" onClick={onPackage}>Review case</button>
     </article>
   );
 }
 
 function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }: any) {
   if (!pkg) {
-    return <article className="panel"><span className="eyebrow">Operational Case</span><h2>No case package generated yet.</h2><p>Generate the case to assemble trigger, last healthy state, changes, peer comparison, missing context, decision state and outcome follow-up.</p><button className="button primary" onClick={onGenerate}>Build Operational Case</button></article>;
+    return <article className="panel"><span className="eyebrow">Operational case</span><h2>No case package generated yet.</h2><p>Open the case package to assemble trigger, last healthy state, changes, peer comparison, missing context, decision state and outcome follow-up.</p><button className="button primary" onClick={onGenerate}>Open case package</button></article>;
   }
   return (
     <article className="panel">
       <div className="package-head">
-        <div><span className="eyebrow">Operational Case</span><h2>Decision state</h2><p>This case preserves what the team knew, what they chose to do, and what must be checked afterward.</p></div>
-        <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Sealed" : "Record decision + seal"}</button>
+        <div><span className="eyebrow">Decision</span><h2>What did the team know at 14:27?</h2><p>This case preserves the evidence available at the decision point and the uncertainty that remained.</p></div>
+        <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Sealed" : "Record decision"}</button>
       </div>
       <div className="package-grid">
         <PackageItem title="Trigger" value="grip pose drift after policy update" />
         <PackageItem title="Last known healthy" value={short(rec?.last_known_healthy?.event_time)} />
-        <PackageItem title="Recent changes" value="policy v0.8 → v0.9 · calibration B → C · gripper firmware 7.2 → 7.3" />
+        <PackageItem title="Recent changes" value="policy v0.8 to v0.9 · calibration B to C · gripper firmware 7.2 to 7.3" />
         <PackageItem title="Machine state" value={rec?.current_state?.health || "degraded"} />
         <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 2} / ${comparison?.same_change ?? 6}`} />
         <PackageItem title="Observed" value="engineer note recorded at 14:26" />
@@ -259,6 +295,10 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
         <PackageItem title="Human action" value={pkg.package.human_decision?.decision || "pending"} />
         <PackageItem title="Outcome" value="pending" />
       </div>
+      <div className="split-count">
+        <div><strong>What the team knew at 14:27</strong><span>R03 affected · R05 affected · R06 no known issue</span></div>
+        <div><strong>What Veyra knows now</strong><span>R06 had an earlier signal that became available later</span></div>
+      </div>
       <div className="callout warning">
         <b>{pkg.package.decision_substantiation?.question || "Is the team ready to act on this case?"}</b>
         <p>{pkg.package.decision_substantiation?.summary || "Decision package incomplete."}</p>
@@ -268,9 +308,34 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
       </div>
       <div className="callout">
         <b>What this package rules in / rules out</b>
-        <p>Policy-wide issue: weak support in current peer comparison. Calibration/firmware interaction: plausible. Environment contribution: still unresolved. More low-light validation runs: current evidence supports collecting them.</p>
+        <p>Policy-wide issue: weak support in current peer comparison. Calibration and firmware interaction: plausible. Environment contribution: still unresolved. More low-light validation runs: current evidence supports collecting them.</p>
       </div>
       {pkg.sealed && <Signature pkg={pkg} verification={verification} />}
+    </article>
+  );
+}
+
+function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
+  if (!pkg) {
+    return <article className="panel"><span className="eyebrow">Actions</span><h2>No decision state generated yet.</h2><p>Open the case first so the action is recorded with the evidence available at the time.</p><button className="button primary" onClick={onGenerate}>Open case package</button></article>;
+  }
+  return (
+    <article className="panel">
+      <span className="eyebrow">Actions</span>
+      <h2>The team chooses a response.</h2>
+      <p>Veyra keeps the decision, the action that was actually executed, and the evidence available at the time together.</p>
+      <div className="package-grid">
+        <PackageItem title="Decision" value="pause rollout" />
+        <PackageItem title="Executed" value="rollback R03 and R05" />
+        <PackageItem title="Watch" value="monitor R06" />
+        <PackageItem title="Customer" value="notify support" />
+        <PackageItem title="Field" value="hold dispatch" />
+        <PackageItem title="Owner" value="Operations Lead · 14:31" />
+      </div>
+      <div className="hero-actions">
+        <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Decision sealed" : "Seal decision state"}</button>
+        <button className="button primary" onClick={onOutcome}>Track outcome</button>
+      </div>
     </article>
   );
 }
@@ -278,8 +343,8 @@ function PackageStage({ pkg, verification, rec, comparison, onGenerate, onSeal }
 function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }: any) {
   return (
     <article className="panel dramatic">
-      <span className="eyebrow">Outcome update</span>
-      <h2>The case keeps updating after the team acts.</h2>
+      <span className="eyebrow">Outcome</span>
+      <h2>Did the action work?</h2>
       <p>R03 and R05 recover after rollback. R06 later shows the same pattern.</p>
       <p className="evidence-detail">Late evidence: R06 post-run telemetry was re-analyzed at 14:31; grip pose drift was present at 14:09:11.</p>
       <div className="time-rail">
@@ -296,6 +361,12 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
         <Metric label="Decision-time view" value="2" note="affected in sealed package" />
         <Metric label="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 3)}`} note="affected after delayed evidence" />
         <Metric label="Decision state" value="Intact" note="new evidence leaves old context intact" />
+      </div>
+      <div className="grid four">
+        <Metric label="Field dispatch" value="Avoided" note="remote action was enough for R03/R05" />
+        <Metric label="Rollout" value="Paused" note="then resumed after review" />
+        <Metric label="Engineering time" value="Reduced" note="no added investigation for R03/R05" />
+        <Metric label="Customer support" value="Informed" note="before escalation" />
       </div>
       {pkg?.sealed ? <Signature pkg={pkg} verification={verification} /> : <button className="button lime" onClick={onSeal}>Seal package first</button>}
       <button className="button primary" onClick={onOutcome}>Link outcome</button>
@@ -315,15 +386,19 @@ function MemoryStage({ memory, onOutcome }: any) {
         <p>Under similar conditions, rollout was paused, rollback recovered the affected machines, field dispatch was avoided, and one additional affected machine appeared later.</p>
       </div>
       <div className="package-grid memory-grid">
-        <PackageItem title="What matched" value="software update + config profile + grip pose drift" />
-        <PackageItem title="What worked before" value="pause rollout and roll back affected machines" />
-        <PackageItem title="What was missed" value="one exposed machine became affected later" />
-        <PackageItem title="Suggested next step" value="check configuration profile before dispatching a technician" />
+        <PackageItem title="Previous case" value="same software release and calibration C exposure" />
+        <PackageItem title="Previous action" value="pause rollout and roll back affected machines" />
+        <PackageItem title="Previous outcome" value="rollback recovered 2 of 2 affected machines" />
+        <PackageItem title="Later learning" value="one additional exposed machine failed later" />
+      </div>
+      <div className="callout">
+        <b>Before dispatching a technician</b>
+        <p>Compare the current machine against the previous exposed group and check whether the same software and calibration combination is present.</p>
       </div>
       {!hasMemory && <button className="button primary" onClick={onOutcome}>Link outcome first</button>}
       <div className="ending">
         <b>The company is no longer solving the same problem from zero.</b>
-        <span>Every operational case should make the next one smarter.</span>
+        <span>A company should not solve the same machine problem twice.</span>
       </div>
     </article>
   );
