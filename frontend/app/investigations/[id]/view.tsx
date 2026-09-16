@@ -127,6 +127,15 @@ function InvestigationInner({ id }: { id: string }) {
     const mins = Math.max(0, Math.round((ticket - first) / 60000));
     return `${mins} minutes before the engineer note`;
   }, [rec]);
+  const stageLabel: Record<string, string> = {
+    overview: "Overview",
+    changes: "Changes",
+    scope: "Scope",
+    decision: "Decision",
+    action: "Actions",
+    outcome: "Outcome",
+    history: "History",
+  };
 
   return (
     <div className="shell">
@@ -158,25 +167,47 @@ function InvestigationInner({ id }: { id: string }) {
           </div>}
         </div>
 
-        <section className="hero demo-hero">
-          <span className="eyebrow">Operational case</span>
-          <h1>Two machines started behaving differently after the same update.</h1>
-          <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and outcome.</p>
-          <div className="hero-actions">
-            <button className="button primary" onClick={() => setStage("overview")}>Open case</button>
-            <button className="button lime" onClick={generatePackage}>Review case</button>
-          </div>
-        </section>
+        {stage === "overview" ? (
+          <section className="case-header">
+            <div className="case-header-copy">
+              <span className="eyebrow">Operational case</span>
+              <h1>Two machines changed after the same update.</h1>
+              <p>Veyra reconstructs what changed, where else it appears, what the team did and whether it worked.</p>
+            </div>
+            <div className="case-header-rail">
+              <div className="case-pills">
+                <b>{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
+                {lateEvidenceVisible && <b>2 decision-time</b>}
+                <b>{healthy} healthy</b>
+                <b>6 updated</b>
+              </div>
+              <div className="hero-actions">
+                <button className="button primary" onClick={() => setStage("overview")}>Open case</button>
+                <button className="button lime" onClick={generatePackage}>Review case</button>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <section className="case-context-bar">
+            <div>
+              <span className="eyebrow">Operational case</span>
+              <strong>{stageLabel[stage]}</strong>
+            </div>
+            <p>R03 / R05 anomaly after release v0.9</p>
+            <div className="case-pills">
+              <b>{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
+              {lateEvidenceVisible && <b>2 decision-time</b>}
+              <b>{healthy} healthy</b>
+              <b>6 updated</b>
+            </div>
+          </section>
+        )}
 
         <div className="status-strip">
           <span>{notice}</span>
-          <b>{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
-          {lateEvidenceVisible && <b>2 decision-time</b>}
-          <b>{healthy} healthy</b>
-          <b>6 updated</b>
         </div>
 
-        <section className="backend-strip">
+        {presenter && <section className="backend-strip">
           <span>Backend v0 live</span>
           <b>Source evidence ingestion</b>
           <b>What changed</b>
@@ -185,7 +216,7 @@ function InvestigationInner({ id }: { id: string }) {
           <b>Decision state</b>
           <b>Action record</b>
           <b>Outcome memory</b>
-        </section>
+        </section>}
 
         {stage === "overview" && <LiveFailure rec={rec} comparison={comparison} detectionLead={detectionLead} onChanges={() => setStage("changes")} onPackage={generatePackage} />}
         {stage === "changes" && <ChangesStage onScope={() => setStage("scope")} />}
