@@ -396,6 +396,35 @@ def summarize_values(values: list[Any]) -> str:
     return f"{value} · {count}/{len(values)}"
 
 
+def demo_hypotheses() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "h-firmware-profile",
+            "hypothesis": "Module firmware 4.9 with device profile C17 is contributing to reconnect failures.",
+            "confidence": 0.58,
+            "status": "supported_by_current_evidence",
+            "supporting_evidence": ["R03 and R05 affected", "R06 shares exposure", "profile and firmware co-occur across affected machines"],
+            "counter_evidence": ["Application 0.36 is deployed across all seven machines", "Cellular-only connection appears in healthy machines too"],
+        },
+        {
+            "id": "h-site-network",
+            "hypothesis": "Customer-site network or firewall state is contributing to intermittent connectivity.",
+            "confidence": 0.42,
+            "status": "plausible_but_unresolved",
+            "supporting_evidence": ["Affected machines share site network profile N7", "Exact disconnect reason is missing"],
+            "counter_evidence": ["No customer firewall state has been retrieved yet"],
+        },
+        {
+            "id": "h-application-wide",
+            "hypothesis": "Application 0.36 caused a deployment-wide connectivity issue.",
+            "confidence": 0.18,
+            "status": "weak_support",
+            "supporting_evidence": ["Issue appeared after app 0.36 rollout"],
+            "counter_evidence": ["Five updated machines have no known signal at decision time"],
+        },
+    ]
+
+
 def build_package(db: Session, investigation_id: str) -> DecisionPackage:
     seed_decision_primitives(db, investigation_id)
     rec = reconstruct(db, investigation_id)
@@ -420,8 +449,18 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
         "peer_comparison": comp,
         "supporting_evidence": ["deployment manifest", "configuration record", "module health telemetry", "engineer note"],
         "missing_evidence": rec["evidence_gaps"],
+        "what_was_unknown": [
+            "Whether R06 would later show the same reconnect failure",
+            "Whether customer-site firewall or network state contributed",
+            "Whether remote restart would restore connectivity",
+            "Whether module firmware 4.9 and profile C17 were causal or only correlated",
+        ],
+        "hypotheses": demo_hypotheses(),
+        "primary_hypothesis": demo_hypotheses()[0],
         "current_interpretation": comp["interpretation"],
         "human_decision": None,
+        "planned_action": None,
+        "actual_action": None,
         "options_considered": [serialize_option(option) for option in options],
         "observability_state": serialize_observability(observability),
         "approval_policy": {
@@ -441,6 +480,11 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
             "checks": substantiation_checks,
         },
         "outcome": None,
+        "outcome_validation": {
+            "status": "pending",
+            "method": "Track connectivity recovery, recurrence and field dispatch outcome after action",
+            "causal_attribution": "not_established",
+        },
     }
     dp = DecisionPackage(id=f"pkg-{uuid.uuid4().hex[:10]}", investigation_id=investigation_id, version=1, package=package)
     db.add(dp)
@@ -499,8 +543,16 @@ def attach_human_decision(db: Session, decision: Decision) -> None:
             "id": snapshot.id if snapshot else None,
             "known_state": snapshot.known_state if snapshot else {},
             "unknowns": snapshot.unknowns if snapshot else [],
+            "what_was_unknown": snapshot.unknowns if snapshot else [],
+            "hypotheses": demo_hypotheses(),
+            "primary_hypothesis": demo_hypotheses()[0],
         },
         "observability_state": serialize_observability(observability),
+        "planned_action": {
+            "action_type": "remote_fix_and_hold_rollout",
+            "label": "Remote restart affected machines, hold field dispatch and monitor R06",
+            "scope": {"remote_restart": ["R03", "R05"], "watch": ["R06"], "held_rollout": ["device profile C17", "module firmware 4.9"]},
+        },
     }
     record_digest = hashlib.sha256(json.dumps(record_body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     if not db.scalar(select(DecisionRecord.id).where(DecisionRecord.decision_id == decision.id).limit(1)):
@@ -533,6 +585,19 @@ def attach_human_decision(db: Session, decision: Decision) -> None:
         "rationale": decision.rationale,
         "decided_at": iso(DEMO_DECISION_TIME),
         "signature_intent": "approved for action by named human owner",
+    }
+    package["planned_action"] = {
+        "action_type": "remote_fix_and_hold_rollout",
+        "label": "Remote restart affected machines, hold field dispatch and monitor R06",
+        "owner": decision.owner,
+        "planned_at": iso(DEMO_DECISION_TIME),
+        "scope": {"remote_restart": ["R03", "R05"], "watch": ["R06"], "held_rollout": ["device profile C17", "module firmware 4.9"]},
+    }
+    package["actual_action"] = {
+        "status": "recorded",
+        "action_type": "remote_fix_and_hold_rollout",
+        "executed_at": iso(DEMO_DECISION_TIME + timedelta(minutes=4)),
+        "scope": {"remote_restart": ["R03", "R05"], "watch": ["R06"], "field_dispatch": "held"},
     }
     package["outcome_follow_up"] = {
         "required": True,
@@ -645,6 +710,12 @@ def decision_context(db: Session, investigation_id: str) -> dict[str, Any]:
                 "options_considered": item.options_considered,
                 "evidence_snapshot": item.evidence_snapshot,
                 "observability_state": item.observability_state,
+                "hypotheses": item.evidence_snapshot.get("hypotheses", []) if isinstance(item.evidence_snapshot, dict) else [],
+                "planned_action": {
+                    "action_type": "remote_fix_and_hold_rollout",
+                    "label": "Remote restart affected machines, hold field dispatch and monitor R06",
+                    "scope": {"remote_restart": ["R03", "R05"], "watch": ["R06"], "held_rollout": ["device profile C17", "module firmware 4.9"]},
+                },
                 "immutable": item.immutable,
                 "digest": item.digest,
             }
@@ -833,6 +904,13 @@ def record_cost_impact(db: Session, outcome: Outcome) -> CostImpact:
         evidence={
             "recovery_observed_after_action": True,
             "causal_proof": False,
+            "validation_status": payload.get("validation_status", "observed_recovery_not_causal_proof"),
+            "validated_signals": payload.get("validated_signals", ["module health returned to normal", "no field visit required"]),
+            "hypothesis_result": payload.get("hypothesis_result", {
+                "h-firmware-profile": "partially_supported",
+                "h-site-network": "still_unresolved",
+                "h-application-wide": "weakened",
+            }),
             "recurrence_window": payload.get("recurrence_window", "24h clean for R03/R05; R06 later showed same pattern"),
         },
     )
@@ -888,6 +966,12 @@ def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
             for row in cost_rows
         ],
         "evidence_strength": "precedent, not causal proof",
+        "outcome_validation": {
+            "status": attributions[0].evidence.get("validation_status") if attributions else "pending",
+            "validated_signals": attributions[0].evidence.get("validated_signals") if attributions else [],
+            "hypothesis_result": attributions[0].evidence.get("hypothesis_result") if attributions else {},
+            "causal_attribution": "not_established",
+        },
     }
     db.add(
         PrecedentComparison(

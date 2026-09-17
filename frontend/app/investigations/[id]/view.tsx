@@ -335,6 +335,9 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
   const record = decisionContext?.decision_records?.[0];
   const options = decisionContext?.options_considered || pkg.package.options_considered || [];
   const observability = decisionContext?.observability_state || pkg.package.observability_state;
+  const hypotheses = pkg.package.hypotheses || record?.hypotheses || [];
+  const primaryHypothesis = pkg.package.primary_hypothesis || hypotheses[0];
+  const unknowns = pkg.package.what_was_unknown || pkg.package.missing_evidence || [];
   return (
     <article className="panel">
       <div className="package-head">
@@ -354,9 +357,23 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
         <PackageItem title="Missing evidence" value={(pkg.package.missing_evidence || []).join(" · ")} />
         <PackageItem title="Approval policy" value={pkg.package.approval_policy?.name || "Physical system rollout review"} />
         <PackageItem title="Substantiation" value={pkg.package.decision_substantiation?.status || "incomplete"} />
+        <PackageItem title="Primary hypothesis" value={primaryHypothesis?.hypothesis || "pending"} />
+        <PackageItem title="Hypothesis confidence" value={primaryHypothesis ? `${Math.round((primaryHypothesis.confidence || 0) * 100)}% · ${primaryHypothesis.status}` : "pending"} />
         <PackageItem title="Human identity" value={pkg.package.human_decision?.identity || "pending named owner"} />
         <PackageItem title="Human action" value={pkg.package.human_decision?.decision || "pending"} />
         <PackageItem title="Outcome" value="pending" />
+      </div>
+      <div className="callout">
+        <b>What was unknown</b>
+        <ul className="check-list compact-list">
+          {unknowns.slice(0, 4).map((item: string) => <li key={item}><span>unknown</span><b>{item}</b></li>)}
+        </ul>
+      </div>
+      <div className="callout">
+        <b>Working hypotheses</b>
+        <ul className="check-list compact-list">
+          {hypotheses.map((item: any) => <li key={item.id}><span>{Math.round((item.confidence || 0) * 100)}%</span><b>{item.hypothesis}</b><small>{item.status}</small></li>)}
+        </ul>
       </div>
       <div className="callout">
         <b>Decision record</b>
@@ -416,6 +433,8 @@ function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
   if (!pkg) {
     return <article className="panel"><span className="eyebrow">Actions</span><h2>No decision state generated yet.</h2><p>Open the case first so the action is recorded with the evidence available at the time.</p><button className="button primary" onClick={onGenerate}>Open case package</button></article>;
   }
+  const planned = pkg.package.planned_action;
+  const actual = pkg.package.actual_action;
   return (
     <article className="panel">
       <span className="eyebrow">Actions</span>
@@ -423,7 +442,8 @@ function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
       <p>Veyra keeps the decision, the action that was actually executed, and the evidence available at the time together.</p>
       <div className="package-grid">
         <PackageItem title="Decision" value="remote fix before dispatch" />
-        <PackageItem title="Executed" value="remote restart R03 and R05" />
+        <PackageItem title="Planned action" value={planned?.label || "remote restart affected machines"} />
+        <PackageItem title="Actual action" value={actual?.scope?.remote_restart ? `remote restart ${actual.scope.remote_restart.join(" and ")}` : "remote restart R03 and R05"} />
         <PackageItem title="Watch" value="monitor R06" />
         <PackageItem title="Customer" value="notify support" />
         <PackageItem title="Field" value="hold dispatch" />
@@ -438,6 +458,7 @@ function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
 }
 
 function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }: any) {
+  const validation = pkg?.package?.outcome_validation;
   return (
     <article className="panel dramatic">
       <span className="eyebrow">Outcome</span>
@@ -469,6 +490,10 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
         <Metric label="Engineering time" value="Reduced" note="no added investigation for R03/R05" />
         <Metric label="Customer support" value="Informed" note="before escalation" />
       </div>
+      <div className="callout">
+        <b>Outcome validation</b>
+        <p>{validation?.status === "pending" ? "Pending until the outcome is linked." : "Connectivity recovery is observed after the action. Causality is not treated as proven."}</p>
+      </div>
       {pkg?.sealed ? <Signature pkg={pkg} verification={verification} /> : <button className="button lime" onClick={onSeal}>Seal package first</button>}
       <button className="button primary" onClick={onOutcome}>Link outcome</button>
     </article>
@@ -478,6 +503,7 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
 function MemoryStage({ memory, precedent, onOutcome }: any) {
   const hasMemory = memory?.similar_cases?.length > 0;
   const rows = precedent?.outcome_comparison || memory?.precedent_comparison?.outcome_comparison || [];
+  const validation = precedent?.outcome_validation || memory?.precedent_comparison?.outcome_validation;
   return (
     <article className="panel final-stage">
       <span className="eyebrow">12 days later</span>
@@ -504,6 +530,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
       <div className="package-grid memory-grid">
         <PackageItem title="Evidence strength" value="precedent, not causal proof" />
         <PackageItem title="Previously successful" value="observed after action" />
+        <PackageItem title="Outcome validation" value={validation?.status || "record outcome first"} />
         <PackageItem title="What to reuse" value="check prior conditions before field dispatch" />
         <PackageItem title="What to verify" value="whether the same evidence pattern holds now" />
       </div>

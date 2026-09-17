@@ -57,6 +57,9 @@ def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     assert package["package"]["decision_substantiation"]["question"] == "Are we allowed and justified to take the operational action yet?"
     assert package["package"]["observability_state"]["status"] == "partial"
     assert len(package["package"]["options_considered"]) == 4
+    assert package["package"]["what_was_unknown"]
+    assert package["package"]["primary_hypothesis"]["confidence"] > 0
+    assert package["package"]["outcome_validation"]["status"] == "pending"
     client.post(
         f"/investigations/{investigation_id}/decision",
         json={
@@ -70,6 +73,8 @@ def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     assert sealed["sealed"] is True
     assert sealed["package"]["human_decision"]["owner"] == "Robotics Engineering"
     assert sealed["package"]["decision_substantiation"]["status"] == "actionable_with_open_follow_up"
+    assert sealed["package"]["planned_action"]["action_type"] == "remote_fix_and_hold_rollout"
+    assert sealed["package"]["actual_action"]["scope"]["field_dispatch"] == "held"
     assert sealed["package"]["_seal"]["trusted_timestamp"] == "2026-09-03T14:27:00Z"
     assert sealed["package"]["_seal"]["timestamp_authority"] == "Veyra demo timestamp authority"
     digest = sealed["digest"]
@@ -109,6 +114,8 @@ def test_decision_context_tracks_options_observability_actions_and_late_review_f
     assert context["evidence_snapshots"]
     assert context["decision_records"][0]["immutable"] is True
     assert context["decision_records"][0]["chosen_option"]["option_type"] in {"remote_fix", "pause_rollout"}
+    assert context["decision_records"][0]["evidence_snapshot"]["what_was_unknown"]
+    assert context["decision_records"][0]["evidence_snapshot"]["primary_hypothesis"]["confidence"] > 0
     decision_record_digest = context["decision_records"][0]["digest"]
     client.post("/demo/late-evidence")
     context_after_late = client.get(f"/investigations/{investigation_id}/decision-context").json()
@@ -152,6 +159,8 @@ def test_outcome_becomes_operational_memory():
     precedent = client.get(f"/precedents/compare?investigation_id={investigation_id}").json()
     assert precedent["response_history"]["remote_fix"]["cases"] >= 1
     assert precedent["response_history"]["remote_fix"]["attribution"] == "observed"
+    assert precedent["outcome_validation"]["status"] == "observed_recovery_not_causal_proof"
+    assert precedent["outcome_validation"]["causal_attribution"] == "not_established"
     assert precedent["cost_comparison"][0]["field_visit"] is False
     remote_fix_row = [row for row in precedent["outcome_comparison"] if row["action"] == "remote_fix"][0]
     assert remote_fix_row["attribution"] == "observed"
