@@ -460,42 +460,52 @@ function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
 function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }: any) {
   const validation = pkg?.package?.outcome_validation;
   return (
-    <article className="panel dramatic">
-      <span className="eyebrow">Outcome</span>
-      <h2>Did the action work?</h2>
-      <p>R03 and R05 recover after remote restart. R06 later shows the same pattern.</p>
-      <div className="callout warning">
-        <b>New decision-relevant evidence arrived</b>
-        <p>The original decision record remains unchanged. The current case view is updated and flagged for review.</p>
+    <article className="panel outcome-page">
+      <div className="package-head">
+        <div>
+          <span className="eyebrow">Outcome</span>
+          <h2>Did the action work?</h2>
+          <p>R03 and R05 recovered after remote restart. R06 later shows the same pattern through delayed module-health evidence.</p>
+        </div>
+        <div className={pkg?.sealed ? "sealed-mini good" : "sealed-mini"}>
+          <span>{pkg?.sealed ? "Sealed" : "Unsealed"}</span>
+          <b>{pkg?.sealed ? "Decision record intact" : "Seal decision first"}</b>
+        </div>
       </div>
-      <p className="evidence-detail">Late evidence: R06 module-health buffer was uploaded at 14:31; reconnect failures were present at 14:09:11.</p>
-      <div className="time-rail">
-        <div><b>14:09</b><span>event_time</span><small>module-health buffer shows reconnect failures</small></div>
-        <i />
-        <div><b>14:27</b><span>decision sealed</span><small>known evidence only</small></div>
-        <i />
-        <div><b>14:31</b><span>known_at</span><small>became knowable</small></div>
-        <i />
+
+      <section className="outcome-summary">
+        <div className="outcome-status">
+          <span className="eyebrow">Outcome validation</span>
+          <strong>{validation?.status === "pending" ? "Pending" : "Observed recovery"}</strong>
+          <p>{validation?.status === "pending" ? "Link the outcome to validate the action." : "Connectivity recovery is observed after the remote restart. Causality is not treated as proven."}</p>
+        </div>
+        <div className="outcome-status">
+          <span className="eyebrow">Late evidence</span>
+          <strong>Review required</strong>
+          <p>R06 module-health buffer arrived after the decision and shows reconnect failures before the decision time.</p>
+        </div>
+      </section>
+
+      <section className="mini-timeline">
+        <div><b>14:09</b><span>event_time</span><small>R06 reconnect failures existed</small></div>
+        <div><b>14:27</b><span>decision sealed</span><small>2 affected known</small></div>
+        <div><b>14:31</b><span>known_at</span><small>late evidence became knowable</small></div>
         <div><b>14:31:04</b><span>ingested_at</span><small>received by Veyra</small></div>
+      </section>
+
+      <section className="outcome-ledger">
+        <PackageItem title="Decision-time view" value="2 affected" />
+        <PackageItem title="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 3)} affected`} />
+        <PackageItem title="Field dispatch" value="avoided" />
+        <PackageItem title="Rollout" value="paused, then resumed" />
+        <PackageItem title="Engineering time" value="reduced" />
+        <PackageItem title="Customer support" value="informed before escalation" />
+      </section>
+
+      <div className="outcome-actions">
+        {!pkg?.sealed && <button className="button lime" onClick={onSeal}>Seal decision first</button>}
+        <button className="button primary" onClick={onOutcome}>Link outcome</button>
       </div>
-      <p>Veyra updates what we know now, not what the team knew then.</p>
-      <div className="grid three">
-        <Metric label="Decision-time view" value="2" note="affected in sealed package" />
-        <Metric label="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 3)}`} note="affected after delayed evidence" />
-        <Metric label="Decision state" value="Intact" note="new evidence leaves old context intact" />
-      </div>
-      <div className="grid four">
-        <Metric label="Field dispatch" value="Avoided" note="remote action was enough for R03/R05" />
-        <Metric label="Rollout" value="Paused" note="then resumed after review" />
-        <Metric label="Engineering time" value="Reduced" note="no added investigation for R03/R05" />
-        <Metric label="Customer support" value="Informed" note="before escalation" />
-      </div>
-      <div className="callout">
-        <b>Outcome validation</b>
-        <p>{validation?.status === "pending" ? "Pending until the outcome is linked." : "Connectivity recovery is observed after the action. Causality is not treated as proven."}</p>
-      </div>
-      {pkg?.sealed ? <Signature pkg={pkg} verification={verification} /> : <button className="button lime" onClick={onSeal}>Seal package first</button>}
-      <button className="button primary" onClick={onOutcome}>Link outcome</button>
     </article>
   );
 }
