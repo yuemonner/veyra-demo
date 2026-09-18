@@ -68,6 +68,8 @@ function CinematicDemoInner() {
         previous_action: "Remote restart affected machines; hold field dispatch; monitor R06",
         recovery_minutes: 41,
         days_later: 12,
+        attribution_level: "observed",
+        attribution_rationale: "Recovery was observed after remote restart. The restart is not treated as proven causal.",
       },
     });
     setMemoryReady(true);
@@ -141,7 +143,7 @@ function OpenScene({ onNext }: { onNext: () => void }) {
     <section className="cinema-scene center">
       <span className="eyebrow">Operational Case · Physical AI</span>
       <h1>One deployment. Seven machines. Two start dropping offline.</h1>
-      <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and outcome.</p>
+      <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and observed outcome.</p>
       <button className="button lime" onClick={onNext}>Start case</button>
     </section>
   );
@@ -209,20 +211,20 @@ function DecisionStateScene({ pkg, onNext }: { pkg: DecisionPackage | null; onNe
     <section className="cinema-scene">
       <SceneTitle eyebrow="4 · Decision" title="What did the team actually know at 14:27?" subtitle="The case separates known evidence from open questions before the team acts." />
       <div className="split-count">
-        <div><strong>What the team knew at 14:27</strong><span>R03 affected · R05 affected · R06 no known issue</span></div>
-        <div><strong>What Veyra knows now</strong><span>R06 had earlier reconnect failures that became available later</span></div>
+        <div><strong>What the team knew at 14:27</strong><span>R03 affected · R05 affected · no known issue on R06</span></div>
+        <div><strong>What Veyra knows now</strong><span>R06 had earlier reconnect failures that became available after the decision snapshot</span></div>
       </div>
       <div className="time-rail cinematic-rail">
         <div><b>14:09</b><span>event_time</span><small>R06 reconnect failures existed in edge buffer</small></div>
         <i />
-        <div><b>14:27</b><span>decision point</span><small>2 affected known to the team</small></div>
+        <div><b>14:27</b><span>decision snapshot</span><small>2 affected known to the team</small></div>
         <i />
-        <div><b>14:31</b><span>known_at</span><small>delayed evidence becomes knowable</small></div>
+        <div><b>14:31</b><span>known_at</span><small>evidence becomes available to reconstruction</small></div>
         <i />
         <div><b>14:31:04</b><span>ingested_at</span><small>evidence reaches Veyra</small></div>
       </div>
       <HeroLine text="Veyra preserves what the team knew when the decision was made." />
-      <div className="seal-card quiet-seal"><span>Decision package saved · 14:27</span><small>{pkg?.sealed ? "Operational case ready for action and outcome follow-up." : "Decision package generated from backend evidence."}</small></div>
+      <div className="seal-card quiet-seal"><span>Decision snapshot · 14:27</span><small>{pkg?.sealed ? "Sealed after owner and action were recorded." : "Generated from backend evidence."}</small></div>
       <button className="button primary" onClick={onNext}>What did the team do?</button>
     </section>
   );
@@ -249,18 +251,19 @@ function ActionScene({ onNext }: { onNext: () => void }) {
 function OutcomeScene({ comparison, onNext }: { comparison: Comparison | null; onNext: () => void }) {
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="6 · Outcome" title="Did the action work?" subtitle="A few hours later, and then three days later, the case keeps updating." />
+      <SceneTitle eyebrow="6 · Outcome" title="What happened after the action?" subtitle="A few hours later, and then three days later, the case keeps updating." />
       <div className="outcome-grid">
         <div><span>R03</span><b>recovered after remote restart</b></div>
         <div><span>R05</span><b>recovered after remote restart</b></div>
-        <div><span>Field visit</span><b>avoided</b></div>
+        <div><span>Attribution</span><b>observed after action, not causal proof</b></div>
+        <div><span>Field visit</span><b>held by decision path</b></div>
         <div><span>Follow-up window</span><b>clean for 24 hours</b></div>
         <div><span>Rollout</span><b>paused, then resumed</b></div>
         <div><span>Escalation</span><b>contained for R03/R05</b></div>
         <div><span>+3 days</span><b>R06 shows the same pattern</b></div>
         <div><span>Current population</span><b>{Math.max(comparison?.same_signal ?? 3, 3)} affected</b></div>
       </div>
-      <HeroLine text="New evidence updates the case without rewriting the original decision." />
+      <HeroLine text="New evidence updates the case without rewriting the original decision snapshot." />
       <button className="button primary" onClick={onNext}>12 days later</button>
     </section>
   );
@@ -275,12 +278,13 @@ function MemoryScene({ memoryReady, onNext }: { memoryReady: boolean; onNext: ()
         <p><b>Previous case</b></p>
         <p>Same application release.</p>
         <p>Same profile C17 and module firmware 4.9 exposure.</p>
-        <p>Remote restart restored 2/2 affected machines.</p>
+        <p>R03 and R05 recovered after remote restart.</p>
         <p>No field visit was required.</p>
         <p>One additional exposed machine failed later.</p>
+        <p>Evidence strength: precedent, not causal proof.</p>
         <p>Previous action available: remote restart, hold dispatch and monitor exposed machines.</p>
       </div>
-      <HeroLine text="The company is no longer solving the same problem from zero." />
+      <HeroLine text="The next case does not start from zero." />
       <div className="future-strip"><span>{memoryReady ? "Operational Case" : "Case preview"}</span><b>Evidence → decision state → action → outcome → reusable learning</b></div>
       <button className="button lime" onClick={onNext}>End</button>
     </section>
@@ -290,14 +294,14 @@ function MemoryScene({ memoryReady, onNext }: { memoryReady: boolean; onNext: ()
 function EndScene() {
   return (
     <section className="cinema-scene center end-frame">
-      <h1>A company should not solve the same machine problem twice.</h1>
+      <h1>A company should not start from zero when a similar machine problem appears again.</h1>
       <p>Veyra turns each operational case into evidence for the next one.</p>
       <p>Now run the same scenario in the live product.</p>
       <p>Operational intelligence for Physical AI.</p>
       <div className="unlock-row">
         <div><span>See</span><b>what changed</b></div>
         <div><span>Decide</span><b>what to do</b></div>
-        <div><span>Learn</span><b>whether it worked</b></div>
+        <div><span>Learn</span><b>what happened after</b></div>
       </div>
       <Link className="button lime" href="/product-demo">Open live product</Link>
     </section>

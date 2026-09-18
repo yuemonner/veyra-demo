@@ -27,7 +27,7 @@ export default async function Page() {
           <span className="eyebrow">Operational intelligence for Physical AI.</span>
           <h1>One deployment. Seven machines. Two start dropping offline.</h1>
           <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and outcome.</p>
-          <p><b>See what changed. Decide what to do. Know whether it worked. Reuse it next time.</b></p>
+          <p><b>See what changed. Decide what to do. Learn what happened after. Reuse it next time.</b></p>
           <div className="hero-actions"><Link className="button primary" href="/product-demo">Open live product</Link><Link className="button" href="/cinematic">Review cinematic case</Link></div>
         </section>
         <div className="grid three">

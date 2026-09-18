@@ -18,7 +18,7 @@ Signal
 
 > Six machines. One software update. Something changed.
 >
-> See what changed. Decide what to do. Know whether it worked. Reuse it next time.
+> See what changed. Decide what to do. Learn what happened after. Reuse it next time.
 
 ## 1. Signal
 

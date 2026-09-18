@@ -75,7 +75,7 @@ def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     assert sealed["package"]["decision_substantiation"]["status"] == "actionable_with_open_follow_up"
     assert sealed["package"]["planned_action"]["action_type"] == "remote_fix_and_hold_rollout"
     assert sealed["package"]["actual_action"]["scope"]["field_dispatch"] == "held"
-    assert sealed["package"]["_seal"]["trusted_timestamp"] == "2026-09-03T14:27:00Z"
+    assert sealed["package"]["_seal"]["trusted_timestamp"] == "2026-09-03T14:31:00Z"
     assert sealed["package"]["_seal"]["timestamp_authority"] == "Veyra demo timestamp authority"
     digest = sealed["digest"]
     assert len(digest) == 64

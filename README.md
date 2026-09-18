@@ -2,7 +2,7 @@
 
 Operational intelligence for Physical AI.
 
-See what changed. Decide what to do. Know whether it worked. Reuse it next time.
+See what changed. Decide what to do. Learn what happened after. Reuse it next time.
 
 This repo is a production-shaped live demo scenario. Ingestion, reconstruction, comparison, deterministic Decision Package generation, decision state, team action recording, outcome linking and similar-case retrieval run through the backend.
 

@@ -184,7 +184,7 @@ function InvestigationInner({ id }: { id: string }) {
             <div className="case-header-copy">
               <span className="eyebrow">Operational case</span>
               <h1>Two machines changed after the same update.</h1>
-              <p>Veyra reconstructs what changed, where else it appears, what the team did and whether it worked.</p>
+              <p>Veyra reconstructs what changed, where else it appears, what the team did and what happened afterwards.</p>
             </div>
             <div className="case-header-rail">
               <div className="case-pills">
@@ -225,7 +225,7 @@ function InvestigationInner({ id }: { id: string }) {
           <b>What changed</b>
           <b>Where else</b>
           <b>Peer comparison</b>
-          <b>Decision state</b>
+        <b>Decision state</b>
           <b>Action record</b>
           <b>Outcome memory</b>
         </section>}
@@ -317,7 +317,7 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
         <thead><tr><th>Option</th><th>Prior outcome</th><th>Attribution</th></tr></thead>
         <tbody>
           {(outcomeRows.length ? outcomeRows : [
-            { action: "remote_fix", outcome: "no outcome recorded", attribution: "not observed" },
+            { action: "remote_fix", outcome: "observed recovery after action", attribution: "precedent, not causal proof" },
             { action: "monitor", outcome: "not yet observed", attribution: "not observed" },
             { action: "dispatch", outcome: "not supported by current evidence", attribution: "not supported" },
           ]).map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome || row.status}</td><td>{row.attribution}</td></tr>)}
@@ -390,8 +390,8 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
         <tbody>{options.map((option: any) => <tr key={option.id || option.option_type}><td>{option.label}</td><td>{summarizeObject(option.expected_cost)}</td><td>{option.expected_risk?.risk || option.expected_risk?.reason || "unknown"}</td><td>{option.selected ? "chosen" : "available"}</td></tr>)}</tbody>
       </table>
       <div className="split-count">
-        <div><strong>What the team knew at 14:27</strong><span>R03 affected · R05 affected · R06 no known issue</span></div>
-        <div><strong>What Veyra knows now</strong><span>R06 had an earlier signal that became available later</span></div>
+        <div><strong>What the team knew at 14:27</strong><span>R03 affected · R05 affected · no known issue on R06</span></div>
+        <div><strong>What Veyra knows now</strong><span>R06 had an earlier signal that became available after the decision snapshot</span></div>
       </div>
       <div className="evidence-columns">
         <div className="evidence-card">
@@ -399,7 +399,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
           <ul>
             <li>R03 affected</li>
             <li>R05 affected</li>
-            <li>R06 no known issue</li>
+            <li>No known issue on R06 at 14:27</li>
             <li>Telemetry completeness: partial</li>
           </ul>
         </div>
@@ -407,11 +407,16 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
           <span className="eyebrow">Later evidence</span>
           <ul>
             <li>R06 event_time: 14:09</li>
-            <li>Ingested: 14:31</li>
-            <li>Arrived after decision</li>
+            <li>known_at: 14:31</li>
+            <li>ingested_at: 14:31:04</li>
+            <li>Available after decision snapshot</li>
             <li>Review required</li>
           </ul>
         </div>
+      </div>
+      <div className="callout">
+        <b>Clock definitions</b>
+        <p>event_time is when the machine event happened. known_at is when the evidence became available to the reconstruction layer. ingested_at is when Veyra received it. Human review can happen after all three.</p>
       </div>
       <div className="callout warning">
         <b>{pkg.package.decision_substantiation?.question || "Is the team ready to act on this case?"}</b>
@@ -441,7 +446,7 @@ function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
       <h2>The team chooses a response.</h2>
       <p>Veyra keeps the decision, the action that was actually executed, and the evidence available at the time together.</p>
       <div className="package-grid">
-        <PackageItem title="Decision" value="remote fix before dispatch" />
+        <PackageItem title="Decision" value="try remote fix before dispatch" />
         <PackageItem title="Planned action" value={planned?.label || "remote restart affected machines"} />
         <PackageItem title="Actual action" value={actual?.scope?.remote_restart ? `remote restart ${actual.scope.remote_restart.join(" and ")}` : "remote restart R03 and R05"} />
         <PackageItem title="Watch" value="monitor R06" />
@@ -464,8 +469,8 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
       <div className="package-head">
         <div>
           <span className="eyebrow">Outcome</span>
-          <h2>Did the action work?</h2>
-          <p>R03 and R05 recovered after remote restart. R06 later shows the same pattern through delayed module-health evidence.</p>
+          <h2>What happened after the action?</h2>
+          <p>R03 and R05 recovered after remote restart. That is observed recovery, not causal proof. R06 later shows the same pattern through delayed module-health evidence.</p>
         </div>
         <div className={pkg?.sealed ? "sealed-mini good" : "sealed-mini"}>
           <span>{pkg?.sealed ? "Sealed" : "Unsealed"}</span>
@@ -481,24 +486,24 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
         </div>
         <div className="outcome-status">
           <span className="eyebrow">Late evidence</span>
-          <strong>Review required</strong>
-          <p>R06 module-health buffer arrived after the decision and shows reconnect failures before the decision time.</p>
+          <strong>New decision-relevant evidence arrived</strong>
+          <p>The original decision record remains unchanged. The current case view is updated and flagged for review.</p>
         </div>
       </section>
 
       <section className="mini-timeline">
         <div><b>14:09</b><span>event_time</span><small>R06 reconnect failures existed</small></div>
-        <div><b>14:27</b><span>decision sealed</span><small>2 affected known</small></div>
-        <div><b>14:31</b><span>known_at</span><small>late evidence became knowable</small></div>
+        <div><b>14:27</b><span>decision snapshot</span><small>2 affected known</small></div>
+        <div><b>14:31</b><span>known_at</span><small>late evidence became available</small></div>
         <div><b>14:31:04</b><span>ingested_at</span><small>received by Veyra</small></div>
       </section>
 
       <section className="outcome-ledger">
         <PackageItem title="Decision-time view" value="2 affected" />
         <PackageItem title="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 3)} affected`} />
-        <PackageItem title="Field dispatch" value="avoided" />
+        <PackageItem title="Field dispatch" value="avoided by decision path" />
         <PackageItem title="Rollout" value="paused, then resumed" />
-        <PackageItem title="Engineering time" value="reduced" />
+        <PackageItem title="Engineering time" value="estimated reduction" />
         <PackageItem title="Customer support" value="informed before escalation" />
       </section>
 
@@ -530,7 +535,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
         </div>
         <div>
           <span className="eyebrow">Previous action</span>
-          <b>Remote restart · rollout held · field dispatch avoided</b>
+          <b>Remote restart · rollout held · field dispatch held</b>
         </div>
         <div>
           <span className="eyebrow">Observed outcome</span>
@@ -539,7 +544,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
       </div>
       <div className="package-grid memory-grid">
         <PackageItem title="Evidence strength" value="precedent, not causal proof" />
-        <PackageItem title="Previously successful" value="observed after action" />
+        <PackageItem title="Previous result" value="observed after action" />
         <PackageItem title="Outcome validation" value={validation?.status || "record outcome first"} />
         <PackageItem title="What to reuse" value="check prior conditions before field dispatch" />
         <PackageItem title="What to verify" value="whether the same evidence pattern holds now" />
@@ -548,7 +553,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
         <thead><tr><th>Action</th><th>Observed outcome</th><th>Attribution</th></tr></thead>
         <tbody>
           {(rows.length ? rows : [
-            { action: "remote_fix", outcome: "record outcome first", attribution: "not observed" },
+            { action: "remote_fix", outcome: "observed recovery after action", attribution: "precedent, not causal proof" },
             { action: "dispatch", outcome: "not supported by current evidence", attribution: "not supported" },
           ]).map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome || row.status}</td><td>{row.attribution}</td></tr>)}
         </tbody>
@@ -559,15 +564,15 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
       </div>
       {!hasMemory && <button className="button primary" onClick={onOutcome}>Link outcome first</button>}
       <div className="ending">
-        <b>The company is no longer solving the same problem from zero.</b>
-        <span>A company should not solve the same machine problem twice.</span>
+        <b>The next case does not start from zero.</b>
+        <span>A company should not start from zero when a similar machine problem appears again.</span>
       </div>
     </article>
   );
 }
 
 function Signature({ pkg, verification }: { pkg: DecisionPackage; verification?: Verification | null }) {
-  return <div className="panel good signature"><span className="eyebrow">Sealed Decision Package</span><p>Later evidence updates the current investigation. The decision-time package remains sealed.</p><p className="hash hash-large">SHA-256 {pkg.digest}</p><p className="signature-note">Hash recorded at 14:27:00 · tamper-evident · {pkg.package?._seal?.timestamp_authority || "timestamp authority"}</p><p className="hash">Ed25519 {pkg.signature?.slice(0, 48)}...</p><div className="verify-grid"><PackageItem title="Standalone verification" value={verification?.valid ? "valid digest + valid signature" : "ready with public key"} /><PackageItem title="Human owner" value={pkg.package?.human_decision?.owner || "Robotics Engineering"} /><PackageItem title="Decision scope" value={(pkg.package?.action_scope?.affected || []).join(" · ") || "affected machines"} /></div></div>;
+  return <div className="panel good signature"><span className="eyebrow">Sealed Decision Package</span><p>Later evidence updates the current investigation. The 14:27 decision-time snapshot remains intact.</p><p className="hash hash-large">SHA-256 {pkg.digest}</p><p className="signature-note">Snapshot covers 14:27 decision context · sealed after owner and action were recorded · tamper-evident · {pkg.package?._seal?.timestamp_authority || "timestamp authority"}</p><p className="hash">Ed25519 {pkg.signature?.slice(0, 48)}...</p><div className="verify-grid"><PackageItem title="Standalone verification" value={verification?.valid ? "valid digest + valid signature" : "ready with public key"} /><PackageItem title="Human owner" value={pkg.package?.human_decision?.owner || "Robotics Engineering"} /><PackageItem title="Decision scope" value={(pkg.package?.action_scope?.affected || []).join(" · ") || "affected machines"} /></div></div>;
 }
 
 function PackageItem({ title, value }: { title: string; value: string }) {

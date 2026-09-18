@@ -33,6 +33,7 @@ from app.models import (
 
 BASE = datetime(2026, 9, 3, 14, 0, 0)
 DEMO_DECISION_TIME = BASE + timedelta(minutes=27)
+DEMO_SEAL_TIME = BASE + timedelta(minutes=31)
 TIMESTAMP_AUTHORITY = "Veyra demo timestamp authority"
 STATE_KEYS = [
     "application_version",
@@ -729,7 +730,7 @@ def seal_body(dp: DecisionPackage) -> dict[str, Any]:
     package.pop("_seal", None)
     return {
         "version": dp.version,
-        "trusted_timestamp": iso(DEMO_DECISION_TIME),
+        "trusted_timestamp": iso(DEMO_SEAL_TIME),
         "timestamp_authority": TIMESTAMP_AUTHORITY,
         "package": package,
     }
@@ -741,7 +742,7 @@ def seal_package(db: Session, package_id: str) -> DecisionPackage:
         raise ValueError("package not found")
     if dp.sealed:
         return dp
-    sealed_at = DEMO_DECISION_TIME
+    sealed_at = DEMO_SEAL_TIME
     body = seal_body(dp)
     canonical = json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
     digest = hashlib.sha256(canonical).hexdigest()
@@ -758,7 +759,7 @@ def seal_package(db: Session, package_id: str) -> DecisionPackage:
         "canonicalization": "json.sort_keys.compact",
         "digest_algorithm": "SHA-256",
         "signature_algorithm": "Ed25519",
-        "trusted_timestamp": iso(DEMO_DECISION_TIME),
+        "trusted_timestamp": iso(DEMO_SEAL_TIME),
         "timestamp_authority": TIMESTAMP_AUTHORITY,
         "standalone_verification": "Use the public key, canonical body and signature to verify this package outside Veyra.",
     }
@@ -792,7 +793,7 @@ def verify_package(db: Session, package_id: str) -> dict[str, Any]:
         "signature_valid": signature_valid,
         "digest": dp.digest,
         "public_key": dp.public_key,
-        "trusted_timestamp": iso(DEMO_DECISION_TIME),
+        "trusted_timestamp": iso(DEMO_SEAL_TIME),
         "timestamp_authority": TIMESTAMP_AUTHORITY,
         "canonicalization": "json.sort_keys.compact",
         "verification_mode": "standalone",
@@ -926,12 +927,12 @@ def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
     response_history = {
         "remote_fix": {
             "cases": len([o for o in outcomes if "remote" in (o.outcome or "").lower() or "restart" in json.dumps(o.payload or {}).lower()]),
-            "observed_outcome": "connectivity restored without a field visit" if outcomes else "no outcome recorded",
+            "observed_outcome": "connectivity restored without a field visit" if outcomes else "outcome pending",
             "attribution": attributions[0].attribution_level if attributions else "not_observed",
         },
         "monitor": {"cases": 0, "observed_outcome": "not yet observed"},
         "dispatch": {"cases": 0, "observed_outcome": "not supported by current evidence"},
-        "pause_rollout": {"cases": len(outcomes), "observed_outcome": "rollout contained while review continued" if outcomes else "no outcome recorded"},
+        "pause_rollout": {"cases": len(outcomes), "observed_outcome": "rollout contained while review continued" if outcomes else "outcome pending"},
     }
     result = {
         "investigation_id": investigation_id,
