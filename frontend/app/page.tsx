@@ -38,7 +38,7 @@ export default async function Page() {
         <section className="investigation panel">
           <span className="eyebrow">Backend v0 live</span>
           <h2>Product core behind the demo</h2>
-          <p>The cinematic story and live investigation run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed, finding where else the pattern appears, comparing affected and healthy machines, deterministic Decision Package generation, action recording, outcome linking and similar-case retrieval.</p>
+          <p>The cinematic story and live product run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed, finding where else the pattern appears, comparing affected and healthy machines, option comparison, action recording, outcome linking and similar-case retrieval.</p>
           <div className="backend-grid">
             <b>Evidence → Decision state → Action → Outcome → Learning</b>
             <b>source evidence ingestion</b>

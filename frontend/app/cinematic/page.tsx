@@ -19,7 +19,7 @@ const SCENES = ["open", "signal", "changed", "whereelse", "decision", "action", 
 
 export default function CinematicDemo() {
   return (
-    <Suspense fallback={<main className="cinematic"><section className="cinema-scene center"><h1>Loading operational case...</h1></section></main>}>
+    <Suspense fallback={<main className="cinematic"><section className="cinema-scene center"><h1>Loading live demo...</h1></section></main>}>
       <CinematicDemoInner />
     </Suspense>
   );
@@ -295,7 +295,7 @@ function EndScene() {
   return (
     <section className="cinema-scene center end-frame">
       <h1>A company should not start from zero when a similar machine problem appears again.</h1>
-      <p>Veyra turns each operational case into evidence for the next one.</p>
+      <p>Veyra turns each machine decision into evidence for the next one.</p>
       <p>Now run the same scenario in the live product.</p>
       <p>Operational intelligence for Physical AI.</p>
       <div className="unlock-row">

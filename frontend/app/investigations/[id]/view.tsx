@@ -76,9 +76,9 @@ function InvestigationInner({ id }: { id: string }) {
       setPrecedent(await getJson(`/precedents/compare?investigation_id=${investigationId}`));
       setVerification(null);
       setStage("decision");
-      setNotice("Decision Package generated from backend evidence.");
+      setNotice("Decision options ready.");
     } catch (error) {
-      reportError("Decision Package generation", error);
+      reportError("Decision options", error);
     }
   }
 
@@ -98,7 +98,7 @@ function InvestigationInner({ id }: { id: string }) {
       setPrecedent(await getJson(`/precedents/compare?investigation_id=${investigationId}`));
       setNotice("Operational Case updated with team action and decision state.");
     } catch (error) {
-      reportError("Decision Package sealing", error);
+      reportError("Decision record", error);
     }
   }
 
@@ -144,7 +144,7 @@ function InvestigationInner({ id }: { id: string }) {
     changes: "Changes",
     scope: "Scope",
     decision: "Decision",
-    action: "Actions",
+    action: "What we chose",
     outcome: "Outcome",
     history: "History",
   };
@@ -160,12 +160,12 @@ function InvestigationInner({ id }: { id: string }) {
           <button className={stage === "changes" ? "active" : ""} onClick={() => setStage("changes")}>Changes</button>
           <button className={stage === "scope" ? "active" : ""} onClick={() => setStage("scope")}>Scope</button>
           <button className={stage === "decision" ? "active" : ""} onClick={() => setStage("decision")}>Decision</button>
-          <button className={stage === "action" ? "active" : ""} onClick={() => setStage("action")}>Actions</button>
+          <button className={stage === "action" ? "active" : ""} onClick={() => setStage("action")}>What we chose</button>
           <button className={stage === "outcome" ? "active" : ""} onClick={() => setStage("outcome")}>Outcome</button>
           <button className={stage === "history" ? "active" : ""} onClick={() => setStage("history")}>History</button>
           {presenter && <Link className="nav-link-strong" href="/demo-control">Demo Control</Link>}
         </nav>
-        <div className="boundary">Machine evidence becomes review context.</div>
+        <div className="boundary">A machine changed. What should the team do next?</div>
       </aside>
 
       <main className="main">
@@ -182,9 +182,9 @@ function InvestigationInner({ id }: { id: string }) {
         {stage === "overview" ? (
           <section className="case-header">
             <div className="case-header-copy">
-              <span className="eyebrow">Operational case</span>
+              <span className="eyebrow">Live machine decision</span>
               <h1>Two machines changed after the same update.</h1>
-              <p>Veyra reconstructs what changed, where else it appears, what the team did and what happened afterwards.</p>
+              <p>Seven machines got the same update. Two started failing. Veyra shows what changed, where else it appears, and what happened when teams took similar actions before.</p>
             </div>
             <div className="case-header-rail">
               <div className="case-pills">
@@ -195,7 +195,7 @@ function InvestigationInner({ id }: { id: string }) {
               </div>
               <div className="hero-actions">
                 <button className="button primary" onClick={() => setStage("overview")}>Open case</button>
-                <button className="button lime" onClick={generatePackage}>Review case</button>
+                <button className="button lime" onClick={generatePackage}>What should we do?</button>
               </div>
             </div>
           </section>
@@ -225,9 +225,9 @@ function InvestigationInner({ id }: { id: string }) {
           <b>What changed</b>
           <b>Where else</b>
           <b>Peer comparison</b>
-        <b>Decision state</b>
-          <b>Action record</b>
-          <b>Outcome memory</b>
+          <b>Options</b>
+          <b>Chosen action</b>
+          <b>Outcome history</b>
         </section>}
 
         {stage === "overview" && <LiveFailure rec={rec} comparison={comparison} detectionLead={detectionLead} onChanges={() => setStage("changes")} onPackage={generatePackage} />}
@@ -259,10 +259,16 @@ function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: a
         <Metric label="14:26:03" value="Engineer note" note="human discovery recorded" />
       </div>
       <article className="panel dramatic">
-        <span className="eyebrow">Post-deployment operations</span>
+        <span className="eyebrow">The team has four choices</span>
         <h2>Same deployment. Different connectivity behavior.</h2>
         <p>Every machine received app 0.36. Only two began showing module unhealthy and repeated reconnects. The team needs to decide whether this is application, firmware, site network or device-specific before sending someone onsite.</p>
-        <div className="hero-actions"><button className="button primary" onClick={onChanges}>What changed?</button><button className="button" onClick={onPackage}>Review case</button></div>
+        <div className="choice-row">
+          <b>Monitor</b>
+          <b>Remote recovery</b>
+          <b>Rollback</b>
+          <b>Dispatch</b>
+        </div>
+        <div className="hero-actions"><button className="button primary" onClick={onChanges}>What changed?</button><button className="button" onClick={onPackage}>Compare options</button></div>
       </article>
     </>
   );
@@ -310,8 +316,8 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
         <p>Application 0.36 is shared across both groups. Device profile C17, module firmware 4.9 and site network profile N7 are shared by the affected machines, while R06 has the same exposure without a known issue at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
       </div>
       <div className="callout">
-        <b>Decision comparison</b>
-        <p>Similar conditions are evaluated by response history, outcome and attribution strength.</p>
+        <b>What happened when we took these actions before?</b>
+        <p>Similar conditions are compared by prior response, observed outcome and attribution boundary.</p>
       </div>
       <table className="table focus-table">
         <thead><tr><th>Option</th><th>Prior outcome</th><th>Attribution</th></tr></thead>
@@ -323,14 +329,83 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
           ]).map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome || row.status}</td><td>{row.attribution}</td></tr>)}
         </tbody>
       </table>
-      <button className="button primary" onClick={onPackage}>Review case</button>
+      <button className="button primary" onClick={onPackage}>Compare options</button>
     </article>
+  );
+}
+
+function DecisionOptions({ options }: { options: any[] }) {
+  const fallback = [
+    {
+      id: "monitor",
+      label: "Monitor",
+      evidenceFor: "R06 has no known issue at 14:27",
+      evidenceAgainst: "R03 and R05 are already unstable",
+      priorOutcome: "not yet observed",
+      cost: "low cost, higher operational risk",
+    },
+    {
+      id: "remote_restart",
+      label: "Remote restart",
+      evidenceFor: "affected machines show reconnect failures",
+      evidenceAgainst: "site network cause remains unresolved",
+      priorOutcome: "observed recovery after action",
+      cost: "low cost, no field visit",
+    },
+    {
+      id: "rollback",
+      label: "Roll back",
+      evidenceFor: "issue follows deployment window",
+      evidenceAgainst: "app 0.36 runs on healthy machines too",
+      priorOutcome: "not established",
+      cost: "rollout delay",
+    },
+    {
+      id: "dispatch",
+      label: "Dispatch technician",
+      evidenceFor: "local site state is missing",
+      evidenceAgainst: "current evidence does not support immediate visit",
+      priorOutcome: "not supported by current evidence",
+      cost: "high cost",
+    },
+  ];
+  const normalized = options.length ? options.map((option: any) => ({
+    id: option.id || option.option_type,
+    label: option.option_type === "remote_fix" ? "Remote restart" : option.option_type === "pause_rollout" ? "Roll back / hold rollout" : option.option_type === "dispatch" ? "Dispatch technician" : option.option_type === "monitor" ? "Monitor" : option.label,
+    evidenceFor: option.historical_support?.summary || option.label,
+    evidenceAgainst: option.expected_risk?.reason || "uncertainty remains",
+    priorOutcome: option.historical_support?.status === "none_yet" ? "no prior outcome in this workspace" : option.historical_support?.summary || "pending",
+    cost: summarizeObject(option.expected_cost),
+    selected: option.selected,
+  })) : fallback;
+  return (
+    <div className="option-grid">
+      {normalized.map((option: any) => (
+        <article className={option.selected ? "option-card selected" : "option-card"} key={option.id}>
+          <header><span>{option.selected ? "chosen" : "option"}</span><b>{option.label}</b></header>
+          <dl>
+            <dt>Evidence for</dt><dd>{option.evidenceFor}</dd>
+            <dt>Evidence against</dt><dd>{option.evidenceAgainst}</dd>
+            <dt>Previous outcome</dt><dd>{option.priorOutcome}</dd>
+            <dt>Cost</dt><dd>{option.cost}</dd>
+          </dl>
+        </article>
+      ))}
+    </div>
   );
 }
 
 function PackageStage({ pkg, verification, rec, comparison, decisionContext, onGenerate, onSeal }: any) {
   if (!pkg) {
-    return <article className="panel"><span className="eyebrow">Operational case</span><h2>No case package generated yet.</h2><p>Open the case package to assemble trigger, last healthy state, changes, peer comparison, missing context, decision state and outcome follow-up.</p><button className="button primary" onClick={onGenerate}>Open case package</button></article>;
+    return (
+      <article className="panel">
+        <span className="eyebrow">Decision</span>
+        <h2>What should we do now?</h2>
+        <p>Compare the options before the team acts. Veyra assembles the evidence, prior outcomes, cost and uncertainty around each choice.</p>
+        <DecisionOptions options={[]} />
+        <button className="button primary" onClick={onGenerate}>Compare options</button>
+      </article>
+    );
   }
   const record = decisionContext?.decision_records?.[0];
   const options = decisionContext?.options_considered || pkg.package.options_considered || [];
@@ -341,8 +416,13 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
   return (
     <article className="panel">
       <div className="package-head">
-        <div><span className="eyebrow">Decision</span><h2>What did the team know at 14:27?</h2><p>This case preserves the evidence available at the decision point and the uncertainty that remained.</p></div>
-        <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Sealed" : "Record decision"}</button>
+        <div><span className="eyebrow">Decision</span><h2>What should we do now?</h2><p>Each option is grounded in current evidence, known gaps, cost and prior outcomes. The team still owns the decision.</p></div>
+        <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Decision recorded" : "Record decision"}</button>
+      </div>
+      <DecisionOptions options={options} />
+      <div className="callout">
+        <b>What did the team know at 14:27?</b>
+        <p>R03 and R05 were affected. R06 had no known issue at the decision snapshot. Site network evidence was incomplete.</p>
       </div>
       <div className="package-grid">
         <PackageItem title="Trigger" value="module unhealthy after deployment" />
@@ -360,7 +440,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
         <PackageItem title="Primary hypothesis" value={primaryHypothesis?.hypothesis || "pending"} />
         <PackageItem title="Hypothesis confidence" value={primaryHypothesis ? `${Math.round((primaryHypothesis.confidence || 0) * 100)}% · ${primaryHypothesis.status}` : "pending"} />
         <PackageItem title="Human identity" value={pkg.package.human_decision?.identity || "pending named owner"} />
-        <PackageItem title="Human action" value={pkg.package.human_decision?.decision || "pending"} />
+        <PackageItem title="Chosen action" value={pkg.package.human_decision?.decision || "pending"} />
         <PackageItem title="Outcome" value="pending" />
       </div>
       <div className="callout">
@@ -436,17 +516,19 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
 
 function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
   if (!pkg) {
-    return <article className="panel"><span className="eyebrow">Actions</span><h2>No decision state generated yet.</h2><p>Open the case first so the action is recorded with the evidence available at the time.</p><button className="button primary" onClick={onGenerate}>Open case package</button></article>;
+    return <article className="panel"><span className="eyebrow">What we chose</span><h2>Choose the next action first.</h2><p>Compare the options so the chosen action is recorded with the evidence available at the time.</p><button className="button primary" onClick={onGenerate}>Compare options</button></article>;
   }
   const planned = pkg.package.planned_action;
   const actual = pkg.package.actual_action;
   return (
     <article className="panel">
-      <span className="eyebrow">Actions</span>
-      <h2>The team chooses a response.</h2>
-      <p>Veyra keeps the decision, the action that was actually executed, and the evidence available at the time together.</p>
+      <span className="eyebrow">What we chose</span>
+      <h2>Decision: Remote restart + hold rollout.</h2>
+      <p>The decision, the executed action and the evidence available at the time stay together.</p>
       <div className="package-grid">
-        <PackageItem title="Decision" value="try remote fix before dispatch" />
+        <PackageItem title="Why this action" value="remote recovery has lower cost than dispatch while evidence remains incomplete" />
+        <PackageItem title="Known at the time" value="R03 and R05 affected, R06 no known issue" />
+        <PackageItem title="Still unknown" value="site network state and exact disconnect reason" />
         <PackageItem title="Planned action" value={planned?.label || "remote restart affected machines"} />
         <PackageItem title="Actual action" value={actual?.scope?.remote_restart ? `remote restart ${actual.scope.remote_restart.join(" and ")}` : "remote restart R03 and R05"} />
         <PackageItem title="Watch" value="monitor R06" />
@@ -455,7 +537,7 @@ function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
         <PackageItem title="Owner" value="Operations Lead · 14:31" />
       </div>
       <div className="hero-actions">
-        <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Decision sealed" : "Seal decision state"}</button>
+        <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Decision recorded" : "Record decision"}</button>
         <button className="button primary" onClick={onOutcome}>Track outcome</button>
       </div>
     </article>
@@ -525,8 +607,8 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
       <h2>A similar pattern appears again.</h2>
       <p>R12 begins showing reconnect failures after a new deployment.</p>
       <div className="callout">
-        <b>{hasMemory ? "Similar previous case" : "Reusable case preview"}</b>
-        <p>Use the previous case as operational precedent. It records what conditions were present, what the team did and what outcome followed.</p>
+        <b>Last time, remote restart restored connectivity without a field visit. The issue later appeared on a third machine.</b>
+        <p>Does the same precedent apply here?</p>
       </div>
       <div className="precedent-stack">
         <div>
@@ -543,7 +625,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
         </div>
       </div>
       <div className="package-grid memory-grid">
-        <PackageItem title="Evidence strength" value="precedent, not causal proof" />
+        <PackageItem title="Boundary" value="precedent, not causal proof" />
         <PackageItem title="Previous result" value="observed after action" />
         <PackageItem title="Outcome validation" value={validation?.status || "record outcome first"} />
         <PackageItem title="What to reuse" value="check prior conditions before field dispatch" />
@@ -562,7 +644,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
         <b>Before dispatching a technician</b>
         <p>Compare the current machine against the previous exposed group and check whether the same application, firmware, profile and site network pattern is present.</p>
       </div>
-      {!hasMemory && <button className="button primary" onClick={onOutcome}>Link outcome first</button>}
+      {!hasMemory && <button className="button primary" onClick={onOutcome}>Record outcome first</button>}
       <div className="ending">
         <b>The next case does not start from zero.</b>
         <span>A company should not start from zero when a similar machine problem appears again.</span>
