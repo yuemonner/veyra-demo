@@ -9,8 +9,8 @@ class Asset(Base):
     __tablename__ = "assets"
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    asset_type: Mapped[str] = mapped_column(String, nullable=False, default="AMR")
-    family: Mapped[str] = mapped_column(String, nullable=False, default="AMR-X")
+    asset_type: Mapped[str] = mapped_column(String, nullable=False, default="Physical machine")
+    family: Mapped[str] = mapped_column(String, nullable=False, default="Physical AI system")
     site: Mapped[str] = mapped_column(String, nullable=False, default="Warehouse A")
     environment: Mapped[str] = mapped_column(String, nullable=False, default="warehouse")
 

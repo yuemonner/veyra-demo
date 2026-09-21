@@ -25,15 +25,15 @@ export default async function Page() {
         <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Review cinematic case</Link><Link className="button" href="/product-demo">Open live product</Link></div></div>
         <section className="hero">
           <span className="eyebrow">Operational intelligence for Physical AI.</span>
-          <h1>One deployment. Seven machines. Two start dropping offline.</h1>
-          <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and outcome.</p>
+          <h1>One deployment. Twelve machines. Three enter safe-stop.</h1>
+          <p>Veyra reconstructs what changed, shows where else the same conditions exist, compares the team’s options and follows the case through action and outcome.</p>
           <p><b>See what changed. Decide what to do. Learn what happened after. Reuse it next time.</b></p>
           <div className="hero-actions"><Link className="button primary" href="/product-demo">Open live product</Link><Link className="button" href="/cinematic">Review cinematic case</Link></div>
         </section>
         <div className="grid three">
-          <article className="panel metric"><span>Machine group</span><strong>{assets.length || "7"}</strong><p>machines updated.</p></article>
-          <article className="panel metric"><span>Affected</span><strong>2</strong><p>module unhealthy.</p></article>
-          <article className="panel metric"><span>Stable</span><strong>5</strong><p>same app, no signal.</p></article>
+          <article className="panel metric"><span>Machine group</span><strong>{assets.length || "12"}</strong><p>machines updated.</p></article>
+          <article className="panel metric"><span>Affected</span><strong>3</strong><p>safe-stop near loading zone B.</p></article>
+          <article className="panel metric"><span>Stable</span><strong>9</strong><p>same release, no signal.</p></article>
         </div>
         <section className="investigation panel">
           <span className="eyebrow">Backend v0 live</span>
@@ -55,8 +55,8 @@ export default async function Page() {
         </section>
         <section className="investigation panel">
           <span className="eyebrow">Current investigation</span>
-          <h2>{active?.asset_id || "AMR-001"} · {active?.title || "Start the backend and reset demo data"}</h2>
-          <p>Operational Case: evidence, decision state, action, outcome and reusable learning.</p>
+          <h2>{active?.asset_id || "EX03"} · {active?.title || "Start the backend and reset demo data"}</h2>
+          <p>Live product: what changed, where else, options, action, outcome and reusable precedent.</p>
           <Link className="button primary" href="/product-demo">Open live product</Link>
         </section>
       </main>

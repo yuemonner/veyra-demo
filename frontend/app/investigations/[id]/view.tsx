@@ -61,7 +61,7 @@ function InvestigationInner({ id }: { id: string }) {
       setDecisionContext(null);
       setPrecedent(null);
       setStage("overview");
-      setNotice("Scenario reset. 2 machines are known affected at decision time.");
+      setNotice("Scenario reset. 3 machines are known affected at decision time.");
       await refresh();
     } catch (error) {
       reportError("Scenario reset", error);
@@ -86,9 +86,9 @@ function InvestigationInner({ id }: { id: string }) {
     if (!pkg) return;
     try {
       await postJson(`/investigations/${investigationId}/decision`, {
-        decision: "Remote restart affected machines and hold field dispatch",
+        decision: "Remote recovery on affected machines and hold field dispatch",
         owner: "Robotics Engineering",
-        rationale: "Application 0.36 ran everywhere, while affected machines share module firmware 4.9, device profile C17 and site network profile N7 with one exposed machine to watch.",
+        rationale: "Autonomy 2.7 ran everywhere, while affected machines share localization profile L4 and loading zone B exposure with one exposed machine to watch.",
         package_id: pkg.id,
       });
       const sealed = await postJson<DecisionPackage>(`/decision-packages/${pkg.id}/seal`);
@@ -108,7 +108,7 @@ function InvestigationInner({ id }: { id: string }) {
       await refresh();
       setDecisionContext(await getJson(`/investigations/${investigationId}/decision-context`));
       setStage("outcome");
-      setNotice("Delayed module-health evidence arrived with event_time before the engineer note.");
+      setNotice("Delayed runtime evidence arrived with event_time before the operator review.");
     } catch (error) {
       reportError("Delayed evidence injection", error);
     }
@@ -117,8 +117,8 @@ function InvestigationInner({ id }: { id: string }) {
   async function outcome() {
     try {
       await postJson(`/investigations/${investigationId}/outcome`, {
-        outcome: "Remote restart restored connectivity; field visit avoided; rollout held pending review",
-        payload: { previous_action: "Remote restart R03 and R05; hold field dispatch; monitor R06", recovery_minutes: 18, days_later: 12, field_visit: false, engineering_hours_saved: 3, attribution_level: "observed", attribution_rationale: "Connectivity recovery was observed after remote restart. Remote restart is not treated as proven causal." },
+        outcome: "Remote recovery returned machines to service; field visit avoided; rollout held pending review",
+        payload: { previous_action: "Remote recovery on EX03, EX05 and EX08; hold field dispatch; monitor EX11", recovery_minutes: 18, days_later: 12, field_visit: false, engineering_hours_saved: 2, attribution_level: "observed", attribution_rationale: "Return-to-service was observed after remote recovery. Remote recovery is not treated as proven causal." },
       });
       setMemory(await getJson(`/memory/similar?investigation_id=${investigationId}`));
       setPrecedent(await getJson(`/precedents/compare?investigation_id=${investigationId}`));
@@ -129,9 +129,9 @@ function InvestigationInner({ id }: { id: string }) {
     }
   }
 
-  const affected = comparison?.same_signal ?? 2;
-  const healthy = comparison?.no_signal ?? 5;
-  const lateEvidenceVisible = affected > 2;
+  const affected = comparison?.same_signal ?? 3;
+  const healthy = comparison?.no_signal ?? 9;
+  const lateEvidenceVisible = affected > 3;
   const detectionLead = useMemo(() => {
     if (!rec?.human_discovery?.event_time || !rec?.first_abnormal_evidence?.event_time) return "before engineer note";
     const first = new Date(rec.first_abnormal_evidence.event_time).getTime();
@@ -144,7 +144,7 @@ function InvestigationInner({ id }: { id: string }) {
     changes: "Changes",
     scope: "Scope",
     decision: "Decision",
-    action: "What we chose",
+    action: "Action",
     outcome: "Outcome",
     history: "History",
   };
@@ -158,11 +158,11 @@ function InvestigationInner({ id }: { id: string }) {
           <span className="nav-section-label">Case</span>
           <button className={stage === "overview" ? "active" : ""} onClick={() => setStage("overview")}>Overview</button>
           <button className={stage === "changes" ? "active" : ""} onClick={() => setStage("changes")}>Changes</button>
-          <button className={stage === "scope" ? "active" : ""} onClick={() => setStage("scope")}>Scope</button>
+          <button className={stage === "scope" ? "active" : ""} onClick={() => setStage("scope")}>Fleet</button>
           <button className={stage === "decision" ? "active" : ""} onClick={() => setStage("decision")}>Decision</button>
-          <button className={stage === "action" ? "active" : ""} onClick={() => setStage("action")}>What we chose</button>
+          <button className={stage === "action" ? "active" : ""} onClick={() => setStage("action")}>Action</button>
           <button className={stage === "outcome" ? "active" : ""} onClick={() => setStage("outcome")}>Outcome</button>
-          <button className={stage === "history" ? "active" : ""} onClick={() => setStage("history")}>History</button>
+          <button className={stage === "history" ? "active" : ""} onClick={() => setStage("history")}>Precedent</button>
           {presenter && <Link className="nav-link-strong" href="/demo-control">Demo Control</Link>}
         </nav>
         <div className="boundary">A machine changed. What should the team do next?</div>
@@ -170,7 +170,7 @@ function InvestigationInner({ id }: { id: string }) {
 
       <main className="main">
         <div className="topbar">
-          <span className="eyebrow">Operational case · 7 machines · application release 0.36 · 2 known affected</span>
+          <span className="eyebrow">Remote equipment fleet · 12 machines · autonomy release 2.7 · 3 known affected</span>
           {presenter && <div className="demo-controls">
             <Link className="button" href="/cinematic">Cinematic story</Link>
             <button className="button" onClick={refresh}>Refresh</button>
@@ -183,15 +183,15 @@ function InvestigationInner({ id }: { id: string }) {
           <section className="case-header">
             <div className="case-header-copy">
               <span className="eyebrow">Live machine decision</span>
-              <h1>Two machines changed after the same update.</h1>
-              <p>Seven machines got the same update. Two started failing. Veyra shows what changed, where else it appears, and what happened when teams took similar actions before.</p>
+              <h1>Three excavators entered safe-stop after the same deployment.</h1>
+              <p>Twelve machines got autonomy release 2.7. Three started entering safe-stop near the same loading zone. Veyra shows what changed, where else it appears, and what happened when teams took similar actions before.</p>
             </div>
             <div className="case-header-rail">
               <div className="case-pills">
                 <b>{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
-                {lateEvidenceVisible && <b>2 decision-time</b>}
+                {lateEvidenceVisible && <b>3 decision-time</b>}
                 <b>{healthy} healthy</b>
-                <b>7 updated</b>
+                <b>12 updated</b>
               </div>
               <div className="hero-actions">
                 <button className="button primary" onClick={() => setStage("overview")}>Open case</button>
@@ -205,12 +205,12 @@ function InvestigationInner({ id }: { id: string }) {
               <span className="eyebrow">Operational case</span>
               <strong>{stageLabel[stage]}</strong>
             </div>
-            <p>R03 / R05 connectivity degradation after app 0.36</p>
+            <p>EX03 / EX05 / EX08 safe-stop after autonomy 2.7</p>
             <div className="case-pills">
               <b>{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
-              {lateEvidenceVisible && <b>2 decision-time</b>}
+              {lateEvidenceVisible && <b>3 decision-time</b>}
               <b>{healthy} healthy</b>
-              <b>7 updated</b>
+              <b>12 updated</b>
             </div>
           </section>
         )}
@@ -246,26 +246,26 @@ function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: a
   return (
     <>
       <div className="fleet-map" aria-label="fleet status">
-        {Array.from({ length: 7 }).map((_, i) => {
-          const affected = i < (comparison?.same_signal ?? 2);
-          return <span key={i} className={affected ? "dot bad" : "dot good"} title={`R${String(i + 1).padStart(2, "0")}`} />;
+        {Array.from({ length: 12 }).map((_, i) => {
+          const affected = i < (comparison?.same_signal ?? 3);
+          return <span key={i} className={affected ? "dot bad" : "dot good"} title={`EX${String(i + 1).padStart(2, "0")}`} />;
         })}
       </div>
       <div className="grid four">
-        <Metric label="14:02:11" value="App 0.36" note="deployment started" />
-        <Metric label="14:04:37" value="7/7" note="machines updated" />
-        <Metric label="14:11:08" value="First known signal" note={rec?.first_abnormal_evidence?.payload?.signal || "module unhealthy"} />
-        <Metric label="14:18:42" value="2 affected" note="pattern detected before review" />
-        <Metric label="14:26:03" value="Engineer note" note="human discovery recorded" />
+        <Metric label="14:02:11" value="Autonomy 2.7" note="deployment started" />
+        <Metric label="14:04:37" value="12/12" note="machines updated" />
+        <Metric label="14:11:08" value="First safe-stop" note={rec?.first_abnormal_evidence?.payload?.signal || "safe-stop near loading zone"} />
+        <Metric label="14:26:03" value="3 affected" note="pattern detected before review" />
+        <Metric label="14:31:00" value="Operator review" note="human review opened" />
       </div>
       <article className="panel dramatic">
         <span className="eyebrow">The team has four choices</span>
-        <h2>Same deployment. Different connectivity behavior.</h2>
-        <p>Every machine received app 0.36. Only two began showing module unhealthy and repeated reconnects. The team needs to decide whether this is application, firmware, site network or device-specific before sending someone onsite.</p>
+        <h2>Same deployment. Different physical behavior.</h2>
+        <p>Every machine received autonomy 2.7. Three entered safe-stop near loading zone B. The team needs to decide whether this is release-wide, localization-specific, map-related, site-specific or machine-specific before sending someone onsite.</p>
         <div className="choice-row">
           <b>Monitor</b>
           <b>Remote recovery</b>
-          <b>Rollback</b>
+          <b>Rollback release</b>
           <b>Dispatch</b>
         </div>
         <div className="hero-actions"><button className="button primary" onClick={onChanges}>What changed?</button><button className="button" onClick={onPackage}>Compare options</button></div>
@@ -280,12 +280,12 @@ function ChangesStage({ onScope }: { onScope: () => void }) {
       <span className="eyebrow">Changes</span>
       <h2>What changed around the failure?</h2>
       <div className="package-grid">
-        <PackageItem title="Application" value="app 0.35 to 0.36" />
-        <PackageItem title="Device profile" value="profile C16 to C17" />
-        <PackageItem title="Module firmware" value="module 4.8 to 4.9" />
-        <PackageItem title="Machine state" value="module unhealthy, repeated reconnects" />
-        <PackageItem title="Human context" value="engineer note at 14:26" />
-        <PackageItem title="Site context" value="firewall and network state unconfirmed" />
+        <PackageItem title="Autonomy stack" value="2.6 to 2.7" />
+        <PackageItem title="Localization config" value="L3 to L4" />
+        <PackageItem title="LiDAR firmware" value="5.2 to 5.3" />
+        <PackageItem title="Map version" value="M18 to M19" />
+        <PackageItem title="Machine state" value="safe-stop near loading zone B" />
+        <PackageItem title="Human context" value="operator review at 14:31" />
       </div>
       <div className="callout">
         <b>Three relevant changes occurred before the first known failure.</b>
@@ -303,9 +303,9 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
       <span className="eyebrow">Scope</span>
       <h2>Where else does this pattern appear?</h2>
       <div className="grid three">
-        <Metric label="Same app" value={`${comparison?.same_change ?? 7}`} note="machines on app 0.36" />
-        <Metric label="Same signal" value={`${comparison?.same_signal ?? 2}`} note="module unhealthy detected" />
-        <Metric label="No signal" value={`${comparison?.no_signal ?? 5}`} note="updated but stable" />
+        <Metric label="Same release" value={`${comparison?.same_change ?? 12}`} note="machines on autonomy 2.7" />
+        <Metric label="Same behavior" value={`${comparison?.same_signal ?? 3}`} note="safe-stop detected" />
+        <Metric label="No signal" value={`${comparison?.no_signal ?? 9}`} note="updated but stable" />
       </div>
       <table className="table focus-table">
         <thead><tr><th>Context</th><th>Signal present</th><th>No signal</th></tr></thead>
@@ -313,7 +313,7 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
       </table>
       <div className="callout">
         <b>What the evidence narrows</b>
-        <p>Application 0.36 is shared across both groups. Device profile C17, module firmware 4.9 and site network profile N7 are shared by the affected machines, while R06 has the same exposure without a known issue at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
+        <p>Autonomy 2.7 is shared across both groups. Localization profile L4 and loading zone B exposure are shared by the affected machines, while EX11 has the same exposure without a known issue at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
       </div>
       <div className="callout">
         <b>What happened when we took these actions before?</b>
@@ -339,31 +339,39 @@ function DecisionOptions({ options }: { options: any[] }) {
     {
       id: "monitor",
       label: "Monitor",
-      evidenceFor: "R06 has no known issue at 14:27",
-      evidenceAgainst: "R03 and R05 are already unstable",
+      evidenceFor: "EX11 has no known issue at 14:27",
+      evidenceAgainst: "EX03, EX05 and EX08 are already in safe-stop",
       priorOutcome: "not yet observed",
       cost: "low cost, higher operational risk",
     },
     {
       id: "remote_restart",
-      label: "Remote restart",
-      evidenceFor: "affected machines show reconnect failures",
-      evidenceAgainst: "site network cause remains unresolved",
+      label: "Remote recovery",
+      evidenceFor: "affected machines entered safe-stop after the release",
+      evidenceAgainst: "planner fallback cause remains unresolved",
       priorOutcome: "observed recovery after action",
       cost: "low cost, no field visit",
     },
     {
       id: "rollback",
-      label: "Roll back",
+      label: "Roll back autonomy release",
       evidenceFor: "issue follows deployment window",
-      evidenceAgainst: "app 0.36 runs on healthy machines too",
+      evidenceAgainst: "autonomy 2.7 runs on healthy machines too",
       priorOutcome: "not established",
       cost: "rollout delay",
     },
     {
+      id: "revert_localization",
+      label: "Revert localization config",
+      evidenceFor: "affected machines share localization L4",
+      evidenceAgainst: "some healthy machines also share L4",
+      priorOutcome: "not yet observed",
+      cost: "configuration interruption",
+    },
+    {
       id: "dispatch",
       label: "Dispatch technician",
-      evidenceFor: "local site state is missing",
+      evidenceFor: "local site and sensor state are missing",
       evidenceAgainst: "current evidence does not support immediate visit",
       priorOutcome: "not supported by current evidence",
       cost: "high cost",
@@ -371,7 +379,7 @@ function DecisionOptions({ options }: { options: any[] }) {
   ];
   const normalized = options.length ? options.map((option: any) => ({
     id: option.id || option.option_type,
-    label: option.option_type === "remote_fix" ? "Remote restart" : option.option_type === "pause_rollout" ? "Roll back / hold rollout" : option.option_type === "dispatch" ? "Dispatch technician" : option.option_type === "monitor" ? "Monitor" : option.label,
+    label: option.option_type === "remote_fix" ? "Remote recovery" : option.option_type === "pause_rollout" ? "Roll back / hold rollout" : option.option_type === "dispatch" ? "Dispatch technician" : option.option_type === "monitor" ? "Monitor" : option.label,
     evidenceFor: option.historical_support?.summary || option.label,
     evidenceAgainst: option.expected_risk?.reason || "uncertainty remains",
     priorOutcome: option.historical_support?.status === "none_yet" ? "no prior outcome in this workspace" : option.historical_support?.summary || "pending",
@@ -422,18 +430,18 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
       <DecisionOptions options={options} />
       <div className="callout">
         <b>What did the team know at 14:27?</b>
-        <p>R03 and R05 were affected. R06 had no known issue at the decision snapshot. Site network evidence was incomplete.</p>
+        <p>EX03, EX05 and EX08 were affected. EX11 had no known issue at the decision snapshot. Planner fallback evidence was incomplete.</p>
       </div>
       <div className="package-grid">
-        <PackageItem title="Trigger" value="module unhealthy after deployment" />
+        <PackageItem title="Trigger" value="safe-stop after deployment" />
         <PackageItem title="Last known healthy" value={short(rec?.last_known_healthy?.event_time)} />
-        <PackageItem title="Recent changes" value="app 0.35 to 0.36 · profile C16 to C17 · module firmware 4.8 to 4.9" />
+        <PackageItem title="Recent changes" value="autonomy 2.6 to 2.7 · localization L3 to L4 · LiDAR firmware 5.2 to 5.3 · map M18 to M19" />
         <PackageItem title="Machine state" value={rec?.current_state?.health || "degraded"} />
-        <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 2} / ${comparison?.same_change ?? 7}`} />
+        <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 3} / ${comparison?.same_change ?? 12}`} />
         <PackageItem title="Observability status" value={`${observability?.status || "partial"} at decision time`} />
         <PackageItem title="Observed" value="engineer note recorded at 14:26" />
-        <PackageItem title="Inferred" value="profile C17, module firmware 4.9 and network N7 co-occur across affected machines" />
-        <PackageItem title="Human asserted" value="engineer suspects site network or module firmware setting" />
+        <PackageItem title="Inferred" value="localization L4 and loading zone B co-occur across affected machines" />
+        <PackageItem title="Human asserted" value="operator suspects planner fallback near loading zone B" />
         <PackageItem title="Missing evidence" value={(pkg.package.missing_evidence || []).join(" · ")} />
         <PackageItem title="Approval policy" value={pkg.package.approval_policy?.name || "Physical system rollout review"} />
         <PackageItem title="Substantiation" value={pkg.package.decision_substantiation?.status || "incomplete"} />
@@ -470,23 +478,24 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
         <tbody>{options.map((option: any) => <tr key={option.id || option.option_type}><td>{option.label}</td><td>{summarizeObject(option.expected_cost)}</td><td>{option.expected_risk?.risk || option.expected_risk?.reason || "unknown"}</td><td>{option.selected ? "chosen" : "available"}</td></tr>)}</tbody>
       </table>
       <div className="split-count">
-        <div><strong>What the team knew at 14:27</strong><span>R03 affected · R05 affected · no known issue on R06</span></div>
-        <div><strong>What Veyra knows now</strong><span>R06 had an earlier signal that became available after the decision snapshot</span></div>
+        <div><strong>What the team knew at 14:27</strong><span>EX03, EX05 and EX08 affected · no known issue on EX11</span></div>
+        <div><strong>What Veyra knows now</strong><span>EX11 had an earlier signal that became available after the decision snapshot</span></div>
       </div>
       <div className="evidence-columns">
         <div className="evidence-card">
           <span className="eyebrow">Evidence available at decision time</span>
           <ul>
-            <li>R03 affected</li>
-            <li>R05 affected</li>
-            <li>No known issue on R06 at 14:27</li>
-            <li>Telemetry completeness: partial</li>
+            <li>EX03 affected</li>
+            <li>EX05 affected</li>
+            <li>EX08 affected</li>
+            <li>No known issue on EX11 at 14:27</li>
+            <li>Runtime trace completeness: partial</li>
           </ul>
         </div>
         <div className="evidence-card">
           <span className="eyebrow">Later evidence</span>
           <ul>
-            <li>R06 event_time: 14:09</li>
+            <li>EX11 event_time: 14:09</li>
             <li>known_at: 14:31</li>
             <li>ingested_at: 14:31:04</li>
             <li>Available after decision snapshot</li>
@@ -507,7 +516,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
       </div>
       <div className="callout">
         <b>What this package rules in / rules out</b>
-        <p>Application-wide issue: weak support in current peer comparison. Firmware/profile issue: plausible. Site network issue: still unresolved. Field dispatch: current evidence is insufficient to support it.</p>
+        <p>Release-wide issue: weak support in current peer comparison. Localization and loading-zone issue: plausible. Perception or map context: still unresolved. Field dispatch: current evidence is insufficient to support it.</p>
       </div>
       {pkg.sealed && <Signature pkg={pkg} verification={verification} />}
     </article>
@@ -523,15 +532,15 @@ function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
   return (
     <article className="panel">
       <span className="eyebrow">What we chose</span>
-      <h2>Decision: Remote restart + hold rollout.</h2>
+      <h2>Decision: Remote recovery + hold rollout.</h2>
       <p>The decision, the executed action and the evidence available at the time stay together.</p>
       <div className="package-grid">
         <PackageItem title="Why this action" value="remote recovery has lower cost than dispatch while evidence remains incomplete" />
-        <PackageItem title="Known at the time" value="R03 and R05 affected, R06 no known issue" />
-        <PackageItem title="Still unknown" value="site network state and exact disconnect reason" />
+        <PackageItem title="Known at the time" value="EX03, EX05 and EX08 affected, EX11 no known issue" />
+        <PackageItem title="Still unknown" value="planner fallback reason and local perception trace" />
         <PackageItem title="Planned action" value={planned?.label || "remote restart affected machines"} />
-        <PackageItem title="Actual action" value={actual?.scope?.remote_restart ? `remote restart ${actual.scope.remote_restart.join(" and ")}` : "remote restart R03 and R05"} />
-        <PackageItem title="Watch" value="monitor R06" />
+        <PackageItem title="Actual action" value={actual?.scope?.remote_recovery ? `remote recovery ${actual.scope.remote_recovery.join(" and ")}` : "remote recovery EX03, EX05 and EX08"} />
+        <PackageItem title="Watch" value="monitor EX11" />
         <PackageItem title="Customer" value="notify support" />
         <PackageItem title="Field" value="hold dispatch" />
         <PackageItem title="Owner" value="Operations Lead · 14:31" />
@@ -552,7 +561,7 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
         <div>
           <span className="eyebrow">Outcome</span>
           <h2>What happened after the action?</h2>
-          <p>R03 and R05 recovered after remote restart. That is observed recovery, not causal proof. R06 later shows the same pattern through delayed module-health evidence.</p>
+          <p>EX03, EX05 and EX08 returned to service after remote recovery. That is observed recovery, not causal proof. EX11 later shows the same pattern through delayed runtime evidence.</p>
         </div>
         <div className={pkg?.sealed ? "sealed-mini good" : "sealed-mini"}>
           <span>{pkg?.sealed ? "Sealed" : "Unsealed"}</span>
@@ -564,24 +573,24 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
         <div className="outcome-status">
           <span className="eyebrow">Outcome validation</span>
           <strong>{validation?.status === "pending" ? "Pending" : "Observed recovery"}</strong>
-          <p>{validation?.status === "pending" ? "Link the outcome to validate the action." : "Connectivity recovery is observed after the remote restart. Causality is not treated as proven."}</p>
+          <p>{validation?.status === "pending" ? "Record the outcome to validate the action." : "Return-to-service is observed after remote recovery. Causality is not treated as proven."}</p>
         </div>
         <div className="outcome-status">
           <span className="eyebrow">Late evidence</span>
           <strong>New decision-relevant evidence arrived</strong>
-          <p>The original decision record remains unchanged. The current case view is updated and flagged for review.</p>
+          <p>The original decision record remains unchanged. The current fleet view is updated and flagged for review.</p>
         </div>
       </section>
 
       <section className="mini-timeline">
-        <div><b>14:09</b><span>event_time</span><small>R06 reconnect failures existed</small></div>
-        <div><b>14:27</b><span>decision snapshot</span><small>2 affected known</small></div>
+        <div><b>14:09</b><span>event_time</span><small>EX11 safe-stop behavior existed</small></div>
+        <div><b>14:27</b><span>decision snapshot</span><small>3 affected known</small></div>
         <div><b>14:31</b><span>known_at</span><small>late evidence became available</small></div>
         <div><b>14:31:04</b><span>ingested_at</span><small>received by Veyra</small></div>
       </section>
 
       <section className="outcome-ledger">
-        <PackageItem title="Decision-time view" value="2 affected" />
+        <PackageItem title="Decision-time view" value="3 affected" />
         <PackageItem title="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 3)} affected`} />
         <PackageItem title="Field dispatch" value="avoided by decision path" />
         <PackageItem title="Rollout" value="paused, then resumed" />
@@ -605,30 +614,30 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
     <article className="panel final-stage">
       <span className="eyebrow">12 days later</span>
       <h2>A similar pattern appears again.</h2>
-      <p>R12 begins showing reconnect failures after a new deployment.</p>
+      <p>EX21 enters safe-stop after autonomy release 2.8.</p>
       <div className="callout">
-        <b>Last time, remote restart restored connectivity without a field visit. The issue later appeared on a third machine.</b>
+        <b>Last time, remote recovery returned the affected machines to service without a field visit. The issue later appeared on a fourth machine.</b>
         <p>Does the same precedent apply here?</p>
       </div>
       <div className="precedent-stack">
         <div>
           <span className="eyebrow">Previous conditions</span>
-          <b>App 0.36 · Profile C17 · Module firmware 4.9</b>
+          <b>Autonomy 2.7 · Localization L4 · Loading zone B</b>
         </div>
         <div>
           <span className="eyebrow">Previous action</span>
-          <b>Remote restart · rollout held · field dispatch held</b>
+          <b>Remote recovery · rollout held · field dispatch held</b>
         </div>
         <div>
           <span className="eyebrow">Observed outcome</span>
-          <b>Connectivity restored · no field visit · R06 later showed same pattern</b>
+          <b>Returned to service · no field visit · EX11 later showed same pattern</b>
         </div>
       </div>
       <div className="package-grid memory-grid">
         <PackageItem title="Boundary" value="precedent, not causal proof" />
         <PackageItem title="Previous result" value="observed after action" />
         <PackageItem title="Outcome validation" value={validation?.status || "record outcome first"} />
-        <PackageItem title="What to reuse" value="check prior conditions before field dispatch" />
+        <PackageItem title="What to reuse" value="check localization, map and zone exposure before field dispatch" />
         <PackageItem title="What to verify" value="whether the same evidence pattern holds now" />
       </div>
       <table className="table focus-table">
@@ -642,7 +651,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
       </table>
       <div className="callout">
         <b>Before dispatching a technician</b>
-        <p>Compare the current machine against the previous exposed group and check whether the same application, firmware, profile and site network pattern is present.</p>
+        <p>Compare the current machine against the previous exposed group and check whether the same autonomy release, localization profile, map and loading-zone pattern is present.</p>
       </div>
       {!hasMemory && <button className="button primary" onClick={onOutcome}>Record outcome first</button>}
       <div className="ending">

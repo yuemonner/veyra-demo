@@ -39,6 +39,7 @@ STATE_KEYS = [
     "application_version",
     "firmware_version",
     "configuration",
+    "map_version",
     "network_profile",
     "connection_type",
     "process_health",
@@ -102,34 +103,38 @@ def reset_demo(db: Session) -> dict[str, Any]:
         db.execute(delete(model))
     assets = [
         Asset(
-            id=f"R{i:02d}",
-            name=f"R{i:02d}",
-            asset_type="Connected Machine",
-            family="Smart Equipment",
-            site="Customer Site A" if i <= 3 else "Customer Site B",
-            environment="deployed customer environment",
+            id=f"EX{i:02d}",
+            name=f"EX{i:02d}",
+            asset_type="Remote-operated excavator",
+            family="Heavy equipment robotics",
+            site="Quarry North" if i <= 6 else "Port Yard East",
+            environment="deployed industrial site",
         )
-        for i in range(1, 8)
+        for i in range(1, 13)
     ]
     db.add_all(assets)
-    affected_ids = {"R03", "R05"}
+    affected_ids = {"EX03", "EX05", "EX08"}
     for a in assets:
-        asset_num = int(a.id[1:])
-        network_profile = "site-network-N7" if asset_num in {3, 5, 6} else "site-network-standard"
-        connection_type = "cellular-only" if asset_num in {2, 3, 5, 6} else "wired-backhaul"
+        asset_num = int(a.id[2:])
+        localization_profile = "localization-L4" if asset_num in {2, 3, 5, 8, 11} else "localization-L3"
+        lidar_firmware = "lidar-fw-5.3" if asset_num in {2, 3, 4, 5, 8, 9, 11} else "lidar-fw-5.2"
+        map_version = "map-M19" if asset_num in {2, 3, 4, 5, 6, 8, 9, 11} else "map-M18"
+        zone_profile = "loading-zone-B" if asset_num in {3, 5, 8, 11} else "standard-route"
+        connection_type = "private-5g" if asset_num in {1, 3, 5, 8, 10, 11} else "site-wifi"
         db.add(
             evidence(
                 a.id,
                 "state_snapshot",
                 2,
                 0,
-                "edge_agent",
+                "robot_runtime",
                 "OBSERVED",
                 {
-                    "application_version": "app-0.35",
-                    "firmware_version": "module-fw-4.8",
-                    "configuration": "device-profile-C16",
-                    "network_profile": network_profile,
+                    "application_version": "autonomy-2.6",
+                    "firmware_version": "lidar-fw-5.2",
+                    "configuration": "localization-L3",
+                    "map_version": "map-M18",
+                    "network_profile": zone_profile,
                     "connection_type": connection_type,
                     "process_health": "healthy",
                     "health": "healthy",
@@ -143,23 +148,28 @@ def reset_demo(db: Session) -> dict[str, Any]:
                 "deployment",
                 4,
                 1,
-                "deployment_manifest",
+                "release_manifest",
                 "OBSERVED",
-                {"application_version": "app-0.36", "previous_application_version": "app-0.35", "deployment_id": "app-connectivity-036", "rollout_size": 7},
-                f"{a.id}-app-036",
+                {"application_version": "autonomy-2.7", "previous_application_version": "autonomy-2.6", "deployment_id": "autonomy-release-27", "rollout_size": 12},
+                f"{a.id}-autonomy-27",
             )
         )
-    for aid in ["R03", "R05", "R06"]:
+    for aid in ["EX02", "EX03", "EX04", "EX05", "EX06", "EX08", "EX09", "EX11"]:
+        asset_num = int(aid[2:])
+        localization_profile = "localization-L4" if asset_num in {2, 3, 5, 8, 11} else "localization-L3"
+        lidar_firmware = "lidar-fw-5.3" if asset_num in {2, 3, 4, 5, 8, 9, 11} else "lidar-fw-5.2"
+        map_version = "map-M19"
+        zone_profile = "loading-zone-B" if asset_num in {3, 5, 8, 11} else "standard-route"
         db.add(
             evidence(
                 aid,
                 "configuration_change",
                 6,
                 1,
-                "config_registry",
+                "robot_config_registry",
                 "OBSERVED",
-                {"configuration": "device-profile-C17", "previous_configuration": "device-profile-C16", "firmware_version": "module-fw-4.9", "network_profile": "site-network-N7"},
-                f"{aid}-profile-c17-fw-49",
+                {"configuration": localization_profile, "previous_configuration": "localization-L3", "firmware_version": lidar_firmware, "map_version": map_version, "network_profile": zone_profile},
+                f"{aid}-localization-map-update",
             )
         )
     for index, aid in enumerate(sorted(affected_ids)):
@@ -167,27 +177,27 @@ def reset_demo(db: Session) -> dict[str, Any]:
             evidence(
                 aid,
                 "telemetry_anomaly",
-                11 + (index % 8),
+                11 + (index * 7),
                 1,
-                "module_health",
+                "mission_runtime",
                 "OBSERVED",
-                {"signal": "module_unhealthy_reconnect_failures", "process_health": "degraded", "severity": "review", "reconnect_failures": 6 + (index * 3)},
-                f"{aid}-module-unhealthy",
+                {"signal": "safe_stop_near_loading_zone", "process_health": "safe_stop", "severity": "review", "safe_stop_count": 1 + index, "zone": "loading-zone-B"},
+                f"{aid}-safe-stop",
             )
         )
     db.add(
         evidence(
-            "R03",
+            "EX03",
             "human_discovery",
-            26,
+            31,
             0,
-            "engineer_note",
+            "operator_review",
             "HUMAN_ASSERTED",
-            {"observation": "Engineer observes repeated reconnects and module unhealthy state after app 0.36 rollout", "reported_by": "support_engineer"},
-            "R03-engineer-note-1426",
+            {"observation": "Operator review opened after three machines entered safe-stop near loading zone B after autonomy release 2.7", "reported_by": "fleet_operator"},
+            "EX03-operator-review-1431",
         )
     )
-    inv = Investigation(id="inv-120-robots-bad-rollout", asset_id="R03", trigger_id="R03-module-unhealthy", title="Connectivity degradation after deployment")
+    inv = Investigation(id="inv-120-robots-bad-rollout", asset_id="EX03", trigger_id="EX03-safe-stop", title="Safe-stop after autonomy release")
     db.add(inv)
     db.commit()
     seed_decision_primitives(db, inv.id)
@@ -202,9 +212,9 @@ def seed_decision_primitives(db: Session, investigation_id: str) -> None:
             id=f"opt-{uuid.uuid4().hex[:10]}",
             investigation_id=investigation_id,
             option_type="remote_fix",
-            label="Remote restart R03 and R05, hold field dispatch",
-            expected_cost={"engineering_hours": 1.5, "field_visit": False, "rollout_delay_minutes": 45},
-            expected_risk={"risk": "medium", "reason": "R06 remains exposed but has no known issue at decision time"},
+            label="Remote recovery on EX03, EX05 and EX08, hold technician dispatch",
+            expected_cost={"engineering_hours": 1.2, "field_visit": False, "rollout_delay_minutes": 43},
+            expected_risk={"risk": "medium", "reason": "EX11 remains exposed but has no known issue at decision time"},
             historical_support={"status": "none_yet", "summary": "No prior outcome in this workspace"},
         ),
         DecisionOption(
@@ -213,7 +223,7 @@ def seed_decision_primitives(db: Session, investigation_id: str) -> None:
             option_type="monitor",
             label="Continue monitoring without intervention",
             expected_cost={"engineering_hours": 0.5, "field_visit": False, "rollout_delay_minutes": 0},
-            expected_risk={"risk": "high", "reason": "Affected machines may continue dropping offline before site conditions are understood"},
+            expected_risk={"risk": "high", "reason": "Affected machines may keep entering safe-stop during production missions"},
             historical_support={"status": "weak", "summary": "No recovery evidence yet"},
         ),
         DecisionOption(
@@ -222,14 +232,14 @@ def seed_decision_primitives(db: Session, investigation_id: str) -> None:
             option_type="dispatch",
             label="Dispatch field engineer",
             expected_cost={"engineering_hours": 0.5, "field_visit": True, "estimated_cost_usd": 1200},
-            expected_risk={"risk": "low", "reason": "Fast local inspection, but current evidence does not yet justify the visit"},
+            expected_risk={"risk": "low", "reason": "Fast onsite inspection, but current evidence does not yet justify the visit"},
             historical_support={"status": "not_supported", "summary": "No hardware fault confirmed"},
         ),
         DecisionOption(
             id=f"opt-{uuid.uuid4().hex[:10]}",
             investigation_id=investigation_id,
             option_type="pause_rollout",
-            label="Hold rollout to exposed machines",
+            label="Pause autonomy 2.7 rollout for exposed machines",
             expected_cost={"engineering_hours": 1.0, "field_visit": False, "rollout_delay_minutes": 60},
             expected_risk={"risk": "low", "reason": "Contains exposed group while preserving investigation time"},
             historical_support={"status": "reasonable", "summary": "Matches current evidence boundary"},
@@ -242,20 +252,21 @@ def seed_decision_primitives(db: Session, investigation_id: str) -> None:
             investigation_id=investigation_id,
             assessed_at=DEMO_DECISION_TIME,
             status="partial",
-            connected_sources=["deployment_manifest", "config_registry", "module_health", "engineer_note"],
+            connected_sources=["release_manifest", "robot_config_registry", "mission_runtime", "operator_review"],
             freshness={
-                "deployment_manifest": "fresh",
-                "config_registry": "fresh",
-                "module_health": "partial",
-                "engineer_note": "fresh",
+                "release_manifest": "fresh",
+                "robot_config_registry": "fresh",
+                "mission_runtime": "partial",
+                "operator_review": "fresh",
             },
             completeness={
-                "R03": "complete",
-                "R05": "complete",
-                "R06": "no known issue at decision time",
+                "EX03": "complete",
+                "EX05": "complete",
+                "EX08": "complete",
+                "EX11": "no known issue at decision time",
             },
             delayed_sources=["edge_buffer"],
-            missing_windows=["customer-site firewall state", "exact disconnect reason", "R06 module-health buffer not known at 14:27"],
+            missing_windows=["operator intent at safe-stop", "exact planner fallback reason", "EX11 runtime buffer not known at 14:27"],
         )
     )
     db.commit()
@@ -286,6 +297,8 @@ def latest_state(db: Session, asset_id: str, at: datetime, known_at: Optional[da
                 state["network_profile"] = payload.get("network_profile")
             if payload.get("firmware_version") is not None:
                 state["firmware_version"] = payload.get("firmware_version")
+            if payload.get("map_version") is not None:
+                state["map_version"] = payload.get("map_version")
         if ev.event_type in ["state_snapshot", "telemetry_anomaly"]:
             for key in STATE_KEYS:
                 if payload.get(key) is not None:
@@ -323,7 +336,7 @@ def reconstruct(db: Session, investigation_id: str, knowledge_time: Optional[dat
     gaps = [f for f in required if not current.get(f)]
     if not human_discovery:
         gaps.append("human discovery context")
-    for contextual_gap in ["customer-site firewall state", "exact disconnect reason", "local module logs during reconnect window", "engineer workaround rationale"]:
+    for contextual_gap in ["operator intent at safe-stop", "exact planner fallback reason", "local perception trace near loading zone B", "operator workaround rationale"]:
         if contextual_gap not in gaps:
             gaps.append(contextual_gap)
     return {
@@ -356,11 +369,11 @@ def compare(db: Session, investigation_id: str) -> dict[str, Any]:
             (affected if anomalies else unaffected).append(asset.id)
     table = []
     dimensions = [
-        ("Application 0.36", "application_version", "app-0.36"),
-        ("Device profile C17", "configuration", "device-profile-C17"),
-        ("Module firmware 4.9", "firmware_version", "module-fw-4.9"),
-        ("Site network profile N7", "network_profile", "site-network-N7"),
-        ("Cellular-only", "connection_type", "cellular-only"),
+        ("Autonomy release 2.7", "application_version", "autonomy-2.7"),
+        ("Localization profile L4", "configuration", "localization-L4"),
+        ("LiDAR firmware 5.3", "firmware_version", "lidar-fw-5.3"),
+        ("Map M19", "map_version", "map-M19"),
+        ("Loading zone B", "network_profile", "loading-zone-B"),
     ]
     for label, key, expected in dimensions:
         affected_count = sum(1 for aid in affected if latest_state(db, aid, trigger.event_time).get(key) == expected)
@@ -375,14 +388,14 @@ def compare(db: Session, investigation_id: str) -> dict[str, Any]:
         "unaffected_assets": unaffected,
         "table": table,
         "interpretation": [
-            "Application 0.36 ran on all seven machines, so the application update alone does not explain the split.",
-            "Device profile C17, module firmware 4.9 and site network profile N7 co-occur across the affected machines.",
-            "R06 shares the same exposure without a known issue at decision time.",
-            "Cellular-only connectivity is present in both affected and healthy machines, so it is not sufficient on its own.",
+            "Autonomy release 2.7 ran on all twelve machines, so the release alone does not explain the split.",
+            "Localization profile L4 and loading zone B exposure co-occur across the affected machines.",
+            "EX11 shares the same exposure without a known issue at decision time.",
+            "LiDAR firmware 5.3 and map M19 also appear in healthy machines, so they are not sufficient on their own.",
             "This narrows the investigation; it does not establish cause.",
         ],
         "potentially_exposed": [
-            {"asset_id": "R06", "reason": "Shares device profile C17, module firmware 4.9 and site network profile N7 without a known issue at decision time."}
+            {"asset_id": "EX11", "reason": "Shares localization profile L4, LiDAR firmware 5.3 and loading zone B exposure without a known issue at decision time."}
         ],
     }
 
@@ -400,28 +413,28 @@ def summarize_values(values: list[Any]) -> str:
 def demo_hypotheses() -> list[dict[str, Any]]:
     return [
         {
-            "id": "h-firmware-profile",
-            "hypothesis": "Module firmware 4.9 with device profile C17 is contributing to reconnect failures.",
+            "id": "h-localization-zone",
+            "hypothesis": "Localization profile L4 with loading zone B exposure is contributing to safe-stop events.",
             "confidence": 0.58,
             "status": "supported_by_current_evidence",
-            "supporting_evidence": ["R03 and R05 affected", "R06 shares exposure", "profile and firmware co-occur across affected machines"],
-            "counter_evidence": ["Application 0.36 is deployed across all seven machines", "Cellular-only connection appears in healthy machines too"],
+            "supporting_evidence": ["EX03, EX05 and EX08 affected", "EX11 shares exposure", "localization profile and zone exposure co-occur across affected machines"],
+            "counter_evidence": ["Autonomy 2.7 is deployed across all twelve machines", "LiDAR firmware 5.3 and map M19 also appear in healthy machines"],
         },
         {
-            "id": "h-site-network",
-            "hypothesis": "Customer-site network or firewall state is contributing to intermittent connectivity.",
+            "id": "h-perception-map",
+            "hypothesis": "Perception confidence or map context near loading zone B is contributing to planner fallback.",
             "confidence": 0.42,
             "status": "plausible_but_unresolved",
-            "supporting_evidence": ["Affected machines share site network profile N7", "Exact disconnect reason is missing"],
-            "counter_evidence": ["No customer firewall state has been retrieved yet"],
+            "supporting_evidence": ["Affected machines share loading zone B exposure", "Exact planner fallback reason is missing"],
+            "counter_evidence": ["No local perception trace has been retrieved yet"],
         },
         {
-            "id": "h-application-wide",
-            "hypothesis": "Application 0.36 caused a deployment-wide connectivity issue.",
+            "id": "h-release-wide",
+            "hypothesis": "Autonomy release 2.7 caused a fleet-wide safe-stop issue.",
             "confidence": 0.18,
             "status": "weak_support",
-            "supporting_evidence": ["Issue appeared after app 0.36 rollout"],
-            "counter_evidence": ["Five updated machines have no known signal at decision time"],
+            "supporting_evidence": ["Issue appeared after autonomy 2.7 rollout"],
+            "counter_evidence": ["Nine updated machines have no known signal at decision time"],
         },
     ]
 
@@ -438,7 +451,7 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
         {"name": "exposed-but-stable systems identified", "status": "supported", "evidence": ", ".join(item["asset_id"] for item in comp["potentially_exposed"]) or "none"},
         {"name": "decision owner assigned", "status": "missing", "evidence": "no named human owner until decision is recorded"},
         {"name": "unknowns explicitly preserved", "status": "supported", "evidence": "; ".join(unknowns[:2])},
-        {"name": "inference boundary checked", "status": "warning", "evidence": "firmware/profile/network exposure is plausible, not established cause"},
+        {"name": "inference boundary checked", "status": "warning", "evidence": "localization/zone exposure is plausible, not established cause"},
         {"name": "outcome follow-up required", "status": "missing", "evidence": "no outcome record yet"},
     ]
     package = {
@@ -448,13 +461,13 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
         "first_abnormal_evidence": rec["first_abnormal_evidence"],
         "machine_state": rec["current_state"],
         "peer_comparison": comp,
-        "supporting_evidence": ["deployment manifest", "configuration record", "module health telemetry", "engineer note"],
+        "supporting_evidence": ["release manifest", "robot configuration record", "mission runtime telemetry", "operator review"],
         "missing_evidence": rec["evidence_gaps"],
         "what_was_unknown": [
-            "Whether R06 would later show the same reconnect failure",
-            "Whether customer-site firewall or network state contributed",
-            "Whether remote restart would restore connectivity",
-            "Whether module firmware 4.9 and profile C17 were causal or only correlated",
+            "Whether EX11 would later show the same safe-stop behavior",
+            "Whether loading zone B map or perception context contributed",
+            "Whether remote recovery would restore service",
+            "Whether localization profile L4 was causal or only correlated",
         ],
         "hypotheses": demo_hypotheses(),
         "primary_hypothesis": demo_hypotheses()[0],
@@ -465,7 +478,7 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
         "options_considered": [serialize_option(option) for option in options],
         "observability_state": serialize_observability(observability),
         "approval_policy": {
-            "name": "Physical system rollout review",
+            "name": "Remote equipment rollout review",
             "version": "v0.3",
             "required": ["decision owner", "evidence package", "action scope", "outcome follow-up"],
         },
@@ -483,7 +496,7 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
         "outcome": None,
         "outcome_validation": {
             "status": "pending",
-            "method": "Track connectivity recovery, recurrence and field dispatch outcome after action",
+            "method": "Track return-to-service, recurrence and field dispatch outcome after action",
             "causal_attribution": "not_established",
         },
     }
@@ -528,8 +541,8 @@ def attach_human_decision(db: Session, decision: Decision) -> None:
             action_type="remote_fix_and_hold_rollout",
             owner=decision.owner,
             executed_at=DEMO_DECISION_TIME + timedelta(minutes=4),
-            scope={"remote_restart": ["R03", "R05"], "watch": ["R06"], "held_rollout": ["device profile C17", "module firmware 4.9"]},
-            payload={"customer_support": "informed", "field_dispatch": "held", "remote_fix": "module reconnect and restart"},
+            scope={"remote_recovery": ["EX03", "EX05", "EX08"], "watch": ["EX11"], "held_rollout": ["localization-L4", "loading-zone-B"]},
+            payload={"operations_support": "informed", "field_dispatch": "held", "remote_fix": "remote recovery and autonomy service restart"},
         )
     )
     snapshot = db.scalar(select(EvidenceSnapshot).where(EvidenceSnapshot.investigation_id == decision.investigation_id).order_by(EvidenceSnapshot.snapshot_time.desc()).limit(1))
@@ -551,8 +564,8 @@ def attach_human_decision(db: Session, decision: Decision) -> None:
         "observability_state": serialize_observability(observability),
         "planned_action": {
             "action_type": "remote_fix_and_hold_rollout",
-            "label": "Remote restart affected machines, hold field dispatch and monitor R06",
-            "scope": {"remote_restart": ["R03", "R05"], "watch": ["R06"], "held_rollout": ["device profile C17", "module firmware 4.9"]},
+            "label": "Remote recovery on affected machines, hold field dispatch and monitor EX11",
+            "scope": {"remote_recovery": ["EX03", "EX05", "EX08"], "watch": ["EX11"], "held_rollout": ["localization-L4", "loading-zone-B"]},
         },
     }
     record_digest = hashlib.sha256(json.dumps(record_body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -589,16 +602,16 @@ def attach_human_decision(db: Session, decision: Decision) -> None:
     }
     package["planned_action"] = {
         "action_type": "remote_fix_and_hold_rollout",
-        "label": "Remote restart affected machines, hold field dispatch and monitor R06",
+        "label": "Remote recovery on affected machines, hold field dispatch and monitor EX11",
         "owner": decision.owner,
         "planned_at": iso(DEMO_DECISION_TIME),
-        "scope": {"remote_restart": ["R03", "R05"], "watch": ["R06"], "held_rollout": ["device profile C17", "module firmware 4.9"]},
+        "scope": {"remote_recovery": ["EX03", "EX05", "EX08"], "watch": ["EX11"], "held_rollout": ["localization-L4", "loading-zone-B"]},
     }
     package["actual_action"] = {
         "status": "recorded",
         "action_type": "remote_fix_and_hold_rollout",
         "executed_at": iso(DEMO_DECISION_TIME + timedelta(minutes=4)),
-        "scope": {"remote_restart": ["R03", "R05"], "watch": ["R06"], "field_dispatch": "held"},
+        "scope": {"remote_recovery": ["EX03", "EX05", "EX08"], "watch": ["EX11"], "field_dispatch": "held"},
     }
     package["outcome_follow_up"] = {
         "required": True,
@@ -714,8 +727,8 @@ def decision_context(db: Session, investigation_id: str) -> dict[str, Any]:
                 "hypotheses": item.evidence_snapshot.get("hypotheses", []) if isinstance(item.evidence_snapshot, dict) else [],
                 "planned_action": {
                     "action_type": "remote_fix_and_hold_rollout",
-                    "label": "Remote restart affected machines, hold field dispatch and monitor R06",
-                    "scope": {"remote_restart": ["R03", "R05"], "watch": ["R06"], "held_rollout": ["device profile C17", "module firmware 4.9"]},
+                    "label": "Remote recovery on affected machines, hold field dispatch and monitor EX11",
+                    "scope": {"remote_recovery": ["EX03", "EX05", "EX08"], "watch": ["EX11"], "held_rollout": ["localization-L4", "loading-zone-B"]},
                 },
                 "immutable": item.immutable,
                 "digest": item.digest,
@@ -820,21 +833,22 @@ def serialize_evidence(ev: Optional[Evidence]) -> Optional[dict[str, Any]]:
 
 def inject_late_evidence(db: Session) -> dict[str, Any]:
     ev = evidence(
-        "R06",
+        "EX11",
         "telemetry_anomaly",
         9,
         22,
         "delayed_edge_buffer",
         "OBSERVED",
         {
-            "signal": "module_unhealthy_reconnect_failures",
-            "process_health": "degraded",
+            "signal": "safe_stop_near_loading_zone",
+            "process_health": "safe_stop",
             "severity": "review",
-            "reconnect_failures": 5,
+            "safe_stop_count": 1,
+            "zone": "loading-zone-B",
             "source_detail": "delayed edge buffer upload",
-            "note": "R06 module-health buffer was uploaded at 14:31; reconnect failures were present at 14:09:11.",
+            "note": "EX11 runtime buffer was uploaded at 14:31; safe-stop behavior was present at 14:09:11.",
         },
-        "R06-delayed-module-unhealthy",
+        "EX11-delayed-safe-stop",
         ingested_delay_seconds=4,
     )
     if not db.get(Evidence, ev.id):
@@ -843,10 +857,10 @@ def inject_late_evidence(db: Session) -> dict[str, Any]:
     investigation_id = "inv-120-robots-bad-rollout"
     latest_decision = db.scalar(select(Decision).where(Decision.investigation_id == investigation_id).order_by(Decision.decided_at.desc()).limit(1))
     latest_record = db.scalar(select(DecisionRecord).where(DecisionRecord.investigation_id == investigation_id).order_by(DecisionRecord.decision_time.desc()).limit(1))
-    if not db.get(LateEvidence, "late-R06-delayed-module-unhealthy"):
+    if not db.get(LateEvidence, "late-EX11-delayed-safe-stop"):
         db.add(
             LateEvidence(
-                id="late-R06-delayed-module-unhealthy",
+                id="late-EX11-delayed-safe-stop",
                 investigation_id=investigation_id,
                 evidence_id=ev.id,
                 decision_id=latest_decision.id if latest_decision else None,
@@ -862,7 +876,7 @@ def inject_late_evidence(db: Session) -> dict[str, Any]:
                 decision_id=latest_decision.id if latest_decision else None,
                 flag_type="late_decision_relevant_evidence",
                 severity="review",
-                reason="R06 evidence had event_time before the sealed decision but known_at after the decision.",
+                reason="EX11 evidence had event_time before the sealed decision but known_at after the decision.",
                 status="open",
                 created_at=ev.ingested_at,
             )
@@ -890,7 +904,7 @@ def record_cost_impact(db: Session, outcome: Outcome) -> CostImpact:
         customer_escalation=bool(payload.get("customer_escalation", False)),
         estimated_cost={
             "field_visit_avoided_usd": payload.get("field_visit_avoided_usd", 1200),
-            "engineering_hours_saved": payload.get("engineering_hours_saved", 3),
+            "engineering_hours_saved": payload.get("engineering_hours_saved", 2),
             "rollout_risk_reduced": True,
         },
     )
@@ -901,18 +915,18 @@ def record_cost_impact(db: Session, outcome: Outcome) -> CostImpact:
         outcome_id=outcome.id,
         action_type="remote_fix_and_hold_rollout",
         attribution_level=payload.get("attribution_level", "observed"),
-        rationale=payload.get("attribution_rationale", "Connectivity recovery was observed after remote restart. The restart is not treated as proven causal."),
+        rationale=payload.get("attribution_rationale", "Return-to-service was observed after remote recovery. Remote recovery is not treated as proven causal."),
         evidence={
             "recovery_observed_after_action": True,
             "causal_proof": False,
             "validation_status": payload.get("validation_status", "observed_recovery_not_causal_proof"),
-            "validated_signals": payload.get("validated_signals", ["module health returned to normal", "no field visit required"]),
+            "validated_signals": payload.get("validated_signals", ["safe-stop cleared", "machines returned to service", "no field visit required"]),
             "hypothesis_result": payload.get("hypothesis_result", {
-                "h-firmware-profile": "partially_supported",
-                "h-site-network": "still_unresolved",
-                "h-application-wide": "weakened",
+                "h-localization-zone": "partially_supported",
+                "h-perception-map": "still_unresolved",
+                "h-release-wide": "weakened",
             }),
-            "recurrence_window": payload.get("recurrence_window", "24h clean for R03/R05; R06 later showed same pattern"),
+            "recurrence_window": payload.get("recurrence_window", "EX03 and EX08 stable; EX05 entered safe-stop again six hours later; EX11 later showed same pattern"),
         },
     )
     db.add(attribution)
@@ -927,7 +941,7 @@ def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
     response_history = {
         "remote_fix": {
             "cases": len([o for o in outcomes if "remote" in (o.outcome or "").lower() or "restart" in json.dumps(o.payload or {}).lower()]),
-            "observed_outcome": "connectivity restored without a field visit" if outcomes else "outcome pending",
+            "observed_outcome": "returned to service without a field visit" if outcomes else "outcome pending",
             "attribution": attributions[0].attribution_level if attributions else "not_observed",
         },
         "monitor": {"cases": 0, "observed_outcome": "not yet observed"},
@@ -939,10 +953,12 @@ def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
         "query": {
             "question": "In similar conditions, what responses were tried and what happened?",
             "state": {
-                "application": "app-0.36",
-                "configuration": "device-profile-C17",
-                "firmware": "module-fw-4.9",
-                "signal": "module_unhealthy_reconnect_failures",
+                "application": "autonomy-2.7",
+                "configuration": "localization-L4",
+                "firmware": "lidar-fw-5.3",
+                "map": "map-M19",
+                "zone": "loading-zone-B",
+                "signal": "safe_stop_near_loading_zone",
             },
         },
         "similar_state": {
@@ -997,7 +1013,7 @@ def similar_memory(db: Session, investigation_id: str) -> dict[str, Any]:
         "similar_cases": [
             {
                 "investigation_id": o.investigation_id,
-                "match_reason": "same post-deployment connectivity degradation, module-health signal and firmware/profile split",
+                "match_reason": "same post-deployment safe-stop pattern, localization profile and loading-zone exposure",
                 "outcome": o.outcome,
                 "recorded_at": iso(o.recorded_at),
             }

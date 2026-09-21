@@ -2,7 +2,7 @@
 
 ## Asset
 
-A physical system such as a robot, AMR, drone, industrial machine or software-defined physical asset.
+A physical system such as a robot, remote-operated machine, drone, industrial machine or software-defined physical asset.
 
 ## Evidence
 
@@ -32,7 +32,7 @@ A source-backed transition between two states.
 
 ## Trigger
 
-An event that opens a review, such as reconnect instability, planner latency, deployment risk or a human escalation.
+An event that opens a review, such as safe-stop behavior, planner fallback, deployment risk or a human escalation.
 
 ## Investigation
 
