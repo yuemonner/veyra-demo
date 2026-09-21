@@ -182,7 +182,7 @@ function InvestigationInner({ id }: { id: string }) {
           <div className="status-strip workspace-status"><span>{notice}</span></div>
 
           {presenter && <section className="backend-strip compact-backend">
-            <span>Backend v0 live</span>
+            <span>Backend-backed demo</span>
             <b>Evidence</b>
             <b>Changes</b>
             <b>Fleet</b>
@@ -272,7 +272,7 @@ function WorkspaceRightRail({ stage, pkg, verification, memory, precedent, onPac
     <aside className="workspace-rail">
       <div className="rail-card">
         <span className="eyebrow">Case role</span>
-        <p>A live review context for choosing the next operational action.</p>
+        <p>A Product Demo for choosing the next operational action from changing machine evidence.</p>
       </div>
       <div className="rail-card relevant-history">
         <span className="eyebrow">Relevant history</span>
@@ -413,19 +413,11 @@ function DecisionOptions({ options }: { options: any[] }) {
     },
     {
       id: "rollback",
-      label: "Roll back autonomy release",
+      label: "Rollback release",
       evidenceFor: "issue follows deployment window",
       evidenceAgainst: "autonomy 2.7 runs on healthy machines too",
       priorOutcome: "not established",
       cost: "rollout delay",
-    },
-    {
-      id: "revert_localization",
-      label: "Revert localization config",
-      evidenceFor: "affected machines share localization L4",
-      evidenceAgainst: "some healthy machines also share L4",
-      priorOutcome: "not yet observed",
-      cost: "configuration interruption",
     },
     {
       id: "dispatch",
@@ -438,7 +430,7 @@ function DecisionOptions({ options }: { options: any[] }) {
   ];
   const normalized = options.length ? options.map((option: any) => ({
     id: option.id || option.option_type,
-    label: option.option_type === "remote_fix" ? "Remote recovery" : option.option_type === "pause_rollout" ? "Roll back / hold rollout" : option.option_type === "dispatch" ? "Dispatch technician" : option.option_type === "monitor" ? "Monitor" : option.label,
+    label: option.option_type === "remote_fix" ? "Remote recovery" : option.option_type === "pause_rollout" ? "Rollback release" : option.option_type === "dispatch" ? "Dispatch technician" : option.option_type === "monitor" ? "Monitor" : option.label,
     evidenceFor: option.historical_support?.summary || option.label,
     evidenceAgainst: option.expected_risk?.reason || "uncertainty remains",
     priorOutcome: option.historical_support?.status === "none_yet" ? "no prior outcome in this workspace" : option.historical_support?.summary || "pending",
@@ -451,9 +443,9 @@ function DecisionOptions({ options }: { options: any[] }) {
         <article className={option.selected ? "option-card selected" : "option-card"} key={option.id}>
           <header><span>{option.selected ? "chosen" : "option"}</span><b>{option.label}</b></header>
           <dl>
-            <dt>Evidence for</dt><dd>{option.evidenceFor}</dd>
-            <dt>Evidence against</dt><dd>{option.evidenceAgainst}</dd>
-            <dt>Previous outcome</dt><dd>{option.priorOutcome}</dd>
+            <dt>Evidence</dt><dd>{option.evidenceFor}</dd>
+            <dt>Risk</dt><dd>{option.evidenceAgainst}</dd>
+            <dt>Prior outcome</dt><dd>{option.priorOutcome}</dd>
             <dt>Cost</dt><dd>{option.cost}</dd>
           </dl>
         </article>
@@ -465,12 +457,17 @@ function DecisionOptions({ options }: { options: any[] }) {
 function PackageStage({ pkg, verification, rec, comparison, decisionContext, onGenerate, onSeal }: any) {
   if (!pkg) {
     return (
-      <article className="panel">
-        <span className="eyebrow">Decision</span>
-        <h2>What should we do now?</h2>
-        <p>Compare the options before the team acts. Veyra assembles the evidence, prior outcomes, cost and uncertainty around each choice.</p>
+      <article className="panel decision-panel">
+        <div className="package-head">
+          <div>
+            <span className="eyebrow">Decision</span>
+            <h2>What should the team do now?</h2>
+            <p>Compare the next actions using current evidence, known gaps, cost and previous outcomes.</p>
+          </div>
+          <button className="button primary" onClick={onGenerate}>Compare options</button>
+        </div>
         <DecisionOptions options={[]} />
-        <button className="button primary" onClick={onGenerate}>Compare options</button>
+        <DecisionContextMini />
       </article>
     );
   }
@@ -481,104 +478,69 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
   const primaryHypothesis = pkg.package.primary_hypothesis || hypotheses[0];
   const unknowns = pkg.package.what_was_unknown || pkg.package.missing_evidence || [];
   return (
-    <article className="panel">
+    <article className="panel decision-panel">
       <div className="package-head">
-        <div><span className="eyebrow">Decision</span><h2>What should we do now?</h2><p>Each option is grounded in current evidence, known gaps, cost and prior outcomes. The team still owns the decision.</p></div>
+        <div><span className="eyebrow">Decision</span><h2>What should the team do now?</h2><p>Compare the next actions using current evidence, known gaps, cost and previous outcomes.</p></div>
         <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Decision recorded" : "Record decision"}</button>
       </div>
       <DecisionOptions options={options} />
-      <div className="callout">
-        <b>What did the team know at 14:27?</b>
-        <p>EX03, EX05 and EX08 were affected. EX11 had no known issue at the decision snapshot. Planner fallback evidence was incomplete.</p>
-      </div>
-      <div className="package-grid">
-        <PackageItem title="Trigger" value="safe-stop after deployment" />
-        <PackageItem title="Last known healthy" value={short(rec?.last_known_healthy?.event_time)} />
-        <PackageItem title="Recent changes" value="autonomy 2.6 to 2.7 · localization L3 to L4 · LiDAR firmware 5.2 to 5.3 · map M18 to M19" />
-        <PackageItem title="Machine state" value={rec?.current_state?.health || "degraded"} />
-        <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 3} / ${comparison?.same_change ?? 12}`} />
-        <PackageItem title="Observability status" value={`${observability?.status || "partial"} at decision time`} />
-        <PackageItem title="Observed" value="engineer note recorded at 14:26" />
-        <PackageItem title="Inferred" value="localization L4 and loading zone B co-occur across affected machines" />
-        <PackageItem title="Human asserted" value="operator suspects planner fallback near loading zone B" />
-        <PackageItem title="Missing evidence" value={(pkg.package.missing_evidence || []).join(" · ")} />
-        <PackageItem title="Approval policy" value={pkg.package.approval_policy?.name || "Physical system rollout review"} />
-        <PackageItem title="Substantiation" value={pkg.package.decision_substantiation?.status || "incomplete"} />
-        <PackageItem title="Primary hypothesis" value={primaryHypothesis?.hypothesis || "pending"} />
-        <PackageItem title="Hypothesis confidence" value={primaryHypothesis ? `${Math.round((primaryHypothesis.confidence || 0) * 100)}% · ${primaryHypothesis.status}` : "pending"} />
-        <PackageItem title="Human identity" value={pkg.package.human_decision?.identity || "pending named owner"} />
-        <PackageItem title="Chosen action" value={pkg.package.human_decision?.decision || "pending"} />
-        <PackageItem title="Outcome" value="pending" />
-      </div>
-      <div className="callout">
-        <b>What was unknown</b>
-        <ul className="check-list compact-list">
-          {unknowns.slice(0, 4).map((item: string) => <li key={item}><span>unknown</span><b>{item}</b></li>)}
-        </ul>
-      </div>
-      <div className="callout">
-        <b>Working hypotheses</b>
-        <ul className="check-list compact-list">
-          {hypotheses.map((item: any) => <li key={item.id}><span>{Math.round((item.confidence || 0) * 100)}%</span><b>{item.hypothesis}</b><small>{item.status}</small></li>)}
-        </ul>
-      </div>
-      <div className="callout">
-        <b>Decision record</b>
-        <p>{record ? "Evidence snapshot, options, chosen option, owner and observability state are locked into an immutable decision-time record." : "Record the decision to lock evidence snapshot, options, chosen option, owner and observability state."}</p>
-      </div>
-      <div className="package-grid">
-        <PackageItem title="Decision time" value={decisionContext?.decision_time?.slice(11, 16) || "14:27"} />
-        <PackageItem title="Owner" value={record?.owner || pkg.package.human_decision?.owner || "pending"} />
-        <PackageItem title="Chosen option" value={record?.chosen_option?.label || "pending"} />
-        <PackageItem title="Record digest" value={record?.digest?.slice(0, 16) || "pending"} />
-      </div>
-      <table className="table focus-table">
-        <thead><tr><th>Option</th><th>Expected cost</th><th>Expected risk</th><th>Status</th></tr></thead>
-        <tbody>{options.map((option: any) => <tr key={option.id || option.option_type}><td>{option.label}</td><td>{summarizeObject(option.expected_cost)}</td><td>{option.expected_risk?.risk || option.expected_risk?.reason || "unknown"}</td><td>{option.selected ? "chosen" : "available"}</td></tr>)}</tbody>
-      </table>
-      <div className="split-count">
-        <div><strong>What the team knew at 14:27</strong><span>EX03, EX05 and EX08 affected · no known issue on EX11</span></div>
-        <div><strong>What Veyra knows now</strong><span>EX11 had an earlier signal that became available after the decision snapshot</span></div>
-      </div>
-      <div className="evidence-columns">
-        <div className="evidence-card">
-          <span className="eyebrow">Evidence available at decision time</span>
-          <ul>
-            <li>EX03 affected</li>
-            <li>EX05 affected</li>
-            <li>EX08 affected</li>
-            <li>No known issue on EX11 at 14:27</li>
-            <li>Runtime trace completeness: partial</li>
-          </ul>
+      <DecisionContextMini pkg={pkg} record={record} observability={observability} />
+      <details className="snapshot-details">
+        <summary>View decision-time snapshot</summary>
+        <div className="snapshot-content">
+          <div className="split-count">
+            <div><strong>What the team knew at 14:27</strong><span>EX03, EX05 and EX08 affected. No known issue on EX11.</span></div>
+            <div><strong>What can change later</strong><span>Late evidence can update the current case without rewriting this decision record.</span></div>
+          </div>
+          <div className="package-grid">
+            <PackageItem title="Trigger" value="safe-stop after deployment" />
+            <PackageItem title="Last known healthy" value={short(rec?.last_known_healthy?.event_time)} />
+            <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 3} / ${comparison?.same_change ?? 12}`} />
+            <PackageItem title="Observability" value={`${observability?.status || "partial"} at decision time`} />
+            <PackageItem title="Primary hypothesis" value={primaryHypothesis?.hypothesis || "pending"} />
+            <PackageItem title="Confidence" value={primaryHypothesis ? `${Math.round((primaryHypothesis.confidence || 0) * 100)}% · ${primaryHypothesis.status}` : "pending"} />
+            <PackageItem title="Owner" value={record?.owner || pkg.package.human_decision?.owner || "pending"} />
+            <PackageItem title="Chosen action" value={record?.chosen_option?.label || pkg.package.human_decision?.decision || "pending"} />
+          </div>
+          <div className="evidence-columns">
+            <div className="evidence-card">
+              <span className="eyebrow">Evidence available then</span>
+              <ul>
+                <li>EX03, EX05 and EX08 affected</li>
+                <li>EX11 no known issue at 14:27</li>
+                <li>Telemetry completeness partial</li>
+              </ul>
+            </div>
+            <div className="evidence-card">
+              <span className="eyebrow">Still unknown then</span>
+              <ul>
+                {unknowns.slice(0, 4).map((item: string) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+          </div>
+          <div className="callout">
+            <b>Clock definitions</b>
+            <p>event_time is when the machine event happened. known_at is when the evidence became available to reconstruction. ingested_at is when Veyra received it.</p>
+          </div>
+          <div className="callout warning">
+            <b>{pkg.package.decision_substantiation?.question || "Is the team ready to act on this case?"}</b>
+            <p>{pkg.package.decision_substantiation?.summary || "Decision package incomplete."}</p>
+          </div>
+          {pkg.sealed && <Signature pkg={pkg} verification={verification} />}
         </div>
-        <div className="evidence-card">
-          <span className="eyebrow">Later evidence</span>
-          <ul>
-            <li>EX11 event_time: 14:09</li>
-            <li>known_at: 14:31</li>
-            <li>ingested_at: 14:31:04</li>
-            <li>Available after decision snapshot</li>
-            <li>Review required</li>
-          </ul>
-        </div>
-      </div>
-      <div className="callout">
-        <b>Clock definitions</b>
-        <p>event_time is when the machine event happened. known_at is when the evidence became available to the reconstruction layer. ingested_at is when Veyra received it. Human review can happen after all three.</p>
-      </div>
-      <div className="callout warning">
-        <b>{pkg.package.decision_substantiation?.question || "Is the team ready to act on this case?"}</b>
-        <p>{pkg.package.decision_substantiation?.summary || "Decision package incomplete."}</p>
-        <ul className="check-list">
-          {(pkg.package.decision_substantiation?.checks || []).map((check: any) => <li key={check.name}><span>{check.status}</span><b>{check.name}</b><small>{check.evidence}</small></li>)}
-        </ul>
-      </div>
-      <div className="callout">
-        <b>What this package rules in / rules out</b>
-        <p>Release-wide issue: weak support in current peer comparison. Localization and loading-zone issue: plausible. Perception or map context: still unresolved. Field dispatch: current evidence is insufficient to support it.</p>
-      </div>
-      {pkg.sealed && <Signature pkg={pkg} verification={verification} />}
+      </details>
     </article>
+  );
+}
+
+function DecisionContextMini({ pkg, record, observability }: { pkg?: DecisionPackage | null; record?: any; observability?: any }) {
+  return (
+    <section className="decision-context-mini">
+      <div><span>Known now</span><b>3 affected machines</b></div>
+      <div><span>Still unknown</span><b>EX11 and planner fallback</b></div>
+      <div><span>Observability</span><b>{observability?.status || "partial"}</b></div>
+      <div><span>Snapshot</span><b>{pkg?.sealed ? "sealed" : record ? "recorded" : "pending"}</b></div>
+    </section>
   );
 }
 

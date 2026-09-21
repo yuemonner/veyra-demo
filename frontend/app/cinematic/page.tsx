@@ -19,7 +19,7 @@ const SCENES = ["open", "signal", "changed", "whereelse", "decision", "action", 
 
 export default function CinematicDemo() {
   return (
-    <Suspense fallback={<main className="cinematic"><section className="cinema-scene center"><h1>Loading live demo...</h1></section></main>}>
+    <Suspense fallback={<main className="cinematic"><section className="cinema-scene center"><h1>Loading demo...</h1></section></main>}>
       <CinematicDemoInner />
     </Suspense>
   );
@@ -118,7 +118,7 @@ function CinematicDemoInner() {
         <div className="brand"><span className="mark">V</span> Veyra</div>
         <div className="mode-switch">
           {(["Presenter", "Auto"] as const).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{item}</button>)}
-          <Link href="/product-demo">Live product</Link>
+          <Link href="/product-demo">Product Demo</Link>
           <button onClick={reset}>Reset</button>
         </div>
       </div>}
@@ -296,14 +296,14 @@ function EndScene() {
     <section className="cinema-scene center end-frame">
       <h1>A company should not start from zero when a similar machine problem appears again.</h1>
       <p>Veyra turns each machine decision into evidence for the next one.</p>
-      <p>Now run the same scenario in the live product.</p>
+      <p>Now run the same scenario in the Product Demo.</p>
       <p>Operational intelligence for Physical AI.</p>
       <div className="unlock-row">
         <div><span>See</span><b>what changed</b></div>
         <div><span>Decide</span><b>what to do</b></div>
         <div><span>Learn</span><b>what happened after</b></div>
       </div>
-      <Link className="button lime" href="/product-demo">Open live product</Link>
+      <Link className="button lime" href="/product-demo">Open Product Demo</Link>
     </section>
   );
 }

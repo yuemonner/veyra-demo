@@ -25,7 +25,7 @@ export default function ProductPage() {
       <section className="product-page-hero">
         <nav>
           <Link className="workspace-brand" href="/"><span className="mark">V</span> Veyra</Link>
-          <Link className="button" href="/product-demo">Open live product</Link>
+          <Link className="button" href="/product-demo">Open Product Demo</Link>
         </nav>
         <div className="product-page-title">
           <span className="eyebrow">Product page</span>
