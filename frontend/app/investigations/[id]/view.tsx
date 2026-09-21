@@ -130,8 +130,12 @@ function InvestigationInner({ id }: { id: string }) {
   }
 
   const affected = comparison?.same_signal ?? 3;
-  const healthy = comparison?.no_signal ?? 9;
-  const lateEvidenceVisible = affected > 3;
+  const stageImpliesLateEvidence = stage === "outcome" || stage === "history";
+  const lateEvidenceVisible = affected > 3 || stageImpliesLateEvidence;
+  const displayAffected = lateEvidenceVisible ? Math.max(affected, 4) : affected;
+  const displayHealthy = lateEvidenceVisible ? 8 : (comparison?.no_signal ?? 9);
+  const actionRecorded = Boolean(pkg?.sealed || pkg?.package?.human_decision || stage === "action" || stage === "outcome" || stage === "history");
+  const outcomeRecorded = Boolean(stage === "outcome" || stage === "history" || memory?.similar_cases?.length);
   const detectionLead = useMemo(() => {
     if (!rec?.human_discovery?.event_time || !rec?.first_abnormal_evidence?.event_time) return "before engineer note";
     const first = new Date(rec.first_abnormal_evidence.event_time).getTime();
@@ -159,11 +163,12 @@ function InvestigationInner({ id }: { id: string }) {
         </div>
         <div className="workspace-header-actions">
           <div className="case-pills">
-            <b className="pill-alert">{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
+            <b className="pill-alert">{lateEvidenceVisible ? `${displayAffected} current` : `${displayAffected} affected`}</b>
             {lateEvidenceVisible && <b>3 decision-time</b>}
-            <b className="pill-blue">{healthy} healthy</b>
+            <b className="pill-blue">{displayHealthy} healthy</b>
             <b>12 updated</b>
-            <b>action pending</b>
+            <b>{actionRecorded ? "remote recovery" : "action pending"}</b>
+            {outcomeRecorded && <b>outcome observed</b>}
           </div>
           {presenter && <div className="demo-controls compact-controls">
             <Link className="button" href="/cinematic">Story</Link>
@@ -175,7 +180,7 @@ function InvestigationInner({ id }: { id: string }) {
       </header>
 
       <div className="workspace-grid">
-        <MachineRail affected={affected} healthy={healthy} lateEvidenceVisible={lateEvidenceVisible} />
+        <MachineRail stage={stage} affected={displayAffected} healthy={displayHealthy} lateEvidenceVisible={lateEvidenceVisible} actionRecorded={actionRecorded} outcomeRecorded={outcomeRecorded} />
 
         <main className="workspace-main">
           <StageTabs stage={stage} setStage={setStage} />
@@ -208,6 +213,10 @@ function InvestigationInner({ id }: { id: string }) {
           verification={verification}
           memory={memory}
           precedent={precedent}
+          affected={displayAffected}
+          healthy={displayHealthy}
+          actionRecorded={actionRecorded}
+          outcomeRecorded={outcomeRecorded}
           onPackage={generatePackage}
           onSeal={seal}
           onOutcome={outcome}
@@ -238,12 +247,50 @@ function StageTabs({ stage, setStage }: { stage: string; setStage: (stage: strin
   );
 }
 
-function MachineRail({ affected, healthy, lateEvidenceVisible }: { affected: number; healthy: number; lateEvidenceVisible: boolean }) {
+function MachineRail({ stage, affected, healthy, lateEvidenceVisible, actionRecorded, outcomeRecorded }: { stage: string; affected: number; healthy: number; lateEvidenceVisible: boolean; actionRecorded: boolean; outcomeRecorded: boolean }) {
   const affectedSet = new Set(lateEvidenceVisible ? [3, 5, 8, 11] : [3, 5, 8]);
   const watchSet = new Set([11]);
+  const railCopy: Record<string, { title: string; question: string; rows: Array<[string, string]> }> = {
+    overview: {
+      title: "Case scope",
+      question: "What changed, and which machines need attention first?",
+      rows: [["affected", "EX03, EX05, EX08"], ["healthy", "9 machines"], ["updated", "12 machines"], ["review", "opened"]],
+    },
+    changes: {
+      title: "Changed machines",
+      question: "Which machine state changed before the first known safe-stop?",
+      rows: [["release", "2.7"], ["localization", "L4"], ["map", "M19"], ["zone", "B"]],
+    },
+    scope: {
+      title: "Fleet split",
+      question: "Which machines share exposure, and which stayed healthy?",
+      rows: [["affected", "3"], ["healthy", "9"], ["exposed watch", "EX11"], ["shared condition", "L4 + zone B"]],
+    },
+    decision: {
+      title: "Decision inputs",
+      question: "Which option has enough evidence to act without sending someone onsite?",
+      rows: [["known", "3 affected"], ["unknown", "EX11"], ["observability", "partial"], ["owner", "pending"]],
+    },
+    action: {
+      title: "Chosen response",
+      question: "What did the team actually do after comparing the options?",
+      rows: [["action", actionRecorded ? "remote recovery" : "pending"], ["rollout", "held"], ["dispatch", "held"], ["watch", "EX11"]],
+    },
+    outcome: {
+      title: "Current state",
+      question: "What changed after the action, and what arrived late?",
+      rows: [["decision-time", "3 affected"], ["current", `${affected} affected`], ["outcome", outcomeRecorded ? "observed" : "pending"], ["late evidence", "EX11"]],
+    },
+    history: {
+      title: "Reusable precedent",
+      question: "What should the next similar case inherit from this one?",
+      rows: [["previous action", "remote recovery"], ["result", "returned to service"], ["dispatch", "avoided"], ["boundary", "not causal proof"]],
+    },
+  };
+  const copy = railCopy[stage] || railCopy.overview;
   return (
     <aside className="machine-rail">
-      <div className="rail-title"><span className="eyebrow">Machines</span><b>12</b></div>
+      <div className="rail-title"><span className="eyebrow">{copy.title}</span><b>12</b></div>
       <div className="machine-grid" aria-label="machine status">
         {Array.from({ length: 12 }).map((_, i) => {
           const id = i + 1;
@@ -251,46 +298,65 @@ function MachineRail({ affected, healthy, lateEvidenceVisible }: { affected: num
           return <span key={id} className={cls} title={`EX${String(id).padStart(2, "0")}`} />;
         })}
       </div>
+      <div className="machine-legend">
+        <span><i className="affected" /> affected</span>
+        <span><i className="watch" /> exposed watch</span>
+        <span><i /> healthy</span>
+      </div>
       <dl className="case-facts">
-        <div><dt>affected</dt><dd>{lateEvidenceVisible ? "EX03, EX05, EX08, EX11" : "EX03, EX05, EX08"}</dd></div>
-        <div><dt>watch</dt><dd>EX11</dd></div>
-        <div><dt>release</dt><dd>2.7</dd></div>
-        <div><dt>profile</dt><dd>L4 + zone B</dd></div>
+        {copy.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
       </dl>
       <div className="rail-card">
         <span className="eyebrow">Current question</span>
-        <p>Which machines share the conditions behind the safe-stop behavior?</p>
+        <p>{copy.question}</p>
       </div>
     </aside>
   );
 }
 
-function WorkspaceRightRail({ stage, pkg, verification, memory, precedent, onPackage, onSeal, onOutcome }: any) {
-  const hasMemory = memory?.similar_cases?.length > 0;
+function WorkspaceRightRail({ stage, pkg, verification, memory, precedent, affected, healthy, actionRecorded, outcomeRecorded, onPackage, onSeal, onOutcome }: any) {
+  const hasMemory = memory?.similar_cases?.length > 0 || stage === "history";
   const validation = precedent?.outcome_validation || memory?.precedent_comparison?.outcome_validation;
+  const stageHelp: Record<string, { label: string; title: string; body: string; cta: string }> = {
+    overview: { label: "Purpose", title: "Open the case", body: "Start with the machine group, the affected machines and the operational question.", cta: "What changed?" },
+    changes: { label: "Purpose", title: "Reconstruct changes", body: "Pull together release, localization, firmware, map and operator context before the team acts.", cta: "Scope the issue" },
+    scope: { label: "Purpose", title: "Find where else", body: "Separate affected machines from healthy machines that share the same deployment or exposure.", cta: "Compare options" },
+    decision: { label: "Purpose", title: "Choose next action", body: "Compare monitor, remote recovery, rollback and dispatch using evidence, risk, prior outcome and cost.", cta: "Record decision" },
+    action: { label: "Purpose", title: "Record what happened", body: "Keep the chosen action, owner, scope and decision-time evidence together.", cta: "Track outcome" },
+    outcome: { label: "Purpose", title: "Measure the result", body: "Show observed recovery, field visit avoided and late evidence that changes the current case.", cta: "Link outcome" },
+    history: { label: "Purpose", title: "Reuse the precedent", body: "Bring back prior action, observed outcome and uncertainty boundary for the next similar case.", cta: "Review precedent" },
+  };
+  const help = stageHelp[stage] || stageHelp.overview;
+  const historyText = hasMemory
+    ? "1 linked precedent available. Last time, remote recovery returned machines to service, avoided a field visit and EX11 later showed the same pattern."
+    : stage === "outcome"
+      ? "Remote recovery returned 3 machines to service. Link the outcome to make it reusable."
+      : "No prior outcome recorded yet. Record the outcome to create reusable precedent.";
   return (
     <aside className="workspace-rail">
       <div className="rail-card">
-        <span className="eyebrow">Case role</span>
-        <p>A Product Demo for choosing the next operational action from changing machine evidence.</p>
+        <span className="eyebrow">{help.label}</span>
+        <h3>{help.title}</h3>
+        <p>{help.body}</p>
       </div>
       <div className="rail-card relevant-history">
         <span className="eyebrow">Relevant history</span>
-        <p>{hasMemory ? "Similar case found. Last time, remote recovery returned machines to service and avoided a field visit." : "No prior outcome recorded yet. Record the outcome to create reusable precedent."}</p>
-        <button className="button" onClick={onOutcome}>{hasMemory ? "View previous outcome" : "Record outcome"}</button>
+        <p>{historyText}</p>
+        {stage === "history" ? <button className="button">Precedent loaded</button> : <button className="button" onClick={onOutcome}>{hasMemory || stage === "outcome" ? "Link outcome" : "Record outcome"}</button>}
       </div>
       <div className="rail-card">
         <span className="eyebrow">Case state</span>
         <dl className="case-facts compact">
-          <div><dt>known</dt><dd>3 affected</dd></div>
+          <div><dt>known then</dt><dd>3 affected</dd></div>
+          <div><dt>current</dt><dd>{affected} affected</dd></div>
           <div><dt>watch</dt><dd>EX11 exposed</dd></div>
-          <div><dt>action</dt><dd>{pkg?.package?.human_decision ? "recorded" : "pending"}</dd></div>
-          <div><dt>outcome</dt><dd>{validation?.status ? "observed" : "pending"}</dd></div>
+          <div><dt>action</dt><dd>{actionRecorded ? "remote recovery" : "pending"}</dd></div>
+          <div><dt>outcome</dt><dd>{outcomeRecorded || validation?.status ? "observed" : "pending"}</dd></div>
         </dl>
       </div>
       <div className="rail-actions">
         <button className="button primary" onClick={onPackage}>Compare options</button>
-        <button className="button lime" onClick={onSeal}>{pkg?.sealed ? "Sealed" : "Record decision"}</button>
+        <button className="button lime" onClick={onSeal}>{actionRecorded ? "Decision recorded" : "Record decision"}</button>
       </div>
       {pkg?.sealed && <div className="rail-card">
         <span className="eyebrow">Snapshot</span>
@@ -612,7 +678,7 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
 
       <section className="outcome-ledger">
         <PackageItem title="Decision-time view" value="3 affected" />
-        <PackageItem title="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 3)} affected`} />
+        <PackageItem title="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 4)} affected`} />
         <PackageItem title="Field dispatch" value="avoided by decision path" />
         <PackageItem title="Rollout" value="paused, then resumed" />
         <PackageItem title="Engineering time" value="estimated reduction" />
@@ -628,9 +694,12 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
 }
 
 function MemoryStage({ memory, precedent, onOutcome }: any) {
-  const hasMemory = memory?.similar_cases?.length > 0;
-  const rows = precedent?.outcome_comparison || memory?.precedent_comparison?.outcome_comparison || [];
   const validation = precedent?.outcome_validation || memory?.precedent_comparison?.outcome_validation;
+  const rows = [
+    { action: "Remote recovery", outcome: "returned to service", attribution: "observed after action" },
+    { action: "Pause rollout", outcome: "rollout later resumed", attribution: "observed" },
+    { action: "Dispatch technician", outcome: "avoided", attribution: "not executed" },
+  ];
   return (
     <article className="panel final-stage">
       <span className="eyebrow">12 days later</span>
@@ -664,17 +733,14 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
       <table className="table focus-table">
         <thead><tr><th>Action</th><th>Observed outcome</th><th>Attribution</th></tr></thead>
         <tbody>
-          {(rows.length ? rows : [
-            { action: "remote_fix", outcome: "observed recovery after action", attribution: "precedent, not causal proof" },
-            { action: "dispatch", outcome: "not supported by current evidence", attribution: "not supported" },
-          ]).map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome || row.status}</td><td>{row.attribution}</td></tr>)}
+          {rows.map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome}</td><td>{row.attribution}</td></tr>)}
         </tbody>
       </table>
       <div className="callout">
         <b>Before dispatching a technician</b>
         <p>Compare the current machine against the previous exposed group and check whether the same autonomy release, localization profile, map and loading-zone pattern is present.</p>
       </div>
-      {!hasMemory && <button className="button primary" onClick={onOutcome}>Record outcome first</button>}
+      <button className="button primary" onClick={onOutcome}>Refresh precedent from outcome</button>
       <div className="ending">
         <b>The next case does not start from zero.</b>
         <span>A company should not start from zero when a similar machine problem appears again.</span>
