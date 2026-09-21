@@ -150,95 +150,154 @@ function InvestigationInner({ id }: { id: string }) {
   };
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="brand"><span className="mark">V</span> Veyra</div>
-        <nav className="nav">
-          <Link href="/">Home</Link>
-          <span className="nav-section-label">Case</span>
-          <button className={stage === "overview" ? "active" : ""} onClick={() => setStage("overview")}>Overview</button>
-          <button className={stage === "changes" ? "active" : ""} onClick={() => setStage("changes")}>Changes</button>
-          <button className={stage === "scope" ? "active" : ""} onClick={() => setStage("scope")}>Fleet</button>
-          <button className={stage === "decision" ? "active" : ""} onClick={() => setStage("decision")}>Decision</button>
-          <button className={stage === "action" ? "active" : ""} onClick={() => setStage("action")}>Action</button>
-          <button className={stage === "outcome" ? "active" : ""} onClick={() => setStage("outcome")}>Outcome</button>
-          <button className={stage === "history" ? "active" : ""} onClick={() => setStage("history")}>Precedent</button>
-          {presenter && <Link className="nav-link-strong" href="/demo-control">Demo Control</Link>}
-        </nav>
-        <div className="boundary">A machine changed. What should the team do next?</div>
-      </aside>
-
-      <main className="main">
-        <div className="topbar">
-          <span className="eyebrow">Remote equipment fleet · 12 machines · autonomy release 2.7 · 3 known affected</span>
-          {presenter && <div className="demo-controls">
-            <Link className="button" href="/cinematic">Cinematic story</Link>
+    <div className="product-shell">
+      <header className="workspace-header">
+        <div>
+          <Link className="workspace-brand" href="/"><span className="mark">V</span> Veyra</Link>
+          <span className="eyebrow">Case workspace</span>
+          <h1>EX03 / EX05 / EX08 safe-stop after autonomy 2.7</h1>
+        </div>
+        <div className="workspace-header-actions">
+          <div className="case-pills">
+            <b className="pill-alert">{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
+            {lateEvidenceVisible && <b>3 decision-time</b>}
+            <b className="pill-blue">{healthy} healthy</b>
+            <b>12 updated</b>
+            <b>action pending</b>
+          </div>
+          {presenter && <div className="demo-controls compact-controls">
+            <Link className="button" href="/cinematic">Story</Link>
             <button className="button" onClick={refresh}>Refresh</button>
-            <button className="button" onClick={resetScenario}>Reset scenario</button>
-            <button className="button" onClick={lateEvidence}>Inject delayed evidence</button>
+            <button className="button" onClick={resetScenario}>Reset</button>
+            <button className="button" onClick={lateEvidence}>Late evidence</button>
           </div>}
         </div>
+      </header>
 
-        {stage === "overview" ? (
-          <section className="case-header">
-            <div className="case-header-copy">
-              <span className="eyebrow">Live machine decision</span>
-              <h1>Three excavators entered safe-stop after the same deployment.</h1>
-              <p>Twelve machines got autonomy release 2.7. Three started entering safe-stop near the same loading zone. Veyra shows what changed, where else it appears, and what happened when teams took similar actions before.</p>
-            </div>
-            <div className="case-header-rail">
-              <div className="case-pills">
-                <b>{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
-                {lateEvidenceVisible && <b>3 decision-time</b>}
-                <b>{healthy} healthy</b>
-                <b>12 updated</b>
-              </div>
-              <div className="hero-actions">
-                <button className="button primary" onClick={() => setStage("overview")}>Open case</button>
-                <button className="button lime" onClick={generatePackage}>What should we do?</button>
-              </div>
-            </div>
+      <div className="workspace-grid">
+        <MachineRail affected={affected} healthy={healthy} lateEvidenceVisible={lateEvidenceVisible} />
+
+        <main className="workspace-main">
+          <StageTabs stage={stage} setStage={setStage} />
+          <div className="status-strip workspace-status"><span>{notice}</span></div>
+
+          {presenter && <section className="backend-strip compact-backend">
+            <span>Backend v0 live</span>
+            <b>Evidence</b>
+            <b>Changes</b>
+            <b>Fleet</b>
+            <b>Options</b>
+            <b>Action</b>
+            <b>Outcome</b>
+          </section>}
+
+          <section className="workspace-stage">
+            {stage === "overview" && <LiveFailure rec={rec} comparison={comparison} detectionLead={detectionLead} onChanges={() => setStage("changes")} onPackage={generatePackage} />}
+            {stage === "changes" && <ChangesStage onScope={() => setStage("scope")} />}
+            {stage === "scope" && <CompareStage comparison={comparison} precedent={precedent} onPackage={generatePackage} />}
+            {stage === "decision" && <PackageStage pkg={pkg} verification={verification} rec={rec} comparison={comparison} decisionContext={decisionContext} onGenerate={generatePackage} onSeal={seal} />}
+            {stage === "action" && <ActionStage pkg={pkg} onGenerate={generatePackage} onSeal={seal} onOutcome={() => setStage("outcome")} />}
+            {stage === "outcome" && <LateEvidenceStage pkg={pkg} verification={verification} comparison={comparison} onSeal={seal} onOutcome={outcome} />}
+            {stage === "history" && <MemoryStage memory={memory} precedent={precedent} onOutcome={outcome} />}
           </section>
-        ) : (
-          <section className="case-context-bar">
-            <div>
-              <span className="eyebrow">Operational case</span>
-              <strong>{stageLabel[stage]}</strong>
-            </div>
-            <p>EX03 / EX05 / EX08 safe-stop after autonomy 2.7</p>
-            <div className="case-pills">
-              <b>{lateEvidenceVisible ? `${affected} current` : `${affected} affected`}</b>
-              {lateEvidenceVisible && <b>3 decision-time</b>}
-              <b>{healthy} healthy</b>
-              <b>12 updated</b>
-            </div>
-          </section>
-        )}
+        </main>
 
-        <div className="status-strip">
-          <span>{notice}</span>
-        </div>
-
-        {presenter && <section className="backend-strip">
-          <span>Backend v0 live</span>
-          <b>Source evidence ingestion</b>
-          <b>What changed</b>
-          <b>Where else</b>
-          <b>Peer comparison</b>
-          <b>Options</b>
-          <b>Chosen action</b>
-          <b>Outcome history</b>
-        </section>}
-
-        {stage === "overview" && <LiveFailure rec={rec} comparison={comparison} detectionLead={detectionLead} onChanges={() => setStage("changes")} onPackage={generatePackage} />}
-        {stage === "changes" && <ChangesStage onScope={() => setStage("scope")} />}
-        {stage === "scope" && <CompareStage comparison={comparison} precedent={precedent} onPackage={generatePackage} />}
-        {stage === "decision" && <PackageStage pkg={pkg} verification={verification} rec={rec} comparison={comparison} decisionContext={decisionContext} onGenerate={generatePackage} onSeal={seal} />}
-        {stage === "action" && <ActionStage pkg={pkg} onGenerate={generatePackage} onSeal={seal} onOutcome={() => setStage("outcome")} />}
-        {stage === "outcome" && <LateEvidenceStage pkg={pkg} verification={verification} comparison={comparison} onSeal={seal} onOutcome={outcome} />}
-        {stage === "history" && <MemoryStage memory={memory} precedent={precedent} onOutcome={outcome} />}
-      </main>
+        <WorkspaceRightRail
+          stage={stage}
+          pkg={pkg}
+          verification={verification}
+          memory={memory}
+          precedent={precedent}
+          onPackage={generatePackage}
+          onSeal={seal}
+          onOutcome={outcome}
+        />
+      </div>
     </div>
+  );
+}
+
+function StageTabs({ stage, setStage }: { stage: string; setStage: (stage: string) => void }) {
+  const tabs = [
+    ["overview", "Overview"],
+    ["changes", "Changes"],
+    ["scope", "Fleet"],
+    ["decision", "Decision"],
+    ["action", "Action"],
+    ["outcome", "Outcome"],
+    ["history", "Precedent"],
+  ];
+  return (
+    <nav className="stage-tabs" aria-label="case sections">
+      {tabs.map(([id, label], index) => (
+        <button key={id} className={stage === id ? "active" : ""} onClick={() => setStage(id)}>
+          <span>{String(index + 1).padStart(2, "0")}</span>{label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function MachineRail({ affected, healthy, lateEvidenceVisible }: { affected: number; healthy: number; lateEvidenceVisible: boolean }) {
+  const affectedSet = new Set(lateEvidenceVisible ? [3, 5, 8, 11] : [3, 5, 8]);
+  const watchSet = new Set([11]);
+  return (
+    <aside className="machine-rail">
+      <div className="rail-title"><span className="eyebrow">Machines</span><b>12</b></div>
+      <div className="machine-grid" aria-label="machine status">
+        {Array.from({ length: 12 }).map((_, i) => {
+          const id = i + 1;
+          const cls = affectedSet.has(id) ? "affected" : watchSet.has(id) ? "watch" : "healthy";
+          return <span key={id} className={cls} title={`EX${String(id).padStart(2, "0")}`} />;
+        })}
+      </div>
+      <dl className="case-facts">
+        <div><dt>affected</dt><dd>{lateEvidenceVisible ? "EX03, EX05, EX08, EX11" : "EX03, EX05, EX08"}</dd></div>
+        <div><dt>watch</dt><dd>EX11</dd></div>
+        <div><dt>release</dt><dd>2.7</dd></div>
+        <div><dt>profile</dt><dd>L4 + zone B</dd></div>
+      </dl>
+      <div className="rail-card">
+        <span className="eyebrow">Current question</span>
+        <p>Which machines share the conditions behind the safe-stop behavior?</p>
+      </div>
+    </aside>
+  );
+}
+
+function WorkspaceRightRail({ stage, pkg, verification, memory, precedent, onPackage, onSeal, onOutcome }: any) {
+  const hasMemory = memory?.similar_cases?.length > 0;
+  const validation = precedent?.outcome_validation || memory?.precedent_comparison?.outcome_validation;
+  return (
+    <aside className="workspace-rail">
+      <div className="rail-card">
+        <span className="eyebrow">Case role</span>
+        <p>A live review context for choosing the next operational action.</p>
+      </div>
+      <div className="rail-card relevant-history">
+        <span className="eyebrow">Relevant history</span>
+        <p>{hasMemory ? "Similar case found. Last time, remote recovery returned machines to service and avoided a field visit." : "No prior outcome recorded yet. Record the outcome to create reusable precedent."}</p>
+        <button className="button" onClick={onOutcome}>{hasMemory ? "View previous outcome" : "Record outcome"}</button>
+      </div>
+      <div className="rail-card">
+        <span className="eyebrow">Case state</span>
+        <dl className="case-facts compact">
+          <div><dt>known</dt><dd>3 affected</dd></div>
+          <div><dt>watch</dt><dd>EX11 exposed</dd></div>
+          <div><dt>action</dt><dd>{pkg?.package?.human_decision ? "recorded" : "pending"}</dd></div>
+          <div><dt>outcome</dt><dd>{validation?.status ? "observed" : "pending"}</dd></div>
+        </dl>
+      </div>
+      <div className="rail-actions">
+        <button className="button primary" onClick={onPackage}>Compare options</button>
+        <button className="button lime" onClick={onSeal}>{pkg?.sealed ? "Sealed" : "Record decision"}</button>
+      </div>
+      {pkg?.sealed && <div className="rail-card">
+        <span className="eyebrow">Snapshot</span>
+        <p className="hash">SHA-256 {pkg.digest?.slice(0, 18)}...</p>
+        <small>{verification?.valid ? "verified" : "sealed"}</small>
+      </div>}
+    </aside>
   );
 }
 
