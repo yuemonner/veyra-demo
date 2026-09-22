@@ -230,23 +230,15 @@ function WhereElseScene({ comparison, onNext }: { comparison: Comparison | null;
 function DecisionStateScene({ pkg, onNext }: { pkg: DecisionPackage | null; onNext: () => void }) {
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="4 · Decision" title="What did the team know at 14:27?" subtitle="Later evidence can change the current case. It cannot change what the team knew then." />
-      <div className="split-count">
-        <div><strong>What the team knew at 14:27</strong><span>EX03, EX05 and EX08 affected · no known issue on EX11</span></div>
-        <div><strong>What is known now</strong><span>EX11 also had safe-stop behavior, but that evidence arrived later</span></div>
+      <SceneTitle eyebrow="4 · Decision" title="Later facts do not rewrite the old decision." subtitle="Veyra preserves what the team knew at decision time, then updates the current view when new evidence arrives." />
+      <div className="decision-timeline">
+        <span>14:27 Decision made</span>
+        <i />
+        <span>14:31 New evidence arrived</span>
+        <i />
+        <span>Current view updated</span>
       </div>
-      <div className="time-rail cinematic-rail">
-        <div><b>14:09</b><span>event_time</span><small>EX11 safe-stop happened</small></div>
-        <i />
-        <div><b>14:27</b><span>decision snapshot</span><small>3 affected known to the team</small></div>
-        <i />
-        <div><b>14:31</b><span>known_at</span><small>evidence became available</small></div>
-        <i />
-        <div><b>14:31:04</b><span>ingested_at</span><small>Veyra received it</small></div>
-      </div>
-      <HeroLine text="Later facts do not rewrite the old decision." />
-      <div className="seal-card quiet-seal lock-motion"><span>Decision snapshot · 14:27</span><small>{pkg?.sealed ? "Owner and action recorded." : "Built from the evidence available then."}</small></div>
-      <DecisionAgentMotion />
+      <DecisionSnapshotMotion sealed={Boolean(pkg?.sealed)} />
       <button className="button primary" onClick={onNext}>What did the team do?</button>
     </section>
   );
@@ -279,28 +271,64 @@ function ActionScene({ onNext }: { onNext: () => void }) {
   );
 }
 
-function DecisionAgentMotion() {
+function DecisionSnapshotMotion({ sealed }: { sealed: boolean }) {
   return (
-    <div className="agent-motion" aria-label="decision agent recommendation">
-      <div className="agent-evidence-stack">
-        <span>Evidence in</span>
-        <b>3 affected</b>
-        <b>9 healthy</b>
-        <b>EX11 counterexample</b>
-        <b>$1K to $2K dispatch</b>
-        <b>prior recovery result</b>
-      </div>
-      <div className="agent-core">
-        <span>Decision agent</span>
+    <div className="decision-snapshot-motion" aria-label="decision snapshot and later evidence">
+      <section className="snapshot-side decision-then">
+        <span className="eyebrow">Decision snapshot · 14:27</span>
+        <h3>What the team knew</h3>
+        <div className="snapshot-groups">
+          <div>
+            <b>Known</b>
+            <p>3 affected · 9 healthy · EX11 appeared healthy</p>
+          </div>
+          <div>
+            <b>Cost context</b>
+            <p>Dispatch costs $1K to $2K. Rollout hold has operational cost.</p>
+          </div>
+          <div className="recommendation-mini">
+            <b>Recommended action</b>
+            <p>Remote recovery · hold rollout · hold field dispatch</p>
+          </div>
+          <div>
+            <b>Why</b>
+            <p>Lowest-cost reversible step while one more signal is missing: EX11 runtime history.</p>
+          </div>
+        </div>
+        <small>Based on evidence available at decision time.</small>
+      </section>
+
+      <div className="snapshot-bridge">
+        <div className="lock-orb">Locked</div>
+        <b>Snapshot preserved</b>
+        <span>{sealed ? "Owner and action recorded" : "Built from evidence available then"}</span>
         <i />
-        <b>Compare options</b>
+        <small>Current view updates separately</small>
       </div>
-      <div className="agent-recommendation">
-        <span>Suggested action</span>
-        <strong>Remote recovery</strong>
-        <p>Hold rollout. Hold field dispatch.</p>
-        <small>Confidence: medium · Need one more signal: EX11 runtime history</small>
-      </div>
+
+      <section className="snapshot-side later-now">
+        <span className="eyebrow">Later evidence · 14:31</span>
+        <h3>What arrived later</h3>
+        <div className="snapshot-groups">
+          <div className="new-fact">
+            <b>New fact</b>
+            <p>EX11 had the same safe-stop pattern at 14:09.</p>
+          </div>
+          <div>
+            <b>Current fleet view</b>
+            <p>3 affected → 4 affected. Scope is wider than the original snapshot.</p>
+          </div>
+          <div>
+            <b>What stays true</b>
+            <p>The original decision record does not change.</p>
+          </div>
+          <div>
+            <b>Clock trail</b>
+            <p>event_time 14:09 · known_at 14:31 · ingested_at 14:31:04</p>
+          </div>
+        </div>
+        <small>Historical decision preserved. Current fleet view updated.</small>
+      </section>
     </div>
   );
 }
