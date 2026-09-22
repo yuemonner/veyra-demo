@@ -275,56 +275,54 @@ function DecisionAgentMoment({ sealed }: { sealed: boolean }) {
 
       <div className="agent-pipeline">
         <section className="evidence-stream">
-          <span className="eyebrow">Evidence stream</span>
-          <b className="key-signal">3 affected</b>
-          <b>9 healthy</b>
-          <b className="key-signal">EX11 exposed</b>
-          <b>$1K to $2K dispatch</b>
-          <b>prior recovery worked</b>
+          <span className="eyebrow">Evidence context</span>
+          <div className="evidence-group">
+            <small>Fleet</small>
+            <p><b className="key-signal">3 affected</b><b>9 healthy</b><b className="key-signal">EX11 exposed</b></p>
+          </div>
+          <div className="evidence-group">
+            <small>Cost</small>
+            <p><b>Dispatch $1K to $2K</b></p>
+          </div>
+          <div className="evidence-group">
+            <small>History</small>
+            <p><b>Prior recovery → returned to service</b></p>
+          </div>
         </section>
 
         <section className="veyra-agent-core">
           <span>Veyra Decision Agent</span>
           <div className="agent-orbit" />
-          <ul>
-            <li>Comparing fleet state</li>
-            <li>Checking previous outcomes</li>
-            <li>One signal still missing</li>
-          </ul>
-          <small>Fetching EX11 runtime history...</small>
+          <div className="agent-state-stack">
+            <p><em>Analyzing</em><b>Comparing affected vs healthy</b></p>
+            <p><em>Narrowing</em><b>Release 2.7 alone does not explain the failure</b></p>
+            <p><em>Need one more signal</em><b>EX11 runtime history</b></p>
+          </div>
+          <small>Recommendation ready</small>
         </section>
 
         <section className="recommended-action-hero">
-          <span className="eyebrow">Suggested action</span>
+          <span className="eyebrow">Recommended action</span>
           <h3>Remote recovery</h3>
           <strong>Hold rollout · Hold field dispatch</strong>
           <dl>
             <div><dt>Why</dt><dd>3 affected machines share the same exposure. Release 2.7 alone does not explain the failure.</dd></div>
-            <div><dt>Missing evidence</dt><dd>EX11 runtime history.</dd></div>
+            <div><dt>Missing</dt><dd>EX11 runtime history.</dd></div>
             <div><dt>Confidence</dt><dd>Medium</dd></div>
           </dl>
         </section>
       </div>
 
-      <div className="agent-approval-row">
-        <div className="approved-action">
-          <span>Approve action</span>
-          <b>Decision recorded · 14:27</b>
-        </div>
-        <div className="late-event-card">
-          <span>Late evidence</span>
-          <b>EX11 · event_time 14:09</b>
-          <small>arrived 14:31</small>
-        </div>
-        <div className="view-update-card">
-          <span>Current view</span>
-          <b>3 → 4 affected</b>
-          <small>Decision snapshot stays 3</small>
-        </div>
+      <div className="agent-timeline-rail">
+        <div className="timeline-node approved-action"><span>14:27</span><b>Decision recorded</b><small>3 affected</small></div>
+        <i />
+        <div className="timeline-node late-event-card"><span>14:31</span><b>Late evidence arrived</b><small>EX11 safe-stop · event_time 14:09</small></div>
+        <i />
+        <div className="timeline-node view-update-card"><span>Now</span><b>4 affected</b><small>Snapshot stays 3</small></div>
       </div>
 
       <div className="agent-final-line">
-        <b>Current view updated. Decision snapshot preserved.</b>
+        <b>Current view updated · Snapshot preserved</b>
         <span>Later facts do not rewrite the old decision.</span>
       </div>
     </div>
