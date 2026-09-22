@@ -143,7 +143,6 @@ function OpenScene({ onNext, onReplay }: { onNext: () => void; onReplay: () => v
       <p>Veyra shows what changed, where else it is happening, what the team did, and what happened after.</p>
       <div className="hero-actions">
         <button className="button lime" onClick={onReplay}>Replay field case</button>
-        <button className="button" onClick={onNext}>Step through manually</button>
       </div>
     </section>
   );
