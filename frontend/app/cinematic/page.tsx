@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { getJson, postJson } from "../../lib/api";
 
 type Comparison = {
@@ -16,7 +15,6 @@ type DecisionPackage = { id: string; sealed: boolean; digest?: string; signature
 
 const INVESTIGATION_ID = "inv-120-robots-bad-rollout";
 const SCENES = ["open", "signal", "changed", "whereelse", "decision", "action", "outcome", "memory", "end"];
-const SCENE_DURATIONS = [5200, 10500, 10500, 13000, 13500, 10000, 13000, 12000, 9000];
 
 export default function CinematicDemo() {
   return (
@@ -27,9 +25,7 @@ export default function CinematicDemo() {
 }
 
 function CinematicDemoInner() {
-  const presenter = useSearchParams().get("presenter") === "1";
   const [scene, setScene] = useState(0);
-  const [mode, setMode] = useState<"Presenter" | "Auto">("Presenter");
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [pkg, setPkg] = useState<DecisionPackage | null>(null);
   const [memoryReady, setMemoryReady] = useState(false);
@@ -92,18 +88,10 @@ function CinematicDemoInner() {
 
   async function replay() {
     await reset();
-    setMode("Auto");
     setScene(1);
   }
 
   useEffect(() => { reset().catch(() => undefined); }, []);
-
-  useEffect(() => {
-    if (mode !== "Auto") return;
-    if (scene === SCENES.length - 1) return;
-    const timer = window.setTimeout(() => { nextScene().catch(() => undefined); }, SCENE_DURATIONS[scene] || 10000);
-    return () => window.clearTimeout(timer);
-  }, [mode, scene, pkg]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -121,12 +109,11 @@ function CinematicDemoInner() {
   const healthy = comparison?.no_signal ?? 9;
 
   return (
-    <main className={`cinematic ${mode === "Presenter" ? "presenter-mode" : ""}`}>
-      <div className={presenter ? "cinematic-top" : "cinematic-top demo-visible"}>
+    <main className="cinematic">
+      <div className="cinematic-top demo-visible">
         <div className="brand"><span className="mark">V</span> Veyra</div>
         <div className="mode-switch">
-          <button className={mode === "Auto" ? "active" : ""} onClick={replay}>Auto replay</button>
-          <button className={mode === "Presenter" ? "active" : ""} onClick={() => setMode("Presenter")}>Manual</button>
+          <button className="active" onClick={replay}>Replay field case</button>
           <button onClick={() => nextScene().catch(() => undefined)}>Next</button>
           <Link href="/product-demo">Open Product Demo</Link>
           <button onClick={reset}>Reset</button>
