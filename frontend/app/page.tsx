@@ -18,17 +18,17 @@ export default async function Page() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand"><span className="mark">V</span> Veyra</div>
-        <nav className="nav"><Link className="active" href="/">Overview</Link><Link href="/product-demo">Product Demo</Link><Link href="/cinematic">Cinematic story</Link></nav>
+        <nav className="nav"><Link className="active" href="/">Overview</Link><Link href="/product-demo">Product Demo</Link><Link href="/cinematic">Field Case Replay</Link></nav>
         <div className="boundary">Read-only beside your existing stack. Machine control remains in customer systems.</div>
       </aside>
       <main className="main">
-        <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Review cinematic case</Link><Link className="button" href="/product-demo">Open Product Demo</Link></div></div>
+        <div className="topbar"><span className="eyebrow">Physical AI Operations</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Review field case</Link><Link className="button" href="/product-demo">Open Product Demo</Link></div></div>
         <section className="hero">
           <span className="eyebrow">Operational intelligence for Physical AI.</span>
           <h1>One deployment. Twelve machines. Three enter safe-stop.</h1>
           <p>Veyra reconstructs what changed, shows where else the same conditions exist, compares the team’s options and follows the case through action and outcome.</p>
           <p><b>See what changed. Decide what to do. Learn what happened after. Reuse it next time.</b></p>
-          <div className="hero-actions"><Link className="button primary" href="/product-demo">Open Product Demo</Link><Link className="button" href="/cinematic">Review cinematic case</Link></div>
+          <div className="hero-actions"><Link className="button primary" href="/product-demo">Open Product Demo</Link><Link className="button" href="/cinematic">Review field case</Link></div>
         </section>
         <div className="grid three">
           <article className="panel metric"><span>Machine group</span><strong>{assets.length || "12"}</strong><p>machines updated.</p></article>
@@ -38,7 +38,7 @@ export default async function Page() {
         <section className="investigation panel">
           <span className="eyebrow">Backend-backed demo</span>
           <h2>Product core behind the demo</h2>
-          <p>The cinematic story and Product Demo run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed, finding where else the pattern appears, comparing affected and healthy machines, option comparison, action recording, outcome linking and similar-case retrieval.</p>
+          <p>The field case replay and Product Demo run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed, finding where else the pattern appears, comparing affected and healthy machines, option comparison, action recording, outcome linking and similar-case retrieval.</p>
           <div className="backend-grid">
             <b>Evidence → Decision state → Action → Outcome → Learning</b>
             <b>source evidence ingestion</b>

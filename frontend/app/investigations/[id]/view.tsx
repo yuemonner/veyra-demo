@@ -171,7 +171,7 @@ function InvestigationInner({ id }: { id: string }) {
             {outcomeRecorded && <b>outcome observed</b>}
           </div>
           {presenter && <div className="demo-controls compact-controls">
-            <Link className="button" href="/cinematic">Story</Link>
+            <Link className="button" href="/cinematic">Case replay</Link>
             <button className="button" onClick={refresh}>Refresh</button>
             <button className="button" onClick={resetScenario}>Reset</button>
             <button className="button" onClick={lateEvidence}>Late evidence</button>
@@ -200,7 +200,7 @@ function InvestigationInner({ id }: { id: string }) {
             {stage === "overview" && <LiveFailure rec={rec} comparison={comparison} detectionLead={detectionLead} onChanges={() => setStage("changes")} onPackage={generatePackage} />}
             {stage === "changes" && <ChangesStage onScope={() => setStage("scope")} />}
             {stage === "scope" && <CompareStage comparison={comparison} precedent={precedent} onPackage={generatePackage} />}
-            {stage === "decision" && <PackageStage pkg={pkg} verification={verification} rec={rec} comparison={comparison} decisionContext={decisionContext} onGenerate={generatePackage} onSeal={seal} />}
+            {stage === "decision" && <PackageStage pkg={pkg} verification={verification} rec={rec} comparison={comparison} decisionContext={decisionContext} onGenerate={generatePackage} onSeal={seal} onFetchEvidence={lateEvidence} />}
             {stage === "action" && <ActionStage pkg={pkg} onGenerate={generatePackage} onSeal={seal} onOutcome={() => setStage("outcome")} />}
             {stage === "outcome" && <LateEvidenceStage pkg={pkg} verification={verification} comparison={comparison} onSeal={seal} onOutcome={outcome} />}
             {stage === "history" && <MemoryStage memory={memory} precedent={precedent} onOutcome={outcome} />}
@@ -520,7 +520,7 @@ function DecisionOptions({ options }: { options: any[] }) {
   );
 }
 
-function PackageStage({ pkg, verification, rec, comparison, decisionContext, onGenerate, onSeal }: any) {
+function PackageStage({ pkg, verification, rec, comparison, decisionContext, onGenerate, onSeal, onFetchEvidence }: any) {
   if (!pkg) {
     return (
       <article className="panel decision-panel">
@@ -532,6 +532,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
           </div>
           <button className="button primary" onClick={onGenerate}>Compare options</button>
         </div>
+        <DecisionAgentCard ready={false} onGenerate={onGenerate} onSeal={onSeal} onFetchEvidence={onFetchEvidence} />
         <DecisionOptions options={[]} />
         <DecisionContextMini />
       </article>
@@ -549,6 +550,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
         <div><span className="eyebrow">Decision</span><h2>What should the team do now?</h2><p>Compare the next actions using current evidence, known gaps, cost and previous outcomes.</p></div>
         <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Decision recorded" : "Record decision"}</button>
       </div>
+      <DecisionAgentCard ready pkg={pkg} onGenerate={onGenerate} onSeal={onSeal} onFetchEvidence={onFetchEvidence} />
       <DecisionOptions options={options} />
       <DecisionContextMini pkg={pkg} record={record} observability={observability} />
       <details className="snapshot-details">
@@ -596,6 +598,50 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
         </div>
       </details>
     </article>
+  );
+}
+
+function DecisionAgentCard({ ready, pkg, onGenerate, onSeal, onFetchEvidence }: { ready: boolean; pkg?: DecisionPackage | null; onGenerate: () => void; onSeal: () => void; onFetchEvidence: () => void }) {
+  return (
+    <section className="agent-card decision-agent">
+      <div>
+        <span className="eyebrow">Case agent</span>
+        <h3>{ready ? "Recommended action: remote recovery + hold rollout" : "Generate the decision context first"}</h3>
+        <p>{ready ? "Confidence: medium. The agent is narrowing an operational action from current evidence, not declaring root cause." : "Veyra will assemble options, evidence boundaries and missing context before the team acts."}</p>
+      </div>
+      {ready ? (
+        <>
+          <div className="agent-columns">
+            <div>
+              <b>Why this action</b>
+              <ul>
+                <li>3 affected machines share L4 and loading zone B exposure.</li>
+                <li>9 machines on autonomy 2.7 remain healthy.</li>
+                <li>Current evidence does not justify dispatch.</li>
+                <li>Remote recovery has the lowest irreversible cost.</li>
+              </ul>
+            </div>
+            <div>
+              <b>What could change it</b>
+              <ul>
+                <li>EX11 runtime state.</li>
+                <li>Planner fallback evidence.</li>
+                <li>Site-local sensor health.</li>
+              </ul>
+            </div>
+          </div>
+          <div className="agent-actions">
+            <button className="button primary" onClick={onFetchEvidence}>Fetch next evidence</button>
+            <button className="button lime" onClick={onSeal}>{pkg?.sealed ? "Recommendation approved" : "Approve recommendation"}</button>
+            <button className="button">Choose another action</button>
+          </div>
+        </>
+      ) : (
+        <div className="agent-actions">
+          <button className="button primary" onClick={onGenerate}>Compare options</button>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -685,9 +731,33 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
         <PackageItem title="Customer support" value="informed before escalation" />
       </section>
 
+      <section className="agent-card outcome-agent">
+        <span className="eyebrow">Outcome agent</span>
+        <h3>Draft observed outcome</h3>
+        <p>Remote recovery was followed by return to service on EX03, EX05 and EX08. This is an observed association, not causal proof.</p>
+        <div className="agent-columns">
+          <div>
+            <b>Operational value</b>
+            <ul>
+              <li>Field dispatch avoided.</li>
+              <li>Rollout remained held until EX11 evidence was reviewed.</li>
+              <li>Customer support informed before escalation.</li>
+            </ul>
+          </div>
+          <div>
+            <b>Record boundary</b>
+            <ul>
+              <li>Original decision snapshot remains unchanged.</li>
+              <li>Current case view updates to 4 affected.</li>
+              <li>Outcome can become precedent after confirmation.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       <div className="outcome-actions">
         {!pkg?.sealed && <button className="button lime" onClick={onSeal}>Seal decision first</button>}
-        <button className="button primary" onClick={onOutcome}>Link outcome</button>
+        <button className="button primary" onClick={onOutcome}>Confirm outcome</button>
       </div>
     </article>
   );
@@ -730,6 +800,33 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
         <PackageItem title="What to reuse" value="check localization, map and zone exposure before field dispatch" />
         <PackageItem title="What to verify" value="whether the same evidence pattern holds now" />
       </div>
+      <section className="agent-card precedent-agent">
+        <span className="eyebrow">Precedent agent</span>
+        <h3>1 relevant precedent found</h3>
+        <p>The agent separates reusable operating context from evidence that must be checked again.</p>
+        <div className="agent-columns">
+          <div>
+            <b>Reusable from last time</b>
+            <ul>
+              <li>Post-release safe-stop near loading zone B.</li>
+              <li>Localization L4 was present in the affected group.</li>
+              <li>Remote recovery returned machines to service.</li>
+            </ul>
+          </div>
+          <div>
+            <b>Different this time</b>
+            <ul>
+              <li>Autonomy release 2.8 instead of 2.7.</li>
+              <li>LiDAR firmware and map state must be rechecked.</li>
+              <li>Prior outcome is precedent, not causal proof.</li>
+            </ul>
+          </div>
+        </div>
+        <div className="agent-actions">
+          <button className="button primary">Use previous outcome</button>
+          <button className="button">Review differences</button>
+        </div>
+      </section>
       <table className="table focus-table">
         <thead><tr><th>Action</th><th>Observed outcome</th><th>Attribution</th></tr></thead>
         <tbody>
