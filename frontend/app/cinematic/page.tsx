@@ -154,6 +154,10 @@ function SignalScene({ affected, healthy, onNext }: { affected: number; healthy:
     <section className="cinema-scene">
       <SceneTitle eyebrow="1 · Signal" title="Three excavators entered safe-stop after the same deployment." subtitle="The team needs to understand what changed before deciding whether to recover remotely, roll back, or dispatch someone onsite." />
       <CinematicFleet affected={affected} />
+      <div className="failure-counter" aria-label="failure burst">
+        <span>Pattern detected</span>
+        <b><i>0</i><i>1</i><i>2</i><i>3</i> affected</b>
+      </div>
       <div className="cinema-events">
         <EventLine time="14:02" label="autonomy release 2.7 deployment begins" />
         <EventLine time="14:04" label="12/12 machines updated" />
@@ -171,13 +175,16 @@ function ChangedScene({ onNext }: { onNext: () => void }) {
   return (
     <section className="cinema-scene">
       <SceneTitle eyebrow="2 · What changed?" title="What changed before the safe-stops?" subtitle="The system reconstructs autonomy release, localization config, map version, machine state and operator observations around the case." />
-      <div className="decision-card">
-        <div><span>Autonomy stack</span><b>2.6 → 2.7</b></div>
-        <div><span>Localization</span><b>L3 → L4</b></div>
-        <div><span>LiDAR firmware</span><b>5.2 → 5.3</b></div>
-        <div><span>Map version</span><b>M18 → M19</b></div>
-        <div><span>Machine state</span><b>safe-stop near loading zone B</b></div>
-        <div><span>Human context</span><b>operator review at 14:31</b></div>
+      <div className="scan-card">
+        <span className="eyebrow">Scanning deployment history</span>
+        <div className="decision-card change-assembly">
+          <div><span>Autonomy stack</span><b>2.6 → 2.7</b></div>
+          <div className="signal-change"><span>Localization</span><b>L3 → L4</b></div>
+          <div><span>LiDAR firmware</span><b>5.2 → 5.3</b></div>
+          <div><span>Map version</span><b>M18 → M19</b></div>
+          <div className="signal-change"><span>Machine state</span><b>safe-stop near loading zone B</b></div>
+          <div><span>Human context</span><b>operator review at 14:31</b></div>
+        </div>
       </div>
       <HeroLine text="Three relevant changes occurred before the first known failure. Cause is not yet established." />
       <button className="button primary" onClick={onNext}>Scope the issue</button>
@@ -196,6 +203,7 @@ function WhereElseScene({ comparison, onNext }: { comparison: Comparison | null;
         <div><span>Same exposure</span><b>4 machines</b><small>localization L4 · zone B</small></div>
         <div><span>Currently affected</span><b>{comparison?.same_signal ?? 3}</b><small>EX03 · EX05 · EX08</small></div>
       </div>
+      <CohortMotion />
       <table className="table cinema-table">
         <thead><tr><th>Context</th><th>Affected</th><th>Healthy</th></tr></thead>
         <tbody>{rows.map((row) => <tr className={row.context === "Localization profile L4" || row.context === "Loading zone B" ? "highlight-row" : ""} key={row.context}><td>{row.context}</td><td>{row.affected}</td><td>{row.unaffected}</td></tr>)}</tbody>
@@ -224,7 +232,7 @@ function DecisionStateScene({ pkg, onNext }: { pkg: DecisionPackage | null; onNe
         <div><b>14:31:04</b><span>ingested_at</span><small>evidence reaches Veyra</small></div>
       </div>
       <HeroLine text="Veyra preserves what the team knew when the decision was made." />
-      <div className="seal-card quiet-seal"><span>Decision snapshot · 14:27</span><small>{pkg?.sealed ? "Sealed after owner and action were recorded." : "Generated from backend evidence."}</small></div>
+      <div className="seal-card quiet-seal lock-motion"><span>Decision snapshot · 14:27</span><small>{pkg?.sealed ? "Sealed after owner and action were recorded." : "Generated from backend evidence."}</small></div>
       <button className="button primary" onClick={onNext}>What did the team do?</button>
     </section>
   );
@@ -263,6 +271,11 @@ function OutcomeScene({ comparison, onNext }: { comparison: Comparison | null; o
         <div><span>+3 days</span><b>EX11 shows the same pattern</b></div>
         <div><span>Current population</span><b>{Math.max(comparison?.same_signal ?? 3, 3)} affected</b></div>
       </div>
+      <div className="late-evidence-motion">
+        <div className="late-packet"><span>event_time 14:09</span><b>EX11 safe-stop</b><small>arrived 14:31</small></div>
+        <div className="late-arrow" />
+        <div className="late-result"><span>Current view</span><b>3 → 4 affected</b><small>Decision snapshot remains 3</small></div>
+      </div>
       <HeroLine text="New evidence updates the case without rewriting the original decision snapshot." />
       <button className="button primary" onClick={onNext}>12 days later</button>
     </section>
@@ -283,6 +296,16 @@ function MemoryScene({ memoryReady, onNext }: { memoryReady: boolean; onNext: ()
         <p>One additional exposed machine failed later.</p>
         <p>Evidence strength: precedent, not causal proof.</p>
         <p>Previous action available: remote recovery, hold dispatch and monitor exposed machines.</p>
+      </div>
+      <div className="precedent-match">
+        <div className="case-node"><span>Previous case</span><b>Autonomy 2.7 · EX03/05/08</b></div>
+        <div className="match-lines">
+          <span>Localization L4</span>
+          <span>Zone B</span>
+          <span>Safe-stop</span>
+          <em>2.7 ≠ 2.8</em>
+        </div>
+        <div className="case-node new"><span>Current case</span><b>Autonomy 2.8 · EX21</b></div>
       </div>
       <HeroLine text="The next case does not start from zero." />
       <div className="future-strip"><span>{memoryReady ? "Operational Case" : "Case preview"}</span><b>Evidence → decision state → action → outcome → reusable learning</b></div>
@@ -309,7 +332,29 @@ function EndScene() {
 }
 
 function CinematicFleet({ affected }: { affected: number }) {
-  return <div className="cinema-fleet">{Array.from({ length: 12 }).map((_, index) => <span key={index} className={index < affected ? "robot-dot affected" : "robot-dot"} />)}</div>;
+  const affectedIds = new Set([2, 4, 7]);
+  return <div className="cinema-fleet">{Array.from({ length: 12 }).map((_, index) => <span key={index} style={{ animationDelay: `${index * 35}ms` }} className={affectedIds.has(index) ? "robot-dot affected" : "robot-dot"}><small>EX{String(index + 1).padStart(2, "0")}</small></span>)}</div>;
+}
+
+function CohortMotion() {
+  return (
+    <div className="cohort-motion" aria-label="fleet cohort split">
+      <div className="cohort-group affected-group">
+        <span>Safe-stop</span>
+        {[3, 5, 8].map((id) => <b key={id}>EX{String(id).padStart(2, "0")}</b>)}
+      </div>
+      <div className="filter-stack">
+        <i>Autonomy 2.7</i>
+        <i>L4</i>
+        <i>Zone B</i>
+      </div>
+      <div className="cohort-group healthy-group">
+        <span>Updated and stable</span>
+        {[1, 2, 4, 6, 7, 9, 10, 12].map((id) => <b key={id}>EX{String(id).padStart(2, "0")}</b>)}
+        <b className="watch">EX11 watch</b>
+      </div>
+    </div>
+  );
 }
 
 function SceneTitle({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) {
