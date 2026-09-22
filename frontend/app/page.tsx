@@ -26,7 +26,7 @@ export default async function Page() {
         <section className="hero">
           <span className="eyebrow">Operational intelligence for Physical AI.</span>
           <h1>One deployment. Twelve machines. Three enter safe-stop.</h1>
-          <p>Veyra reconstructs what changed, shows where else the same conditions exist, compares the team’s options and follows the case through action and outcome.</p>
+          <p>Veyra shows what changed, where else it is happening, what the team can do, and what happened after.</p>
           <p><b>See what changed. Decide what to do. Learn what happened after. Reuse it next time.</b></p>
           <div className="hero-actions"><Link className="button primary" href="/product-demo">Open Product Demo</Link><Link className="button" href="/cinematic">Review field case</Link></div>
         </section>
@@ -38,11 +38,11 @@ export default async function Page() {
         <section className="investigation panel">
           <span className="eyebrow">Backend-backed demo</span>
           <h2>Product core behind the demo</h2>
-          <p>The field case replay and Product Demo run on the same backend: evidence ingestion, canonical evidence model, reconstructing what changed, finding where else the pattern appears, comparing affected and healthy machines, option comparison, action recording, outcome linking and similar-case retrieval.</p>
+          <p>The field case replay and Product Demo run on the same backend: source evidence, time-aware records, what changed, where else, affected versus healthy machines, option comparison, action recording, outcome linking and similar-case history.</p>
           <div className="backend-grid">
             <b>Evidence → Decision state → Action → Outcome → Learning</b>
             <b>source evidence ingestion</b>
-            <b>canonical evidence model</b>
+            <b>shared evidence format</b>
             <b>event_time / known_at / ingested_at</b>
             <b>reconstruct what changed around a case</b>
             <b>find where else the same pattern appears</b>
@@ -50,13 +50,13 @@ export default async function Page() {
             <b>decision state</b>
             <b>team action record</b>
             <b>outcome linking</b>
-            <b>outcome-linked precedent</b>
+            <b>outcome-linked history</b>
           </div>
         </section>
         <section className="investigation panel">
           <span className="eyebrow">Current investigation</span>
           <h2>{active?.asset_id || "EX03"} · {active?.title || "Start the backend and reset demo data"}</h2>
-          <p>Product Demo: what changed, where else, options, action, outcome and reusable precedent.</p>
+          <p>Product Demo: what changed, where else, options, action, outcome and reusable history.</p>
           <Link className="button primary" href="/product-demo">Open Product Demo</Link>
         </section>
       </main>

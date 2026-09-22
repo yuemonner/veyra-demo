@@ -30,7 +30,7 @@ export default function ProductPage() {
         <div className="product-page-title">
           <span className="eyebrow">Product page</span>
           <h1>Operational case workspace for Physical AI.</h1>
-          <p>One deployed machine group changes behavior. Veyra reconstructs what changed, scopes where else it appears, compares options, records the team action, tracks the outcome and brings the precedent back next time.</p>
+          <p>One machine group changes behavior. Veyra shows what changed, where else it appears, what the team can do, what they chose and what happened after.</p>
         </div>
         <div className="case-pills product-page-pills">
           <b className="pill-alert">3 affected</b>
@@ -54,7 +54,7 @@ export default function ProductPage() {
           </dl>
           <div className="rail-card">
             <span className="eyebrow">Current question</span>
-            <p>Which machines share the conditions behind the safe-stop behavior?</p>
+            <p>Where else is this happening?</p>
           </div>
         </aside>
 
@@ -78,7 +78,7 @@ export default function ProductPage() {
               <MiniCard title="Machine state" value="safe-stop near loading zone B" />
               <MiniCard title="Human context" value="operator review at 14:31" />
             </div>
-            <p className="section-note">Multiple changes happened before the first known safe-stop. No cause is established yet.</p>
+            <p className="section-note">Multiple changes happened before the first known safe-stop. Cause is not proven yet.</p>
           </ProductSection>
 
           <ProductSection number="03" title="Fleet" heading="Where else does this behavior appear?">
@@ -86,7 +86,7 @@ export default function ProductPage() {
               <thead><tr><th>Context</th><th>Safe-stop</th><th>Healthy</th></tr></thead>
               <tbody>{compareRows.map((row) => <tr key={row[0]}><td>{row[0]}</td><td>{row[1]}</td><td>{row[2]}</td></tr>)}</tbody>
             </table>
-            <p className="section-note">Autonomy 2.7 is shared across all machines. Localization profile L4 and loading zone B narrow the investigation. They do not establish cause.</p>
+            <p className="section-note">Autonomy 2.7 is on all machines. Localization L4 and loading zone B help focus the search. They do not prove the cause.</p>
           </ProductSection>
 
           <ProductSection number="04" title="Decision" heading="What should the team do now?">
@@ -102,7 +102,7 @@ export default function ProductPage() {
             </div>
             <div className="decision-snapshot">
               <div><span className="eyebrow">Known at 14:27</span><b>EX03, EX05 and EX08 affected. EX11 had no known issue.</b></div>
-              <div><span className="eyebrow">Still unknown</span><b>Planner fallback reason, perception trace and whether remote recovery will hold.</b></div>
+              <div><span className="eyebrow">Still missing</span><b>Planner fallback reason, perception trace and whether remote recovery will hold.</b></div>
             </div>
           </ProductSection>
 
@@ -124,18 +124,18 @@ export default function ProductPage() {
               <MiniCard title="Rollout" value="held for 43 minutes" />
               <MiniCard title="Recurrence" value="EX05 safe-stop six hours later" />
               <MiniCard title="Late evidence" value="EX11 event_time 14:09, known_at 14:31" />
-              <MiniCard title="Boundary" value="observed recovery, not causal proof" />
+              <MiniCard title="Cause" value="seen after action, not proven yet" />
             </div>
-            <p className="section-note">New evidence updates the current case. It does not rewrite what was known when the decision was made.</p>
+            <p className="section-note">New evidence updates the current case. It does not rewrite what the team knew when it made the decision.</p>
           </ProductSection>
 
-          <ProductSection number="07" title="Precedent" heading="The next case does not start from zero.">
+          <ProductSection number="07" title="History" heading="The next case does not start from zero.">
             <div className="precedent-strip">
               <div><span className="eyebrow">Previous conditions</span><b>Autonomy 2.7 · Localization L4 · Loading zone B</b></div>
               <div><span className="eyebrow">Previous action</span><b>Remote recovery · rollout held · field dispatch held</b></div>
               <div><span className="eyebrow">Observed outcome</span><b>Returned to service · no field visit · later recurrence</b></div>
             </div>
-            <p className="section-note">When a similar safe-stop pattern appears again, Veyra brings back the prior evidence, action, outcome and uncertainty boundary.</p>
+            <p className="section-note">When a similar safe-stop pattern appears again, Veyra brings back what was known, what the team did and what happened after.</p>
           </ProductSection>
         </div>
       </section>

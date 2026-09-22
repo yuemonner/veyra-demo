@@ -268,7 +268,7 @@ function MachineRail({ stage, affected, healthy, lateEvidenceVisible, actionReco
     },
     decision: {
       title: "Decision inputs",
-      question: "Which option has enough evidence to act without sending someone onsite?",
+      question: "What should the team do now?",
       rows: [["known", "3 affected"], ["unknown", "EX11"], ["observability", "partial"], ["owner", "pending"]],
     },
     action: {
@@ -282,9 +282,9 @@ function MachineRail({ stage, affected, healthy, lateEvidenceVisible, actionReco
       rows: [["decision-time", "3 affected"], ["current", `${affected} affected`], ["outcome", outcomeRecorded ? "observed" : "pending"], ["late evidence", "EX11"]],
     },
     history: {
-      title: "Reusable precedent",
+      title: "Relevant history",
       question: "What should the next similar case inherit from this one?",
-      rows: [["previous action", "remote recovery"], ["result", "returned to service"], ["dispatch", "avoided"], ["boundary", "not causal proof"]],
+      rows: [["previous action", "remote recovery"], ["result", "returned to service"], ["dispatch", "avoided"], ["cause", "not proven"]],
     },
   };
   const copy = railCopy[stage] || railCopy.overview;
@@ -318,20 +318,20 @@ function WorkspaceRightRail({ stage, pkg, verification, memory, precedent, affec
   const hasMemory = memory?.similar_cases?.length > 0 || stage === "history";
   const validation = precedent?.outcome_validation || memory?.precedent_comparison?.outcome_validation;
   const stageHelp: Record<string, { label: string; title: string; body: string; cta: string }> = {
-    overview: { label: "Purpose", title: "Open the case", body: "Start with the machine group, the affected machines and the operational question.", cta: "What changed?" },
-    changes: { label: "Purpose", title: "Reconstruct changes", body: "Pull together release, localization, firmware, map and operator context before the team acts.", cta: "Scope the issue" },
-    scope: { label: "Purpose", title: "Find where else", body: "Separate affected machines from healthy machines that share the same deployment or exposure.", cta: "Compare options" },
-    decision: { label: "Purpose", title: "Choose next action", body: "Compare monitor, remote recovery, rollback and dispatch using evidence, risk, prior outcome and cost.", cta: "Record decision" },
-    action: { label: "Purpose", title: "Record what happened", body: "Keep the chosen action, owner, scope and decision-time evidence together.", cta: "Track outcome" },
-    outcome: { label: "Purpose", title: "Measure the result", body: "Show observed recovery, field visit avoided and late evidence that changes the current case.", cta: "Link outcome" },
-    history: { label: "Purpose", title: "Reuse the precedent", body: "Bring back prior action, observed outcome and uncertainty boundary for the next similar case.", cta: "Review precedent" },
+    overview: { label: "Purpose", title: "Open the case", body: "Start with the machine group, the affected machines and the question the team needs to answer.", cta: "What changed?" },
+    changes: { label: "Purpose", title: "See what changed", body: "Pull together the release, localization, firmware, map and operator note before the team acts.", cta: "Where else?" },
+    scope: { label: "Purpose", title: "Find where else", body: "Separate machines that failed from machines that stayed healthy under similar conditions.", cta: "Compare options" },
+    decision: { label: "Purpose", title: "Choose next action", body: "Compare monitor, remote recovery, rollback and dispatch using evidence, risk, past result and cost.", cta: "Record decision" },
+    action: { label: "Purpose", title: "Record the action", body: "Keep the chosen action, owner, machines covered and evidence available then in one place.", cta: "Track outcome" },
+    outcome: { label: "Purpose", title: "See what happened", body: "Show return to service, field visit avoided and late evidence that changed the current case.", cta: "Link outcome" },
+    history: { label: "Purpose", title: "Use relevant history", body: "Bring back what the last team did, what happened after and what must be checked again.", cta: "Review history" },
   };
   const help = stageHelp[stage] || stageHelp.overview;
   const historyText = hasMemory
-    ? "1 linked precedent available. Last time, remote recovery returned machines to service, avoided a field visit and EX11 later showed the same pattern."
+    ? "1 relevant past case available. Last time, remote recovery returned machines to service, avoided a field visit and EX11 later showed the same pattern."
     : stage === "outcome"
       ? "Remote recovery returned 3 machines to service. Link the outcome to make it reusable."
-      : "No prior outcome recorded yet. Record the outcome to create reusable precedent.";
+      : "No past result recorded yet. Record the outcome so the next case can reuse it.";
   return (
     <aside className="workspace-rail">
       <div className="rail-card">
@@ -375,7 +375,7 @@ function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: a
           <div>
             <span className="eyebrow">Veyra brief</span>
             <h2>Investigation completed. Decision now required.</h2>
-            <p>Veyra automatically reconstructed the release diff, fleet scope, affected-vs-healthy comparison and missing evidence before asking the team to choose an action.</p>
+            <p>Veyra found the changes, checked the fleet, compared affected and healthy machines, and surfaced what the team still needs before choosing an action.</p>
           </div>
           <div className="brief-status">
             <span>Case agent</span>
@@ -384,10 +384,10 @@ function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: a
         </div>
         <div className="brief-grid">
           <BriefItem step="01" title="Relevant changes" value="Localization L3 to L4 · Map M18 to M19 · LiDAR 5.2 to 5.3" />
-          <BriefItem step="02" title="Pattern scope" value={`${comparison?.same_signal ?? 3}/12 affected. Release 2.7 alone does not explain the issue.`} />
-          <BriefItem step="03" title="Strongest discriminator" value="Localization L4 + loading zone B exposure." />
+          <BriefItem step="02" title="Where else" value={`${comparison?.same_signal ?? 3}/12 affected. Release 2.7 alone does not explain the issue.`} />
+          <BriefItem step="03" title="Strongest clue" value="Localization L4 + loading zone B exposure." />
           <BriefItem step="04" title="Exception" value="EX11 shares the exposure but has no known issue at decision time." />
-          <BriefItem step="05" title="Next evidence" value="Fetch EX11 runtime history before dispatch." />
+          <BriefItem step="05" title="Next check" value="Fetch EX11 runtime history before dispatch." />
           <BriefItem step="06" title="Recommended action" value="Remote recovery + hold rollout. Do not dispatch yet." />
         </div>
         <div className="brief-flow">
@@ -439,7 +439,7 @@ function ChangesStage({ onScope }: { onScope: () => void }) {
         <b>Three relevant changes occurred before the first known failure.</b>
         <p>Cause is not yet established. The case now needs scope and comparison before the team acts.</p>
       </div>
-      <button className="button primary" onClick={onScope}>Scope the issue</button>
+      <button className="button primary" onClick={onScope}>Where else?</button>
     </article>
   );
 }
@@ -460,18 +460,18 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
         <tbody>{comparison?.table?.map((r: any) => <tr key={r.context}><td>{r.context}</td><td>{r.affected}</td><td>{r.unaffected}</td></tr>)}</tbody>
       </table>
       <div className="callout">
-        <b>What the evidence narrows</b>
-        <p>Autonomy 2.7 is shared across both groups. Localization profile L4 and loading zone B exposure are shared by the affected machines, while EX11 has the same exposure without a known issue at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
+        <b>What this narrows</b>
+        <p>Autonomy 2.7 is on both failed and healthy machines. Localization L4 and loading zone B are shared by the affected machines. EX11 shares both but had no known issue at decision time. This helps the team focus. It does not prove the cause.</p>
       </div>
       <div className="callout">
-        <b>What happened when we took these actions before?</b>
-        <p>Similar conditions are compared by prior response, observed outcome and attribution boundary.</p>
+        <b>What happened when we tried these actions before?</b>
+        <p>Past cases show the action taken, what happened after and whether cause was actually proven.</p>
       </div>
       <table className="table focus-table">
         <thead><tr><th>Option</th><th>Prior outcome</th><th>Attribution</th></tr></thead>
         <tbody>
           {(outcomeRows.length ? outcomeRows : [
-            { action: "remote_fix", outcome: "observed recovery after action", attribution: "precedent, not causal proof" },
+            { action: "remote_fix", outcome: "recovered after action", attribution: "useful precedent" },
             { action: "monitor", outcome: "not yet observed", attribution: "not observed" },
             { action: "dispatch", outcome: "not supported by current evidence", attribution: "not supported" },
           ]).map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome || row.status}</td><td>{row.attribution}</td></tr>)}
@@ -497,7 +497,7 @@ function DecisionOptions({ options }: { options: any[] }) {
       label: "Remote recovery",
       evidenceFor: "affected machines entered safe-stop after the release",
       evidenceAgainst: "planner fallback cause remains unresolved",
-      priorOutcome: "observed recovery after action",
+      priorOutcome: "recovered after action",
       cost: "low cost, no field visit",
     },
     {
@@ -512,7 +512,7 @@ function DecisionOptions({ options }: { options: any[] }) {
       id: "dispatch",
       label: "Dispatch technician",
       evidenceFor: "local site and sensor state are missing",
-      evidenceAgainst: "current evidence does not support immediate visit",
+      evidenceAgainst: "current evidence does not support an immediate visit",
       priorOutcome: "not supported by current evidence",
       cost: "high cost",
     },
@@ -521,7 +521,7 @@ function DecisionOptions({ options }: { options: any[] }) {
     id: option.id || option.option_type,
     label: option.option_type === "remote_fix" ? "Remote recovery" : option.option_type === "pause_rollout" ? "Rollback release" : option.option_type === "dispatch" ? "Dispatch technician" : option.option_type === "monitor" ? "Monitor" : option.label,
     evidenceFor: option.historical_support?.summary || option.label,
-    evidenceAgainst: option.expected_risk?.reason || "uncertainty remains",
+      evidenceAgainst: option.expected_risk?.reason || "still unknown",
     priorOutcome: option.historical_support?.status === "none_yet" ? "no prior outcome in this workspace" : option.historical_support?.summary || "pending",
     cost: summarizeObject(option.expected_cost),
     selected: option.selected,
@@ -551,7 +551,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
           <div>
             <span className="eyebrow">Decision</span>
             <h2>What should the team do now?</h2>
-            <p>Compare the next actions using current evidence, known gaps, cost and previous outcomes.</p>
+            <p>Compare the next actions using what is known now, what is missing, cost and past results.</p>
           </div>
           <button className="button primary" onClick={onGenerate}>Compare options</button>
         </div>
@@ -570,7 +570,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
   return (
     <article className="panel decision-panel">
       <div className="package-head">
-        <div><span className="eyebrow">Decision</span><h2>What should the team do now?</h2><p>Compare the next actions using current evidence, known gaps, cost and previous outcomes.</p></div>
+        <div><span className="eyebrow">Decision</span><h2>What should the team do now?</h2><p>Compare the next actions using what is known now, what is missing, cost and past results.</p></div>
         <button className="button lime" onClick={onSeal}>{pkg.sealed ? "Decision recorded" : "Record decision"}</button>
       </div>
       <DecisionAgentCard ready pkg={pkg} onGenerate={onGenerate} onSeal={onSeal} onFetchEvidence={onFetchEvidence} />
@@ -581,7 +581,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
         <div className="snapshot-content">
           <div className="split-count">
             <div><strong>What the team knew at 14:27</strong><span>EX03, EX05 and EX08 affected. No known issue on EX11.</span></div>
-            <div><strong>What can change later</strong><span>Late evidence can update the current case without rewriting this decision record.</span></div>
+            <div><strong>What can change later</strong><span>Late evidence can update the current case without changing this old decision record.</span></div>
           </div>
           <div className="package-grid">
             <PackageItem title="Trigger" value="safe-stop after deployment" />
@@ -603,7 +603,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
               </ul>
             </div>
             <div className="evidence-card">
-              <span className="eyebrow">Still unknown then</span>
+            <span className="eyebrow">Still missing then</span>
               <ul>
                 {unknowns.slice(0, 4).map((item: string) => <li key={item}>{item}</li>)}
               </ul>
@@ -611,7 +611,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
           </div>
           <div className="callout">
             <b>Clock definitions</b>
-            <p>event_time is when the machine event happened. known_at is when the evidence became available to reconstruction. ingested_at is when Veyra received it.</p>
+            <p>event_time is when the machine event happened. known_at is when the evidence became available. ingested_at is when Veyra received it.</p>
           </div>
           <div className="callout warning">
             <b>{pkg.package.decision_substantiation?.question || "Is the team ready to act on this case?"}</b>
@@ -629,8 +629,8 @@ function DecisionAgentCard({ ready, pkg, onGenerate, onSeal, onFetchEvidence }: 
     <section className="agent-card decision-agent">
       <div>
         <span className="eyebrow">Case agent</span>
-        <h3>{ready ? "Recommended action: remote recovery + hold rollout" : "Generate the decision context first"}</h3>
-        <p>{ready ? "Confidence: medium. The agent is narrowing an operational action from current evidence, not declaring root cause." : "Veyra will assemble options, evidence boundaries and missing context before the team acts."}</p>
+        <h3>{ready ? "Suggested action: remote recovery + hold rollout" : "Compare the options first"}</h3>
+        <p>{ready ? "Confidence: medium. Veyra is helping choose the next action. It is not declaring root cause." : "Veyra will assemble options, missing evidence and past results before the team acts."}</p>
       </div>
       {ready ? (
         <>
@@ -645,7 +645,7 @@ function DecisionAgentCard({ ready, pkg, onGenerate, onSeal, onFetchEvidence }: 
               </ul>
             </div>
             <div>
-              <b>What could change it</b>
+              <b>What could change this</b>
               <ul>
                 <li>EX11 runtime state.</li>
                 <li>Planner fallback evidence.</li>
@@ -655,7 +655,7 @@ function DecisionAgentCard({ ready, pkg, onGenerate, onSeal, onFetchEvidence }: 
           </div>
           <div className="agent-actions">
             <button className="button primary" onClick={onFetchEvidence}>Fetch next evidence</button>
-            <button className="button lime" onClick={onSeal}>{pkg?.sealed ? "Recommendation approved" : "Approve recommendation"}</button>
+            <button className="button lime" onClick={onSeal}>{pkg?.sealed ? "Decision recorded" : "Record decision"}</button>
             <button className="button">Choose another action</button>
           </div>
         </>
@@ -672,7 +672,7 @@ function DecisionContextMini({ pkg, record, observability }: { pkg?: DecisionPac
   return (
     <section className="decision-context-mini">
       <div><span>Known now</span><b>3 affected machines</b></div>
-      <div><span>Still unknown</span><b>EX11 and planner fallback</b></div>
+      <div><span>Still missing</span><b>EX11 and planner fallback</b></div>
       <div><span>Observability</span><b>{observability?.status || "partial"}</b></div>
       <div><span>Snapshot</span><b>{pkg?.sealed ? "sealed" : record ? "recorded" : "pending"}</b></div>
     </section>
@@ -681,7 +681,7 @@ function DecisionContextMini({ pkg, record, observability }: { pkg?: DecisionPac
 
 function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
   if (!pkg) {
-    return <article className="panel"><span className="eyebrow">What we chose</span><h2>Choose the next action first.</h2><p>Compare the options so the chosen action is recorded with the evidence available at the time.</p><button className="button primary" onClick={onGenerate}>Compare options</button></article>;
+    return <article className="panel"><span className="eyebrow">What we chose</span><h2>Choose the next action first.</h2><p>Compare the options so the chosen action is recorded with what the team knew at the time.</p><button className="button primary" onClick={onGenerate}>Compare options</button></article>;
   }
   const planned = pkg.package.planned_action;
   const actual = pkg.package.actual_action;
@@ -689,11 +689,11 @@ function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
     <article className="panel">
       <span className="eyebrow">What we chose</span>
       <h2>Decision: Remote recovery + hold rollout.</h2>
-      <p>The decision, the executed action and the evidence available at the time stay together.</p>
+      <p>The decision, the action and what the team knew stay together.</p>
       <div className="package-grid">
-        <PackageItem title="Why this action" value="remote recovery has lower cost than dispatch while evidence remains incomplete" />
+        <PackageItem title="Why this action" value="remote recovery costs less than dispatch while evidence is still incomplete" />
         <PackageItem title="Known at the time" value="EX03, EX05 and EX08 affected, EX11 no known issue" />
-        <PackageItem title="Still unknown" value="planner fallback reason and local perception trace" />
+        <PackageItem title="Still missing" value="planner fallback reason and local perception trace" />
         <PackageItem title="Planned action" value={planned?.label || "remote restart affected machines"} />
         <PackageItem title="Actual action" value={actual?.scope?.remote_recovery ? `remote recovery ${actual.scope.remote_recovery.join(" and ")}` : "remote recovery EX03, EX05 and EX08"} />
         <PackageItem title="Watch" value="monitor EX11" />
@@ -717,7 +717,7 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
         <div>
           <span className="eyebrow">Outcome</span>
           <h2>What happened after the action?</h2>
-          <p>EX03, EX05 and EX08 returned to service after remote recovery. That is observed recovery, not causal proof. EX11 later shows the same pattern through delayed runtime evidence.</p>
+          <p>EX03, EX05 and EX08 returned to service after remote recovery. That is seen after the action. Cause is not proven yet. EX11 later shows the same pattern through delayed runtime evidence.</p>
         </div>
         <div className={pkg?.sealed ? "sealed-mini good" : "sealed-mini"}>
           <span>{pkg?.sealed ? "Sealed" : "Unsealed"}</span>
@@ -727,14 +727,14 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
 
       <section className="outcome-summary">
         <div className="outcome-status">
-          <span className="eyebrow">Outcome validation</span>
+          <span className="eyebrow">Outcome check</span>
           <strong>{validation?.status === "pending" ? "Pending" : "Observed recovery"}</strong>
-          <p>{validation?.status === "pending" ? "Record the outcome to validate the action." : "Return-to-service is observed after remote recovery. Causality is not treated as proven."}</p>
+          <p>{validation?.status === "pending" ? "Record the outcome so it can be reused." : "Return to service happened after remote recovery. Cause is not proven yet."}</p>
         </div>
         <div className="outcome-status">
           <span className="eyebrow">Late evidence</span>
           <strong>New decision-relevant evidence arrived</strong>
-          <p>The original decision record remains unchanged. The current fleet view is updated and flagged for review.</p>
+          <p>The old decision record stays unchanged. The current fleet view updates and gets flagged for review.</p>
         </div>
       </section>
 
@@ -757,7 +757,7 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
       <section className="agent-card outcome-agent">
         <span className="eyebrow">Outcome agent</span>
         <h3>Draft observed outcome</h3>
-        <p>Remote recovery was followed by return to service on EX03, EX05 and EX08. This is an observed association, not causal proof.</p>
+        <p>EX03, EX05 and EX08 returned to service after remote recovery. Useful result. Cause not proven yet.</p>
         <div className="agent-columns">
           <div>
             <b>Operational value</b>
@@ -772,7 +772,7 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
             <ul>
               <li>Original decision snapshot remains unchanged.</li>
               <li>Current case view updates to 4 affected.</li>
-              <li>Outcome can become precedent after confirmation.</li>
+              <li>Outcome can be reused after confirmation.</li>
             </ul>
           </div>
         </div>
@@ -789,7 +789,7 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
 function MemoryStage({ memory, precedent, onOutcome }: any) {
   const validation = precedent?.outcome_validation || memory?.precedent_comparison?.outcome_validation;
   const rows = [
-    { action: "Remote recovery", outcome: "returned to service", attribution: "observed after action" },
+    { action: "Remote recovery", outcome: "returned to service", attribution: "seen after action" },
     { action: "Pause rollout", outcome: "rollout later resumed", attribution: "observed" },
     { action: "Dispatch technician", outcome: "avoided", attribution: "not executed" },
   ];
@@ -817,16 +817,16 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
         </div>
       </div>
       <div className="package-grid memory-grid">
-        <PackageItem title="Boundary" value="precedent, not causal proof" />
-        <PackageItem title="Previous result" value="observed after action" />
-        <PackageItem title="Outcome validation" value={validation?.status || "record outcome first"} />
+        <PackageItem title="Cause" value="useful precedent, not proven cause" />
+        <PackageItem title="Previous result" value="seen after action" />
+        <PackageItem title="Outcome check" value={validation?.status || "record outcome first"} />
         <PackageItem title="What to reuse" value="check localization, map and zone exposure before field dispatch" />
         <PackageItem title="What to verify" value="whether the same evidence pattern holds now" />
       </div>
       <section className="agent-card precedent-agent">
         <span className="eyebrow">Precedent agent</span>
         <h3>1 relevant precedent found</h3>
-        <p>The agent separates reusable operating context from evidence that must be checked again.</p>
+        <p>Veyra separates what can be reused from what must be checked again.</p>
         <div className="agent-columns">
           <div>
             <b>Reusable from last time</b>
@@ -841,7 +841,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
             <ul>
               <li>Autonomy release 2.8 instead of 2.7.</li>
               <li>LiDAR firmware and map state must be rechecked.</li>
-              <li>Prior outcome is precedent, not causal proof.</li>
+              <li>Prior outcome is useful, but cause is not proven.</li>
             </ul>
           </div>
         </div>
@@ -860,7 +860,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
         <b>Before dispatching a technician</b>
         <p>Compare the current machine against the previous exposed group and check whether the same autonomy release, localization profile, map and loading-zone pattern is present.</p>
       </div>
-      <button className="button primary" onClick={onOutcome}>Refresh precedent from outcome</button>
+      <button className="button primary" onClick={onOutcome}>Refresh history from outcome</button>
       <div className="ending">
         <b>The next case does not start from zero.</b>
         <span>A company should not start from zero when a similar machine problem appears again.</span>
@@ -870,7 +870,7 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
 }
 
 function Signature({ pkg, verification }: { pkg: DecisionPackage; verification?: Verification | null }) {
-  return <div className="panel good signature"><span className="eyebrow">Sealed Decision Package</span><p>Later evidence updates the current investigation. The 14:27 decision-time snapshot remains intact.</p><p className="hash hash-large">SHA-256 {pkg.digest}</p><p className="signature-note">Snapshot covers 14:27 decision context · sealed after owner and action were recorded · tamper-evident · {pkg.package?._seal?.timestamp_authority || "timestamp authority"}</p><p className="hash">Ed25519 {pkg.signature?.slice(0, 48)}...</p><div className="verify-grid"><PackageItem title="Standalone verification" value={verification?.valid ? "valid digest + valid signature" : "ready with public key"} /><PackageItem title="Human owner" value={pkg.package?.human_decision?.owner || "Robotics Engineering"} /><PackageItem title="Decision scope" value={(pkg.package?.action_scope?.affected || []).join(" · ") || "affected machines"} /></div></div>;
+  return <div className="panel good signature"><span className="eyebrow">Sealed Decision Package</span><p>Later evidence updates the current case. The 14:27 decision snapshot stays intact.</p><p className="hash hash-large">SHA-256 {pkg.digest}</p><p className="signature-note">Snapshot covers what was known at 14:27 · sealed after owner and action were recorded · tamper-evident · {pkg.package?._seal?.timestamp_authority || "timestamp authority"}</p><p className="hash">Ed25519 {pkg.signature?.slice(0, 48)}...</p><div className="verify-grid"><PackageItem title="Standalone check" value={verification?.valid ? "valid digest + valid signature" : "ready with public key"} /><PackageItem title="Human owner" value={pkg.package?.human_decision?.owner || "Robotics Engineering"} /><PackageItem title="Decision scope" value={(pkg.package?.action_scope?.affected || []).join(" · ") || "affected machines"} /></div></div>;
 }
 
 function PackageItem({ title, value }: { title: string; value: string }) {

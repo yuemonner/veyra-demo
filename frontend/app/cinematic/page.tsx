@@ -143,7 +143,7 @@ function OpenScene({ onNext }: { onNext: () => void }) {
     <section className="cinema-scene center">
       <span className="eyebrow">Field Case Replay · Physical AI</span>
       <h1>One deployment. Twelve machines. Three enter safe-stop.</h1>
-      <p>Veyra reconstructs what changed, shows where else the same conditions exist, and follows the case through action and observed outcome.</p>
+      <p>Veyra shows what changed, where else it is happening, what the team did, and what happened after.</p>
       <button className="button lime" onClick={onNext}>Start case</button>
     </section>
   );
@@ -152,7 +152,7 @@ function OpenScene({ onNext }: { onNext: () => void }) {
 function SignalScene({ affected, healthy, onNext }: { affected: number; healthy: number; onNext: () => void }) {
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="1 · Signal" title="Three excavators entered safe-stop after the same deployment." subtitle="The team needs to understand what changed before deciding whether to recover remotely, roll back, or dispatch someone onsite." />
+      <SceneTitle eyebrow="1 · Signal" title="Three excavators entered safe-stop after the same deployment." subtitle="The team needs to know what changed before choosing remote recovery, rollback, or a field visit." />
       <CinematicFleet affected={affected} />
       <div className="failure-counter" aria-label="failure burst">
         <span>Pattern detected</span>
@@ -174,7 +174,7 @@ function SignalScene({ affected, healthy, onNext }: { affected: number; healthy:
 function ChangedScene({ onNext }: { onNext: () => void }) {
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="2 · What changed?" title="What changed before the safe-stops?" subtitle="The system reconstructs autonomy release, localization config, map version, machine state and operator observations around the case." />
+      <SceneTitle eyebrow="2 · What changed?" title="What changed before the safe-stops?" subtitle="Veyra pulls together the release, localization, map, machine state and operator note." />
       <div className="scan-card">
         <span className="eyebrow">Scanning deployment history</span>
         <div className="decision-card change-assembly">
@@ -186,8 +186,8 @@ function ChangedScene({ onNext }: { onNext: () => void }) {
           <div><span>Human context</span><b>operator review at 14:31</b></div>
         </div>
       </div>
-      <HeroLine text="Three relevant changes occurred before the first known failure. Cause is not yet established." />
-      <button className="button primary" onClick={onNext}>Scope the issue</button>
+      <HeroLine text="Several things changed before the first known failure. Cause is not proven yet." />
+      <button className="button primary" onClick={onNext}>Where else?</button>
     </section>
   );
 }
@@ -196,7 +196,7 @@ function WhereElseScene({ comparison, onNext }: { comparison: Comparison | null;
   const rows = useMemo(() => comparison?.table ?? [], [comparison]);
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="3 · Scope" title="Which machines share the same exposure?" subtitle="The case moves from one issue to operational scope." />
+      <SceneTitle eyebrow="3 · Where else?" title="Where else is this happening?" subtitle="The team checks which machines failed, which stayed healthy, and which should be watched." />
       <div className="site-grid">
         <div><span>Current group</span><b>12 machines</b><small>same autonomy release</small></div>
         <div><span>Same release</span><b>12 machines</b><small>autonomy 2.7</small></div>
@@ -208,8 +208,8 @@ function WhereElseScene({ comparison, onNext }: { comparison: Comparison | null;
         <thead><tr><th>Context</th><th>Affected</th><th>Healthy</th></tr></thead>
         <tbody>{rows.map((row) => <tr className={row.context === "Localization profile L4" || row.context === "Loading zone B" ? "highlight-row" : ""} key={row.context}><td>{row.context}</td><td>{row.affected}</td><td>{row.unaffected}</td></tr>)}</tbody>
       </table>
-      <p className="scene-footnote">Localization L4 and loading zone B are shared by the affected machines, while EX11 has the same exposure without a known issue at decision time. The exposure is relevant. It is not sufficient to explain the failure.</p>
-      <button className="button primary" onClick={onNext}>Decision</button>
+      <p className="scene-footnote">The affected machines share localization L4 and loading zone B. EX11 shares both but had no known issue when the team made the decision. This narrows the search. It does not prove the cause.</p>
+      <button className="button primary" onClick={onNext}>What did we know?</button>
     </section>
   );
 }
@@ -217,22 +217,22 @@ function WhereElseScene({ comparison, onNext }: { comparison: Comparison | null;
 function DecisionStateScene({ pkg, onNext }: { pkg: DecisionPackage | null; onNext: () => void }) {
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="4 · Decision" title="What did the team actually know at 14:27?" subtitle="The case separates known evidence from open questions before the team acts." />
+      <SceneTitle eyebrow="4 · Decision" title="What did the team know at 14:27?" subtitle="Later evidence can change the current case. It cannot change what the team knew then." />
       <div className="split-count">
         <div><strong>What the team knew at 14:27</strong><span>EX03, EX05 and EX08 affected · no known issue on EX11</span></div>
-        <div><strong>What Veyra knows now</strong><span>EX11 had earlier safe-stop behavior that became available after the decision snapshot</span></div>
+        <div><strong>What is known now</strong><span>EX11 also had safe-stop behavior, but that evidence arrived later</span></div>
       </div>
       <div className="time-rail cinematic-rail">
-        <div><b>14:09</b><span>event_time</span><small>EX11 safe-stop behavior existed in edge buffer</small></div>
+        <div><b>14:09</b><span>event_time</span><small>EX11 safe-stop happened</small></div>
         <i />
         <div><b>14:27</b><span>decision snapshot</span><small>3 affected known to the team</small></div>
         <i />
-        <div><b>14:31</b><span>known_at</span><small>evidence becomes available to reconstruction</small></div>
+        <div><b>14:31</b><span>known_at</span><small>evidence became available</small></div>
         <i />
-        <div><b>14:31:04</b><span>ingested_at</span><small>evidence reaches Veyra</small></div>
+        <div><b>14:31:04</b><span>ingested_at</span><small>Veyra received it</small></div>
       </div>
-      <HeroLine text="Veyra preserves what the team knew when the decision was made." />
-      <div className="seal-card quiet-seal lock-motion"><span>Decision snapshot · 14:27</span><small>{pkg?.sealed ? "Sealed after owner and action were recorded." : "Generated from backend evidence."}</small></div>
+      <HeroLine text="Later facts do not rewrite the old decision." />
+      <div className="seal-card quiet-seal lock-motion"><span>Decision snapshot · 14:27</span><small>{pkg?.sealed ? "Owner and action recorded." : "Built from the evidence available then."}</small></div>
       <button className="button primary" onClick={onNext}>What did the team do?</button>
     </section>
   );
@@ -241,7 +241,7 @@ function DecisionStateScene({ pkg, onNext }: { pkg: DecisionPackage | null; onNe
 function ActionScene({ onNext }: { onNext: () => void }) {
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="5 · Team action" title="The team chooses a response." subtitle="Veyra keeps the decision, the executed action and the evidence available at the time together." />
+      <SceneTitle eyebrow="5 · Team action" title="What did the team do?" subtitle="The decision, the action and the evidence stay together." />
       <div className="decision-card">
         <div><span>Decision</span><b>Remote recovery before dispatch</b></div>
         <div><span>Executed</span><b>Remote recovery on EX03, EX05 and EX08</b></div>
@@ -250,7 +250,7 @@ function ActionScene({ onNext }: { onNext: () => void }) {
         <div><span>Field</span><b>Hold dispatch</b></div>
         <div><span>Owner</span><b>Operations Lead · 14:31</b></div>
       </div>
-      <HeroLine text="The decision and the executed action stay linked." />
+      <HeroLine text="Now the action can be checked against what happened next." />
       <button className="button primary" onClick={onNext}>What happened after?</button>
     </section>
   );
@@ -259,11 +259,11 @@ function ActionScene({ onNext }: { onNext: () => void }) {
 function OutcomeScene({ comparison, onNext }: { comparison: Comparison | null; onNext: () => void }) {
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="6 · Outcome" title="What happened after the action?" subtitle="A few hours later, and then three days later, the case keeps updating." />
+      <SceneTitle eyebrow="6 · Outcome" title="What happened after the action?" subtitle="The machines returned to service. Later, EX11 changed the current view." />
       <div className="outcome-grid">
         <div><span>EX03</span><b>returned to service after remote recovery</b></div>
         <div><span>EX05</span><b>returned to service after remote recovery</b></div>
-        <div><span>Attribution</span><b>observed after action, not causal proof</b></div>
+        <div><span>Cause</span><b>seen after action, not proven yet</b></div>
         <div><span>Field visit</span><b>held by decision path</b></div>
         <div><span>Follow-up window</span><b>clean for 24 hours</b></div>
         <div><span>Rollout</span><b>paused, then resumed</b></div>
@@ -276,7 +276,7 @@ function OutcomeScene({ comparison, onNext }: { comparison: Comparison | null; o
         <div className="late-arrow" />
         <div className="late-result"><span>Current view</span><b>3 → 4 affected</b><small>Decision snapshot remains 3</small></div>
       </div>
-      <HeroLine text="New evidence updates the case without rewriting the original decision snapshot." />
+      <HeroLine text="The current case updates. The old decision stays honest." />
       <button className="button primary" onClick={onNext}>12 days later</button>
     </section>
   );
@@ -294,7 +294,7 @@ function MemoryScene({ memoryReady, onNext }: { memoryReady: boolean; onNext: ()
         <p>EX03, EX05 and EX08 returned to service after remote recovery.</p>
         <p>No field visit was required.</p>
         <p>One additional exposed machine failed later.</p>
-        <p>Evidence strength: precedent, not causal proof.</p>
+        <p>Useful precedent. Cause not proven yet.</p>
         <p>Previous action available: remote recovery, hold dispatch and monitor exposed machines.</p>
       </div>
       <div className="precedent-match">
@@ -308,7 +308,7 @@ function MemoryScene({ memoryReady, onNext }: { memoryReady: boolean; onNext: ()
         <div className="case-node new"><span>Current case</span><b>Autonomy 2.8 · EX21</b></div>
       </div>
       <HeroLine text="The next case does not start from zero." />
-      <div className="future-strip"><span>{memoryReady ? "Operational Case" : "Case preview"}</span><b>Evidence → decision state → action → outcome → reusable learning</b></div>
+      <div className="future-strip"><span>{memoryReady ? "Case ready" : "Case preview"}</span><b>Evidence → decision → action → outcome → learning</b></div>
       <button className="button lime" onClick={onNext}>End</button>
     </section>
   );
@@ -318,7 +318,7 @@ function EndScene() {
   return (
     <section className="cinema-scene center end-frame">
       <h1>A company should not start from zero when a similar machine problem appears again.</h1>
-      <p>Veyra turns each machine decision into evidence for the next one.</p>
+      <p>Veyra helps the next team reuse what the last team learned.</p>
       <p>Now run the same scenario in the Product Demo.</p>
       <p>Operational intelligence for Physical AI.</p>
       <div className="unlock-row">
