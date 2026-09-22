@@ -370,12 +370,43 @@ function WorkspaceRightRail({ stage, pkg, verification, memory, precedent, affec
 function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: any) {
   return (
     <>
-      <div className="fleet-map" aria-label="fleet status">
-        {Array.from({ length: 12 }).map((_, i) => {
-          const affected = i < (comparison?.same_signal ?? 3);
-          return <span key={i} className={affected ? "dot bad" : "dot good"} title={`EX${String(i + 1).padStart(2, "0")}`} />;
-        })}
-      </div>
+      <article className="panel dramatic brief-panel">
+        <div className="package-head">
+          <div>
+            <span className="eyebrow">Veyra brief</span>
+            <h2>Investigation completed. Decision now required.</h2>
+            <p>Veyra automatically reconstructed the release diff, fleet scope, affected-vs-healthy comparison and missing evidence before asking the team to choose an action.</p>
+          </div>
+          <div className="brief-status">
+            <span>Case agent</span>
+            <b>ready</b>
+          </div>
+        </div>
+        <div className="brief-grid">
+          <BriefItem step="01" title="Relevant changes" value="Localization L3 to L4 · Map M18 to M19 · LiDAR 5.2 to 5.3" />
+          <BriefItem step="02" title="Pattern scope" value={`${comparison?.same_signal ?? 3}/12 affected. Release 2.7 alone does not explain the issue.`} />
+          <BriefItem step="03" title="Strongest discriminator" value="Localization L4 + loading zone B exposure." />
+          <BriefItem step="04" title="Exception" value="EX11 shares the exposure but has no known issue at decision time." />
+          <BriefItem step="05" title="Next evidence" value="Fetch EX11 runtime history before dispatch." />
+          <BriefItem step="06" title="Recommended action" value="Remote recovery + hold rollout. Do not dispatch yet." />
+        </div>
+        <div className="brief-flow">
+          <span>What changed</span>
+          <i />
+          <span>Where else</span>
+          <i />
+          <span>What differs</span>
+          <i />
+          <span>Decision</span>
+        </div>
+        <div className="choice-row">
+          <b>Monitor</b>
+          <b>Remote recovery</b>
+          <b>Rollback release</b>
+          <b>Dispatch</b>
+        </div>
+        <div className="hero-actions"><button className="button" onClick={onChanges}>Show investigation</button><button className="button primary" onClick={onPackage}>Compare options</button></div>
+      </article>
       <div className="grid four">
         <Metric label="14:02:11" value="Autonomy 2.7" note="deployment started" />
         <Metric label="14:04:37" value="12/12" note="machines updated" />
@@ -383,20 +414,12 @@ function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: a
         <Metric label="14:26:03" value="3 affected" note="pattern detected before review" />
         <Metric label="14:31:00" value="Operator review" note="human review opened" />
       </div>
-      <article className="panel dramatic">
-        <span className="eyebrow">The team has four choices</span>
-        <h2>Same deployment. Different physical behavior.</h2>
-        <p>Every machine received autonomy 2.7. Three entered safe-stop near loading zone B. The team needs to decide whether this is release-wide, localization-specific, map-related, site-specific or machine-specific before sending someone onsite.</p>
-        <div className="choice-row">
-          <b>Monitor</b>
-          <b>Remote recovery</b>
-          <b>Rollback release</b>
-          <b>Dispatch</b>
-        </div>
-        <div className="hero-actions"><button className="button primary" onClick={onChanges}>What changed?</button><button className="button" onClick={onPackage}>Compare options</button></div>
-      </article>
     </>
   );
+}
+
+function BriefItem({ step, title, value }: { step: string; title: string; value: string }) {
+  return <div className="brief-item"><span>{step}</span><b>{title}</b><p>{value}</p></div>;
 }
 
 function ChangesStage({ onScope }: { onScope: () => void }) {
