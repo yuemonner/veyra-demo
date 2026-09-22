@@ -16,6 +16,7 @@ type DecisionPackage = { id: string; sealed: boolean; digest?: string; signature
 
 const INVESTIGATION_ID = "inv-120-robots-bad-rollout";
 const SCENES = ["open", "signal", "changed", "whereelse", "decision", "action", "outcome", "memory", "end"];
+const SCENE_DURATIONS = [5200, 10500, 10500, 13000, 13500, 10000, 13000, 12000, 9000];
 
 export default function CinematicDemo() {
   return (
@@ -89,11 +90,18 @@ function CinematicDemoInner() {
     setScene((value) => Math.max(value - 1, 0));
   }
 
+  async function replay() {
+    await reset();
+    setMode("Auto");
+    setScene(1);
+  }
+
   useEffect(() => { reset().catch(() => undefined); }, []);
 
   useEffect(() => {
     if (mode !== "Auto") return;
-    const timer = window.setTimeout(() => { nextScene().catch(() => undefined); }, scene === 0 ? 5000 : 11500);
+    if (scene === SCENES.length - 1) return;
+    const timer = window.setTimeout(() => { nextScene().catch(() => undefined); }, SCENE_DURATIONS[scene] || 10000);
     return () => window.clearTimeout(timer);
   }, [mode, scene, pkg]);
 
@@ -114,18 +122,20 @@ function CinematicDemoInner() {
 
   return (
     <main className={`cinematic ${mode === "Presenter" ? "presenter-mode" : ""}`}>
-      {presenter && <div className="cinematic-top">
+      <div className={presenter ? "cinematic-top" : "cinematic-top demo-visible"}>
         <div className="brand"><span className="mark">V</span> Veyra</div>
         <div className="mode-switch">
-          {(["Presenter", "Auto"] as const).map((item) => <button key={item} className={mode === item ? "active" : ""} onClick={() => setMode(item)}>{item}</button>)}
+          <button className={mode === "Auto" ? "active" : ""} onClick={replay}>Auto replay</button>
+          <button className={mode === "Presenter" ? "active" : ""} onClick={() => setMode("Presenter")}>Manual</button>
+          <button onClick={() => nextScene().catch(() => undefined)}>Next</button>
           <Link href="/product-demo">Open Product Demo</Link>
           <button onClick={reset}>Reset</button>
         </div>
-      </div>}
+      </div>
 
       <div className="progress"><span style={{ width: `${((scene + 1) / SCENES.length) * 100}%` }} /></div>
 
-      {SCENES[scene] === "open" && <OpenScene onNext={nextScene} />}
+      {SCENES[scene] === "open" && <OpenScene onNext={nextScene} onReplay={replay} />}
       {SCENES[scene] === "signal" && <SignalScene affected={affected} healthy={healthy} onNext={nextScene} />}
       {SCENES[scene] === "changed" && <ChangedScene onNext={nextScene} />}
       {SCENES[scene] === "whereelse" && <WhereElseScene comparison={comparison} onNext={nextScene} />}
@@ -138,13 +148,16 @@ function CinematicDemoInner() {
   );
 }
 
-function OpenScene({ onNext }: { onNext: () => void }) {
+function OpenScene({ onNext, onReplay }: { onNext: () => void; onReplay: () => void }) {
   return (
     <section className="cinema-scene center">
       <span className="eyebrow">Field Case Replay · Physical AI</span>
       <h1>One deployment. Twelve machines. Three enter safe-stop.</h1>
       <p>Veyra shows what changed, where else it is happening, what the team did, and what happened after.</p>
-      <button className="button lime" onClick={onNext}>Start case</button>
+      <div className="hero-actions">
+        <button className="button lime" onClick={onReplay}>Replay field case</button>
+        <button className="button" onClick={onNext}>Step through manually</button>
+      </div>
     </section>
   );
 }
@@ -233,6 +246,7 @@ function DecisionStateScene({ pkg, onNext }: { pkg: DecisionPackage | null; onNe
       </div>
       <HeroLine text="Later facts do not rewrite the old decision." />
       <div className="seal-card quiet-seal lock-motion"><span>Decision snapshot · 14:27</span><small>{pkg?.sealed ? "Owner and action recorded." : "Built from the evidence available then."}</small></div>
+      <DecisionAgentMotion />
       <button className="button primary" onClick={onNext}>What did the team do?</button>
     </section>
   );
@@ -242,17 +256,52 @@ function ActionScene({ onNext }: { onNext: () => void }) {
   return (
     <section className="cinema-scene">
       <SceneTitle eyebrow="5 · Team action" title="What did the team do?" subtitle="The decision, the action and the evidence stay together." />
-      <div className="decision-card">
-        <div><span>Decision</span><b>Remote recovery before dispatch</b></div>
-        <div><span>Executed</span><b>Remote recovery on EX03, EX05 and EX08</b></div>
-        <div><span>Watch</span><b>Monitor EX11</b></div>
-        <div><span>Operations</span><b>Notify support</b></div>
-        <div><span>Field</span><b>Hold dispatch</b></div>
-        <div><span>Owner</span><b>Operations Lead · 14:31</b></div>
+      <div className="action-flow">
+        <div className="action-source">
+          <span>Chosen action</span>
+          <b>Remote recovery</b>
+          <small>Hold rollout · hold field dispatch</small>
+        </div>
+        <div className="action-machine-results">
+          <b>EX03 ✓</b>
+          <b>EX05 ✓</b>
+          <b>EX08 ✓</b>
+        </div>
+        <div className="action-source good">
+          <span>Record</span>
+          <b>Decision recorded</b>
+          <small>Owner · Operations Lead · 14:31</small>
+        </div>
       </div>
       <HeroLine text="Now the action can be checked against what happened next." />
       <button className="button primary" onClick={onNext}>What happened after?</button>
     </section>
+  );
+}
+
+function DecisionAgentMotion() {
+  return (
+    <div className="agent-motion" aria-label="decision agent recommendation">
+      <div className="agent-evidence-stack">
+        <span>Evidence in</span>
+        <b>3 affected</b>
+        <b>9 healthy</b>
+        <b>EX11 counterexample</b>
+        <b>$1K to $2K dispatch</b>
+        <b>prior recovery result</b>
+      </div>
+      <div className="agent-core">
+        <span>Decision agent</span>
+        <i />
+        <b>Compare options</b>
+      </div>
+      <div className="agent-recommendation">
+        <span>Suggested action</span>
+        <strong>Remote recovery</strong>
+        <p>Hold rollout. Hold field dispatch.</p>
+        <small>Confidence: medium · Need one more signal: EX11 runtime history</small>
+      </div>
+    </div>
   );
 }
 
