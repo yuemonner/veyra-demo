@@ -59,8 +59,8 @@ export default function ProductPage() {
         </aside>
 
         <div className="product-case-stack">
-          <ProductSection number="01" title="Overview" heading="Three excavators entered safe-stop after the same deployment.">
-            <p>Twelve remote-operated machines received autonomy release 2.7. EX03, EX05 and EX08 entered safe-stop near loading zone B. EX11 shares the exposure but had no known issue at decision time.</p>
+          <ProductSection number="01" title="Overview" heading="Three autonomous field robots entered safe-stop after the same deployment.">
+            <p>Twelve field robots received autonomy release 2.7. EX03, EX05 and EX08 entered safe-stop near loading zone B. EX11 shares the exposure but had no known issue at decision time.</p>
             <div className="product-metrics">
               <MiniMetric label="14:02" value="Release 2.7" note="deployment started" />
               <MiniMetric label="14:11" value="First safe-stop" note="EX03 signal" />

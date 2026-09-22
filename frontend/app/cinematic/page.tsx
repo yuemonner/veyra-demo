@@ -151,7 +151,7 @@ function OpenScene({ onNext, onReplay }: { onNext: () => void; onReplay: () => v
 function SignalScene({ affected, healthy, onNext }: { affected: number; healthy: number; onNext: () => void }) {
   return (
     <section className="cinema-scene">
-      <SceneTitle eyebrow="1 · Signal" title="Three excavators entered safe-stop after the same deployment." subtitle="The team needs to know what changed before choosing remote recovery, rollback, or a field visit." />
+      <SceneTitle eyebrow="1 · Signal" title="Three autonomous field robots entered safe-stop after the same deployment." subtitle="The team needs to know what changed before choosing remote recovery, rollback, or a field visit." />
       <CinematicFleet affected={affected} />
       <div className="failure-counter" aria-label="failure burst">
         <span>Pattern detected</span>
