@@ -268,9 +268,9 @@ function DecisionAgentMoment({ sealed }: { sealed: boolean }) {
   return (
     <div className="agent-stage" aria-label="evidence to decision agent to action">
       <div className="decision-status-strip">
-        <span>Decision snapshot: 3 affected</span>
-        <b>{sealed ? "Decision recorded · 14:27" : "Ready for approval"}</b>
-        <small>Current view can update later</small>
+        <div><span>Snapshot</span><b>3 affected at decision time</b></div>
+        <div><span>Recorded</span><b>{sealed ? "14:27" : "ready for approval"}</b></div>
+        <div><span>Current view</span><b>updates when later evidence arrives</b></div>
       </div>
 
       <div className="agent-pipeline">
@@ -278,15 +278,15 @@ function DecisionAgentMoment({ sealed }: { sealed: boolean }) {
           <span className="eyebrow">Evidence context</span>
           <div className="evidence-group">
             <small>Fleet</small>
-            <p><b className="key-signal">3 affected</b><b>9 healthy</b><b className="key-signal">EX11 exposed</b></p>
+            <p className="fleet-facts"><span><b>3</b>affected</span><span><b>9</b>healthy</span><span><b>EX11</b>exposed</span></p>
           </div>
           <div className="evidence-group">
             <small>Cost</small>
-            <p><b>Dispatch $1K to $2K</b></p>
+            <p className="evidence-line">Dispatch $1K to $2K</p>
           </div>
           <div className="evidence-group">
             <small>History</small>
-            <p><b>Prior recovery → returned to service</b></p>
+            <p className="evidence-line">Prior recovery returned machines to service</p>
           </div>
         </section>
 
@@ -306,7 +306,7 @@ function DecisionAgentMoment({ sealed }: { sealed: boolean }) {
           <h3>Remote recovery</h3>
           <strong>Hold rollout · Hold field dispatch</strong>
           <dl>
-            <div><dt>Why</dt><dd>3 affected machines share the same exposure. Release 2.7 alone does not explain the failure.</dd></div>
+            <div><dt>Why</dt><dd><b>3 affected machines share the same exposure.</b><span>Release 2.7 alone does not explain the failure.</span></dd></div>
             <div><dt>Missing</dt><dd>EX11 runtime history.</dd></div>
             <div><dt>Confidence</dt><dd>Medium</dd></div>
           </dl>
@@ -314,11 +314,9 @@ function DecisionAgentMoment({ sealed }: { sealed: boolean }) {
       </div>
 
       <div className="agent-timeline-rail">
-        <div className="timeline-node approved-action"><span>14:27</span><b>Decision recorded</b><small>3 affected</small></div>
+        <div className="timeline-node late-event-card"><span>Late evidence</span><b>EX11 showed the same pattern at 14:09</b><small>Arrived at 14:31</small></div>
         <i />
-        <div className="timeline-node late-event-card"><span>14:31</span><b>Late evidence arrived</b><small>EX11 safe-stop · event_time 14:09</small></div>
-        <i />
-        <div className="timeline-node view-update-card"><span>Now</span><b>4 affected</b><small>Snapshot stays 3</small></div>
+        <div className="timeline-node view-update-card"><span>Current view</span><b>3 → 4 affected</b><small>Snapshot remains 3</small></div>
       </div>
 
       <div className="agent-final-line">
