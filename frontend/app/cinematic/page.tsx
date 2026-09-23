@@ -30,12 +30,12 @@ function CinematicDemoInner() {
   const [pkg, setPkg] = useState<DecisionPackage | null>(null);
   const [memoryReady, setMemoryReady] = useState(false);
 
-  async function reset() {
+  async function reset(goToOpen = true) {
     await postJson("/demo/reset");
     setComparison(await getJson(`/investigations/${INVESTIGATION_ID}/comparison`));
     setPkg(null);
     setMemoryReady(false);
-    setScene(0);
+    if (goToOpen) setScene(0);
   }
 
   async function ensureDecisionState() {
@@ -74,12 +74,14 @@ function CinematicDemoInner() {
 
   async function nextScene() {
     const next = Math.min(scene + 1, SCENES.length - 1);
-    if (SCENES[next] === "decision") await ensureDecisionState();
-    if (SCENES[next] === "outcome") {
-      await injectLateEvidence();
-      await recordOutcome();
-    }
     setScene(next);
+    if (SCENES[next] === "decision") {
+      ensureDecisionState().catch(() => undefined);
+    }
+    if (SCENES[next] === "outcome") {
+      injectLateEvidence().catch(() => undefined);
+      recordOutcome().catch(() => undefined);
+    }
   }
 
   function prevScene() {
@@ -87,8 +89,11 @@ function CinematicDemoInner() {
   }
 
   async function replay() {
-    await reset();
     setScene(1);
+    setComparison(null);
+    setPkg(null);
+    setMemoryReady(false);
+    reset(false).catch(() => undefined);
   }
 
   useEffect(() => { reset().catch(() => undefined); }, []);
@@ -116,7 +121,7 @@ function CinematicDemoInner() {
           <button className="active" onClick={replay}>Replay field case</button>
           <button onClick={() => nextScene().catch(() => undefined)}>Next</button>
           <Link href="/product-demo">Open Product Demo</Link>
-          <button onClick={reset}>Reset</button>
+          <button onClick={() => reset()}>Reset</button>
         </div>
       </div>
 
