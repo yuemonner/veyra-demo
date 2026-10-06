@@ -176,7 +176,7 @@ function WhereElse({ onNext }: { onNext: () => void }) {
       <SceneTitle
         eyebrow="2 · Where else"
         title="Where else is this happening?"
-        subtitle="The point is not every machine detail. The point is finding the useful counterexample."
+        subtitle="Veyra looks for healthy machines that can rule explanations in or out."
       />
       <div className="cohort-motion field-cohorts">
         <div className="cohort-group affected-group">
@@ -222,7 +222,7 @@ function PossibleCauses({ onNext }: { onNext: () => void }) {
       status: "Weak",
       forText: "Recently changed.",
       against: "Many healthy machines use the same version.",
-      missing: "None worth checking first.",
+      missing: "No useful next check.",
     },
   ];
 
@@ -231,7 +231,7 @@ function PossibleCauses({ onNext }: { onNext: () => void }) {
       <SceneTitle
         eyebrow="3 · Possible causes"
         title="Keep the explanations separate."
-        subtitle="No fake confidence score. Just what supports each explanation, what pushes against it, and what is missing."
+        subtitle="See what supports each explanation, what pushes against it, and what is still missing."
       />
       <div className="hypothesis-grid">
         {hypotheses.map((item) => (
@@ -256,7 +256,7 @@ function NextCheck({ onNext }: { onNext: () => void }) {
       <SceneTitle
         eyebrow="4 · Next check"
         title="What should we check next?"
-        subtitle="The best next move is the one that separates the strongest remaining explanations without disrupting production."
+        subtitle="A useful next move separates the strongest remaining explanations with as little disruption as possible."
       />
       <div className="next-move-layout">
         <article className="next-move-card recommended">
@@ -314,7 +314,7 @@ function Outcome({ onNext }: { onNext: () => void }) {
         <div><span>EX03</span><b>Recovered after rollback</b></div>
         <div><span>EX05</span><b>Recovered after rollback</b></div>
         <div><span>EX08</span><b>Recovered after rollback</b></div>
-        <div><span>Field visit</span><b>Avoided</b></div>
+        <div><span>Field visit</span><b>Not needed in this replay</b></div>
         <div><span>What it supports</span><b>Localization-related explanation</b></div>
         <div><span>What it does not prove</span><b>L4 alone vs L4 + Zone B</b></div>
       </div>
