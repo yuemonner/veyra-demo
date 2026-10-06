@@ -86,9 +86,9 @@ function InvestigationInner({ id }: { id: string }) {
     if (!pkg) return;
     try {
       await postJson(`/investigations/${investigationId}/decision`, {
-        decision: "Remote recovery on affected machines and hold field dispatch",
+        decision: "Roll back localization L4 on EX03, EX05 and EX08",
         owner: "Robotics Engineering",
-        rationale: "Autonomy 2.7 ran everywhere, while affected machines share localization profile L4 and loading zone B exposure with one exposed machine to watch.",
+        rationale: "Autonomy 2.7 ran everywhere, while affected machines share localization L4 and Zone B. EX11 remains the useful healthy comparison in Zone C.",
         package_id: pkg.id,
       });
       const sealed = await postJson<DecisionPackage>(`/decision-packages/${pkg.id}/seal`);
@@ -108,7 +108,7 @@ function InvestigationInner({ id }: { id: string }) {
       await refresh();
       setDecisionContext(await getJson(`/investigations/${investigationId}/decision-context`));
       setStage("outcome");
-      setNotice("Delayed runtime evidence arrived with event_time before the operator review.");
+      setNotice("Additional runtime evidence arrived after the original review.");
     } catch (error) {
       reportError("Delayed evidence injection", error);
     }
@@ -117,8 +117,8 @@ function InvestigationInner({ id }: { id: string }) {
   async function outcome() {
     try {
       await postJson(`/investigations/${investigationId}/outcome`, {
-        outcome: "Remote recovery returned machines to service; field visit avoided; rollout held pending review",
-        payload: { previous_action: "Remote recovery on EX03, EX05 and EX08; hold field dispatch; monitor EX11", recovery_minutes: 18, days_later: 12, field_visit: false, engineering_hours_saved: 2, attribution_level: "observed", attribution_rationale: "Return-to-service was observed after remote recovery. Remote recovery is not treated as proven causal." },
+        outcome: "EX03, EX05 and EX08 recovered after localization L4 rollback",
+        payload: { previous_action: "Rollback localization L4 on EX03, EX05 and EX08; hold rollout", recovery_minutes: 18, days_later: 12, attribution_level: "observed", attribution_rationale: "Recovery was observed after rollback. The result supports a localization-related explanation but does not prove L4 alone versus L4 plus Zone B." },
       });
       setMemory(await getJson(`/memory/similar?investigation_id=${investigationId}`));
       setPrecedent(await getJson(`/precedents/compare?investigation_id=${investigationId}`));
@@ -132,8 +132,8 @@ function InvestigationInner({ id }: { id: string }) {
   const affected = comparison?.same_signal ?? 3;
   const stageImpliesLateEvidence = stage === "outcome" || stage === "history";
   const lateEvidenceVisible = affected > 3 || stageImpliesLateEvidence;
-  const displayAffected = lateEvidenceVisible ? Math.max(affected, 4) : affected;
-  const displayHealthy = lateEvidenceVisible ? 8 : (comparison?.no_signal ?? 9);
+  const displayAffected = affected;
+  const displayHealthy = comparison?.no_signal ?? 9;
   const actionRecorded = Boolean(pkg?.sealed || pkg?.package?.human_decision || stage === "action" || stage === "outcome" || stage === "history");
   const outcomeRecorded = Boolean(stage === "outcome" || stage === "history" || memory?.similar_cases?.length);
   const detectionLead = useMemo(() => {
@@ -163,11 +163,10 @@ function InvestigationInner({ id }: { id: string }) {
         </div>
         <div className="workspace-header-actions">
           <div className="case-pills">
-            <b className="pill-alert">{lateEvidenceVisible ? `${displayAffected} current` : `${displayAffected} affected`}</b>
-            {lateEvidenceVisible && <b>3 decision-time</b>}
+            <b className="pill-alert">{displayAffected} affected</b>
             <b className="pill-blue">{displayHealthy} healthy</b>
             <b>12 updated</b>
-            <b>{actionRecorded ? "remote recovery" : "action pending"}</b>
+            <b>{actionRecorded ? "L4 rollback" : "action pending"}</b>
             {outcomeRecorded && <b>outcome observed</b>}
           </div>
           {presenter && <div className="demo-controls compact-controls">
@@ -248,7 +247,7 @@ function StageTabs({ stage, setStage }: { stage: string; setStage: (stage: strin
 }
 
 function MachineRail({ stage, affected, healthy, lateEvidenceVisible, actionRecorded, outcomeRecorded }: { stage: string; affected: number; healthy: number; lateEvidenceVisible: boolean; actionRecorded: boolean; outcomeRecorded: boolean }) {
-  const affectedSet = new Set(lateEvidenceVisible ? [3, 5, 8, 11] : [3, 5, 8]);
+  const affectedSet = new Set([3, 5, 8]);
   const watchSet = new Set([11]);
   const railCopy: Record<string, { title: string; question: string; rows: Array<[string, string]> }> = {
     overview: {
@@ -274,17 +273,17 @@ function MachineRail({ stage, affected, healthy, lateEvidenceVisible, actionReco
     action: {
       title: "Chosen response",
       question: "What did the team actually do after comparing the options?",
-      rows: [["action", actionRecorded ? "remote recovery" : "pending"], ["rollout", "held"], ["dispatch", "held"], ["watch", "EX11"]],
+      rows: [["team action", actionRecorded ? "L4 rollback" : "pending"], ["rollout", "held"], ["scope", "EX03, EX05, EX08"], ["follow up", "test EX11 in Zone B"]],
     },
     outcome: {
       title: "Current state",
-      question: "What changed after the action, and what arrived late?",
-      rows: [["decision-time", "3 affected"], ["current", `${affected} affected`], ["outcome", outcomeRecorded ? "observed" : "pending"], ["late evidence", "EX11"]],
+      question: "What happened after the rollback, and what remains unresolved?",
+      rows: [["affected", "3"], ["result", outcomeRecorded ? "3 of 3 recovered" : "pending"], ["follow up", "test EX11 in Zone B"], ["cause", "not proven"]],
     },
     history: {
-      title: "Relevant history",
+      title: "Case memory",
       question: "What should the next similar case inherit from this one?",
-      rows: [["previous action", "remote recovery"], ["result", "returned to service"], ["dispatch", "avoided"], ["cause", "not proven"]],
+      rows: [["team action", "L4 rollback"], ["result", "3 of 3 recovered"], ["follow up", "test EX11 in Zone B"], ["cause", "localization related"]],
     },
   };
   const copy = railCopy[stage] || railCopy.overview;
@@ -321,16 +320,16 @@ function WorkspaceRightRail({ stage, pkg, verification, memory, precedent, affec
     overview: { label: "Purpose", title: "Open the case", body: "Start with the machine group, the affected machines and the question the team needs to answer.", cta: "What changed?" },
     changes: { label: "Purpose", title: "See what changed", body: "Pull together the release, localization, firmware, map and operator note before the team acts.", cta: "Where else?" },
     scope: { label: "Purpose", title: "Find where else", body: "Separate machines that failed from machines that stayed healthy under similar conditions.", cta: "Compare options" },
-    decision: { label: "Purpose", title: "Choose next action", body: "Compare monitor, remote recovery, rollback and dispatch using evidence, risk, past result and cost.", cta: "Record decision" },
-    action: { label: "Purpose", title: "Record the action", body: "Keep the chosen action, owner, machines covered and evidence available then in one place.", cta: "Track outcome" },
-    outcome: { label: "Purpose", title: "See what happened", body: "Show return to service, field visit avoided and late evidence that changed the current case.", cta: "Link outcome" },
+    decision: { label: "Purpose", title: "Choose next action", body: "Compare observe EX11, rollback L4, monitor and dispatch using evidence, risk, past result and cost.", cta: "Record decision" },
+    action: { label: "Purpose", title: "Record the action", body: "Keep the chosen rollback, owner, machines covered and evidence available then in one place.", cta: "Track outcome" },
+    outcome: { label: "Purpose", title: "See what happened", body: "Show recovery after rollback and keep the unresolved cause boundary visible.", cta: "Link outcome" },
     history: { label: "Purpose", title: "Use relevant history", body: "Bring back what the last team did, what happened after and what must be checked again.", cta: "Review history" },
   };
   const help = stageHelp[stage] || stageHelp.overview;
   const historyText = hasMemory
-    ? "1 relevant past case available. Last time, remote recovery returned machines to service, avoided a field visit and EX11 later showed the same pattern."
+    ? "1 relevant past case available. Last time, rolling back localization L4 returned all three affected machines to service."
     : stage === "outcome"
-      ? "Remote recovery returned 3 machines to service. Link the outcome to make it reusable."
+      ? "Rollback returned 3 machines to service. Link the outcome to make it reusable."
       : "No past result recorded yet. Record the outcome so the next case can reuse it.";
   return (
     <aside className="workspace-rail">
@@ -340,7 +339,7 @@ function WorkspaceRightRail({ stage, pkg, verification, memory, precedent, affec
         <p>{help.body}</p>
       </div>
       <div className="rail-card relevant-history">
-        <span className="eyebrow">Relevant history</span>
+        <span className="eyebrow">{stage === "history" ? "Relevant past case" : "Case memory"}</span>
         <p>{historyText}</p>
         {stage === "history" ? <button className="button">Precedent loaded</button> : <button className="button" onClick={onOutcome}>{hasMemory || stage === "outcome" ? "Link outcome" : "Record outcome"}</button>}
       </div>
@@ -349,8 +348,8 @@ function WorkspaceRightRail({ stage, pkg, verification, memory, precedent, affec
         <dl className="case-facts compact">
           <div><dt>known then</dt><dd>3 affected</dd></div>
           <div><dt>current</dt><dd>{affected} affected</dd></div>
-          <div><dt>watch</dt><dd>EX11 exposed</dd></div>
-          <div><dt>action</dt><dd>{actionRecorded ? "remote recovery" : "pending"}</dd></div>
+          <div><dt>comparison</dt><dd>EX11 healthy</dd></div>
+          <div><dt>action</dt><dd>{actionRecorded ? "L4 rollback" : "pending"}</dd></div>
           <div><dt>outcome</dt><dd>{outcomeRecorded || validation?.status ? "observed" : "pending"}</dd></div>
         </dl>
       </div>
@@ -387,8 +386,8 @@ function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: a
           <BriefItem step="02" title="Where else" value={`${comparison?.same_signal ?? 3}/12 affected. Release 2.7 alone does not explain the issue.`} />
           <BriefItem step="03" title="Strongest clue" value="Localization L4 + loading zone B exposure." />
           <BriefItem step="04" title="Exception" value="EX11 shares the exposure but has no known issue at decision time." />
-          <BriefItem step="05" title="Next check" value="Fetch EX11 runtime history before dispatch." />
-          <BriefItem step="06" title="Recommended action" value="Remote recovery + hold rollout. Do not dispatch yet." />
+          <BriefItem step="05" title="Next check" value="Observe EX11 in Zone B." />
+          <BriefItem step="06" title="Team action" value="Rollback localization L4 on EX03, EX05 and EX08." />
         </div>
         <div className="brief-flow">
           <span>What changed</span>
@@ -401,8 +400,8 @@ function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: a
         </div>
         <div className="choice-row">
           <b>Monitor</b>
-          <b>Remote recovery</b>
-          <b>Rollback release</b>
+          <b>Observe EX11</b>
+          <b>Rollback L4</b>
           <b>Dispatch</b>
         </div>
         <div className="hero-actions"><button className="button" onClick={onChanges}>Show investigation</button><button className="button primary" onClick={onPackage}>Compare options</button></div>
@@ -471,7 +470,7 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
         <thead><tr><th>Option</th><th>Prior outcome</th><th>Attribution</th></tr></thead>
         <tbody>
           {(outcomeRows.length ? outcomeRows : [
-            { action: "remote_fix", outcome: "recovered after action", attribution: "useful precedent" },
+            { action: "rollback_localization", outcome: "recovered after action", attribution: "useful precedent" },
             { action: "monitor", outcome: "not yet observed", attribution: "not observed" },
             { action: "dispatch", outcome: "not supported by current evidence", attribution: "not supported" },
           ]).map((row: any) => <tr key={row.action}><td>{row.action}</td><td>{row.outcome || row.status}</td><td>{row.attribution}</td></tr>)}
@@ -493,20 +492,20 @@ function DecisionOptions({ options }: { options: any[] }) {
       cost: "low cost, higher operational risk",
     },
     {
-      id: "remote_restart",
-      label: "Remote recovery",
-      evidenceFor: "affected machines entered safe-stop after the release",
-      evidenceAgainst: "planner fallback cause remains unresolved",
-      priorOutcome: "recovered after action",
-      cost: "low cost, no field visit",
+      id: "observe_ex11",
+      label: "Observe EX11 in Zone B",
+      evidenceFor: "EX11 has autonomy 2.7 and localization L4 but stayed healthy in Zone C",
+      evidenceAgainst: "does not recover affected machines immediately",
+      priorOutcome: "most useful next check",
+      cost: "low cost, low risk",
     },
     {
       id: "rollback",
-      label: "Rollback release",
-      evidenceFor: "issue follows deployment window",
-      evidenceAgainst: "autonomy 2.7 runs on healthy machines too",
-      priorOutcome: "not established",
-      cost: "rollout delay",
+      label: "Rollback localization L4",
+      evidenceFor: "affected machines share L4 and Zone B",
+      evidenceAgainst: "does not prove L4 alone versus L4 plus Zone B",
+      priorOutcome: "recovery observed after action",
+      cost: "medium disruption",
     },
     {
       id: "dispatch",
@@ -519,7 +518,7 @@ function DecisionOptions({ options }: { options: any[] }) {
   ];
   const normalized = options.length ? options.map((option: any) => ({
     id: option.id || option.option_type,
-    label: option.option_type === "remote_fix" ? "Remote recovery" : option.option_type === "pause_rollout" ? "Rollback release" : option.option_type === "dispatch" ? "Dispatch technician" : option.option_type === "monitor" ? "Monitor" : option.label,
+    label: option.option_type === "remote_fix" ? "Observe EX11 in Zone B" : option.option_type === "pause_rollout" ? "Rollback localization L4" : option.option_type === "dispatch" ? "Dispatch technician" : option.option_type === "monitor" ? "Monitor" : option.label,
     evidenceFor: option.historical_support?.summary || option.label,
       evidenceAgainst: option.expected_risk?.reason || "still unknown",
     priorOutcome: option.historical_support?.status === "none_yet" ? "no prior outcome in this workspace" : option.historical_support?.summary || "pending",
@@ -629,7 +628,7 @@ function DecisionAgentCard({ ready, pkg, onGenerate, onSeal, onFetchEvidence }: 
     <section className="agent-card decision-agent">
       <div>
         <span className="eyebrow">Case agent</span>
-        <h3>{ready ? "Suggested action: remote recovery + hold rollout" : "Compare the options first"}</h3>
+        <h3>{ready ? "Suggested check: observe EX11 in Zone B" : "Compare the options first"}</h3>
         <p>{ready ? "Confidence: medium. Veyra is helping choose the next action. It is not declaring root cause." : "Veyra will assemble options, missing evidence and past results before the team acts."}</p>
       </div>
       {ready ? (
@@ -640,8 +639,8 @@ function DecisionAgentCard({ ready, pkg, onGenerate, onSeal, onFetchEvidence }: 
               <ul>
                 <li>3 affected machines share L4 and loading zone B exposure.</li>
                 <li>9 machines on autonomy 2.7 remain healthy.</li>
-                <li>Current evidence does not justify dispatch.</li>
-                <li>Remote recovery has the lowest irreversible cost.</li>
+                <li>EX11 is the useful healthy comparison in Zone C.</li>
+                <li>The check separates L4 alone from L4 plus Zone B.</li>
               </ul>
             </div>
             <div>
@@ -672,7 +671,7 @@ function DecisionContextMini({ pkg, record, observability }: { pkg?: DecisionPac
   return (
     <section className="decision-context-mini">
       <div><span>Known now</span><b>3 affected machines</b></div>
-      <div><span>Still missing</span><b>EX11 and planner fallback</b></div>
+      <div><span>Still missing</span><b>EX11 in Zone B</b></div>
       <div><span>Observability</span><b>{observability?.status || "partial"}</b></div>
       <div><span>Snapshot</span><b>{pkg?.sealed ? "sealed" : record ? "recorded" : "pending"}</b></div>
     </section>
@@ -688,17 +687,16 @@ function ActionStage({ pkg, onGenerate, onSeal, onOutcome }: any) {
   return (
     <article className="panel">
       <span className="eyebrow">What we chose</span>
-      <h2>Decision: Remote recovery + hold rollout.</h2>
+      <h2>Decision: roll back localization L4.</h2>
       <p>The decision, the action and what the team knew stay together.</p>
       <div className="package-grid">
-        <PackageItem title="Why this action" value="remote recovery costs less than dispatch while evidence is still incomplete" />
+        <PackageItem title="Why this action" value="Production pressure made faster recovery more important than clean diagnosis" />
         <PackageItem title="Known at the time" value="EX03, EX05 and EX08 affected, EX11 no known issue" />
-        <PackageItem title="Still missing" value="planner fallback reason and local perception trace" />
-        <PackageItem title="Planned action" value={planned?.label || "remote restart affected machines"} />
-        <PackageItem title="Actual action" value={actual?.scope?.remote_recovery ? `remote recovery ${actual.scope.remote_recovery.join(" and ")}` : "remote recovery EX03, EX05 and EX08"} />
-        <PackageItem title="Watch" value="monitor EX11" />
-        <PackageItem title="Customer" value="notify support" />
-        <PackageItem title="Field" value="hold dispatch" />
+        <PackageItem title="Still missing" value="whether L4 alone or L4 + Zone B explains the pattern" />
+        <PackageItem title="Veyra suggested" value="observe EX11 in Zone B" />
+        <PackageItem title="Actual action" value="rollback localization L4 on EX03, EX05 and EX08" />
+        <PackageItem title="Follow up" value="test EX11 in Zone B before the next full rollout" />
+        <PackageItem title="Rollout" value="held" />
         <PackageItem title="Owner" value="Operations Lead · 14:31" />
       </div>
       <div className="hero-actions">
@@ -717,7 +715,7 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
         <div>
           <span className="eyebrow">Outcome</span>
           <h2>What happened after the action?</h2>
-          <p>EX03, EX05 and EX08 returned to service after remote recovery. That is seen after the action. Cause is not proven yet. EX11 later shows the same pattern through delayed runtime evidence.</p>
+          <p>EX03, EX05 and EX08 recovered after localization L4 rollback. The result supports a localization-related explanation, but does not prove L4 alone versus L4 plus Zone B.</p>
         </div>
         <div className={pkg?.sealed ? "sealed-mini good" : "sealed-mini"}>
           <span>{pkg?.sealed ? "Sealed" : "Unsealed"}</span>
@@ -729,50 +727,48 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
         <div className="outcome-status">
           <span className="eyebrow">Outcome check</span>
           <strong>{validation?.status === "pending" ? "Pending" : "Observed recovery"}</strong>
-          <p>{validation?.status === "pending" ? "Record the outcome so it can be reused." : "Return to service happened after remote recovery. Cause is not proven yet."}</p>
+          <p>{validation?.status === "pending" ? "Record the outcome so it can be reused." : "Recovery happened after rollback. Cause is not proven yet."}</p>
         </div>
         <div className="outcome-status">
-          <span className="eyebrow">Late evidence</span>
-          <strong>New decision-relevant evidence arrived</strong>
-          <p>The old decision record stays unchanged. The current fleet view updates and gets flagged for review.</p>
+          <span className="eyebrow">Follow-up check</span>
+          <strong>EX11 in Zone B remains unresolved</strong>
+          <p>The next useful check separates L4 alone from L4 plus Zone B before the next full rollout.</p>
         </div>
       </section>
 
       <section className="mini-timeline">
-        <div><b>14:09</b><span>event_time</span><small>EX11 safe-stop behavior existed</small></div>
+        <div><b>14:09</b><span>event_time</span><small>first safe-stop occurred</small></div>
         <div><b>14:27</b><span>decision snapshot</span><small>3 affected known</small></div>
-        <div><b>14:31</b><span>known_at</span><small>late evidence became available</small></div>
-        <div><b>14:31:04</b><span>ingested_at</span><small>received by Veyra</small></div>
+        <div><b>14:31</b><span>known_at</span><small>operator review opened</small></div>
+        <div><b>15:04</b><span>outcome</span><small>3 recovered after rollback</small></div>
       </section>
 
       <section className="outcome-ledger">
-        <PackageItem title="Decision-time view" value="3 affected" />
-        <PackageItem title="Current view" value={`${Math.max(comparison?.same_signal ?? 3, 4)} affected`} />
-        <PackageItem title="Field dispatch" value="avoided by decision path" />
-        <PackageItem title="Rollout" value="paused, then resumed" />
-        <PackageItem title="Engineering time" value="estimated reduction" />
-        <PackageItem title="Customer support" value="informed before escalation" />
+        <PackageItem title="Affected machines" value="EX03, EX05 and EX08" />
+        <PackageItem title="Result" value="3 of 3 recovered" />
+        <PackageItem title="Follow up" value="test EX11 in Zone B" />
+        <PackageItem title="Cause" value="localization related, not proven" />
       </section>
 
       <section className="agent-card outcome-agent">
         <span className="eyebrow">Outcome agent</span>
         <h3>Draft observed outcome</h3>
-        <p>EX03, EX05 and EX08 returned to service after remote recovery. Useful result. Cause not proven yet.</p>
+        <p>EX03, EX05 and EX08 recovered after rollback. Useful result. Cause not proven yet.</p>
         <div className="agent-columns">
           <div>
             <b>Operational value</b>
             <ul>
-              <li>Field dispatch avoided.</li>
-              <li>Rollout remained held until EX11 evidence was reviewed.</li>
-              <li>Customer support informed before escalation.</li>
+              <li>All affected machines returned to service.</li>
+              <li>Rollout remained held until follow-up evidence is checked.</li>
+              <li>EX11 remains the useful healthy comparison.</li>
             </ul>
           </div>
           <div>
             <b>Record boundary</b>
             <ul>
               <li>Original decision snapshot remains unchanged.</li>
-              <li>Current case view updates to 4 affected.</li>
-              <li>Outcome can be reused after confirmation.</li>
+              <li>Outcome supports a localization-related explanation.</li>
+              <li>L4 alone versus L4 plus Zone B remains unresolved.</li>
             </ul>
           </div>
         </div>
@@ -789,9 +785,9 @@ function LateEvidenceStage({ pkg, verification, comparison, onSeal, onOutcome }:
 function MemoryStage({ memory, precedent, onOutcome }: any) {
   const validation = precedent?.outcome_validation || memory?.precedent_comparison?.outcome_validation;
   const rows = [
-    { action: "Remote recovery", outcome: "returned to service", attribution: "seen after action" },
-    { action: "Pause rollout", outcome: "rollout later resumed", attribution: "observed" },
-    { action: "Dispatch technician", outcome: "avoided", attribution: "not executed" },
+    { action: "Localization L4 rollback", outcome: "EX03, EX05 and EX08 recovered", attribution: "seen after action" },
+    { action: "Hold rollout", outcome: "rollout stayed paused for review", attribution: "observed" },
+    { action: "Test EX11 in Zone B", outcome: "still needed", attribution: "follow-up check" },
   ];
   return (
     <article className="panel final-stage">
@@ -799,28 +795,28 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
       <h2>A similar pattern appears again.</h2>
       <p>EX21 enters safe-stop after autonomy release 2.8.</p>
       <div className="callout">
-        <b>Last time, remote recovery returned the affected machines to service without a field visit. The issue later appeared on a fourth machine.</b>
+        <b>Last time, rolling back localization L4 returned all three affected machines to service. The result supported a localization-related explanation, but the role of Zone B was still unresolved.</b>
         <p>Does the same precedent apply here?</p>
       </div>
       <div className="precedent-stack">
         <div>
           <span className="eyebrow">Previous conditions</span>
-          <b>Autonomy 2.7 · Localization L4 · Loading zone B</b>
+          <b>Autonomy 2.7 · Localization L4 · Zone B</b>
         </div>
         <div>
           <span className="eyebrow">Previous action</span>
-          <b>Remote recovery · rollout held · field dispatch held</b>
+          <b>Localization L4 rollback · rollout held</b>
         </div>
         <div>
           <span className="eyebrow">Observed outcome</span>
-          <b>Returned to service · no field visit · EX11 later showed same pattern</b>
+          <b>EX03, EX05 and EX08 recovered after rollback</b>
         </div>
       </div>
       <div className="package-grid memory-grid">
-        <PackageItem title="Cause" value="useful precedent, not proven cause" />
+        <PackageItem title="Cause" value="Localization related, not proven" />
         <PackageItem title="Previous result" value="seen after action" />
         <PackageItem title="Outcome check" value={validation?.status || "record outcome first"} />
-        <PackageItem title="What to reuse" value="check localization, map and zone exposure before field dispatch" />
+        <PackageItem title="What to reuse" value="compare localization profile and Zone B exposure first" />
         <PackageItem title="What to verify" value="whether the same evidence pattern holds now" />
       </div>
       <section className="agent-card precedent-agent">
@@ -831,22 +827,22 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
           <div>
             <b>Reusable from last time</b>
             <ul>
-              <li>Post-release safe-stop near loading zone B.</li>
-              <li>Localization L4 was present in the affected group.</li>
-              <li>Remote recovery returned machines to service.</li>
+              <li>Safe-stop appeared after autonomy 2.7.</li>
+              <li>All affected machines shared localization L4 and Zone B.</li>
+              <li>Rolling back L4 returned all three affected machines to service.</li>
             </ul>
           </div>
           <div>
             <b>Different this time</b>
             <ul>
               <li>Autonomy release 2.8 instead of 2.7.</li>
-              <li>LiDAR firmware and map state must be rechecked.</li>
+              <li>Current Zone B exposure must be checked again.</li>
               <li>Prior outcome is useful, but cause is not proven.</li>
             </ul>
           </div>
         </div>
         <div className="agent-actions">
-          <button className="button primary">Use previous outcome</button>
+          <button className="button primary">Start from previous evidence</button>
           <button className="button">Review differences</button>
         </div>
       </section>
@@ -857,8 +853,8 @@ function MemoryStage({ memory, precedent, onOutcome }: any) {
         </tbody>
       </table>
       <div className="callout">
-        <b>Before dispatching a technician</b>
-        <p>Compare the current machine against the previous exposed group and check whether the same autonomy release, localization profile, map and loading-zone pattern is present.</p>
+        <b>Before choosing the next action</b>
+        <p>Compare the current machine against the previous affected group and check whether localization L4 and Zone B are present again.</p>
       </div>
       <button className="button primary" onClick={onOutcome}>Refresh history from outcome</button>
       <div className="ending">

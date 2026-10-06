@@ -30,7 +30,7 @@ function fallbackResponse(path: string, method: string, body?: unknown): unknown
 
   if (path === "/demo/late-evidence") {
     demoState.lateEvidence = true;
-    return { ok: true, late_evidence: "EX11", event_time: "2026-09-03T14:09:00Z", known_at: "2026-09-03T14:31:00Z" };
+    return { ok: true, late_evidence: "additional runtime trace", event_time: "2026-09-03T14:09:00Z", known_at: "2026-09-03T14:31:00Z" };
   }
 
   if (path.endsWith("/reconstruct")) {
@@ -50,13 +50,13 @@ function fallbackResponse(path: string, method: string, body?: unknown): unknown
   }
 
   if (path.endsWith("/comparison")) {
-    const affected = demoState.lateEvidence ? 4 : 3;
+    const affected = 3;
     return {
       same_change: 12,
       same_signal: affected,
-      no_signal: demoState.lateEvidence ? 8 : 9,
+      no_signal: 9,
       table: [
-        { context: "Autonomy 2.7", affected: `${affected}/${affected}`, unaffected: `${demoState.lateEvidence ? 8 : 9}/${demoState.lateEvidence ? 8 : 9}` },
+        { context: "Autonomy 2.7", affected: `${affected}/${affected}`, unaffected: "9/9" },
         { context: "Localization profile L4", affected: `${affected}/${affected}`, unaffected: "2/9" },
         { context: "LiDAR firmware 5.3", affected: `${affected}/${affected}`, unaffected: "7/9" },
         { context: "Map M19", affected: `${affected}/${affected}`, unaffected: "5/9" },
@@ -126,7 +126,7 @@ function fallbackResponse(path: string, method: string, body?: unknown): unknown
       outcome_comparison: [
         { action: "rollback_localization", outcome: demoState.outcomeRecorded ? "returned to service" : "pending", attribution: demoState.outcomeRecorded ? "observed after action" : "not observed" },
         { action: "observe_EX11_zone_B", outcome: "not executed", attribution: "highest information value" },
-        { action: "dispatch", outcome: "avoided", attribution: "not executed" },
+        { action: "dispatch", outcome: "not needed in this replay", attribution: "not executed" },
       ],
     };
   }
@@ -150,7 +150,7 @@ function demoPackage(sealed: boolean) {
       investigation_id: DEMO_ID,
       human_decision: demoState.decisionRecorded ? { owner: "Operations Lead", decision: "Rollback localization L4 on EX03, EX05 and EX08" } : null,
       planned_action: { label: "Observe EX11 in Zone B" },
-      actual_action: demoState.decisionRecorded ? { label: "Rollback localization L4", scope: { remote_recovery: ["EX03", "EX05", "EX08"] } } : null,
+      actual_action: demoState.decisionRecorded ? { label: "Rollback localization L4", scope: { rollback_localization: ["EX03", "EX05", "EX08"] } } : null,
       hypotheses: demoHypotheses(),
       primary_hypothesis: demoHypotheses()[1],
       options_considered: demoOptions(),
