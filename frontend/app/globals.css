@@ -64,7 +64,7 @@
 .ide-command {
   height: 42px;
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr) 54px;
+  grid-template-columns: 92px minmax(0, 1fr) 92px;
   align-items: center;
   border: 1px solid #ccd7d2;
   border-radius: 10px;
@@ -316,6 +316,26 @@
   letter-spacing: -.045em;
 }
 
+.compare-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.compare-summary span {
+  border: 1px solid #d5ded9;
+  border-radius: 999px;
+  background: #fff;
+  color: #4e5f56;
+  padding: 5px 8px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 720;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .ide-lens-tabs {
   display: flex;
   justify-content: flex-end;
@@ -384,10 +404,12 @@
 
 .ide-data-table tr.affected td {
   background: rgba(255,91,91,.09);
+  box-shadow: inset 3px 0 0 rgba(239,68,68,.58);
 }
 
 .ide-data-table tr.counter td {
   background: rgba(5,150,105,.08);
+  box-shadow: inset 3px 0 0 rgba(5,150,105,.5);
 }
 
 .ide-data-table tr.muted td {
@@ -511,6 +533,15 @@
   color: white;
 }
 
+.next-gap-panel .test-explanation {
+  width: 100%;
+  margin-top: 8px;
+  border-radius: 8px;
+  background: #0f172a;
+  border-color: #0f172a;
+  color: white;
+}
+
 .trace-button {
   width: 100%;
   margin-top: 10px;
@@ -629,22 +660,43 @@
 
 .ide-bottom {
   overflow: hidden;
-  padding: 6px 12px;
+  padding: 8px 12px;
 }
 
-.ide-bottom .ide-event-list div {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+.ide-event-rail {
+  height: 100%;
+  display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 226px;
-  padding: 5px 8px;
+  overflow: auto;
+  white-space: nowrap;
 }
 
-.ide-bottom .ide-event-list b,
-.ide-bottom .ide-event-list span {
+.ide-event-rail div {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #4e5f56;
+  font-size: 12px;
+}
+
+.ide-event-rail div:not(:last-child)::after {
+  content: "";
+  width: 34px;
+  height: 1px;
+  margin: 0 8px;
+  background: #cfd9d4;
+}
+
+.ide-event-rail b {
+  color: #065f46;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.ide-event-rail span {
   margin: 0;
-  font-size: 11px;
+  color: #34423b;
+  font-size: 12px;
 }
 
 @media (max-width: 1180px) {

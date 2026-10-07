@@ -15,7 +15,7 @@ type ObjectKey =
 
 type HypothesisKey = "h2" | "h1" | "h3";
 type TimelineMode = "reality" | "known";
-type ComparatorKey = "healthy" | "same-localization" | "same-site" | "custom";
+type ComparatorKey = "healthy" | "same-release" | "same-localization" | "same-site" | "custom";
 
 const objectNav: Array<{ key: ObjectKey; label: string; count: string }> = [
   { key: "timeline", label: "Timeline", count: "8" },
@@ -101,6 +101,7 @@ const hypotheses: Record<HypothesisKey, {
 
 const comparators: Record<ComparatorKey, { label: string; cohort: string; count: string }> = {
   healthy: { label: "Healthy fleet", cohort: "all healthy machines", count: "9" },
+  "same-release": { label: "Same release", cohort: "healthy autonomy 2.7 machines", count: "9" },
   "same-localization": { label: "Same localization", cohort: "healthy L4 machines", count: "2" },
   "same-site": { label: "Same site", cohort: "healthy zone B machines", count: "1" },
   custom: { label: "Custom cohort", cohort: "EX04 EX06 EX11", count: "3" },
@@ -180,7 +181,7 @@ export default function ProductDemoPage() {
         >
           <span>Ask Veyra</span>
           <strong>show what separates affected from healthy machines</strong>
-          <em>Run</em>
+          <em>Investigate</em>
         </button>
         <div className="ide-source-counts">
           <b>Sources 7</b>
@@ -247,9 +248,15 @@ export default function ProductDemoPage() {
                 {objectKey === "checks"
                   ? "Next Evidence"
                   : objectKey === "machines"
-                    ? `Compare affected against ${activeComparator.label.toLowerCase()}`
+                    ? "Compare affected machines against healthy comparators"
                     : "Active field case data"}
               </h2>
+              {objectKey === "machines" && (
+                <div className="compare-summary">
+                  <span>Affected: EX03 EX05 EX08</span>
+                  <span>Comparator: {activeComparator.label}</span>
+                </div>
+              )}
             </div>
             <div className="ide-lens-tabs" aria-label="hypothesis lens">
               {(Object.keys(hypotheses) as HypothesisKey[]).map((key) => (
@@ -275,7 +282,7 @@ export default function ProductDemoPage() {
                     <th>Localization</th>
                     <th>Zone</th>
                     <th>LiDAR</th>
-                    <th>Lens result</th>
+                    <th>Key difference</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -447,6 +454,15 @@ export default function ProductDemoPage() {
               <button onClick={() => setObjectKey("evidence")}>Inspect evidence</button>
               <button onClick={() => setObjectKey("checks")}>Create check</button>
             </div>
+            <button
+              className="test-explanation"
+              onClick={() => {
+                setObjectKey("checks");
+                setHypothesisKey("h2");
+              }}
+            >
+              Test this explanation
+            </button>
           </section>
 
           <section className="provenance-panel">
@@ -475,7 +491,7 @@ export default function ProductDemoPage() {
       </section>
 
       <footer className="ide-bottom">
-        <div className="ide-event-list">
+        <div className="ide-event-rail">
           {knownEvents.slice(1, 7).map(([time, event]) => (
             <div key={`bottom-${time}`}>
               <b>{time}</b>
