@@ -152,7 +152,7 @@ export default function ProductDemoPage() {
 
           <div className="pilot-source-card">
             <span>Evidence sources</span>
-            <b>Alloy MCP or existing robot data</b>
+            <b>Veyra MCP or existing robot data</b>
             <b>Telemetry</b>
             <b>Software + config</b>
             <b>Jira, Slack, GitHub</b>
@@ -393,7 +393,7 @@ function McpTools() {
       </div>
       <div className="pilot-note split">
         <b>Positioning</b>
-        <p>Alloy can be an upstream robot-data source. Veyra's core object is the cross-system Field Case: machine evidence, engineering changes, human action, physical outcome and precedent.</p>
+        <p>Veyra can connect to existing robot-data sources. Its core object is the cross-system Field Case: machine evidence, engineering changes, human action, physical outcome and precedent.</p>
       </div>
     </div>
   );
