@@ -15,6 +15,7 @@ type ObjectKey =
 
 type HypothesisKey = "h2" | "h1" | "h3";
 type TimelineMode = "reality" | "known";
+type ComparatorKey = "healthy" | "same-localization" | "same-site" | "custom";
 
 const objectNav: Array<{ key: ObjectKey; label: string; count: string }> = [
   { key: "timeline", label: "Timeline", count: "8" },
@@ -67,6 +68,7 @@ const hypotheses: Record<HypothesisKey, {
   supports: string[];
   against: string[];
   missing: string;
+  mind: string;
 }> = {
   h2: {
     id: "H2",
@@ -75,6 +77,7 @@ const hypotheses: Record<HypothesisKey, {
     supports: ["3/3 affected share both conditions", "0/9 healthy share both at decision time"],
     against: ["Limited exposure sample"],
     missing: "Healthy L4 machine observed in Zone B",
+    mind: "EX11 remains healthy in Zone B",
   },
   h1: {
     id: "H1",
@@ -83,6 +86,7 @@ const hypotheses: Record<HypothesisKey, {
     supports: ["3/3 affected use L4"],
     against: ["EX11 uses L4 and has no known safe-stop"],
     missing: "EX11 behavior in Zone B",
+    mind: "Multiple healthy L4 machines remain stable in the same zone",
   },
   h3: {
     id: "H3",
@@ -91,7 +95,15 @@ const hypotheses: Record<HypothesisKey, {
     supports: ["Changed before the first safe-stop"],
     against: ["7/9 healthy machines also use 5.3"],
     missing: "No useful next check",
+    mind: "A healthy LiDAR 5.3 cohort shows the same exposure without safe-stop",
   },
+};
+
+const comparators: Record<ComparatorKey, { label: string; cohort: string; count: string }> = {
+  healthy: { label: "Healthy fleet", cohort: "all healthy machines", count: "9" },
+  "same-localization": { label: "Same localization", cohort: "healthy L4 machines", count: "2" },
+  "same-site": { label: "Same site", cohort: "healthy zone B machines", count: "1" },
+  custom: { label: "Custom cohort", cohort: "EX04 EX06 EX11", count: "3" },
 };
 
 const realityEvents = [
@@ -133,9 +145,11 @@ function lensClass(machine: typeof machines[number], hypothesis: HypothesisKey) 
 export default function ProductDemoPage() {
   const [objectKey, setObjectKey] = useState<ObjectKey>("machines");
   const [hypothesisKey, setHypothesisKey] = useState<HypothesisKey>("h2");
+  const [comparatorKey, setComparatorKey] = useState<ComparatorKey>("healthy");
   const [timelineMode, setTimelineMode] = useState<TimelineMode>("known");
   const [traceOpen, setTraceOpen] = useState(false);
   const activeHypothesis = hypotheses[hypothesisKey];
+  const activeComparator = comparators[comparatorKey];
   const timeline = timelineMode === "reality" ? realityEvents : knownEvents;
 
   const workspaceTitle = useMemo(() => {
@@ -156,10 +170,18 @@ export default function ProductDemoPage() {
     <main className="ide-shell">
       <header className="ide-topbar">
         <Link className="ide-brand" href="/veyra"><span>V</span> Veyra</Link>
-        <div className="ide-command">
+        <button
+          className="ide-command"
+          onClick={() => {
+            setObjectKey("machines");
+            setHypothesisKey("h2");
+            setComparatorKey("same-localization");
+          }}
+        >
           <span>Ask Veyra</span>
-          <input value="show what separates affected from healthy machines" readOnly aria-label="Ask Veyra" />
-        </div>
+          <strong>show what separates affected from healthy machines</strong>
+          <em>Run</em>
+        </button>
         <div className="ide-source-counts">
           <b>Sources 7</b>
           <b>Gaps 2</b>
@@ -192,12 +214,28 @@ export default function ProductDemoPage() {
             </button>
           ))}
           <div className="ide-mini-status">
-            <span>Current case</span>
-            <dl>
-              <div><dt>affected</dt><dd>EX03 EX05 EX08</dd></div>
-              <div><dt>watch</dt><dd>EX11</dd></div>
-              <div><dt>next check</dt><dd>EX11 in Zone B</dd></div>
-            </dl>
+            <span>Cohort control</span>
+            <div className="cohort-group">
+              <label>Affected</label>
+              <p>EX03 EX05 EX08</p>
+            </div>
+            <div className="cohort-group">
+              <label htmlFor="comparator">Comparator</label>
+              <select
+                id="comparator"
+                value={comparatorKey}
+                onChange={(event) => setComparatorKey(event.target.value as ComparatorKey)}
+              >
+                {Object.entries(comparators).map(([key, value]) => (
+                  <option key={key} value={key}>{value.label}</option>
+                ))}
+              </select>
+              <p>{activeComparator.count} machines · {activeComparator.cohort}</p>
+            </div>
+            <div className="cohort-group">
+              <label>Watch</label>
+              <p>EX11</p>
+            </div>
           </div>
         </aside>
 
@@ -205,7 +243,13 @@ export default function ProductDemoPage() {
           <div className="ide-center-head">
             <div>
               <span>{workspaceTitle}</span>
-              <h2>{objectKey === "machines" ? "Compare affected and healthy machines" : "Active field case data"}</h2>
+              <h2>
+                {objectKey === "checks"
+                  ? "Next Evidence"
+                  : objectKey === "machines"
+                    ? `Compare affected against ${activeComparator.label.toLowerCase()}`
+                    : "Active field case data"}
+              </h2>
             </div>
             <div className="ide-lens-tabs" aria-label="hypothesis lens">
               {(Object.keys(hypotheses) as HypothesisKey[]).map((key) => (
@@ -308,13 +352,13 @@ export default function ProductDemoPage() {
           {objectKey === "checks" && (
             <div className="ide-next-check">
               <div>
-                <span>Recommended check</span>
+                <span>Discriminating Check</span>
                 <h3>Observe EX11 in Zone B</h3>
                 <p>Separates H1 from H2 with one low-risk observation.</p>
               </div>
               <div className="branch">
-                <section><b>If EX11 safe-stops</b><span>H2 stronger</span></section>
-                <section><b>If EX11 stays healthy</b><span>H2 weaker, L4 alone weaker</span></section>
+                <section><b>If EX11 safe-stops</b><span>H2 strengthens</span></section>
+                <section><b>If EX11 stays healthy</b><span>H2 weakens</span></section>
               </div>
             </div>
           )}
@@ -368,6 +412,10 @@ export default function ProductDemoPage() {
         <aside className="ide-right">
           <section className="reasoning-panel">
             <span>Current explanations</span>
+            <div className="uncertainty-pill">
+              <b>Case uncertainty</b>
+              <strong>2 unresolved distinctions</strong>
+            </div>
             {(Object.keys(hypotheses) as HypothesisKey[]).map((key) => {
               const item = hypotheses[key];
               return (
@@ -387,6 +435,7 @@ export default function ProductDemoPage() {
               <div><dt>Supports</dt><dd>{activeHypothesis.supports.join("; ")}</dd></div>
               <div><dt>Against</dt><dd>{activeHypothesis.against.join("; ")}</dd></div>
               <div><dt>Missing</dt><dd>{activeHypothesis.missing}</dd></div>
+              <div><dt>Would change our mind</dt><dd>{activeHypothesis.mind}</dd></div>
             </dl>
           </section>
 
