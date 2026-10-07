@@ -88,6 +88,17 @@ const steps: Array<{
   },
 ];
 
+const stateByStep: Record<StepKey, string> = {
+  signal: "Case opened from 3 source records",
+  changed: "Change set reconstructed",
+  where: "Cohorts compared",
+  explain: "Explanation space updated",
+  check: "Next check ranked",
+  decision: "Human decision recorded",
+  outcome: "Outcome linked to intervention",
+  reuse: "Precedent attached to new case",
+};
+
 const machines = [
   ["EX01", "healthy"], ["EX02", "healthy"], ["EX03", "affected"], ["EX04", "healthy"],
   ["EX05", "affected"], ["EX06", "healthy"], ["EX07", "healthy"], ["EX08", "affected"],
@@ -104,6 +115,76 @@ const evidenceByStep: Record<StepKey, string[]> = {
   outcome: ["Recovered: EX03, EX05, EX08", "Attribution: observed after action", "Open question: L4 alone or L4 + Zone B"],
   reuse: ["New case: FC 034", "Shared: safe-stop + L4", "Bring forward: action, outcome, open question"],
 };
+
+const structuredOutput: Record<StepKey, Array<{ label: string; value: string }>> = {
+  signal: [
+    { label: "Telemetry", value: "safe_stop event stream" },
+    { label: "Release", value: "autonomy 2.7 deployment" },
+    { label: "Human note", value: "operator review opened" },
+  ],
+  changed: [
+    { label: "Common change", value: "autonomy 2.7 · 12/12" },
+    { label: "Useful split", value: "localization L4 · 3/3 vs 2/9" },
+    { label: "Useful split", value: "Zone B · 3/3 vs 1/9" },
+  ],
+  where: [
+    { label: "Affected cohort", value: "EX03 · EX05 · EX08" },
+    { label: "Healthy baseline", value: "8 healthy without same exposure" },
+    { label: "Counterexample", value: "EX11 shares L4, no known failure" },
+  ],
+  explain: [
+    { label: "H1", value: "L4 alone · possible" },
+    { label: "H2", value: "L4 plus Zone B · strongest" },
+    { label: "H3", value: "LiDAR 5.3 · weak" },
+  ],
+  check: [
+    { label: "Selected check", value: "observe EX11 in Zone B" },
+    { label: "Why first", value: "separates H1 from H2" },
+    { label: "Cost", value: "low risk · about 15 min" },
+  ],
+  decision: [
+    { label: "Veyra suggested", value: "observe EX11 in Zone B" },
+    { label: "Team chose", value: "rollback L4 on affected robots" },
+    { label: "Reason", value: "production pressure mattered" },
+  ],
+  outcome: [
+    { label: "Observed", value: "3/3 returned to service" },
+    { label: "Supports", value: "localization-related explanation" },
+    { label: "Still open", value: "L4 alone or L4 plus Zone B" },
+  ],
+  reuse: [
+    { label: "Inherited", value: "hypothesis · action · outcome" },
+    { label: "Open question", value: "L4 alone or L4 plus Zone B" },
+    { label: "New case", value: "FC 034 starts with FC 021" },
+  ],
+};
+
+const hypotheses = [
+  {
+    id: "H1",
+    title: "Localization L4 alone",
+    status: "Possible",
+    supports: "3/3 affected use L4",
+    against: "EX11 also uses L4 and is healthy",
+    missing: "EX11 behavior in Zone B",
+  },
+  {
+    id: "H2",
+    title: "L4 plus Zone B",
+    status: "Strong",
+    supports: "3/3 affected share both",
+    against: "No direct counterexample yet",
+    missing: "Healthy L4 machine in Zone B",
+  },
+  {
+    id: "H3",
+    title: "LiDAR firmware 5.3",
+    status: "Weak",
+    supports: "Changed before first stop",
+    against: "7/9 healthy also use 5.3",
+    missing: "No useful next check",
+  },
+];
 
 export default function ProductDemoPage() {
   const [active, setActive] = useState<StepKey>("signal");
@@ -135,8 +216,8 @@ export default function ProductDemoPage() {
       <section className="product-story-hero">
         <div>
           <p>Product Demo · Field Case</p>
-          <h1>One machine problem becomes a clear next move.</h1>
-          <span>Click through the workflow a robotics team would actually use.</span>
+          <h1>One field case. Evidence, uncertainty, action, outcome.</h1>
+          <span>Synthetic replay based on a real deployed-machine investigation pattern.</span>
         </div>
         <button onClick={nextStep}>{activeIndex === steps.length - 1 ? "Replay ending" : "Continue case"}</button>
       </section>
@@ -176,6 +257,50 @@ export default function ProductDemoPage() {
             <h3>{current.result}</h3>
             <p>{current.detail}</p>
           </div>
+
+          <div className="field-case-output">
+            <div className="state-change">
+              <span>Case state change</span>
+              <b>{stateByStep[active]}</b>
+            </div>
+
+            {active === "explain" ? (
+              <div className="hypothesis-mini-grid">
+                {hypotheses.map((hypothesis) => (
+                  <article key={hypothesis.id} className={hypothesis.status.toLowerCase()}>
+                    <header>
+                      <span>{hypothesis.id}</span>
+                      <b>{hypothesis.status}</b>
+                    </header>
+                    <h4>{hypothesis.title}</h4>
+                    <dl>
+                      <div>
+                        <dt>Supports</dt>
+                        <dd>{hypothesis.supports}</dd>
+                      </div>
+                      <div>
+                        <dt>Against</dt>
+                        <dd>{hypothesis.against}</dd>
+                      </div>
+                      <div>
+                        <dt>Missing</dt>
+                        <dd>{hypothesis.missing}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="structured-output-grid">
+                {structuredOutput[active].map((item) => (
+                  <article key={`${item.label}-${item.value}`}>
+                    <span>{item.label}</span>
+                    <b>{item.value}</b>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
 
         <aside className="case-side-panel">
@@ -187,7 +312,7 @@ export default function ProductDemoPage() {
           <div className="quiet-tech-card">
             <span>System step</span>
             <code>{current.tool}()</code>
-            <p>The workspace updates one field case record as the team moves from signal to outcome.</p>
+            <p>Input, output and source links stay attached to the same field case record.</p>
           </div>
         </aside>
       </section>
