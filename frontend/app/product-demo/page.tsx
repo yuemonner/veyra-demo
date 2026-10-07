@@ -231,7 +231,6 @@ export default function ProductDemoPage() {
           className={isAnalyzing ? "ide-command analyzing" : "ide-command"}
           onClick={() => {
             setIsAnalyzing(true);
-            setObjectKey("machines");
             setHypothesisKey("h2");
             setComparatorKey("same-localization");
             setKnownCursor("14:27");
