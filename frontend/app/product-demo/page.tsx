@@ -3,76 +3,89 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-type StepKey = "ingest" | "timeline" | "contrast" | "explain" | "next" | "decision" | "outcome" | "precedent";
+type StepKey = "signal" | "changed" | "where" | "explain" | "check" | "decision" | "outcome" | "reuse";
 
-type ToolResult = {
+const steps: Array<{
+  key: StepKey;
+  label: string;
   title: string;
-  lines: string[];
-  json: Record<string, string | number | string[]>;
-};
-
-const steps: Array<{ key: StepKey; label: string; tool: string; verb: string }> = [
-  { key: "ingest", label: "Open case", tool: "get_case", verb: "Create case graph" },
-  { key: "timeline", label: "Build timeline", tool: "get_case_timeline", verb: "Order evidence" },
-  { key: "contrast", label: "Compare fleet", tool: "compare_assets", verb: "Separate affected and healthy" },
-  { key: "explain", label: "List explanations", tool: "list_hypotheses", verb: "Keep causes explicit" },
-  { key: "next", label: "Rank next check", tool: "rank_next_checks", verb: "Choose useful evidence" },
-  { key: "decision", label: "Record decision", tool: "record_intervention", verb: "Human chooses" },
-  { key: "outcome", label: "Link outcome", tool: "record_outcome", verb: "Measure what happened" },
-  { key: "precedent", label: "Find precedent", tool: "find_precedents", verb: "Reuse the case" },
-];
-
-const results: Record<StepKey, ToolResult> = {
-  ingest: {
-    title: "FC 021 opened",
-    lines: ["12 machines received autonomy 2.7.", "EX03, EX05 and EX08 entered safe-stop.", "Case status: unresolved."],
-    json: { case_id: "FC-021", machines: 12, affected: "EX03, EX05, EX08", status: "open" },
+  subtitle: string;
+  result: string;
+  detail: string;
+  tool: string;
+}> = [
+  {
+    key: "signal",
+    label: "Signal",
+    title: "Three robots entered safe-stop after the same release.",
+    subtitle: "The team opens one field case instead of jumping between dashboards, tickets and release notes.",
+    result: "12 updated · 3 affected · first signal 14:11",
+    detail: "The case starts with a simple question: why did only these machines stop?",
+    tool: "get_case",
   },
-  timeline: {
-    title: "Evidence ordered",
-    lines: ["14:02 release deployed.", "14:11 first safe-stop.", "14:26 operator note added."],
-    json: { windows: ["before", "change", "incident", "review"], first_signal: "14:11", sources: 5 },
+  {
+    key: "changed",
+    label: "Changes",
+    title: "The release changed everywhere. The failure did not.",
+    subtitle: "Veyra reconstructs the changes around the first failure and separates common changes from useful clues.",
+    result: "Autonomy 2.7 is common to all 12 machines.",
+    detail: "Localization L4 and Zone B are more useful than the release itself.",
+    tool: "get_case_timeline",
   },
-  contrast: {
-    title: "The release alone does not explain it",
-    lines: ["Autonomy 2.7: 3/3 affected and 9/9 healthy.", "Localization L4: 3/3 affected and 2/9 healthy.", "Zone B: 3/3 affected and 1/9 healthy."],
-    json: { release: "common", localization_l4: "separator", zone_b: "separator", useful_counterexample: "EX11" },
+  {
+    key: "where",
+    label: "Fleet",
+    title: "EX11 becomes the useful comparison.",
+    subtitle: "It shares the release and localization profile, but has no known safe-stop at decision time.",
+    result: "3 affected · 8 healthy · 1 exposed healthy",
+    detail: "That counterexample keeps the team from jumping to a simple answer too early.",
+    tool: "compare_assets",
   },
-  explain: {
-    title: "Three explanations remain",
-    lines: ["Strong: Localization L4 + Zone B.", "Possible: Localization L4 alone.", "Weak: LiDAR firmware 5.3."],
-    json: { H1: "Localization L4", H2: "L4 + Zone B", H3: "LiDAR 5.3", open_explanations: 3 },
+  {
+    key: "explain",
+    label: "Causes",
+    title: "Veyra keeps competing explanations alive.",
+    subtitle: "The product does not declare root cause. It shows what still fits the evidence.",
+    result: "Strongest: Localization L4 + Zone B",
+    detail: "Still possible: L4 alone. Weak: LiDAR firmware 5.3.",
+    tool: "list_hypotheses",
   },
-  next: {
-    title: "Next useful check selected",
-    lines: ["Observe EX11 in Zone B.", "It separates the two strongest explanations.", "Cost: low. Risk: low. Time: about 15 minutes."],
-    json: { next_check: "Observe EX11 in Zone B", information_value: "high", cost: "low", risk: "low" },
+  {
+    key: "check",
+    label: "Next check",
+    title: "The next useful check is clear.",
+    subtitle: "Before changing production machines, Veyra finds the check that separates the strongest explanations.",
+    result: "Observe EX11 in Zone B",
+    detail: "Low cost. Low risk. About 15 minutes. High information value.",
+    tool: "rank_next_checks",
   },
-  decision: {
-    title: "Human decision recorded",
-    lines: ["Veyra suggested observing EX11.", "Team chose rollback on EX03, EX05 and EX08.", "Reason: production pressure."],
-    json: { suggested: "Observe EX11", chosen: "Rollback L4", owner: "Operations", decision_time: "14:27" },
+  {
+    key: "decision",
+    label: "Decision",
+    title: "The team chooses the practical action.",
+    subtitle: "Veyra suggested the cleanest check. Operations chose faster recovery because production pressure mattered.",
+    result: "Rollback L4 on EX03, EX05 and EX08",
+    detail: "Decision owner and rationale are recorded at 14:27.",
+    tool: "record_intervention",
   },
-  outcome: {
-    title: "Outcome linked",
-    lines: ["All three recovered after rollback.", "Result supports a localization-related explanation.", "It does not prove L4 alone versus L4 plus Zone B."],
-    json: { recovered: "3/3", attribution: "observed_after_action", unresolved: "L4 alone vs L4 + Zone B" },
+  {
+    key: "outcome",
+    label: "Outcome",
+    title: "The machines recover, but cause is still handled carefully.",
+    subtitle: "Veyra links what happened after the action without pretending correlation is proof.",
+    result: "3 of 3 recovered after rollback",
+    detail: "Supports a localization-related explanation. It does not prove L4 alone versus L4 plus Zone B.",
+    tool: "record_outcome",
   },
-  precedent: {
-    title: "FC 034 starts ahead",
-    lines: ["EX21 shows a similar safe-stop 12 days later.", "Veyra retrieves FC 021.", "Previous action, outcome and unresolved question are attached."],
-    json: { new_case: "FC-034", precedent: "FC-021", reused: ["conditions", "action", "outcome", "open question"] },
+  {
+    key: "reuse",
+    label: "Next case",
+    title: "Twelve days later, the next case does not start from zero.",
+    subtitle: "A similar safe-stop appears on EX21. Veyra brings back the prior evidence, action, outcome and open question.",
+    result: "Relevant past case: FC 021",
+    detail: "The team starts with precedent, not a blank search.",
+    tool: "find_precedents",
   },
-};
-
-const graphNodes = [
-  ["Evidence", "Telemetry, releases, config and notes"],
-  ["Contrast", "Affected vs healthy fleet"],
-  ["Hypotheses", "For, against and missing"],
-  ["Next check", "Highest information value"],
-  ["Decision", "Human action and rationale"],
-  ["Outcome", "Observed result"],
-  ["Precedent", "Reusable case memory"],
 ];
 
 const machines = [
@@ -81,193 +94,103 @@ const machines = [
   ["EX09", "healthy"], ["EX10", "healthy"], ["EX11", "watch"], ["EX12", "healthy"],
 ];
 
+const evidenceByStep: Record<StepKey, string[]> = {
+  signal: ["EX03 safe-stop · 14:11", "EX05 safe-stop · 14:18", "EX08 operator note · 14:26"],
+  changed: ["Autonomy 2.6 → 2.7", "Localization L3 → L4", "Map M18 → M19", "LiDAR firmware 5.2 → 5.3"],
+  where: ["Affected: EX03, EX05, EX08", "Healthy with same release: 9", "Useful comparison: EX11"],
+  explain: ["For L4 + Zone B: 3/3 affected", "Against L4 alone: EX11", "Against LiDAR: 7/9 healthy"],
+  check: ["Next check: EX11 in Zone B", "Cost: low", "Risk: low", "Time: ~15 min"],
+  decision: ["Suggested: observe EX11", "Chosen: rollback L4", "Reason: production pressure"],
+  outcome: ["Recovered: EX03, EX05, EX08", "Attribution: observed after action", "Open question: L4 alone or L4 + Zone B"],
+  reuse: ["New case: FC 034", "Shared: safe-stop + L4", "Bring forward: action, outcome, open question"],
+};
+
 export default function ProductDemoPage() {
-  const [active, setActive] = useState<StepKey>("ingest");
-  const [completed, setCompleted] = useState<StepKey[]>(["ingest"]);
+  const [active, setActive] = useState<StepKey>("signal");
   const activeIndex = steps.findIndex((step) => step.key === active);
-  const current = results[active];
+  const current = steps[activeIndex];
 
-  function runStep(key: StepKey) {
-    setActive(key);
-    setCompleted((prev) => Array.from(new Set([...prev, key])));
-  }
-
-  function runNext() {
-    const next = steps[Math.min(activeIndex + 1, steps.length - 1)];
-    runStep(next.key);
-  }
-
-  function resetCase() {
-    setActive("ingest");
-    setCompleted(["ingest"]);
-  }
-
-  const stageStatus = useMemo(() => {
-    if (completed.includes("precedent")) return "precedent ready";
-    if (completed.includes("outcome")) return "outcome linked";
-    if (completed.includes("decision")) return "decision recorded";
-    if (completed.includes("next")) return "next check ranked";
+  const status = useMemo(() => {
+    if (activeIndex >= 7) return "precedent found";
+    if (activeIndex >= 6) return "outcome linked";
+    if (activeIndex >= 5) return "decision recorded";
+    if (activeIndex >= 4) return "next check ready";
     return "case open";
-  }, [completed]);
+  }, [activeIndex]);
+
+  const nextStep = () => setActive(steps[Math.min(activeIndex + 1, steps.length - 1)].key);
 
   return (
-    <main className="pilot-workspace live-product-demo">
-      <header className="pilot-header live-header">
-        <div>
-          <Link className="pilot-brand" href="/veyra"><span>V</span> Veyra</Link>
-          <p>Product Demo · live field case workflow</p>
-          <h1>Click the case tools. Watch the decision record change.</h1>
-        </div>
-        <div className="pilot-kpis" aria-label="case status">
+    <main className="product-story-demo">
+      <header className="product-story-top">
+        <Link className="pilot-brand" href="/veyra"><span>V</span> Veyra</Link>
+        <div className="story-status">
           <b>FC 021</b>
           <b>12 machines</b>
-          <b>{completed.includes("outcome") ? "3 recovered" : "3 affected"}</b>
-          <b>{stageStatus}</b>
+          <b>{activeIndex >= 6 ? "3 recovered" : "3 affected"}</b>
+          <b>{status}</b>
         </div>
       </header>
 
-      <section className="live-demo-grid">
-        <aside className="live-rail">
-          <div className="live-case-summary">
-            <span>Field case</span>
-            <h2>Unexpected safe-stop after autonomy 2.7</h2>
-            <p>All machines got the same release. Only three stopped. Veyra helps decide what to check next and records what worked.</p>
-          </div>
+      <section className="product-story-hero">
+        <div>
+          <p>Product Demo · Field Case</p>
+          <h1>One machine problem becomes a clear next move.</h1>
+          <span>Click through the workflow a robotics team would actually use.</span>
+        </div>
+        <button onClick={nextStep}>{activeIndex === steps.length - 1 ? "Replay ending" : "Continue case"}</button>
+      </section>
 
-          <div className="live-machine-panel">
-            <div><span>Machines</span><b>12</b></div>
-            <div className="machine-grid-mini">
-              {machines.map(([id, status]) => (
-                <i key={id} className={status} title={`${id} ${status}`}>{id}</i>
-              ))}
-            </div>
-            <p><b>Affected</b> EX03 · EX05 · EX08</p>
-            <p><b>Useful comparison</b> EX11</p>
-          </div>
-
-          <nav className="tool-runner" aria-label="Veyra tools">
-            {steps.map((step, index) => {
-              const done = completed.includes(step.key);
-              return (
-                <button key={step.key} className={active === step.key ? "active" : done ? "done" : ""} onClick={() => runStep(step.key)}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <b>{step.label}</b>
-                  <code>{step.tool}()</code>
-                </button>
-              );
-            })}
-          </nav>
+      <section className="case-workbench">
+        <aside className="case-strip" aria-label="case workflow">
+          {steps.map((step, index) => (
+            <button
+              key={step.key}
+              onClick={() => setActive(step.key)}
+              className={step.key === active ? "active" : index < activeIndex ? "done" : ""}
+            >
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              {step.label}
+            </button>
+          ))}
         </aside>
 
-        <section className="live-stage">
-          <div className="stage-topline">
-            <span>{steps[activeIndex].verb}</span>
-            <div className="stage-actions">
-              <button onClick={runNext}>{activeIndex === steps.length - 1 ? "Replay result" : "Run next tool"}</button>
-              <button onClick={resetCase}>Reset</button>
-            </div>
+        <section className="case-main-card">
+          <div className="case-main-copy">
+            <span>{current.label}</span>
+            <h2>{current.title}</h2>
+            <p>{current.subtitle}</p>
           </div>
 
-          <div className="case-graph-live">
-            {graphNodes.map(([label, text], index) => {
-              const isLit = index <= activeIndex;
-              const isNow = index === activeIndex || (active === "timeline" && index === 0);
-              return (
-                <article key={label} className={isLit ? "lit" : ""}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <h3>{label}</h3>
-                  <p>{text}</p>
-                  {isNow && <i>active</i>}
-                </article>
-              );
-            })}
+          <div className="fleet-visual" aria-label="machine state">
+            {machines.map(([id, state]) => (
+              <div key={id} className={`machine-dot ${state}`}>
+                <i />
+                <span>{id}</span>
+              </div>
+            ))}
           </div>
 
-          <div className="tool-result-layout">
-            <article className="tool-result-card">
-              <span>Veyra returned</span>
-              <h2>{current.title}</h2>
-              <ul>
-                {current.lines.map((line) => <li key={line}>{line}</li>)}
-              </ul>
-            </article>
-            <article className="json-card">
-              <span>Tool response</span>
-              <pre>{JSON.stringify(current.json, null, 2)}</pre>
-            </article>
+          <div className="case-result">
+            <span>Veyra shows</span>
+            <h3>{current.result}</h3>
+            <p>{current.detail}</p>
           </div>
-
-          <DynamicDetail active={active} completed={completed} />
         </section>
+
+        <aside className="case-side-panel">
+          <div className="evidence-card">
+            <span>Evidence in view</span>
+            {evidenceByStep[active].map((item) => <b key={item}>{item}</b>)}
+          </div>
+
+          <div className="quiet-tech-card">
+            <span>What runs underneath</span>
+            <code>{current.tool}()</code>
+            <p>Source-linked case data updates the same field case record. The operator sees the useful answer first.</p>
+          </div>
+        </aside>
       </section>
     </main>
-  );
-}
-
-function DynamicDetail({ active, completed }: { active: StepKey; completed: StepKey[] }) {
-  if (active === "contrast") {
-    return (
-      <div className="live-detail contrast-detail">
-        <h2>What separates the stopped machines?</h2>
-        <table>
-          <thead><tr><th>Context</th><th>Affected</th><th>Healthy</th><th>Meaning</th></tr></thead>
-          <tbody>
-            <tr><td>Autonomy 2.7</td><td>3/3</td><td>9/9</td><td>Common to all</td></tr>
-            <tr className="strong"><td>Localization L4</td><td>3/3</td><td>2/9</td><td>Useful separator</td></tr>
-            <tr className="strong"><td>Zone B</td><td>3/3</td><td>1/9</td><td>Useful separator</td></tr>
-            <tr><td>LiDAR 5.3</td><td>3/3</td><td>7/9</td><td>Weak lead</td></tr>
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  if (active === "explain" || active === "next") {
-    return (
-      <div className="live-detail hypothesis-detail">
-        {[
-          ["Strong", "Localization L4 + Zone B", "For: all affected share both", "Missing: healthy L4 machine in Zone B"],
-          ["Possible", "Localization L4", "For: all affected use L4", "Against: EX11 uses L4 and is healthy"],
-          ["Weak", "LiDAR firmware 5.3", "For: recently changed", "Against: many healthy machines use it"],
-        ].map(([status, title, a, b]) => (
-          <article key={title} className={status.toLowerCase()}>
-            <span>{status}</span>
-            <h3>{title}</h3>
-            <p>{a}</p>
-            <p>{b}</p>
-          </article>
-        ))}
-      </div>
-    );
-  }
-
-  if (active === "decision" || active === "outcome" || active === "precedent") {
-    return (
-      <div className="live-detail decision-detail">
-        <article>
-          <span>Veyra suggested</span>
-          <h3>Observe EX11 in Zone B</h3>
-          <p>Best information value. Low disruption.</p>
-        </article>
-        <article className={completed.includes("decision") ? "lit" : ""}>
-          <span>Team chose</span>
-          <h3>Rollback L4 on EX03, EX05 and EX08</h3>
-          <p>Production pressure. Faster recovery mattered more than clean diagnosis.</p>
-        </article>
-        <article className={completed.includes("outcome") ? "lit" : ""}>
-          <span>Observed outcome</span>
-          <h3>3/3 recovered after rollback</h3>
-          <p>Supports localization-related explanation. Causality still not fully proven.</p>
-        </article>
-      </div>
-    );
-  }
-
-  return (
-    <div className="live-detail prompt-detail">
-      <h2>What the customer feels</h2>
-      <p>Instead of opening logs, dashboards and tickets by hand, the team opens one field case and asks focused questions through Veyra tools.</p>
-      <div><b>What changed?</b><b>Where else?</b><b>What could explain it?</b><b>What should we check?</b><b>What happened after?</b></div>
-    </div>
   );
 }
