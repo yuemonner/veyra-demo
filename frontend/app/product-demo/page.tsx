@@ -185,9 +185,9 @@ export default function ProductDemoPage() {
           </div>
 
           <div className="quiet-tech-card">
-            <span>What runs underneath</span>
+            <span>System step</span>
             <code>{current.tool}()</code>
-            <p>Source-linked case data updates the same field case record. The operator sees the useful answer first.</p>
+            <p>The workspace updates one field case record as the team moves from signal to outcome.</p>
           </div>
         </aside>
       </section>
