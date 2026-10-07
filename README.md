@@ -1,67 +1,179 @@
-# Veyra V0 Demo
 
-Operational intelligence for Physical AI.
+# Veyra
 
-See what changed. Decide what to do. Learn what happened after. Reuse it next time.
+**Veyra is Field Case Intelligence for deployed Physical AI.**
 
-This repo is a production-shaped live demo scenario. Ingestion, reconstruction, comparison, deterministic Decision Package generation, decision state, team action recording, outcome linking and similar-case retrieval run through the backend.
+Veyra turns fragmented machine, software, environmental and human evidence into a structured **Field Case** that can be queried, compared, challenged and reused.
 
-## Run
+The core technical problem is not generating another AI answer.
 
-```bash
-cd veyra-v0-demo
-python -m venv backend/.venv
-backend/.venv/bin/pip install -r backend/requirements.txt
-make demo
-make backend
+It is maintaining the evolving evidence state around a real-world incident:
+
+**what happened → what changed → what differs → what could explain it → what is still unknown → what evidence would reduce uncertainty → what humans did → what happened next**
+
+---
+
+## Core architecture
+
+```mermaid
+flowchart LR
+    A[Telemetry / logs] --> N[Evidence normalization]
+    B[Software / config] --> N
+    C[Maintenance / calibration] --> N
+    D[Field observations] --> N
+    E[Engineering systems] --> N
+
+    N --> F[Field Case Graph]
+
+    F --> T[Temporal reconstruction]
+    F --> C1[Cohort contrast]
+    F --> H[Hypothesis graph]
+    F --> G[Evidence gaps]
+
+    T --> R[Reasoning Engine]
+    C1 --> R
+    H --> R
+    G --> R
+
+    R --> X[Next Evidence Ranking]
+
+    X --> I[Human intervention]
+    I --> O[Outcome]
+
+    O --> P[Precedent Memory]
+    P --> F
+
+    F --> M[MCP / Agent Interface]
 ```
 
-In another terminal:
+**Models reason over the case. Veyra owns the case.**
 
-```bash
-cd veyra-v0-demo/frontend
-npm install
-NEXT_PUBLIC_API_URL=http://127.0.0.1:8050 npm run dev
+---
+
+## Technical primitives
+
+### 1. Field Case Graph
+
+A Field Case is not a text summary.
+
+It is a typed graph of:
+
+`Machine · Change · Evidence · Hypothesis · EvidenceGap · Check · Decision · Intervention · Outcome · Precedent`
+
+with relationships such as:
+
+`supports · contradicts · shared_by · tested_by · resulted_in · strengthens · weakens · similar_to`
+
+---
+
+### 2. Temporal evidence
+
+Physical-world investigations have multiple clocks:
+
+`event_time` — when something happened  
+`known_at` — when the team could have known it  
+`ingested_at` — when Veyra received it
+
+This lets Veyra distinguish hindsight from what was actually knowable when a decision was made.
+
+---
+
+### 3. Cohort contrast
+
+Veyra compares affected systems against valid healthy comparators.
+
+It looks for conditions that discriminate:
+
+`affected cohort ↔ healthy cohort`
+
+rather than analysing failed machines in isolation.
+
+---
+
+### 4. Competing hypotheses
+
+Veyra does not collapse uncertainty into a single generated root cause.
+
+Each hypothesis keeps:
+
+`supporting evidence · contradicting evidence · missing evidence · what would change our mind`
+
+---
+
+### 5. Next Evidence Engine
+
+Veyra asks:
+
+> **Which observation would best separate the remaining hypotheses at acceptable cost and risk?**
+
+The system optimizes for the **next useful piece of evidence**, not the most confident-sounding answer.
+
+---
+
+### 6. Intervention–Outcome Memory
+
+Veyra preserves:
+
+`evidence → belief state → recommendation → human decision → intervention → physical outcome → belief update`
+
+So the next field case can inherit prior hypotheses, actions, outcomes and unresolved questions.
+
+---
+
+## Agent-native, model-agnostic
+
+Veyra exposes structured Field Case operations through an MCP-compatible tool surface:
+
+```text
+case.get
+timeline.query
+assets.compare
+hypotheses.list
+hypotheses.evidence
+evidence.gaps
+checks.rank
+interventions.record
+outcomes.record
+precedents.search
 ```
 
-Open:
+Frontier models can improve over time without changing the core product.
 
-- Frontend: http://127.0.0.1:3005
-- Cinematic demo: http://127.0.0.1:3005/cinematic
-- API docs: http://127.0.0.1:8050/docs
-- Demo control: http://127.0.0.1:3005/demo-control
+**The agent is replaceable. The structured field history is cumulative.**
 
-## Demo Scenario
+---
 
-The seed data creates a six-robot manipulation-policy test.
+## What varies vs what compounds
 
-- 14:02: all six robots have a healthy state snapshot.
-- 14:04: policy v0.9 is rolled out to all six robots.
-- 14:06: calibration C and gripper firmware 7.3 are applied to a subset.
-- 14:11: the first grip pose drift signal appears.
-- 14:18: two affected robots are detected.
-- 14:26: an engineer note records human discovery.
-- Two robots show the signal; four remain stable.
-- One stable robot shares the same calibration/firmware exposure and should be watched.
-- A delayed edge-buffer event can later arrive with an event_time before the engineer note but a later known_at timestamp.
-- Runtime producers only need to provide `event_time`; Veyra assigns `known_at` and `ingested_at` when evidence enters the reconstruction layer.
+| Customer-specific | Veyra core |
+|---|---|
+| Connectors | Field Case schema |
+| Source naming | Temporal reconstruction |
+| Schema mapping | Cohort contrast |
+| Machine terminology | Hypothesis graph |
+| Data location | Evidence-gap reasoning |
+| Authentication | Intervention-outcome memory |
+|  | Precedent retrieval |
 
-Veyra reconstructs last-known healthy state, what changed around the case, where else the same pattern appears, affected-vs-healthy comparison, decision state, team action, outcome and similar previous case.
+**We configure the evidence sources. We do not redesign the investigation.**
 
-The product loop is:
+---
 
-> Signal → What changed → Where else → Decision state → Team action → Outcome → Reuse next time
+## System loops
 
-The intended live-demo line is:
+```mermaid
+flowchart LR
+    E[Evidence] --> H[Hypotheses]
+    H --> G[Evidence gaps]
+    G --> C[Next check]
+    C --> D[Human decision]
+    D --> O[Outcome]
+    O --> H
+    O --> P[Precedent]
+    P --> N[Next Field Case]
+```
 
-> From issue to action to outcome.
+One loop reduces uncertainty inside the case.
 
-The ending:
-
-> Every operational case should make the next one smarter.
-
-## Boundaries
-
-Veyra runs as a read-only context layer alongside telemetry, logs, tickets and fleet management systems.
-
-Machine action stays in customer systems. Human decisions stay with the team. Veyra preserves the decision record.
+The second prevents the organization from relearning the same lesson.
+```
