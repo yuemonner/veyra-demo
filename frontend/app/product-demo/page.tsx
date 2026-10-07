@@ -16,6 +16,7 @@ type ObjectKey =
 type HypothesisKey = "h2" | "h1" | "h3";
 type TimelineMode = "reality" | "known";
 type ComparatorKey = "healthy" | "same-release" | "same-localization" | "same-site" | "custom";
+type KnownCursor = "14:11" | "14:18" | "14:23" | "14:24" | "14:26" | "14:27";
 
 const objectNav: Array<{ key: ObjectKey; label: string; count: string }> = [
   { key: "timeline", label: "Timeline", count: "8" },
@@ -75,7 +76,7 @@ const hypotheses: Record<HypothesisKey, {
     label: "L4 + Zone B",
     state: "Strong",
     supports: ["3/3 affected share both conditions", "0/9 healthy share both at decision time"],
-    against: ["Limited exposure sample"],
+    against: ["No healthy L4 machine has yet been observed in Zone B"],
     missing: "Healthy L4 machine observed in Zone B",
     mind: "EX11 remains healthy in Zone B",
   },
@@ -129,6 +130,15 @@ const knownEvents = [
   ["14:31", "Delayed EX11 runtime arrives"],
 ];
 
+const railEvents: Array<[KnownCursor, string]> = [
+  ["14:11", "first stop"],
+  ["14:18", "second stop"],
+  ["14:23", "L4 discovered"],
+  ["14:24", "EX11 counterexample"],
+  ["14:26", "third stop"],
+  ["14:27", "decision"],
+];
+
 const precedentRows = [
   ["FC-021", "0.89", "L4 + safe-stop + same family", "Rollback L4", "3/3 recovered"],
   ["FC-008", "0.61", "localization drift", "Recalibration", "recovered"],
@@ -140,6 +150,43 @@ const lensReadout: Record<HypothesisKey, string[]> = {
   h1: ["affected match 3/3", "healthy match 2/9", "counterexamples 1", "missing comparator 1"],
   h3: ["affected match 3/3", "healthy match 7/9", "counterexamples 7", "missing comparator 0"],
 };
+
+function getBeliefState(cursor: KnownCursor) {
+  if (cursor === "14:11" || cursor === "14:18") {
+    return {
+      label: "BELIEF STATE · early signal",
+      h1: "not formed",
+      h2: "not formed",
+      h3: "possible",
+      detail: "Only safe-stop evidence is known. Change context has not been joined yet.",
+    };
+  }
+  if (cursor === "14:23") {
+    return {
+      label: "BELIEF STATE · 14:23",
+      h1: "stronger",
+      h2: "not yet formed",
+      h3: "weak",
+      detail: "L4 is known. EX11 counterexample and zone exposure are not yet available.",
+    };
+  }
+  if (cursor === "14:24") {
+    return {
+      label: "BELIEF STATE · 14:24",
+      h1: "weakened",
+      h2: "emerging",
+      h3: "weak",
+      detail: "EX11 weakens L4 alone. Zone B begins to matter as the next distinction.",
+    };
+  }
+  return {
+    label: "BELIEF STATE · 14:27",
+    h1: "possible",
+    h2: "strong",
+    h3: "weak",
+    detail: "At decision time, H2 is strongest and EX11 in Zone B is the highest value gap.",
+  };
+}
 
 function lensClass(machine: typeof machines[number], hypothesis: HypothesisKey) {
   if (machine.status === "affected") return "affected";
@@ -154,9 +201,12 @@ export default function ProductDemoPage() {
   const [hypothesisKey, setHypothesisKey] = useState<HypothesisKey>("h2");
   const [comparatorKey, setComparatorKey] = useState<ComparatorKey>("healthy");
   const [timelineMode, setTimelineMode] = useState<TimelineMode>("known");
+  const [knownCursor, setKnownCursor] = useState<KnownCursor>("14:27");
   const [traceOpen, setTraceOpen] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const activeHypothesis = hypotheses[hypothesisKey];
   const activeComparator = comparators[comparatorKey];
+  const beliefState = getBeliefState(knownCursor);
   const timeline = timelineMode === "reality" ? realityEvents : knownEvents;
 
   const workspaceTitle = useMemo(() => {
@@ -166,7 +216,7 @@ export default function ProductDemoPage() {
       changes: "Change matrix",
       evidence: "Evidence sources",
       hypotheses: "Explanation lattice",
-      checks: "Next check planner",
+      checks: "Next Evidence",
       actions: "Decision ledger",
       outcomes: "Outcome and precedent",
     };
@@ -178,16 +228,19 @@ export default function ProductDemoPage() {
       <header className="ide-topbar">
         <Link className="ide-brand" href="/veyra"><span>V</span> Veyra</Link>
         <button
-          className="ide-command"
+          className={isAnalyzing ? "ide-command analyzing" : "ide-command"}
           onClick={() => {
+            setIsAnalyzing(true);
             setObjectKey("machines");
             setHypothesisKey("h2");
             setComparatorKey("same-localization");
+            setKnownCursor("14:27");
+            window.setTimeout(() => setIsAnalyzing(false), 900);
           }}
         >
           <span>⌘ Ask Veyra</span>
           <strong>show what separates affected from healthy machines</strong>
-          <em>Analyze</em>
+          <em>{isAnalyzing ? "Analyzing" : "Analyze"}</em>
         </button>
         <div className="ide-source-counts">
           <b>Sources 7</b>
@@ -261,8 +314,12 @@ export default function ProductDemoPage() {
               {objectKey === "machines" && (
                 <div className="compare-summary">
                   <span>LENS: {activeHypothesis.id}</span>
+                  <span>Comparator: {activeComparator.label}</span>
                   {lensReadout[hypothesisKey].map((item) => <span key={item}>{item}</span>)}
                 </div>
+              )}
+              {objectKey === "checks" && (
+                <p className="workspace-note">Ranked by information value, cost and operational risk.</p>
               )}
             </div>
             <div className="ide-lens-tabs" aria-label="hypothesis lens">
@@ -430,7 +487,7 @@ export default function ProductDemoPage() {
 
         <aside className="ide-right">
           <section className="reasoning-panel">
-            <span>Current explanations</span>
+            <span>{beliefState.label}</span>
             <div className="uncertainty-pill">
               <b>UNCERTAINTY 02</b>
               <strong>2 unresolved distinctions</strong>
@@ -439,14 +496,16 @@ export default function ProductDemoPage() {
             </div>
             {(Object.keys(hypotheses) as HypothesisKey[]).map((key) => {
               const item = hypotheses[key];
+              const temporalState = key === "h1" ? beliefState.h1 : key === "h2" ? beliefState.h2 : beliefState.h3;
               return (
                 <button key={key} className={hypothesisKey === key ? "active" : ""} onClick={() => setHypothesisKey(key)}>
                   <b>{item.id}</b>
                   <strong>{item.label}</strong>
-                  <em>{item.state}</em>
+                  <em>{temporalState}</em>
                 </button>
               );
             })}
+            <p className="belief-note">{beliefState.detail}</p>
           </section>
 
           <section className="reason-detail">
@@ -481,24 +540,27 @@ export default function ProductDemoPage() {
 
           <section className="provenance-panel">
             <span>Why this result?</span>
-            <dl>
-              <div><dt>Evidence sources queried</dt><dd>4</dd></div>
-              <div><dt>Machines compared</dt><dd>12</dd></div>
-              <div><dt>Changes evaluated</dt><dd>18</dd></div>
-              <div><dt>Counterexamples found</dt><dd>1</dd></div>
-              <div><dt>Historical cases searched</dt><dd>37</dd></div>
-            </dl>
+            <p className="provenance-summary">4 sources · 12 machines · 18 changes · 1 counterexample · 37 historical cases searched</p>
             <button className="trace-button" onClick={() => setTraceOpen(!traceOpen)}>
               {traceOpen ? "Hide execution trace" : "View execution trace"}
             </button>
             {traceOpen && (
-              <div className="trace-list">
-                <code>case.get(FC-021)</code>
-                <code>evidence.query(window=24h)</code>
-                <code>assets.compare(affected, healthy)</code>
-                <code>hypotheses.rank()</code>
-                <code>checks.rank_by_information_value()</code>
-              </div>
+              <>
+                <dl>
+                  <div><dt>Evidence sources queried</dt><dd>4</dd></div>
+                  <div><dt>Machines compared</dt><dd>12</dd></div>
+                  <div><dt>Changes evaluated</dt><dd>18</dd></div>
+                  <div><dt>Counterexamples found</dt><dd>1</dd></div>
+                  <div><dt>Historical cases searched</dt><dd>37</dd></div>
+                </dl>
+                <div className="trace-list">
+                  <code>case.get(FC-021)</code>
+                  <code>evidence.query(window=24h)</code>
+                  <code>assets.compare(affected, healthy)</code>
+                  <code>hypotheses.rank()</code>
+                  <code>checks.rank_by_information_value()</code>
+                </div>
+              </>
             )}
           </section>
         </aside>
@@ -506,11 +568,18 @@ export default function ProductDemoPage() {
 
       <footer className="ide-bottom">
         <div className="ide-event-rail">
-          {knownEvents.slice(1, 7).map(([time, event]) => (
-            <div key={`bottom-${time}`}>
+          {railEvents.map(([time, event]) => (
+            <button
+              key={`bottom-${time}`}
+              className={knownCursor === time ? "active" : ""}
+              onClick={() => {
+                setTimelineMode("known");
+                setKnownCursor(time);
+              }}
+            >
               <b>{time}</b>
               <span>{event}</span>
-            </div>
+            </button>
           ))}
         </div>
       </footer>
