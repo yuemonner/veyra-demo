@@ -1,351 +1,440 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-type SurfaceKey = "case" | "evidence" | "reasoning" | "action" | "precedent";
+type ObjectKey =
+  | "timeline"
+  | "machines"
+  | "changes"
+  | "evidence"
+  | "hypotheses"
+  | "checks"
+  | "actions"
+  | "outcomes";
 
-const surfaces: Array<{ key: SurfaceKey; label: string }> = [
-  { key: "case", label: "Case" },
-  { key: "evidence", label: "Evidence" },
-  { key: "reasoning", label: "Reasoning" },
-  { key: "action", label: "Action" },
-  { key: "precedent", label: "Precedent" },
+type HypothesisKey = "h2" | "h1" | "h3";
+type TimelineMode = "reality" | "known";
+
+const objectNav: Array<{ key: ObjectKey; label: string; count: string }> = [
+  { key: "timeline", label: "Timeline", count: "8" },
+  { key: "machines", label: "Machines", count: "12" },
+  { key: "changes", label: "Changes", count: "18" },
+  { key: "evidence", label: "Evidence", count: "7" },
+  { key: "hypotheses", label: "Hypotheses", count: "3" },
+  { key: "checks", label: "Checks", count: "2" },
+  { key: "actions", label: "Actions", count: "1" },
+  { key: "outcomes", label: "Outcomes", count: "1" },
 ];
 
 const machines = [
-  ["EX01", "healthy"], ["EX02", "healthy"], ["EX03", "affected"], ["EX04", "healthy"],
-  ["EX05", "affected"], ["EX06", "healthy"], ["EX07", "healthy"], ["EX08", "affected"],
-  ["EX09", "healthy"], ["EX10", "healthy"], ["EX11", "watch"], ["EX12", "healthy"],
+  { id: "EX01", status: "healthy", release: "2.7", localization: "L3", zone: "A", lidar: "5.2", last: "map sync", exposure: "none" },
+  { id: "EX02", status: "healthy", release: "2.7", localization: "L3", zone: "B", lidar: "5.3", last: "firmware", exposure: "partial" },
+  { id: "EX03", status: "affected", release: "2.7", localization: "L4", zone: "B", lidar: "5.3", last: "safe-stop 14:11", exposure: "full" },
+  { id: "EX04", status: "healthy", release: "2.7", localization: "L4", zone: "C", lidar: "5.2", last: "calibration", exposure: "partial" },
+  { id: "EX05", status: "affected", release: "2.7", localization: "L4", zone: "B", lidar: "5.3", last: "safe-stop 14:18", exposure: "full" },
+  { id: "EX06", status: "healthy", release: "2.7", localization: "L3", zone: "B", lidar: "5.3", last: "mission start", exposure: "partial" },
+  { id: "EX07", status: "healthy", release: "2.7", localization: "L3", zone: "C", lidar: "5.3", last: "none", exposure: "none" },
+  { id: "EX08", status: "affected", release: "2.7", localization: "L4", zone: "B", lidar: "5.3", last: "safe-stop 14:26", exposure: "full" },
+  { id: "EX09", status: "healthy", release: "2.7", localization: "L3", zone: "B", lidar: "5.3", last: "planner fallback", exposure: "partial" },
+  { id: "EX10", status: "healthy", release: "2.7", localization: "L3", zone: "A", lidar: "5.2", last: "none", exposure: "none" },
+  { id: "EX11", status: "watch", release: "2.7", localization: "L4", zone: "C", lidar: "5.3", last: "counterexample", exposure: "counter" },
+  { id: "EX12", status: "healthy", release: "2.7", localization: "L3", zone: "C", lidar: "5.3", last: "none", exposure: "none" },
 ];
 
-const graphNodes = [
-  ["Signal", "3 safe-stops"],
-  ["Changes", "release · L4 · Zone B"],
-  ["Contrast", "affected vs healthy"],
-  ["Hypotheses", "3 still open"],
-  ["Next evidence", "EX11 in Zone B"],
-  ["Intervention", "rollback selected"],
-  ["Outcome", "3/3 recovered"],
-  ["Precedent", "FC034 inherits context"],
+const changes = [
+  { name: "Autonomy 2.7", affected: "3/3", healthy: "9/9", result: "common change", use: "low" },
+  { name: "Localization L4", affected: "3/3", healthy: "2/9", result: "separates some machines", use: "high" },
+  { name: "Loading zone B", affected: "3/3", healthy: "1/9", result: "strong exposure", use: "high" },
+  { name: "LiDAR firmware 5.3", affected: "3/3", healthy: "7/9", result: "too common", use: "low" },
+  { name: "L4 + Zone B", affected: "3/3", healthy: "0/9", result: "best current split", use: "high" },
 ];
 
-const exposureRows = [
-  ["Autonomy 2.7", "3/3", "9/9", "Common"],
-  ["Localization L4", "3/3", "2/9", "Strong"],
-  ["Zone B", "3/3", "1/9", "Strong"],
-  ["L4 + Zone B", "3/3", "0/9", "Very strong"],
-  ["LiDAR firmware 5.3", "3/3", "7/9", "Weak"],
+const evidence = [
+  { source: "Telemetry", record: "safe_stop events", time: "14:11, 14:18, 14:26", status: "observed" },
+  { source: "Deployment", record: "autonomy 2.7 rollout", time: "13:52", status: "observed" },
+  { source: "Config", record: "localization L4", time: "14:23 known", status: "observed" },
+  { source: "Map", record: "zone B mission segment", time: "14:24 known", status: "observed" },
+  { source: "Operator note", record: "review opened", time: "14:26", status: "human note" },
+  { source: "Runtime history", record: "EX11 in zone B", time: "missing", status: "gap" },
+  { source: "Prior cases", record: "37 searched", time: "14:25", status: "retrieved" },
 ];
 
-const hypotheses = [
-  {
-    id: "H1",
-    title: "Localization L4 alone",
-    status: "Possible",
-    supports: "3/3 affected machines use L4",
-    against: "EX11 also uses L4 and has no known safe-stop",
-    missing: "EX11 behavior in Zone B",
-  },
-  {
+const hypotheses: Record<HypothesisKey, {
+  id: string;
+  label: string;
+  state: string;
+  supports: string[];
+  against: string[];
+  missing: string;
+}> = {
+  h2: {
     id: "H2",
-    title: "L4 plus Zone B",
-    status: "Strong",
-    supports: "3/3 affected machines share both conditions",
-    against: "No direct counterexample yet",
+    label: "L4 + Zone B",
+    state: "Strong",
+    supports: ["3/3 affected share both conditions", "0/9 healthy share both at decision time"],
+    against: ["Limited exposure sample"],
     missing: "Healthy L4 machine observed in Zone B",
   },
-  {
+  h1: {
+    id: "H1",
+    label: "L4 alone",
+    state: "Possible",
+    supports: ["3/3 affected use L4"],
+    against: ["EX11 uses L4 and has no known safe-stop"],
+    missing: "EX11 behavior in Zone B",
+  },
+  h3: {
     id: "H3",
-    title: "LiDAR firmware 5.3",
-    status: "Weak",
-    supports: "Changed before the first safe-stop",
-    against: "7/9 healthy machines also use 5.3",
+    label: "LiDAR 5.3",
+    state: "Weak",
+    supports: ["Changed before the first safe-stop"],
+    against: ["7/9 healthy machines also use 5.3"],
     missing: "No useful next check",
   },
+};
+
+const realityEvents = [
+  ["12:40", "Sensor recalibration completed"],
+  ["13:52", "Autonomy 2.7 rollout complete"],
+  ["14:09", "EX11 enters zone B without uploaded runtime segment"],
+  ["14:11", "EX03 safe-stop"],
+  ["14:18", "EX05 safe-stop"],
+  ["14:26", "EX08 safe-stop"],
+  ["14:27", "Team records rollback decision"],
+  ["14:51", "3/3 affected machines recovered after rollback"],
 ];
 
-const evidenceGaps = [
-  ["EX11 in Zone B", "High", "Low", "Low", "15m"],
-  ["Rollback EX03", "Medium", "Medium", "Medium", "30m"],
-  ["Full LiDAR recalibration", "Low", "High", "Medium", "2h"],
+const knownEvents = [
+  ["13:52", "Rollout known"],
+  ["14:11", "First safe-stop known"],
+  ["14:18", "Second safe-stop known"],
+  ["14:23", "Localization L4 discovered"],
+  ["14:24", "EX11 counterexample found"],
+  ["14:26", "Third safe-stop known"],
+  ["14:27", "Decision snapshot sealed"],
+  ["14:31", "Delayed EX11 runtime arrives"],
 ];
 
-const agentTrace = [
-  "get_case(FC021)",
-  "list_changes(window=-24h)",
-  "compare_assets(affected, healthy)",
-  "test_exposure(Localization L4)",
-  "test_exposure(Zone B)",
-  "find_counterexamples()",
-  "rank_next_checks()",
+const precedentRows = [
+  ["FC-021", "0.89", "L4 + safe-stop + same family", "Rollback L4", "3/3 recovered"],
+  ["FC-008", "0.61", "localization drift", "Recalibration", "recovered"],
+  ["FC-014", "0.43", "safe-stop", "Remote restart", "no effect"],
 ];
 
-const caseDiff = [
-  ["14:11", "3 safe-stops", "No dominant hypothesis"],
-  ["14:21", "L4 enriched in affected cohort", "L4 alone still possible"],
-  ["14:24", "EX11 found healthy with L4", "L4 alone weakened"],
-  ["14:26", "Zone B interaction rises", "H2 strongest"],
-  ["14:27", "Operations chooses rollback", "Decision recorded"],
-  ["14:51", "3/3 recover", "Localization-related explanation strengthened"],
-];
-
-function MiniFleet() {
-  return (
-    <div className="workbench-fleet-map" aria-label="machine cohort">
-      {machines.map(([id, state]) => (
-        <span key={id} className={state}>
-          <i />
-          <b>{id}</b>
-        </span>
-      ))}
-    </div>
-  );
+function lensClass(machine: typeof machines[number], hypothesis: HypothesisKey) {
+  if (machine.status === "affected") return "affected";
+  if (hypothesis === "h1" && machine.localization === "L4") return "counter";
+  if (hypothesis === "h2" && machine.localization === "L4" && machine.zone === "B") return "counter";
+  if (hypothesis === "h3" && machine.lidar === "5.3") return "counter";
+  return "muted";
 }
 
 export default function ProductDemoPage() {
-  const [surface, setSurface] = useState<SurfaceKey>("case");
-  const activeIndex = surfaces.findIndex((item) => item.key === surface);
+  const [objectKey, setObjectKey] = useState<ObjectKey>("machines");
+  const [hypothesisKey, setHypothesisKey] = useState<HypothesisKey>("h2");
+  const [timelineMode, setTimelineMode] = useState<TimelineMode>("known");
+  const [traceOpen, setTraceOpen] = useState(false);
+  const activeHypothesis = hypotheses[hypothesisKey];
+  const timeline = timelineMode === "reality" ? realityEvents : knownEvents;
+
+  const workspaceTitle = useMemo(() => {
+    const titles: Record<ObjectKey, string> = {
+      timeline: "Timeline",
+      machines: "Machine contrast",
+      changes: "Change matrix",
+      evidence: "Evidence sources",
+      hypotheses: "Explanation lattice",
+      checks: "Next check planner",
+      actions: "Decision ledger",
+      outcomes: "Outcome and precedent",
+    };
+    return titles[objectKey];
+  }, [objectKey]);
 
   return (
-    <main className="field-workbench">
-      <header className="field-topbar">
-        <Link className="pilot-brand" href="/veyra"><span>V</span> Veyra</Link>
-        <nav aria-label="workbench surfaces">
-          {surfaces.map((item) => (
-            <button
-              key={item.key}
-              className={surface === item.key ? "active" : ""}
-              onClick={() => setSurface(item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
+    <main className="ide-shell">
+      <header className="ide-topbar">
+        <Link className="ide-brand" href="/veyra"><span>V</span> Veyra</Link>
+        <div className="ide-command">
+          <span>Ask Veyra</span>
+          <input value="show what separates affected from healthy machines" readOnly aria-label="Ask Veyra" />
+        </div>
+        <div className="ide-source-counts">
+          <b>Sources 7</b>
+          <b>Gaps 2</b>
+          <b>Hypotheses 3</b>
+        </div>
       </header>
 
-      <section className="field-case-header">
+      <section className="ide-casebar">
         <div>
-          <span>Field Case Workbench</span>
-          <h1>FC-021 · Safe-stop cluster</h1>
+          <span>FC-021</span>
+          <h1>Safe-stop cluster</h1>
         </div>
-        <div className="case-metrics">
-          <b>3 / 12 affected</b>
-          <b>first signal 14:11</b>
-          <b>3 hypotheses open</b>
-          <b>2 evidence gaps</b>
-          <b>status open</b>
-        </div>
+        <b className="open">Open</b>
+        <b>3 affected / 12</b>
+        <b>started 14:11</b>
+        <b>owner operations</b>
       </section>
 
-      <section className="field-workspace">
-        <aside className="case-object-panel">
-          <div className="case-object-title">
-            <span>Case graph</span>
-            <b>Evidence → hypothesis → action → outcome</b>
+      <section className="ide-grid">
+        <aside className="ide-left">
+          <div className="ide-left-title">Case objects</div>
+          {objectNav.map((item) => (
+            <button
+              key={item.key}
+              className={objectKey === item.key ? "active" : ""}
+              onClick={() => setObjectKey(item.key)}
+            >
+              <span>{item.label}</span>
+              <b>{item.count}</b>
+            </button>
+          ))}
+          <div className="ide-mini-status">
+            <span>Current case</span>
+            <dl>
+              <div><dt>affected</dt><dd>EX03 EX05 EX08</dd></div>
+              <div><dt>watch</dt><dd>EX11</dd></div>
+              <div><dt>next check</dt><dd>EX11 in Zone B</dd></div>
+            </dl>
           </div>
-          <div className="case-graph-list">
-            {graphNodes.map(([label, value], index) => (
-              <button key={label} className={index === activeIndex ? "active" : ""}>
-                <span>{label}</span>
-                <b>{value}</b>
-              </button>
-            ))}
-          </div>
-          <MiniFleet />
         </aside>
 
-        <section className="workbench-main">
-          {surface === "case" && (
-            <div className="surface-grid case-surface">
-              <article className="workbench-card wide">
-                <span>Case state</span>
-                <h2>All 12 machines received autonomy 2.7. Only 3 entered safe-stop.</h2>
-                <p>The release alone does not explain the issue. Veyra keeps the case as linked objects, not as a summary paragraph.</p>
-              </article>
-              <article className="workbench-card">
-                <span>Source provenance</span>
-                <dl className="source-list">
-                  <div><dt>Telemetry</dt><dd>safe_stop event stream</dd></div>
-                  <div><dt>Deployment</dt><dd>autonomy 2.7 rollout</dd></div>
-                  <div><dt>Human note</dt><dd>operator review at 14:26</dd></div>
-                </dl>
-              </article>
-              <article className="workbench-card">
-                <span>Known now</span>
-                <dl className="source-list">
-                  <div><dt>Affected</dt><dd>EX03 · EX05 · EX08</dd></div>
-                  <div><dt>Useful comparator</dt><dd>EX11</dd></div>
-                  <div><dt>Open question</dt><dd>L4 alone or L4 plus Zone B</dd></div>
-                </dl>
-              </article>
-              <article className="workbench-card wide">
-                <span>Case state diff</span>
-                <div className="state-diff">
-                  {caseDiff.map(([time, evidence, belief]) => (
-                    <div key={time}>
-                      <b>{time}</b>
-                      <span>{evidence}</span>
-                      <em>{belief}</em>
-                    </div>
-                  ))}
-                </div>
-              </article>
+        <section className="ide-center">
+          <div className="ide-center-head">
+            <div>
+              <span>{workspaceTitle}</span>
+              <h2>{objectKey === "machines" ? "Compare affected and healthy machines" : "Active field case data"}</h2>
             </div>
-          )}
+            <div className="ide-lens-tabs" aria-label="hypothesis lens">
+              {(Object.keys(hypotheses) as HypothesisKey[]).map((key) => (
+                <button
+                  key={key}
+                  className={hypothesisKey === key ? "active" : ""}
+                  onClick={() => setHypothesisKey(key)}
+                >
+                  {hypotheses[key].id} {hypotheses[key].label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          {surface === "evidence" && (
-            <div className="surface-grid evidence-surface">
-              <article className="workbench-card wide">
-                <span>Contrast Lab</span>
-                <h2>Affected cohort vs healthy comparators</h2>
-                <table className="contrast-table">
-                  <thead>
-                    <tr>
-                      <th>Exposure</th>
-                      <th>Affected</th>
-                      <th>Healthy</th>
-                      <th>Signal</th>
+          {(objectKey === "machines" || objectKey === "hypotheses") && (
+            <div className="ide-table-wrap">
+              <table className="ide-data-table">
+                <thead>
+                  <tr>
+                    <th>Machine</th>
+                    <th>Status</th>
+                    <th>Release</th>
+                    <th>Localization</th>
+                    <th>Zone</th>
+                    <th>LiDAR</th>
+                    <th>Lens result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {machines.map((machine) => (
+                    <tr key={machine.id} className={lensClass(machine, hypothesisKey)}>
+                      <td><b>{machine.id}</b></td>
+                      <td>{machine.status}</td>
+                      <td>{machine.release}</td>
+                      <td>{machine.localization}</td>
+                      <td>{machine.zone}</td>
+                      <td>{machine.lidar}</td>
+                      <td>{machine.last}</td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {exposureRows.map(([exposure, affected, healthy, signal]) => (
-                      <tr key={exposure}>
-                        <td>{exposure}</td>
-                        <td>{affected}</td>
-                        <td>{healthy}</td>
-                        <td><b>{signal}</b></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </article>
-              <article className="workbench-card">
-                <span>Why EX11 matters</span>
-                <h3>Counterexample</h3>
-                <p>EX11 has autonomy 2.7 and localization L4, but no known safe-stop at decision time. That weakens L4 alone.</p>
-              </article>
-              <article className="workbench-card">
-                <span>Source links</span>
-                <dl className="source-list">
-                  <div><dt>event_time</dt><dd>14:11 · first safe-stop</dd></div>
-                  <div><dt>known_at</dt><dd>14:26 · review opened</dd></div>
-                  <div><dt>ingested_at</dt><dd>14:26:04 · case updated</dd></div>
-                </dl>
-              </article>
-            </div>
-          )}
-
-          {surface === "reasoning" && (
-            <div className="surface-grid reasoning-surface">
-              <article className="workbench-card wide">
-                <span>Hypothesis board</span>
-                <h2>Veyra maintains the explanation space.</h2>
-                <div className="hypothesis-board">
-                  {hypotheses.map((hypothesis) => (
-                    <article key={hypothesis.id} className={hypothesis.status.toLowerCase()}>
-                      <header>
-                        <span>{hypothesis.id}</span>
-                        <b>{hypothesis.status}</b>
-                      </header>
-                      <h3>{hypothesis.title}</h3>
-                      <dl>
-                        <div><dt>Supports</dt><dd>{hypothesis.supports}</dd></div>
-                        <div><dt>Against</dt><dd>{hypothesis.against}</dd></div>
-                        <div><dt>Missing</dt><dd>{hypothesis.missing}</dd></div>
-                      </dl>
-                    </article>
                   ))}
-                </div>
-              </article>
-              <article className="workbench-card wide">
-                <span>Evidence Gap Map</span>
-                <table className="contrast-table compact">
-                  <thead>
-                    <tr><th>Missing evidence</th><th>Info value</th><th>Cost</th><th>Risk</th><th>Time</th></tr>
-                  </thead>
-                  <tbody>
-                    {evidenceGaps.map(([gap, value, cost, risk, time]) => (
-                      <tr key={gap}><td>{gap}</td><td><b>{value}</b></td><td>{cost}</td><td>{risk}</td><td>{time}</td></tr>
-                    ))}
-                  </tbody>
-                </table>
-              </article>
+                </tbody>
+              </table>
             </div>
           )}
 
-          {surface === "action" && (
-            <div className="surface-grid action-surface">
-              <article className="workbench-card wide">
-                <span>Next Evidence Ranking</span>
-                <h2>Observe EX11 in Zone B.</h2>
-                <p>Why this first: it separates H1 from H2 with one low-risk observation, before changing another production machine.</p>
-                <div className="ranking-list">
-                  <div><b>1</b><span>Observe EX11 in Zone B</span><em>High info value · low risk · 15m</em></div>
-                  <div><b>2</b><span>Roll back L4 on EX03</span><em>Medium info value · medium disruption</em></div>
-                  <div><b>3</b><span>Full LiDAR recalibration</span><em>Low info value · high cost</em></div>
-                </div>
-              </article>
-              <article className="workbench-card">
-                <span>Agent trace</span>
-                <div className="agent-trace-list">
-                  {agentTrace.map((call) => <code key={call}>✓ {call}</code>)}
-                </div>
-              </article>
-              <article className="workbench-card">
-                <span>Human decision</span>
-                <h3>Team chose rollback</h3>
-                <p>Veyra suggested the cleanest check. Operations chose faster recovery because production pressure mattered.</p>
-                <dl className="source-list">
-                  <div><dt>Owner</dt><dd>Operations lead</dd></div>
-                  <div><dt>Recorded</dt><dd>14:27</dd></div>
-                  <div><dt>Rationale</dt><dd>restore service first</dd></div>
-                </dl>
-              </article>
+          {objectKey === "changes" && (
+            <div className="ide-table-wrap">
+              <table className="ide-data-table">
+                <thead><tr><th>Change</th><th>Affected</th><th>Healthy</th><th>Result</th><th>Use</th></tr></thead>
+                <tbody>
+                  {changes.map((change) => (
+                    <tr key={change.name} className={change.use === "high" ? "affected" : "muted"}>
+                      <td><b>{change.name}</b></td>
+                      <td>{change.affected}</td>
+                      <td>{change.healthy}</td>
+                      <td>{change.result}</td>
+                      <td>{change.use}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
-          {surface === "precedent" && (
-            <div className="surface-grid precedent-surface">
-              <article className="workbench-card wide">
-                <span>Precedent injection</span>
-                <h2>FC-034 does not start from zero.</h2>
-                <p>A similar safe-stop appears 12 days later. Veyra brings forward the prior hypothesis, action, outcome and unresolved question.</p>
-              </article>
-              <article className="workbench-card">
-                <span>Matched precedent</span>
-                <h3>FC-021</h3>
-                <dl className="source-list">
-                  <div><dt>Shared</dt><dd>safe-stop · L4 · same family</dd></div>
-                  <div><dt>Action</dt><dd>rollback L4</dd></div>
-                  <div><dt>Outcome</dt><dd>3/3 recovered</dd></div>
-                </dl>
-              </article>
-              <article className="workbench-card">
-                <span>Inherited into FC-034</span>
-                <h3>Starting checks</h3>
-                <ol className="precedent-list">
-                  <li>Confirm zone condition</li>
-                  <li>Inspect localization config</li>
-                  <li>Compare against EX11 precedent</li>
-                </ol>
-              </article>
+          {objectKey === "evidence" && (
+            <div className="ide-table-wrap">
+              <table className="ide-data-table">
+                <thead><tr><th>Source</th><th>Record</th><th>Time</th><th>Status</th></tr></thead>
+                <tbody>
+                  {evidence.map((row) => (
+                    <tr key={row.source} className={row.status === "gap" ? "counter" : ""}>
+                      <td><b>{row.source}</b></td>
+                      <td>{row.record}</td>
+                      <td>{row.time}</td>
+                      <td>{row.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {objectKey === "timeline" && (
+            <div className="ide-timeline-mode">
+              <div className="timeline-toggle">
+                <button className={timelineMode === "reality" ? "active" : ""} onClick={() => setTimelineMode("reality")}>Reality</button>
+                <button className={timelineMode === "known" ? "active" : ""} onClick={() => setTimelineMode("known")}>What the team knew</button>
+              </div>
+              <div className="ide-event-list large">
+                {timeline.map(([time, event]) => (
+                  <div key={`${timelineMode}-${time}`}>
+                    <b>{time}</b>
+                    <span>{event}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {objectKey === "checks" && (
+            <div className="ide-next-check">
+              <div>
+                <span>Recommended check</span>
+                <h3>Observe EX11 in Zone B</h3>
+                <p>Separates H1 from H2 with one low-risk observation.</p>
+              </div>
+              <div className="branch">
+                <section><b>If EX11 safe-stops</b><span>H2 stronger</span></section>
+                <section><b>If EX11 stays healthy</b><span>H2 weaker, L4 alone weaker</span></section>
+              </div>
+            </div>
+          )}
+
+          {objectKey === "actions" && (
+            <div className="ide-table-wrap">
+              <table className="ide-data-table">
+                <thead><tr><th>Time</th><th>Veyra suggested</th><th>Team chose</th><th>Reason</th><th>Outcome</th></tr></thead>
+                <tbody>
+                  <tr className="affected">
+                    <td>14:27</td>
+                    <td>Observe EX11 in Zone B</td>
+                    <td><b>Rollback L4</b></td>
+                    <td>restore service first</td>
+                    <td>3/3 recovered</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="belief-update">
+                <span>Hypothesis update after outcome</span>
+                <b>Localization-related family stronger</b>
+                <p>L4 alone remains unresolved. L4 + Zone B remains unresolved. The rollback result supports the family, not a single proven cause.</p>
+              </div>
+            </div>
+          )}
+
+          {objectKey === "outcomes" && (
+            <div className="ide-table-wrap">
+              <table className="ide-data-table">
+                <thead><tr><th>Case</th><th>Similarity</th><th>Shared conditions</th><th>Intervention</th><th>Outcome</th></tr></thead>
+                <tbody>
+                  {precedentRows.map(([id, score, shared, intervention, outcome], index) => (
+                    <tr key={id} className={index === 0 ? "affected" : ""}>
+                      <td><b>{id}</b></td>
+                      <td>{score}</td>
+                      <td>{shared}</td>
+                      <td>{intervention}</td>
+                      <td>{outcome}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="precedent-operation">
+                <button>Start FC-034 from FC-021</button>
+                <span>Imports hypothesis, unresolved question, successful intervention and suggested checks.</span>
+              </div>
             </div>
           )}
         </section>
 
-        <aside className="operator-panel">
-          <span>Operator</span>
-          <h2>Why did only 3 stop?</h2>
-          <div className="agent-trace-list">
-            {agentTrace.slice(0, 5).map((call) => <code key={call}>✓ {call}</code>)}
-          </div>
-          <div className="operator-result">
-            <b>Current result</b>
-            <p>L4 plus Zone B best fits current evidence. EX11 in Zone B is the next useful check.</p>
-          </div>
+        <aside className="ide-right">
+          <section className="reasoning-panel">
+            <span>Current explanations</span>
+            {(Object.keys(hypotheses) as HypothesisKey[]).map((key) => {
+              const item = hypotheses[key];
+              return (
+                <button key={key} className={hypothesisKey === key ? "active" : ""} onClick={() => setHypothesisKey(key)}>
+                  <b>{item.id}</b>
+                  <strong>{item.label}</strong>
+                  <em>{item.state}</em>
+                </button>
+              );
+            })}
+          </section>
+
+          <section className="reason-detail">
+            <span>{activeHypothesis.id} detail</span>
+            <h3>{activeHypothesis.label}</h3>
+            <dl>
+              <div><dt>Supports</dt><dd>{activeHypothesis.supports.join("; ")}</dd></div>
+              <div><dt>Against</dt><dd>{activeHypothesis.against.join("; ")}</dd></div>
+              <div><dt>Missing</dt><dd>{activeHypothesis.missing}</dd></div>
+            </dl>
+          </section>
+
+          <section className="next-gap-panel">
+            <span>Highest value gap</span>
+            <h3>EX11 in Zone B</h3>
+            <p>Separates the two strongest remaining explanations. Estimated 15 minutes, low operational risk.</p>
+            <div>
+              <button onClick={() => setObjectKey("evidence")}>Inspect evidence</button>
+              <button onClick={() => setObjectKey("checks")}>Create check</button>
+            </div>
+          </section>
+
+          <section className="provenance-panel">
+            <span>Why this result?</span>
+            <dl>
+              <div><dt>Evidence sources queried</dt><dd>4</dd></div>
+              <div><dt>Machines compared</dt><dd>12</dd></div>
+              <div><dt>Changes evaluated</dt><dd>18</dd></div>
+              <div><dt>Counterexamples found</dt><dd>1</dd></div>
+              <div><dt>Historical cases searched</dt><dd>37</dd></div>
+            </dl>
+            <button className="trace-button" onClick={() => setTraceOpen(!traceOpen)}>
+              {traceOpen ? "Hide execution trace" : "View execution trace"}
+            </button>
+            {traceOpen && (
+              <div className="trace-list">
+                <code>case.get(FC-021)</code>
+                <code>evidence.query(window=24h)</code>
+                <code>assets.compare(affected, healthy)</code>
+                <code>hypotheses.rank()</code>
+                <code>checks.rank_by_information_value()</code>
+              </div>
+            )}
+          </section>
         </aside>
       </section>
+
+      <footer className="ide-bottom">
+        <div className="ide-event-list">
+          {knownEvents.slice(1, 7).map(([time, event]) => (
+            <div key={`bottom-${time}`}>
+              <b>{time}</b>
+              <span>{event}</span>
+            </div>
+          ))}
+        </div>
+      </footer>
     </main>
   );
 }
