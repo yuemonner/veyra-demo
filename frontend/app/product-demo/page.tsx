@@ -135,6 +135,12 @@ const precedentRows = [
   ["FC-014", "0.43", "safe-stop", "Remote restart", "no effect"],
 ];
 
+const lensReadout: Record<HypothesisKey, string[]> = {
+  h2: ["affected match 3/3", "healthy match 0/9", "counterexamples 0", "missing comparator 1"],
+  h1: ["affected match 3/3", "healthy match 2/9", "counterexamples 1", "missing comparator 1"],
+  h3: ["affected match 3/3", "healthy match 7/9", "counterexamples 7", "missing comparator 0"],
+};
+
 function lensClass(machine: typeof machines[number], hypothesis: HypothesisKey) {
   if (machine.status === "affected") return "affected";
   if (hypothesis === "h1" && machine.localization === "L4") return "counter";
@@ -179,9 +185,9 @@ export default function ProductDemoPage() {
             setComparatorKey("same-localization");
           }}
         >
-          <span>Ask Veyra</span>
+          <span>⌘ Ask Veyra</span>
           <strong>show what separates affected from healthy machines</strong>
-          <em>Investigate</em>
+          <em>Analyze</em>
         </button>
         <div className="ide-source-counts">
           <b>Sources 7</b>
@@ -195,10 +201,11 @@ export default function ProductDemoPage() {
           <span>FC-021</span>
           <h1>Safe-stop cluster</h1>
         </div>
-        <b className="open">Open</b>
-        <b>3 affected / 12</b>
-        <b>started 14:11</b>
-        <b>owner operations</b>
+        <b className="open">OPEN</b>
+        <b>12 MACHINES</b>
+        <b>7 SOURCES</b>
+        <b>18 CHANGES</b>
+        <b>UPDATED 14:27:08</b>
       </section>
 
       <section className="ide-grid">
@@ -253,8 +260,8 @@ export default function ProductDemoPage() {
               </h2>
               {objectKey === "machines" && (
                 <div className="compare-summary">
-                  <span>Affected: EX03 EX05 EX08</span>
-                  <span>Comparator: {activeComparator.label}</span>
+                  <span>LENS: {activeHypothesis.id}</span>
+                  {lensReadout[hypothesisKey].map((item) => <span key={item}>{item}</span>)}
                 </div>
               )}
             </div>
@@ -288,13 +295,13 @@ export default function ProductDemoPage() {
                 <tbody>
                   {machines.map((machine) => (
                     <tr key={machine.id} className={lensClass(machine, hypothesisKey)}>
-                      <td><b>{machine.id}</b></td>
-                      <td>{machine.status}</td>
-                      <td>{machine.release}</td>
-                      <td>{machine.localization}</td>
-                      <td>{machine.zone}</td>
-                      <td>{machine.lidar}</td>
-                      <td>{machine.last}</td>
+                      <td title="source_id ASSET_REGISTRY"><b>{machine.id}</b></td>
+                      <td title="source telemetry_safe_stop">{machine.status}</td>
+                      <td title="source deployment_config · event_time 13:52 · known_at 13:52">{machine.release}</td>
+                      <td title="source localization_config · known_at 14:23">{machine.localization}</td>
+                      <td title="source mission_map · known_at 14:24">{machine.zone}</td>
+                      <td title="source sensor_manifest">{machine.lidar}</td>
+                      <td title="open source evidence">{machine.last}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -359,9 +366,14 @@ export default function ProductDemoPage() {
           {objectKey === "checks" && (
             <div className="ide-next-check">
               <div>
-                <span>Discriminating Check</span>
-                <h3>Observe EX11 in Zone B</h3>
-                <p>Separates H1 from H2 with one low-risk observation.</p>
+                <span>Next Evidence</span>
+                <h3>01 EX11 → Zone B</h3>
+                <p>Separates H1 / H2. Info high. Cost low. Risk low. About 15 min.</p>
+                <div className="next-evidence-rank">
+                  <button className="active">01 EX11 → Zone B</button>
+                  <button>02 rollback EX03</button>
+                  <button>03 LiDAR recalibration</button>
+                </div>
               </div>
               <div className="branch">
                 <section><b>If EX11 safe-stops</b><span>H2 strengthens</span></section>
@@ -420,8 +432,10 @@ export default function ProductDemoPage() {
           <section className="reasoning-panel">
             <span>Current explanations</span>
             <div className="uncertainty-pill">
-              <b>Case uncertainty</b>
+              <b>UNCERTAINTY 02</b>
               <strong>2 unresolved distinctions</strong>
+              <small>01 L4 alone vs L4 × Zone B</small>
+              <small>02 localization-related vs unknown interaction</small>
             </div>
             {(Object.keys(hypotheses) as HypothesisKey[]).map((key) => {
               const item = hypotheses[key];
