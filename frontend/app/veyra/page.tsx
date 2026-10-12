@@ -65,6 +65,16 @@ export default async function VeyraPage() {
           <p>Product Demo: what changed, where else, options, action, outcome and reusable history.</p>
           <Link className="button primary" href="/product-demo">Open Product Demo</Link>
         </section>
+        <section className="inception-panel" aria-label="NVIDIA Inception membership">
+          <img
+            src="/badges/nvidia-inception-program-badge-rgb-for-screen.svg"
+            alt="NVIDIA Inception Program"
+          />
+          <div>
+            <span className="eyebrow">Credibility</span>
+            <p>Member of NVIDIA Inception</p>
+          </div>
+        </section>
       </main>
     </div>
   );
