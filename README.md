@@ -17,7 +17,7 @@ For one field case, Veyra keeps:
 - source-grounded evidence
 - three-clock time semantics: `event_time`, `known_at`, `ingested_at`
 - affected vs healthy machine comparison
-- competing hypotheses
+- competing possible causes
 - recommended diagnostic checks
 - human decision and action record
 - observed outcome and attribution boundary
@@ -42,7 +42,7 @@ The current synthetic case is:
 
 The product flow is:
 
-> Overview -> Evidence -> Changes -> Fleet -> Hypotheses -> Next Checks -> Decision -> Action -> Outcome -> Precedents
+> Overview -> Evidence -> Changes -> Fleet -> Possible Causes -> Next Checks -> Decision -> Action -> Outcome -> Precedents
 
 ## Architecture
 
@@ -59,9 +59,9 @@ The backend stores canonical case objects. The frontend presents a compact Case 
 ```mermaid
 flowchart LR
   A["Source evidence<br/>telemetry · release history · config · field notes"] --> B["Canonical Evidence<br/>event_time · known_at · ingested_at · provenance"]
-  B --> C["Field Case Graph<br/>machines · changes · evidence · hypotheses · checks"]
+  B --> C["Field Case Graph<br/>machines · changes · evidence · possible causes · checks"]
   C --> D["Contrast Engine<br/>affected vs healthy · comparator cohorts"]
-  C --> E["Hypothesis State<br/>supports · contradicts · missing evidence"]
+  C --> E["Possible Cause State<br/>supports · contradicts · missing evidence"]
   D --> F["Next Evidence Planner<br/>information value · cost · risk"]
   E --> F
   F --> G["Human Decision<br/>options · owner · rationale · snapshot"]
@@ -83,7 +83,7 @@ A Field Case is not a text summary.
 
 It is a typed graph of:
 
-`Machine · Change · Evidence · Hypothesis · EvidenceGap · Check · Decision · Intervention · Outcome · Precedent`
+`Machine · Change · Evidence · CandidateCause · EvidenceGap · Check · Decision · Intervention · Outcome · Precedent`
 
 with relationships such as:
 
@@ -111,11 +111,11 @@ It looks for conditions that discriminate:
 
 rather than analysing failed machines in isolation.
 
-### 4. Competing Hypotheses
+### 4. Competing Possible Causes
 
 Veyra does not collapse uncertainty into a single generated root cause.
 
-Each hypothesis keeps:
+Each possible cause keeps:
 
 `supporting evidence · contradicting evidence · missing evidence · what would change our mind`
 
@@ -123,7 +123,7 @@ Each hypothesis keeps:
 
 Veyra asks:
 
-> Which observation would best separate the remaining hypotheses at acceptable cost and risk?
+> Which observation would best separate the remaining possible causes at acceptable cost and risk?
 
 The system optimizes for the next useful piece of evidence, not the most confident-sounding answer.
 
@@ -133,7 +133,7 @@ Veyra preserves:
 
 `evidence -> belief state -> recommendation -> human decision -> intervention -> physical outcome -> belief update`
 
-So the next field case can inherit prior hypotheses, actions, outcomes and unresolved questions.
+So the next field case can inherit prior possible causes, actions, outcomes and unresolved questions.
 
 ## Agent-Native, Model-Agnostic
 
@@ -143,8 +143,8 @@ Veyra exposes structured Field Case operations through an MCP-compatible tool su
 case.get
 timeline.query
 assets.compare
-hypotheses.list
-hypotheses.evidence
+causes.list
+causes.evidence
 evidence.gaps
 checks.rank
 interventions.record
@@ -163,7 +163,7 @@ Core implemented records include:
 - `Asset`
 - `Evidence`
 - `Investigation`
-- `Hypothesis`
+- `CandidateCause`
 - `DiagnosticCheck`
 - `EvidenceSnapshot`
 - `DecisionOption`
@@ -199,11 +199,11 @@ Rule:
 
 > Temporal proximity alone is never treated as causation.
 
-## Hypotheses And Belief Snapshots
+## Possible Causes And Belief Snapshots
 
-The prototype maintains competing hypotheses for the safe-stop case.
+The prototype maintains competing possible causes for the safe-stop case.
 
-Each hypothesis includes:
+Each possible cause includes:
 
 - supporting evidence
 - contradicting evidence
@@ -227,7 +227,7 @@ Example:
 
 **Observe EX11 in loading zone B**
 
-This is a read-only diagnostic check. It separates the strongest remaining explanations without changing a production machine.
+This is a read-only diagnostic check. It separates the strongest remaining possible causes without changing a production machine.
 
 ## Decision, Intervention And Outcome
 
@@ -276,7 +276,7 @@ Each precedent preserves:
 | Connectors | Field Case schema |
 | Source naming | Temporal reconstruction |
 | Schema mapping | Cohort contrast |
-| Machine terminology | Hypothesis graph |
+| Machine terminology | Possible-cause graph |
 | Data location | Evidence-gap reasoning |
 | Authentication | Intervention-outcome memory |
 |  | Precedent retrieval |
@@ -287,7 +287,7 @@ Each precedent preserves:
 
 ```mermaid
 flowchart LR
-  E["Evidence"] --> H["Hypotheses"]
+  E["Evidence"] --> H["Possible causes"]
   H --> G["Evidence gaps"]
   G --> C["Next check"]
   C --> D["Human decision"]
@@ -303,13 +303,13 @@ The second prevents the organization from relearning the same lesson.
 
 ## Replay And Evaluation
 
-The replay endpoint shows what evidence and hypotheses were knowable at several timestamps.
+The replay endpoint shows what evidence and possible causes were knowable at several timestamps.
 
 The basic evaluation reports:
 
 - evidence linkage status
 - unsupported AI claims
-- hypothesis coverage
+- possible-cause coverage
 - suggested check usefulness
 - precedent applicability
 - decision traceability
@@ -395,7 +395,7 @@ Implemented in this prototype:
 - synthetic 12-machine field case
 - evidence lineage fields and lineage API
 - affected vs healthy comparison
-- hypothesis objects and belief snapshots
+- possible-cause objects and belief snapshots
 - diagnostic check objects and observation updates
 - decision options, decision record and immutable digest
 - action and outcome records
@@ -419,7 +419,7 @@ Planned capabilities:
 - customer-hosted deployment controls
 - real MCP tool execution
 - deeper replay evaluation
-- LLM hypothesis generation guarded by deterministic evidence validation
+- LLM candidate-cause generation guarded by deterministic evidence validation
 
 Known limitations:
 

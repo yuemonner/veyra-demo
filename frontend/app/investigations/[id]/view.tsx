@@ -587,7 +587,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
             <PackageItem title="Last known healthy" value={short(rec?.last_known_healthy?.event_time)} />
             <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 3} / ${comparison?.same_change ?? 12}`} />
             <PackageItem title="Observability" value={`${observability?.status || "partial"} at decision time`} />
-            <PackageItem title="Primary hypothesis" value={primaryHypothesis?.hypothesis || "pending"} />
+            <PackageItem title="Primary possible cause" value={primaryHypothesis?.hypothesis || "pending"} />
             <PackageItem title="Confidence" value={primaryHypothesis ? `${Math.round((primaryHypothesis.confidence || 0) * 100)}% · ${primaryHypothesis.status}` : "pending"} />
             <PackageItem title="Owner" value={record?.owner || pkg.package.human_decision?.owner || "pending"} />
             <PackageItem title="Chosen action" value={record?.chosen_option?.label || pkg.package.human_decision?.decision || "pending"} />

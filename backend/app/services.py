@@ -1294,8 +1294,9 @@ def replay_case(db: Session, investigation_id: str) -> dict[str, Any]:
         "evaluation": {
             "evidence_linkage_correctness": "prototype_checked",
             "unsupported_ai_claims": unsupported_claims,
-            "hypothesis_coverage": "3 competing explanations maintained",
-            "suggested_checks_usefulness": "EX11 check separates strongest remaining explanations",
+            "hypothesis_coverage": "3 competing possible causes maintained",
+            "possible_cause_coverage": "3 competing possible causes maintained",
+            "suggested_checks_usefulness": "EX11 check separates strongest remaining possible causes",
             "precedent_applicability": precedent_comparison(db, investigation_id)["applicability"]["status"],
             "decision_traceability": "decision snapshot and digest preserve what was knowable at 14:27",
         },

@@ -26,7 +26,7 @@ const objectNav: Array<{ key: ObjectKey; label: string; count: string }> = [
   { key: "evidence", label: "Evidence", count: "7" },
   { key: "changes", label: "Changes", count: "18" },
   { key: "fleet", label: "Fleet", count: "12" },
-  { key: "hypotheses", label: "Hypotheses", count: "3" },
+  { key: "hypotheses", label: "Possible Causes", count: "3" },
   { key: "checks", label: "Next Checks", count: "2" },
   { key: "decision", label: "Decision", count: "1" },
   { key: "actions", label: "Action", count: "1" },
@@ -77,7 +77,7 @@ const hypotheses: Record<HypothesisKey, {
   mind: string;
 }> = {
   h2: {
-    id: "H2",
+    id: "C2",
     label: "L4 + Zone B",
     state: "Strong",
     supports: ["3/3 affected share both conditions", "0/9 healthy share both at decision time"],
@@ -86,7 +86,7 @@ const hypotheses: Record<HypothesisKey, {
     mind: "EX11 remains healthy in Zone B",
   },
   h1: {
-    id: "H1",
+    id: "C1",
     label: "L4 alone",
     state: "Possible",
     supports: ["3/3 affected use L4"],
@@ -95,7 +95,7 @@ const hypotheses: Record<HypothesisKey, {
     mind: "Multiple healthy L4 machines remain stable in the same zone",
   },
   h3: {
-    id: "H3",
+    id: "C3",
     label: "LiDAR 5.3",
     state: "Weak",
     supports: ["Changed before the first safe-stop"],
@@ -189,7 +189,7 @@ function getBeliefState(cursor: KnownCursor) {
     h1: "possible",
     h2: "strong",
     h3: "weak",
-    detail: "At decision time, H2 is strongest and EX11 in Zone B is the highest value gap.",
+    detail: "At decision time, Cause 2 is strongest and EX11 in Zone B is the highest value gap.",
   };
 }
 
@@ -221,7 +221,7 @@ export default function ProductDemoPage() {
       fleet: "Machine contrast",
       changes: "Change matrix",
       evidence: "Evidence sources",
-      hypotheses: "Explanation lattice",
+      hypotheses: "Possible causes",
       checks: "Next Evidence",
       decision: "Decision snapshot",
       actions: "Decision ledger",
@@ -252,7 +252,7 @@ export default function ProductDemoPage() {
         <div className="ide-source-counts">
           <b>Sources 7</b>
           <b>Gaps 2</b>
-          <b>Hypotheses 3</b>
+          <b>Causes 3</b>
         </div>
       </header>
 
@@ -332,7 +332,7 @@ export default function ProductDemoPage() {
                 <p className="workspace-note">Ranked by information value, cost and operational risk.</p>
               )}
             </div>
-            <div className="ide-lens-tabs" aria-label="hypothesis lens">
+            <div className="ide-lens-tabs" aria-label="possible cause lens">
               {(Object.keys(hypotheses) as HypothesisKey[]).map((key) => (
                 <button
                   key={key}
@@ -350,7 +350,7 @@ export default function ProductDemoPage() {
               <div>
                 <span>Field Case Intelligence</span>
                 <h3>FC-021 · Safe-stop after autonomy 2.7</h3>
-                <p>EX03, EX05 and EX08 safe-stop after the same deployment. Veyra keeps the evidence, explanations, next checks, human decision, action, outcome and precedent in one case.</p>
+                <p>EX03, EX05 and EX08 safe-stop after the same deployment. Veyra keeps the evidence, possible causes, next checks, human decision, action, outcome and precedent in one case.</p>
                 <div className="next-evidence-rank">
                   <button className="active">3 affected</button>
                   <button>9 healthy</button>
@@ -454,7 +454,7 @@ export default function ProductDemoPage() {
               <div>
                 <span>Next Evidence</span>
                 <h3>01 EX11 → Zone B</h3>
-                <p>Separates H1 / H2. Info high. Cost low. Risk low. About 15 min.</p>
+                <p>Separates Cause 1 / Cause 2. Info high. Cost low. Risk low. About 15 min.</p>
                 <div className="next-evidence-rank">
                   <button className="active">01 EX11 → Zone B</button>
                   <button>02 rollback EX03</button>
@@ -462,8 +462,8 @@ export default function ProductDemoPage() {
                 </div>
               </div>
               <div className="branch">
-                <section><b>If EX11 safe-stops</b><span>H2 strengthens</span></section>
-                <section><b>If EX11 stays healthy</b><span>H2 weakens</span></section>
+                <section><b>If EX11 safe-stops</b><span>Cause 2 strengthens</span></section>
+                <section><b>If EX11 stays healthy</b><span>Cause 2 weakens</span></section>
               </div>
             </div>
           )}
@@ -505,7 +505,7 @@ export default function ProductDemoPage() {
                 </tbody>
               </table>
               <div className="belief-update">
-                <span>Hypothesis update after outcome</span>
+                <span>Possible cause update after outcome</span>
                 <b>Localization-related family stronger</b>
                 <p>L4 alone remains unresolved. L4 + Zone B remains unresolved. The rollback result supports the family, not a single proven cause.</p>
               </div>
@@ -552,7 +552,7 @@ export default function ProductDemoPage() {
               </table>
               <div className="precedent-operation">
                 <button>Start FC-034 from FC-021</button>
-                <span>Imports hypothesis, unresolved question, successful intervention and suggested checks.</span>
+                <span>Imports possible cause, unresolved question, successful intervention and suggested checks.</span>
               </div>
             </div>
           )}
@@ -595,7 +595,7 @@ export default function ProductDemoPage() {
           <section className="next-gap-panel">
             <span>Highest value gap</span>
             <h3>EX11 in Zone B</h3>
-            <p>Separates the two strongest remaining explanations. Estimated 15 minutes, low operational risk.</p>
+            <p>Separates the two strongest remaining possible causes. Estimated 15 minutes, low operational risk.</p>
             <div>
               <button onClick={() => setObjectKey("evidence")}>Inspect evidence</button>
               <button onClick={() => setObjectKey("checks")}>Create check</button>
@@ -607,7 +607,7 @@ export default function ProductDemoPage() {
                 setHypothesisKey("h2");
               }}
             >
-              Test this explanation
+              Test this cause
             </button>
           </section>
 
@@ -630,7 +630,7 @@ export default function ProductDemoPage() {
                   <code>case.get(FC-021)</code>
                   <code>evidence.query(window=24h)</code>
                   <code>assets.compare(affected, healthy)</code>
-                  <code>hypotheses.rank()</code>
+                  <code>causes.rank()</code>
                   <code>checks.rank_by_information_value()</code>
                 </div>
               </>
