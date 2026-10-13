@@ -4,14 +4,17 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 type ObjectKey =
+  | "overview"
   | "timeline"
-  | "machines"
-  | "changes"
   | "evidence"
+  | "changes"
+  | "fleet"
   | "hypotheses"
   | "checks"
+  | "decision"
   | "actions"
-  | "outcomes";
+  | "outcomes"
+  | "precedents";
 
 type HypothesisKey = "h2" | "h1" | "h3";
 type TimelineMode = "reality" | "known";
@@ -19,14 +22,16 @@ type ComparatorKey = "healthy" | "same-release" | "same-localization" | "same-si
 type KnownCursor = "14:11" | "14:18" | "14:23" | "14:24" | "14:26" | "14:27";
 
 const objectNav: Array<{ key: ObjectKey; label: string; count: string }> = [
-  { key: "timeline", label: "Timeline", count: "8" },
-  { key: "machines", label: "Machines", count: "12" },
-  { key: "changes", label: "Changes", count: "18" },
+  { key: "overview", label: "Overview", count: "1" },
   { key: "evidence", label: "Evidence", count: "7" },
+  { key: "changes", label: "Changes", count: "18" },
+  { key: "fleet", label: "Fleet", count: "12" },
   { key: "hypotheses", label: "Hypotheses", count: "3" },
-  { key: "checks", label: "Checks", count: "2" },
-  { key: "actions", label: "Actions", count: "1" },
+  { key: "checks", label: "Next Checks", count: "2" },
+  { key: "decision", label: "Decision", count: "1" },
+  { key: "actions", label: "Action", count: "1" },
   { key: "outcomes", label: "Outcomes", count: "1" },
+  { key: "precedents", label: "Precedents", count: "3" },
 ];
 
 const machines = [
@@ -197,7 +202,7 @@ function lensClass(machine: typeof machines[number], hypothesis: HypothesisKey) 
 }
 
 export default function ProductDemoPage() {
-  const [objectKey, setObjectKey] = useState<ObjectKey>("machines");
+  const [objectKey, setObjectKey] = useState<ObjectKey>("fleet");
   const [hypothesisKey, setHypothesisKey] = useState<HypothesisKey>("h2");
   const [comparatorKey, setComparatorKey] = useState<ComparatorKey>("healthy");
   const [timelineMode, setTimelineMode] = useState<TimelineMode>("known");
@@ -212,13 +217,16 @@ export default function ProductDemoPage() {
   const workspaceTitle = useMemo(() => {
     const titles: Record<ObjectKey, string> = {
       timeline: "Timeline",
-      machines: "Machine contrast",
+      overview: "Case overview",
+      fleet: "Machine contrast",
       changes: "Change matrix",
       evidence: "Evidence sources",
       hypotheses: "Explanation lattice",
       checks: "Next Evidence",
+      decision: "Decision snapshot",
       actions: "Decision ledger",
       outcomes: "Outcome and precedent",
+      precedents: "Precedent retrieval",
     };
     return titles[objectKey];
   }, [objectKey]);
@@ -250,6 +258,7 @@ export default function ProductDemoPage() {
 
       <section className="ide-casebar">
         <div>
+          <span>DEMO / SYNTHETIC CASE</span>
           <span>FC-021</span>
           <h1>Safe-stop cluster</h1>
         </div>
@@ -306,11 +315,13 @@ export default function ProductDemoPage() {
               <h2>
                 {objectKey === "checks"
                   ? "Next Evidence"
-                  : objectKey === "machines"
+                  : objectKey === "fleet"
                     ? "Compare affected machines against healthy comparators"
+                    : objectKey === "overview"
+                      ? "One synthetic field incident, structured as a Field Case"
                     : "Active field case data"}
               </h2>
-              {objectKey === "machines" && (
+              {objectKey === "fleet" && (
                 <div className="compare-summary">
                   <span>LENS: {activeHypothesis.id}</span>
                   <span>Comparator: {activeComparator.label}</span>
@@ -334,7 +345,26 @@ export default function ProductDemoPage() {
             </div>
           </div>
 
-          {(objectKey === "machines" || objectKey === "hypotheses") && (
+          {objectKey === "overview" && (
+            <div className="ide-next-check">
+              <div>
+                <span>Field Case Intelligence</span>
+                <h3>FC-021 · Safe-stop after autonomy 2.7</h3>
+                <p>EX03, EX05 and EX08 safe-stop after the same deployment. Veyra keeps the evidence, explanations, next checks, human decision, action, outcome and precedent in one case.</p>
+                <div className="next-evidence-rank">
+                  <button className="active">3 affected</button>
+                  <button>9 healthy</button>
+                  <button>EX11 comparator</button>
+                </div>
+              </div>
+              <div className="branch">
+                <section><b>Case object</b><span>evidence-backed, append-only state</span></section>
+                <section><b>Boundary</b><span>no root cause claim without supporting evidence</span></section>
+              </div>
+            </div>
+          )}
+
+          {(objectKey === "fleet" || objectKey === "hypotheses") && (
             <div className="ide-table-wrap">
               <table className="ide-data-table">
                 <thead>
@@ -438,6 +468,28 @@ export default function ProductDemoPage() {
             </div>
           )}
 
+          {objectKey === "decision" && (
+            <div className="ide-table-wrap">
+              <table className="ide-data-table">
+                <thead><tr><th>Decision time</th><th>Known</th><th>Unknown</th><th>Recommended check</th><th>Human choice</th></tr></thead>
+                <tbody>
+                  <tr className="affected">
+                    <td><b>14:27</b></td>
+                    <td>3 affected · EX11 comparator</td>
+                    <td>EX11 behavior in Zone B · causal boundary</td>
+                    <td>Observe EX11 in Zone B</td>
+                    <td>Rollback L4 on affected machines</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="belief-update">
+                <span>Immutable belief snapshot</span>
+                <b>Future evidence is hidden from this decision state.</b>
+                <p>The snapshot preserves what was knowable at 14:27. Later evidence can update the current case, but it does not rewrite this record.</p>
+              </div>
+            </div>
+          )}
+
           {objectKey === "actions" && (
             <div className="ide-table-wrap">
               <table className="ide-data-table">
@@ -463,15 +515,37 @@ export default function ProductDemoPage() {
           {objectKey === "outcomes" && (
             <div className="ide-table-wrap">
               <table className="ide-data-table">
-                <thead><tr><th>Case</th><th>Similarity</th><th>Shared conditions</th><th>Intervention</th><th>Outcome</th></tr></thead>
+                <thead><tr><th>Observed result</th><th>Verification window</th><th>Attribution</th><th>Belief update</th></tr></thead>
+                <tbody>
+                  <tr className="affected">
+                    <td><b>3/3 returned to service</b></td>
+                    <td>24h follow-up</td>
+                    <td>observed after rollback, not causal proof</td>
+                    <td>localization-related family stronger</td>
+                  </tr>
+                  <tr className="counter">
+                    <td>EX11 delayed runtime arrived</td>
+                    <td>event_time 14:09 · known_at 14:31</td>
+                    <td>decision-relevant late evidence</td>
+                    <td>current view updated</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {objectKey === "precedents" && (
+            <div className="ide-table-wrap">
+              <table className="ide-data-table">
+                <thead><tr><th>Case</th><th>Applicability</th><th>Shared conditions</th><th>Intervention</th><th>Warning</th></tr></thead>
                 <tbody>
                   {precedentRows.map(([id, score, shared, intervention, outcome], index) => (
                     <tr key={id} className={index === 0 ? "affected" : ""}>
                       <td><b>{id}</b></td>
-                      <td>{score}</td>
+                      <td>{index === 0 ? "partially applicable" : score}</td>
                       <td>{shared}</td>
                       <td>{intervention}</td>
-                      <td>{outcome}</td>
+                      <td>{index === 0 ? "precedent, not causal proof" : outcome}</td>
                     </tr>
                   ))}
                 </tbody>

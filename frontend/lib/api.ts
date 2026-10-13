@@ -81,6 +81,62 @@ function fallbackResponse(path: string, method: string, body?: unknown): unknown
     };
   }
 
+  if (path.endsWith("/evidence-lineage")) {
+    return {
+      rule: "Evidence can support a claim only when it has explicit reference, exact id, human verification or stated inference. Temporal proximity alone is never causation.",
+      evidence: demoEvidenceLineage(),
+    };
+  }
+
+  if (path.endsWith("/hypotheses")) {
+    return {
+      belief_snapshot: { known_at: "2026-09-03T14:27:00Z", immutable: true },
+      unresolved_uncertainty: ["L4 alone vs L4 plus Zone B", "localization-related vs unknown interaction"],
+      hypotheses: demoHypotheses().map((item) => ({
+        ...item,
+        supporting_evidence: item.evidence_refs.slice(0, 2),
+        contradicting_evidence: item.contradicting_refs,
+        missing_evidence: item.missing_evidence,
+        would_change_conclusion: item.would_change_conclusion,
+      })),
+    };
+  }
+
+  if (path.endsWith("/diagnostic-checks")) {
+    return {
+      ranking_method: "Deterministic heuristic: information value, cost, operational risk and whether the check changes physical state.",
+      checks: demoChecks(),
+    };
+  }
+
+  if (path.includes("/diagnostic-checks/") && path.endsWith("/observation")) {
+    return {
+      ...demoChecks()[0],
+      status: "observed",
+      actual_observation: readBodyField(body, "observation") || body,
+      belief_update: { "h-l4-zone-b": "strengthened", "h-l4-alone": "still_unresolved" },
+    };
+  }
+
+  if (path.endsWith("/replay")) {
+    return {
+      frames: [
+        { time: "14:11", known_evidence_ids: ["EX03-safe-stop"], future_evidence_hidden: false },
+        { time: "14:23", known_evidence_ids: ["EX03-safe-stop", "EX03-localization-map-update"], future_evidence_hidden: false },
+        { time: "14:27", known_evidence_ids: ["EX03-safe-stop", "EX05-safe-stop", "EX08-safe-stop"], future_evidence_hidden: true },
+        { time: "14:31", known_evidence_ids: ["EX11-delayed-safe-stop"], future_evidence_hidden: false },
+      ],
+      evaluation: {
+        evidence_linkage_correctness: "prototype_checked",
+        unsupported_ai_claims: [],
+        hypothesis_coverage: "3 competing explanations maintained",
+        suggested_checks_usefulness: "EX11 check separates strongest remaining explanations",
+        precedent_applicability: "partially_applicable",
+        decision_traceability: "decision snapshot preserves what was knowable at 14:27",
+      },
+    };
+  }
+
   if (path.endsWith("/decision-package")) {
     return demoPackage(false);
   }
@@ -123,6 +179,11 @@ function fallbackResponse(path: string, method: string, body?: unknown): unknown
   if (path.startsWith("/precedents/compare")) {
     return {
       outcome_validation: demoState.outcomeRecorded ? { status: "observed", attribution: "precedent, not causal proof" } : { status: "pending" },
+      applicability: {
+        status: demoState.outcomeRecorded ? "partially_applicable" : "insufficient_evidence",
+        why: "Similar signature, but unresolved confounders remain.",
+        reuse_warning: "Use as a starting precedent, not an automatic fix.",
+      },
       outcome_comparison: [
         { action: "rollback_localization", outcome: demoState.outcomeRecorded ? "returned to service" : "pending", attribution: demoState.outcomeRecorded ? "observed after action" : "not observed" },
         { action: "observe_EX11_zone_B", outcome: "not executed", attribution: "highest information value" },
@@ -168,9 +229,61 @@ function demoPackage(sealed: boolean) {
 
 function demoHypotheses() {
   return [
-    { hypothesis: "Localization L4", status: "possible", confidence: 0.58 },
-    { hypothesis: "Localization L4 + Zone B", status: "strong", confidence: 0.76 },
-    { hypothesis: "LiDAR firmware 5.3", status: "weak", confidence: 0.28 },
+    {
+      id: "h-l4-alone",
+      hypothesis: "Localization L4",
+      status: "possible",
+      confidence: 0.58,
+      evidence_refs: ["EX03-localization-map-update", "EX05-localization-map-update", "EX08-localization-map-update"],
+      contradicting_refs: ["EX11-localization-map-update"],
+      missing_evidence: ["EX11 behavior in Zone B"],
+      would_change_conclusion: ["multiple healthy L4 machines remain stable in Zone B"],
+    },
+    {
+      id: "h-l4-zone-b",
+      hypothesis: "Localization L4 + Zone B",
+      status: "strong",
+      confidence: 0.76,
+      evidence_refs: ["EX03-safe-stop", "EX05-safe-stop", "EX08-safe-stop"],
+      contradicting_refs: ["EX11-localization-map-update"],
+      missing_evidence: ["healthy L4 machine observed in Zone B"],
+      would_change_conclusion: ["EX11 remains healthy in Zone B"],
+    },
+    {
+      id: "h-lidar-53",
+      hypothesis: "LiDAR firmware 5.3",
+      status: "weak",
+      confidence: 0.28,
+      evidence_refs: ["EX03-localization-map-update"],
+      contradicting_refs: ["EX02-localization-map-update", "EX09-localization-map-update"],
+      missing_evidence: ["No useful next check"],
+      would_change_conclusion: ["LiDAR 5.3 healthy cohort shows same safe-stop pattern"],
+    },
+  ];
+}
+
+function demoEvidenceLineage() {
+  return [
+    { id: "EX03-safe-stop", source_id: "mission_runtime:EX03", source_type: "mission_runtime", asset_id: "EX03", original_reference: "mission_runtime/EX03/safe_stop/14:11", event_time: "2026-09-03T14:11:00Z", known_at: "2026-09-03T14:12:00Z", ingested_at: "2026-09-03T14:12:08Z", linkage_method: "exact_id", verification_state: "verified", evidence_class: "OBSERVED" },
+    { id: "EX05-safe-stop", source_id: "mission_runtime:EX05", source_type: "mission_runtime", asset_id: "EX05", original_reference: "mission_runtime/EX05/safe_stop/14:18", event_time: "2026-09-03T14:18:00Z", known_at: "2026-09-03T14:19:00Z", ingested_at: "2026-09-03T14:19:08Z", linkage_method: "exact_id", verification_state: "verified", evidence_class: "OBSERVED" },
+    { id: "EX08-safe-stop", source_id: "mission_runtime:EX08", source_type: "mission_runtime", asset_id: "EX08", original_reference: "mission_runtime/EX08/safe_stop/14:26", event_time: "2026-09-03T14:26:00Z", known_at: "2026-09-03T14:27:00Z", ingested_at: "2026-09-03T14:27:08Z", linkage_method: "exact_id", verification_state: "verified", evidence_class: "OBSERVED" },
+  ];
+}
+
+function demoChecks() {
+  return [
+    {
+      id: "check-ex11-zone-b",
+      question: "Does EX11 safe-stop when observed in loading zone B?",
+      check_type: "read_only",
+      rank_score: 0.91,
+      procedure: { asset_id: "EX11", route_segment: "loading-zone-B", do_not_modify_machine: true },
+      expected_observations: { if_safe_stop: "H2 strengthens", if_healthy: "H2 weakens" },
+      estimated_cost: { time_minutes: 15, operator_attention: "low" },
+      operational_risk: { level: "low" },
+      why_informative: "It separates L4 alone from L4 plus Zone B with one low-risk observation.",
+      status: "recommended",
+    },
   ];
 }
 

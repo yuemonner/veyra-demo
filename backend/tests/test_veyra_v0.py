@@ -165,3 +165,33 @@ def test_outcome_becomes_operational_memory():
     assert precedent["cost_comparison"][0]["field_visit"] is False
     remote_fix_row = [row for row in precedent["outcome_comparison"] if row["action"] == "remote_fix"][0]
     assert remote_fix_row["attribution"] == "observed"
+
+
+def test_evidence_lineage_hypotheses_checks_and_replay_are_structured():
+    investigation_id = reset()
+    lineage = client.get(f"/investigations/{investigation_id}/evidence-lineage").json()
+    assert lineage["rule"].startswith("Evidence can support a claim")
+    trigger = [row for row in lineage["evidence"] if row["id"] == "EX03-safe-stop"][0]
+    assert trigger["source_id"]
+    assert trigger["linkage_method"] == "exact_id"
+    assert trigger["verification_state"] == "verified"
+    hypotheses = client.get(f"/investigations/{investigation_id}/hypotheses").json()
+    assert hypotheses["belief_snapshot"]["immutable"] is True
+    h2 = [row for row in hypotheses["hypotheses"] if row["id"] == "h-l4-zone-b"][0]
+    assert h2["supporting_evidence"]
+    assert h2["missing_evidence"]
+    assert h2["would_change_conclusion"]
+    checks = client.get(f"/investigations/{investigation_id}/diagnostic-checks").json()
+    assert checks["ranking_method"].startswith("Deterministic heuristic")
+    assert checks["checks"][0]["id"] == "check-ex11-zone-b"
+    assert checks["checks"][0]["check_type"] == "read_only"
+    observed = client.post(
+        f"/investigations/{investigation_id}/diagnostic-checks/check-ex11-zone-b/observation",
+        json={"observation": {"asset_id": "EX11", "zone": "loading-zone-B", "safe_stop": True}},
+    ).json()
+    assert observed["status"] == "observed"
+    assert observed["belief_update"]["h-l4-zone-b"] == "strengthened"
+    replay = client.get(f"/investigations/{investigation_id}/replay").json()
+    assert any(frame["future_evidence_hidden"] for frame in replay["frames"])
+    assert replay["evaluation"]["unsupported_ai_claims"] == []
+    assert replay["evaluation"]["decision_traceability"].startswith("decision snapshot")

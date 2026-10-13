@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Asset,
+    CaseEvent,
     CostImpact,
     Decision,
     DecisionOption,
@@ -22,6 +23,8 @@ from app.models import (
     Evidence,
     EvidenceSnapshot,
     ExecutedAction,
+    DiagnosticCheck,
+    Hypothesis,
     Investigation,
     LateEvidence,
     ObservabilityState,
@@ -60,6 +63,10 @@ def evidence(
     payload: dict[str, Any],
     eid: Optional[str] = None,
     ingested_delay_seconds: int = 8,
+    linkage_method: str = "exact_id",
+    verification_state: str = "verified",
+    source_type: Optional[str] = None,
+    unresolved_assumptions: Optional[list[str]] = None,
 ) -> Evidence:
     event_time = BASE + timedelta(minutes=minutes)
     known_at = event_time + timedelta(minutes=known_delay)
@@ -71,16 +78,24 @@ def evidence(
         known_at=known_at,
         ingested_at=known_at + timedelta(seconds=ingested_delay_seconds),
         source=source,
+        source_id=f"{source}:{asset_id}",
+        source_type=source_type or source,
+        original_reference=f"{source}/{asset_id}/{event_type}/{minutes}",
+        linkage_method=linkage_method,
+        verification_state=verification_state,
         evidence_class=evidence_class,
         payload=payload,
         confidence=1.0,
-        provenance={"source_ref": f"{source}:{asset_id}:{event_type}:{minutes}"},
+        provenance={"source_ref": f"{source}:{asset_id}:{event_type}:{minutes}", "lineage": "demo synthetic source adapter"},
+        supporting_references=[f"{source}:{asset_id}:{event_type}:{minutes}"],
+        unresolved_assumptions=unresolved_assumptions or [],
     )
 
 
 def reset_demo(db: Session) -> dict[str, Any]:
-    from app.db import init_db
+    from app.db import Base, engine, init_db
 
+    Base.metadata.drop_all(bind=engine)
     init_db()
     for model in [
         PrecedentComparison,
@@ -89,6 +104,9 @@ def reset_demo(db: Session) -> dict[str, Any]:
         CostImpact,
         OutcomeAttribution,
         Outcome,
+        CaseEvent,
+        DiagnosticCheck,
+        Hypothesis,
         DecisionRecord,
         ExecutedAction,
         ObservabilityState,
@@ -270,6 +288,96 @@ def seed_decision_primitives(db: Session, investigation_id: str) -> None:
         )
     )
     db.commit()
+    seed_field_case_reasoning(db, investigation_id)
+
+
+def seed_field_case_reasoning(db: Session, investigation_id: str) -> None:
+    if db.scalar(select(Hypothesis.id).where(Hypothesis.investigation_id == investigation_id).limit(1)):
+        return
+    hypotheses = [
+        Hypothesis(
+            id="h-l4-zone-b",
+            investigation_id=investigation_id,
+            label="Localization L4 with loading zone B exposure",
+            status="strong_current_explanation",
+            supporting_evidence=["EX03-safe-stop", "EX05-safe-stop", "EX08-safe-stop", "EX03-localization-map-update", "EX05-localization-map-update", "EX08-localization-map-update"],
+            contradicting_evidence=["EX11-localization-map-update"],
+            missing_evidence=["EX11 runtime behavior in loading zone B", "healthy L4 machine observed in Zone B"],
+            would_change_conclusion=["EX11 remains healthy after real Zone B exposure", "another healthy L4 + Zone B comparator appears"],
+            revision_history=[
+                {"known_at": iso(BASE + timedelta(minutes=23)), "status": "not_yet_formed", "reason": "zone exposure not joined"},
+                {"known_at": iso(BASE + timedelta(minutes=24)), "status": "emerging", "reason": "EX11 weakens L4-alone explanation"},
+                {"known_at": iso(DEMO_DECISION_TIME), "status": "strong_current_explanation", "reason": "affected group shares L4 + Zone B; no known healthy comparator yet"},
+            ],
+        ),
+        Hypothesis(
+            id="h-l4-alone",
+            investigation_id=investigation_id,
+            label="Localization L4 alone",
+            status="possible_but_weakened",
+            supporting_evidence=["EX03-localization-map-update", "EX05-localization-map-update", "EX08-localization-map-update"],
+            contradicting_evidence=["EX11-localization-map-update"],
+            missing_evidence=["EX11 behavior in loading zone B"],
+            would_change_conclusion=["multiple healthy L4 machines remain stable in the same zone"],
+            revision_history=[
+                {"known_at": iso(BASE + timedelta(minutes=23)), "status": "stronger", "reason": "L4 found on affected machines"},
+                {"known_at": iso(BASE + timedelta(minutes=24)), "status": "weakened", "reason": "EX11 uses L4 without known safe-stop"},
+            ],
+        ),
+        Hypothesis(
+            id="h-lidar-53",
+            investigation_id=investigation_id,
+            label="LiDAR firmware 5.3",
+            status="weak",
+            supporting_evidence=["EX03-localization-map-update", "EX05-localization-map-update", "EX08-localization-map-update"],
+            contradicting_evidence=["EX02-localization-map-update", "EX04-localization-map-update", "EX09-localization-map-update", "EX11-localization-map-update"],
+            missing_evidence=["no useful next check first"],
+            would_change_conclusion=["LiDAR 5.3 healthy cohort begins showing the same safe-stop pattern"],
+            revision_history=[{"known_at": iso(DEMO_DECISION_TIME), "status": "weak", "reason": "too common in healthy machines"}],
+        ),
+    ]
+    checks = [
+        DiagnosticCheck(
+            id="check-ex11-zone-b",
+            investigation_id=investigation_id,
+            question="Does EX11 safe-stop when observed in loading zone B?",
+            procedure={"type": "read_only_observation", "asset_id": "EX11", "route_segment": "loading-zone-B", "do_not_modify_machine": True},
+            expected_observations={
+                "if_safe_stop": {"belief_update": {"h-l4-zone-b": "strengthens"}, "reason": "L4 + Zone B remains the best split"},
+                "if_healthy": {"belief_update": {"h-l4-zone-b": "weakens"}, "reason": "healthy L4 + Zone B comparator appears"},
+            },
+            estimated_cost={"time_minutes": 15, "operator_attention": "low"},
+            operational_risk={"level": "low", "reason": "read-only observation; no production configuration change"},
+            why_informative="It separates L4 alone from L4 plus Zone B with one low-risk observation.",
+            required_approval=None,
+            check_type="read_only",
+            rank_score=0.91,
+        ),
+        DiagnosticCheck(
+            id="check-rollback-ex03",
+            investigation_id=investigation_id,
+            question="Does rolling back L4 on EX03 restore service?",
+            procedure={"type": "intervention", "asset_id": "EX03", "change": "revert localization profile L4 to L3"},
+            expected_observations={
+                "if_recovered": {"belief_update": {"localization_related": "strengthens"}, "caveat": "does not prove L4 alone"},
+                "if_not_recovered": {"belief_update": {"localization_related": "weakens"}},
+            },
+            estimated_cost={"time_minutes": 30, "operational_disruption": "medium"},
+            operational_risk={"level": "medium", "reason": "modifies a production machine"},
+            why_informative="Useful for recovery, but less clean diagnostically than observing EX11 first.",
+            required_approval="operations lead",
+            check_type="intervention",
+            rank_score=0.64,
+        ),
+    ]
+    events = [
+        CaseEvent(id="ce-1411", investigation_id=investigation_id, event_kind="signal", occurred_at=BASE + timedelta(minutes=11), payload={"text": "EX03 safe-stop", "known_at": iso(BASE + timedelta(minutes=12))}),
+        CaseEvent(id="ce-1423", investigation_id=investigation_id, event_kind="belief_update", occurred_at=BASE + timedelta(minutes=23), payload={"text": "Localization L4 discovered", "hypothesis": "h-l4-alone"}),
+        CaseEvent(id="ce-1424", investigation_id=investigation_id, event_kind="counterexample", occurred_at=BASE + timedelta(minutes=24), payload={"text": "EX11 has L4 without known signal", "known_at": iso(BASE + timedelta(minutes=24))}),
+        CaseEvent(id="ce-1427", investigation_id=investigation_id, event_kind="decision_snapshot", occurred_at=DEMO_DECISION_TIME, payload={"text": "Decision snapshot sealed", "known_affected": 3}),
+    ]
+    db.add_all(hypotheses + checks + events)
+    db.commit()
 
 
 def evidence_rows(db: Session, asset_id: Optional[str] = None, known_at: Optional[datetime] = None) -> list[Evidence]:
@@ -351,6 +459,106 @@ def reconstruct(db: Session, investigation_id: str, knowledge_time: Optional[dat
         "evidence_gaps": gaps,
         "timeline": [serialize_evidence(e) for e in rows],
         "known_at": iso(known_at),
+    }
+
+
+def serialize_hypothesis(row: Hypothesis) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "label": row.label,
+        "status": row.status,
+        "supporting_evidence": row.supporting_evidence,
+        "contradicting_evidence": row.contradicting_evidence,
+        "missing_evidence": row.missing_evidence,
+        "would_change_conclusion": row.would_change_conclusion,
+        "revision_history": row.revision_history,
+    }
+
+
+def serialize_check(row: DiagnosticCheck) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "question": row.question,
+        "procedure": row.procedure,
+        "expected_observations": row.expected_observations,
+        "estimated_cost": row.estimated_cost,
+        "operational_risk": row.operational_risk,
+        "why_informative": row.why_informative,
+        "required_approval": row.required_approval,
+        "check_type": row.check_type,
+        "rank_score": row.rank_score,
+        "actual_observation": row.actual_observation,
+        "belief_update": row.belief_update,
+        "status": row.status,
+    }
+
+
+def evidence_lineage(db: Session, investigation_id: str) -> dict[str, Any]:
+    inv = db.get(Investigation, investigation_id)
+    if not inv:
+        raise ValueError("investigation not found")
+    rows = evidence_rows(db)
+    linked = []
+    for ev in rows:
+        payload = ev.payload or {}
+        is_linked = ev.id == inv.trigger_id or ev.asset_id in {"EX03", "EX05", "EX08", "EX11"} or ev.event_type in {"deployment", "configuration_change", "telemetry_anomaly", "human_discovery"}
+        if not is_linked:
+            continue
+        linked.append({
+            **serialize_evidence(ev),
+            "source_id": ev.source_id,
+            "source_type": ev.source_type,
+            "original_reference": ev.original_reference,
+            "linkage_method": ev.linkage_method,
+            "verification_state": ev.verification_state,
+            "supporting_references": ev.supporting_references,
+            "unresolved_assumptions": ev.unresolved_assumptions,
+            "claim_support": payload.get("signal") or payload.get("application_version") or payload.get("configuration") or payload.get("observation") or ev.event_type,
+        })
+    return {
+        "investigation_id": investigation_id,
+        "rule": "Evidence can support a claim only when it has explicit reference, exact id, human verification or stated inference. Temporal proximity alone is never causation.",
+        "evidence": linked,
+    }
+
+
+def hypotheses_state(db: Session, investigation_id: str, known_at: Optional[datetime] = None) -> dict[str, Any]:
+    seed_field_case_reasoning(db, investigation_id)
+    rows = list(db.scalars(select(Hypothesis).where(Hypothesis.investigation_id == investigation_id).order_by(Hypothesis.id)))
+    snapshot_time = known_at or DEMO_DECISION_TIME
+    items = []
+    for row in rows:
+        item = serialize_hypothesis(row)
+        revisions = [rev for rev in row.revision_history if rev.get("known_at", "") <= iso(snapshot_time)]
+        if revisions:
+            item["snapshot_status"] = revisions[-1]["status"]
+            item["snapshot_reason"] = revisions[-1].get("reason")
+        else:
+            item["snapshot_status"] = "not_yet_formed"
+            item["snapshot_reason"] = "not knowable at this time"
+        items.append(item)
+    return {
+        "investigation_id": investigation_id,
+        "belief_snapshot": {
+            "known_at": iso(snapshot_time),
+            "immutable": True,
+            "summary": "Competing explanations as they were knowable at this time.",
+        },
+        "hypotheses": items,
+        "unresolved_uncertainty": [
+            "L4 alone vs L4 plus loading zone B",
+            "localization-related explanation vs unknown site interaction",
+        ],
+    }
+
+
+def diagnostic_checks(db: Session, investigation_id: str) -> dict[str, Any]:
+    seed_field_case_reasoning(db, investigation_id)
+    rows = list(db.scalars(select(DiagnosticCheck).where(DiagnosticCheck.investigation_id == investigation_id).order_by(DiagnosticCheck.rank_score.desc())))
+    return {
+        "investigation_id": investigation_id,
+        "ranking_method": "Deterministic heuristic: information value, cost, operational risk and whether the check changes physical state.",
+        "checks": [serialize_check(row) for row in rows],
     }
 
 
@@ -824,10 +1032,17 @@ def serialize_evidence(ev: Optional[Evidence]) -> Optional[dict[str, Any]]:
         "known_at": iso(ev.known_at),
         "ingested_at": iso(ev.ingested_at),
         "source": ev.source,
+        "source_id": ev.source_id,
+        "source_type": ev.source_type,
+        "original_reference": ev.original_reference,
+        "linkage_method": ev.linkage_method,
+        "verification_state": ev.verification_state,
         "evidence_class": ev.evidence_class,
         "payload": ev.payload,
         "confidence": ev.confidence,
         "provenance": ev.provenance,
+        "supporting_references": ev.supporting_references,
+        "unresolved_assumptions": ev.unresolved_assumptions,
     }
 
 
@@ -983,6 +1198,14 @@ def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
             for row in cost_rows
         ],
         "evidence_strength": "precedent, not causal proof",
+        "applicability": {
+            "status": "partially_applicable" if outcomes else "insufficient_evidence",
+            "why": "The failure signature matches L4 plus loading zone B, but unresolved confounders remain and the prior outcome is observed recovery, not causal proof.",
+            "applicable_conditions": ["safe-stop after autonomy 2.7", "localization L4", "loading zone B exposure"],
+            "excluded_conditions": ["hardware fault not confirmed", "LiDAR 5.3 alone not sufficient"],
+            "unresolved_confounders": ["EX11 delayed evidence", "site-specific map/perception context"],
+            "reuse_warning": "Use as a starting precedent, not an automatic fix.",
+        },
         "outcome_validation": {
             "status": attributions[0].evidence.get("validation_status") if attributions else "pending",
             "validated_signals": attributions[0].evidence.get("validated_signals") if attributions else [],
@@ -1020,4 +1243,60 @@ def similar_memory(db: Session, investigation_id: str) -> dict[str, Any]:
             for o in outcomes[:5]
         ],
         "precedent_comparison": precedent,
+    }
+
+
+def record_check_observation(db: Session, investigation_id: str, check_id: str, observation: dict[str, Any]) -> dict[str, Any]:
+    seed_field_case_reasoning(db, investigation_id)
+    row = db.get(DiagnosticCheck, check_id)
+    if not row or row.investigation_id != investigation_id:
+        raise ValueError("check not found")
+    row.actual_observation = observation
+    if observation.get("safe_stop") is True:
+        row.belief_update = {"h-l4-zone-b": "strengthened", "h-l4-alone": "still_unresolved"}
+    elif observation:
+        row.belief_update = {"h-l4-zone-b": "weakened", "h-l4-alone": "weakened"}
+    row.status = "observed"
+    db.add(row)
+    db.add(CaseEvent(id=f"ce-{uuid.uuid4().hex[:10]}", investigation_id=investigation_id, event_kind="diagnostic_check_observed", occurred_at=BASE + timedelta(minutes=33), payload={"check_id": check_id, "observation": observation, "belief_update": row.belief_update}))
+    db.commit()
+    return serialize_check(row)
+
+
+def replay_case(db: Session, investigation_id: str) -> dict[str, Any]:
+    seed_field_case_reasoning(db, investigation_id)
+    checkpoints = [
+        ("14:11", BASE + timedelta(minutes=11), "First safe-stop is knowable."),
+        ("14:23", BASE + timedelta(minutes=23), "Localization L4 becomes part of the case."),
+        ("14:24", BASE + timedelta(minutes=24), "EX11 appears as a counterexample for L4 alone."),
+        ("14:27", DEMO_DECISION_TIME, "Decision snapshot. Future evidence is hidden."),
+        ("14:31", DEMO_SEAL_TIME, "Late evidence may update current view after the decision."),
+    ]
+    frames = []
+    for label, timestamp, note in checkpoints:
+        lineage = evidence_lineage(db, investigation_id)
+        known_evidence = [ev for ev in lineage["evidence"] if ev["known_at"] <= iso(timestamp)]
+        frames.append({
+            "time": label,
+            "known_at": iso(timestamp),
+            "note": note,
+            "known_evidence_ids": [ev["id"] for ev in known_evidence],
+            "belief_state": hypotheses_state(db, investigation_id, timestamp)["hypotheses"],
+            "future_evidence_hidden": label == "14:27",
+        })
+    unsupported_claims = []
+    for hyp in hypotheses_state(db, investigation_id)["hypotheses"]:
+        if not hyp["supporting_evidence"]:
+            unsupported_claims.append(hyp["id"])
+    return {
+        "investigation_id": investigation_id,
+        "frames": frames,
+        "evaluation": {
+            "evidence_linkage_correctness": "prototype_checked",
+            "unsupported_ai_claims": unsupported_claims,
+            "hypothesis_coverage": "3 competing explanations maintained",
+            "suggested_checks_usefulness": "EX11 check separates strongest remaining explanations",
+            "precedent_applicability": precedent_comparison(db, investigation_id)["applicability"]["status"],
+            "decision_traceability": "decision snapshot and digest preserve what was knowable at 14:27",
+        },
     }

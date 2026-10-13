@@ -24,10 +24,17 @@ class Evidence(Base):
     known_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     ingested_at: Mapped[datetime] = mapped_column(DateTime, index=True)
     source: Mapped[str] = mapped_column(String, index=True)
+    source_id: Mapped[str] = mapped_column(String, default="")
+    source_type: Mapped[str] = mapped_column(String, default="")
+    original_reference: Mapped[str] = mapped_column(String, default="")
+    linkage_method: Mapped[str] = mapped_column(String, default="temporal_candidate")
+    verification_state: Mapped[str] = mapped_column(String, default="verified")
     evidence_class: Mapped[str] = mapped_column(String, index=True)
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
     provenance: Mapped[dict] = mapped_column(JSON, default=dict)
+    supporting_references: Mapped[list] = mapped_column(JSON, default=list)
+    unresolved_assumptions: Mapped[list] = mapped_column(JSON, default=list)
     superseded_by: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     asset: Mapped[Asset] = relationship()
 
@@ -189,6 +196,48 @@ class ReviewFlag(Base):
     reason: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String, default="open")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Hypothesis(Base):
+    __tablename__ = "hypotheses"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    label: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, default="possible")
+    supporting_evidence: Mapped[list] = mapped_column(JSON, default=list)
+    contradicting_evidence: Mapped[list] = mapped_column(JSON, default=list)
+    missing_evidence: Mapped[list] = mapped_column(JSON, default=list)
+    would_change_conclusion: Mapped[list] = mapped_column(JSON, default=list)
+    revision_history: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DiagnosticCheck(Base):
+    __tablename__ = "diagnostic_checks"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    question: Mapped[str] = mapped_column(String)
+    procedure: Mapped[dict] = mapped_column(JSON, default=dict)
+    expected_observations: Mapped[dict] = mapped_column(JSON, default=dict)
+    estimated_cost: Mapped[dict] = mapped_column(JSON, default=dict)
+    operational_risk: Mapped[dict] = mapped_column(JSON, default=dict)
+    why_informative: Mapped[str] = mapped_column(Text)
+    required_approval: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    check_type: Mapped[str] = mapped_column(String, default="read_only")
+    rank_score: Mapped[float] = mapped_column(Float, default=0.0)
+    actual_observation: Mapped[dict] = mapped_column(JSON, default=dict)
+    belief_update: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String, default="recommended")
+
+
+class CaseEvent(Base):
+    __tablename__ = "case_events"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    investigation_id: Mapped[str] = mapped_column(String, ForeignKey("investigations.id"), index=True)
+    event_kind: Mapped[str] = mapped_column(String, index=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    append_only: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class PrecedentComparison(Base):

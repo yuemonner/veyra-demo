@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db, init_db
 from app.models import Asset, Decision, DecisionPackage, Evidence, Investigation, Outcome
-from app.services import attach_human_decision, build_package, compare, decision_context, inject_late_evidence, precedent_comparison, reconstruct, record_cost_impact, reset_demo, seal_package, serialize_evidence, similar_memory, verify_package
+from app.services import attach_human_decision, build_package, compare, decision_context, diagnostic_checks, evidence_lineage, hypotheses_state, inject_late_evidence, precedent_comparison, reconstruct, record_check_observation, record_cost_impact, replay_case, reset_demo, seal_package, serialize_evidence, similar_memory, verify_package
 
 app = FastAPI(title="Veyra V0", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -25,10 +25,17 @@ class EvidenceIn(BaseModel):
     known_at: Optional[datetime] = None
     ingested_at: Optional[datetime] = None
     source: str
+    source_id: str = ""
+    source_type: str = ""
+    original_reference: str = ""
+    linkage_method: str = "explicit_reference"
+    verification_state: str = "verified"
     evidence_class: str
     payload: dict = {}
     confidence: float = 1.0
     provenance: dict = {}
+    supporting_references: list = []
+    unresolved_assumptions: list = []
 
 
 class InvestigationIn(BaseModel):
@@ -47,6 +54,10 @@ class DecisionIn(BaseModel):
 class OutcomeIn(BaseModel):
     outcome: str
     payload: dict = {}
+
+
+class CheckObservationIn(BaseModel):
+    observation: dict = {}
 
 
 @app.on_event("startup")
@@ -98,10 +109,17 @@ def create_event(body: EvidenceIn, db: Session = Depends(get_db)):
         known_at=body.known_at or received_at,
         ingested_at=body.ingested_at or received_at,
         source=body.source,
+        source_id=body.source_id or f"{body.source}:{body.asset_id}",
+        source_type=body.source_type or body.source,
+        original_reference=body.original_reference or f"{body.source}:{body.asset_id}:{body.event_type}",
+        linkage_method=body.linkage_method,
+        verification_state=body.verification_state,
         evidence_class=body.evidence_class,
         payload=body.payload,
         confidence=body.confidence,
         provenance=body.provenance,
+        supporting_references=body.supporting_references,
+        unresolved_assumptions=body.unresolved_assumptions,
     )
     db.add(ev)
     db.commit()
@@ -160,6 +178,31 @@ def decision_package(investigation_id: str, db: Session = Depends(get_db)):
 @app.get("/investigations/{investigation_id}/decision-context")
 def investigation_decision_context(investigation_id: str, db: Session = Depends(get_db)):
     return decision_context(db, investigation_id)
+
+
+@app.get("/investigations/{investigation_id}/evidence-lineage")
+def investigation_evidence_lineage(investigation_id: str, db: Session = Depends(get_db)):
+    return evidence_lineage(db, investigation_id)
+
+
+@app.get("/investigations/{investigation_id}/hypotheses")
+def investigation_hypotheses(investigation_id: str, db: Session = Depends(get_db)):
+    return hypotheses_state(db, investigation_id)
+
+
+@app.get("/investigations/{investigation_id}/diagnostic-checks")
+def investigation_diagnostic_checks(investigation_id: str, db: Session = Depends(get_db)):
+    return diagnostic_checks(db, investigation_id)
+
+
+@app.post("/investigations/{investigation_id}/diagnostic-checks/{check_id}/observation")
+def investigation_record_check_observation(investigation_id: str, check_id: str, body: CheckObservationIn, db: Session = Depends(get_db)):
+    return record_check_observation(db, investigation_id, check_id, body.observation)
+
+
+@app.get("/investigations/{investigation_id}/replay")
+def investigation_replay(investigation_id: str, db: Session = Depends(get_db)):
+    return replay_case(db, investigation_id)
 
 
 @app.post("/decision-packages/{package_id}/seal")
