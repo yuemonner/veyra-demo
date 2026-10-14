@@ -21,6 +21,7 @@ export default async function VeyraPage() {
         <nav className="nav">
           <Link href="/">Silken Reason Lab</Link>
           <Link className="active" href="/veyra">Product</Link>
+          <Link href="/try">Try Veyra</Link>
           <Link href="/product-demo">Product Demo</Link>
           <Link href="/cinematic">Field Case Replay</Link>
           <Link href="/research">Research</Link>
@@ -28,13 +29,13 @@ export default async function VeyraPage() {
         <div className="boundary">Veyra is the first product from Silken Reason Lab. Read-only beside your existing stack. Machine control remains in customer systems.</div>
       </aside>
       <main className="main">
-        <div className="topbar"><span className="eyebrow">Veyra by Silken Reason</span><div className="demo-controls"><Link className="button lime" href="/cinematic">Review field case</Link><Link className="button" href="/product-demo">Open Product Demo</Link></div></div>
+        <div className="topbar"><span className="eyebrow">Veyra by Silken Reason</span><div className="demo-controls"><Link className="button lime" href="/try">Try your data</Link><Link className="button" href="/product-demo">Open Product Demo</Link></div></div>
         <section className="hero">
           <span className="eyebrow">Operational intelligence for Physical AI.</span>
           <h1>One deployment. Twelve machines. Three enter safe-stop.</h1>
           <p>Veyra shows what changed, where else it is happening, what the team can do, and what happened after.</p>
           <p><b>See what changed. Decide what to do. Learn what happened after. Reuse it next time.</b></p>
-          <div className="hero-actions"><Link className="button primary" href="/product-demo">Open Product Demo</Link><Link className="button" href="/cinematic">Review field case</Link></div>
+          <div className="hero-actions"><Link className="button primary" href="/try">Try your data</Link><Link className="button" href="/product-demo">Open Product Demo</Link></div>
         </section>
         <div className="grid three">
           <article className="panel metric"><span>Machine group</span><strong>{assets.length || "12"}</strong><p>machines updated.</p></article>

@@ -356,3 +356,18 @@ export async function postJson<T>(path: string, body?: unknown): Promise<T> {
     body: body ? JSON.stringify(body) : undefined,
   });
 }
+
+export async function uploadFile<T>(path: string, file: File, description = ""): Promise<T> {
+  if (!API) {
+    throw new Error("No backend API is configured. The page can still run a local browser preview.");
+  }
+  const form = new FormData();
+  form.append("file", file);
+  form.append("description", description);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  const res = await fetch(`${API}${path}`, { method: "POST", body: form, signal: controller.signal });
+  clearTimeout(timeout);
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  return res.json();
+}
