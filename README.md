@@ -56,21 +56,54 @@ The prototype uses:
 
 The backend stores canonical case objects. The frontend presents a compact Case Workspace for interacting with those objects.
 
-## Competitor-Parity Baseline
+## Three-Layer Architecture
+
+Veyra deliberately implements mature robotics-data workflows, but does not make a recording, mission or telemetry dataset the primary product object.
+
+### Layer 1 · Competitor-Parity Baseline
 
 Established robotics data products already cover ingestion, search, replay, AI analysis and incident workflows. Veyra treats those as the product baseline, not as defensible differentiation.
 
+### Layer 2 · Veyra Field Case Core
+
+All evidence is normalized into a Field Case:
+
+`Evidence · Changes · Cohorts · Possible Causes · Evidence Gaps · Human Decisions`
+
+The case is the durable investigation object. Uploaded runs and recordings are provenance, not the product boundary.
+
+### Layer 3 · Veyra Expansion
+
+Veyra extends beyond data-platform parity with:
+
+`Diagnostic Checks · Intervention Verification · Conditional Precedents · Case Replay`
+
+The goal is not only to explain what happened to a machine. It is to preserve what the organization learned from the case.
+
+```mermaid
+flowchart TD
+  A["Logs / MCAP / CSV / JSON / Tickets / Notes / Photos"] --> B["Provenance + normalization"]
+  B --> C["FIELD CASE"]
+  C --> D["Search / Timeline / Compare / AI"]
+  D --> E["Possible causes / next evidence"]
+  E --> F["Human decision / intervention"]
+  F --> G["Outcome / case memory"]
+  G --> H["Next Field Case"]
+```
+
+## Competitor-Parity Baseline
+
 | Competitor feature | Official documentation | Existing Veyra support | Implementation required |
 |---|---|---|---|
-| Browser upload for robotics recordings | Alloy browser upload and mission reports; Roboto log ingestion | Implemented for CSV, JSON, JSONL and NDJSON | Add MCAP/ROS bag parsing |
-| Parse and index imported data | Alloy parsing and metadata extraction; Roboto Actions | Implemented for structured text files | Add binary robotics formats and richer topic schemas |
-| Search across recordings | Foxglove recording/event search; Roboto query engine | Implemented via `/recorded-events/search` | Add full-text index and time-window filters |
-| Compare runs | Alloy mission comparison; Foxglove comparison mode | Implemented via `/runs/compare` | Add richer statistical and timeline diffs |
+| Browser upload for robotics recordings | Alloy browser upload and mission reports; Roboto log ingestion | Implemented for CSV, JSON, JSONL and NDJSON under `/field-cases/{id}/evidence-files` | Add MCAP/ROS bag parsing |
+| Parse and index imported data | Alloy parsing and metadata extraction; Roboto Actions | Implemented for structured text files and converted into canonical Field Case evidence | Add binary robotics formats and richer topic schemas |
+| Search across recordings | Foxglove recording/event search; Roboto query engine | Implemented via `/field-cases/{id}/evidence/search` | Add full-text index and time-window filters |
+| Compare runs | Alloy mission comparison; Foxglove comparison mode | Implemented via `/field-cases/{id}/compare` | Add richer statistical and timeline diffs |
 | AI investigation with citations | Alloy AI reports; Foxglove Agents; Roboto Agents | Implemented as deterministic grounded analysis with source references | Add model-backed tool use with strict citation checks |
-| Persistent investigations | Formant incidents; Roboto persistent workflows | Implemented via `/saved-investigations` | Add auth, collaboration and annotations UI |
-| Reports | Alloy mission reports | Implemented JSON report via `/recordings/report` | Add PDF/HTML export |
+| Persistent investigations | Formant incidents; Roboto persistent workflows | Implemented via `/field-cases/{id}/saved-investigations` | Add auth, collaboration and annotations UI |
+| Reports | Alloy mission reports | Implemented JSON report via `/field-cases/{id}/report` | Add PDF/HTML export |
 | SDK / cloud / edge ingestion | Alloy SDK, S3/GCS and Edge; Foxglove Foxlet; Roboto SDK and Actions | Not implemented | Read-only S3/API/edge-folder connectors |
-| MCP | Alloy, Foxglove and Roboto document MCP support | Not implemented | Read-only MCP server over Veyra case and recording APIs |
+| MCP | Robotics products document MCP support | Not implemented | Read-only MCP server over Veyra Field Case APIs |
 
 References:
 
@@ -84,12 +117,15 @@ References:
 
 Implemented now:
 
+- create a Field Case before importing evidence
 - upload `.csv`, `.json`, `.jsonl` and `.ndjson`
 - parse actual file content
 - store the raw uploaded file under `uploaded_recordings/`
-- create a `RunSession`
+- create a `RunSession` as evidence provenance
 - create one `RecordedEvent` per parsed row/object
+- create canonical `Evidence` rows with source references
 - preserve source references such as `filename:row:17`
+- attach imported records to a Field Case through `field_case_id`
 - return processing status and parsing errors
 
 Not implemented yet:
@@ -368,7 +404,73 @@ Future evidence is not exposed in earlier snapshots.
 
 ## API Walkthrough
 
-### Imported Recording Workflow
+### Field-Case-Native Import Workflow
+
+Create the case first:
+
+```bash
+curl -X POST http://127.0.0.1:8050/field-cases \
+  -H "Content-Type: application/json" \
+  -d '{"title":"FC 021 · unexpected safe stop after autonomy 2.7","asset_id":"EX03"}'
+```
+
+Upload structured evidence into that case:
+
+```bash
+curl -F "file=@sample.csv" \
+  -F "description=affected run" \
+  http://127.0.0.1:8050/field-cases/fc-123/evidence-files
+```
+
+Search evidence in one case:
+
+```bash
+GET /field-cases/fc-123/evidence/search?query=safe_stop
+GET /field-cases/fc-123/evidence/search?asset_id=EX03
+GET /field-cases/fc-123/evidence/search?event_type=safe_stop
+GET /field-cases/fc-123/evidence/search?software_version=autonomy-2.7
+```
+
+Compare imported runs inside the case:
+
+```bash
+GET /field-cases/fc-123/compare
+GET /field-cases/fc-123/compare?run_id=run-a&run_id=run-b
+```
+
+Investigate imported evidence:
+
+```bash
+POST /field-cases/fc-123/investigate
+{
+  "question": "Which evidence separates affected machines from healthy comparators?"
+}
+```
+
+Generate a report:
+
+```bash
+POST /field-cases/fc-123/report
+{
+  "question": "What should we check next?"
+}
+```
+
+Save a reusable case investigation:
+
+```bash
+POST /field-cases/fc-123/saved-investigations
+{
+  "title": "FC 021 reusable precedent",
+  "question": "What did we learn?",
+  "run_ids": [],
+  "annotations": ["reuse for FC 034"]
+}
+```
+
+### Low-Level Recording Workflow
+
+These routes remain for compatibility and lower-level testing. New product work should prefer the Field Case routes above.
 
 Upload a structured recording:
 
@@ -499,10 +601,13 @@ PYTHONPATH=backend python -m pytest backend/tests/test_veyra_v0.py -q
 
 Implemented in this prototype:
 
+- Field Case creation API
+- Field Case scoped evidence import, search, comparison, investigation, report and saved investigations
 - CSV/JSON recording ingestion
 - raw file persistence and parse status
-- run/session model
-- event indexing with source references
+- run/session model as evidence provenance
+- event indexing with source references and `field_case_id`
+- canonical `Evidence` rows for imported records
 - event search
 - cross-run comparison
 - grounded investigation response with citations and missing evidence
@@ -539,7 +644,8 @@ Planned capabilities:
 
 Known limitations:
 
-- data is synthetic
+- product demo data is synthetic and labeled as a replay scenario
+- upload/import APIs parse real CSV/JSON files, but the repository does not ship production customer data
 - imported recording support is limited to structured text formats
 - MCAP/ROS bag are not implemented
 - no cloud storage sync

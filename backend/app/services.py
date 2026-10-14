@@ -87,6 +87,7 @@ def first_value(row: dict[str, Any], keys: list[str], default: str = "") -> str:
 def serialize_run(row: RunSession) -> dict[str, Any]:
     return {
         "id": row.id,
+        "field_case_id": row.field_case_id,
         "name": row.name,
         "asset_id": row.asset_id,
         "software_version": row.software_version,
@@ -101,6 +102,7 @@ def serialize_run(row: RunSession) -> dict[str, Any]:
 def serialize_recorded_event(row: RecordedEvent) -> dict[str, Any]:
     return {
         "id": row.id,
+        "field_case_id": row.field_case_id,
         "run_id": row.run_id,
         "file_id": row.file_id,
         "asset_id": row.asset_id,
@@ -137,28 +139,117 @@ def parse_recording_rows(filename: str, content: bytes) -> tuple[str, list[dict[
     raise ValueError("Supported upload formats in this prototype: .csv, .json, .jsonl, .ndjson")
 
 
-def ingest_recording(db: Session, filename: str, content: bytes, description: str = "") -> dict[str, Any]:
+def ensure_asset(db: Session, asset_id: str, name: Optional[str] = None) -> Asset:
+    asset = db.get(Asset, asset_id)
+    if asset:
+        return asset
+    asset = Asset(id=asset_id, name=name or asset_id, asset_type="Physical AI system", family="Imported field case", site="unknown", environment="unknown")
+    db.add(asset)
+    return asset
+
+
+def create_field_case(db: Session, title: str, asset_id: str = "unknown", trigger_payload: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    now = datetime.utcnow()
+    ensure_asset(db, asset_id)
+    trigger = Evidence(
+        id=f"ev-{uuid.uuid4().hex[:10]}",
+        asset_id=asset_id,
+        event_type="field_case_created",
+        event_time=now,
+        known_at=now,
+        ingested_at=now,
+        source="field_case_api",
+        source_id="field_case_api",
+        source_type="api",
+        original_reference=f"field_case:{title}",
+        linkage_method="explicit_reference",
+        verification_state="verified",
+        evidence_class="OBSERVED",
+        payload=trigger_payload or {"title": title},
+        provenance={"created_by": "field_case_api"},
+    )
+    case = Investigation(
+        id=f"fc-{uuid.uuid4().hex[:10]}",
+        asset_id=asset_id,
+        trigger_id=trigger.id,
+        title=title,
+        status="active",
+    )
+    db.add(trigger)
+    db.add(case)
+    db.commit()
+    return serialize_field_case(db, case)
+
+
+def serialize_field_case(db: Session, case: Investigation) -> dict[str, Any]:
+    runs = list(db.scalars(select(RunSession).where(RunSession.field_case_id == case.id).order_by(RunSession.created_at.desc())))
+    events = list(db.scalars(select(RecordedEvent).where(RecordedEvent.field_case_id == case.id).order_by(RecordedEvent.timestamp.asc().nulls_last(), RecordedEvent.id).limit(200)))
+    saved = list(db.scalars(select(SavedInvestigation).where(SavedInvestigation.field_case_id == case.id).order_by(SavedInvestigation.created_at.desc())))
+    return {
+        "id": case.id,
+        "title": case.title,
+        "asset_id": case.asset_id,
+        "trigger_id": case.trigger_id,
+        "status": case.status,
+        "created_at": iso(case.created_at),
+        "runs": [serialize_run(run) for run in runs],
+        "event_count": len(events),
+        "events_preview": [serialize_recorded_event(event) for event in events[:20]],
+        "saved_investigations": [
+            {
+                "id": item.id,
+                "title": item.title,
+                "question": item.question,
+                "created_at": iso(item.created_at),
+            }
+            for item in saved
+        ],
+    }
+
+
+def get_field_case(db: Session, field_case_id: str) -> Investigation:
+    case = db.get(Investigation, field_case_id)
+    if not case:
+        raise ValueError(f"Field Case {field_case_id} was not found")
+    return case
+
+
+def ingest_recording(db: Session, filename: str, content: bytes, description: str = "", field_case_id: Optional[str] = None) -> dict[str, Any]:
     upload_id = f"upl-{uuid.uuid4().hex[:10]}"
     UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
     storage_path = UPLOAD_ROOT / f"{upload_id}-{Path(filename).name}"
     storage_path.write_bytes(content)
+    field_case = get_field_case(db, field_case_id) if field_case_id else None
     try:
         file_format, rows, parse_metadata = parse_recording_rows(filename, content)
     except Exception as exc:
-        run = RunSession(id=f"run-{uuid.uuid4().hex[:10]}", name=Path(filename).stem, asset_id="unknown", metadata_json={"description": description})
-        ingested = IngestedFile(id=upload_id, run_id=run.id, filename=filename, file_format="unknown", storage_path=str(storage_path), status="error", error=str(exc), metadata_json={})
+        if not field_case:
+            field_case = db.get(Investigation, create_field_case(db, f"Imported field case · {Path(filename).stem}", "unknown")["id"])
+        run = RunSession(id=f"run-{uuid.uuid4().hex[:10]}", field_case_id=field_case.id if field_case else None, name=Path(filename).stem, asset_id="unknown", metadata_json={"description": description})
+        ingested = IngestedFile(id=upload_id, field_case_id=field_case.id if field_case else None, run_id=run.id, filename=filename, file_format="unknown", storage_path=str(storage_path), status="error", error=str(exc), metadata_json={})
         db.add(run)
         db.add(ingested)
         db.commit()
-        return {"status": "error", "error": str(exc), "file": {"id": ingested.id, "filename": filename}}
+        return {"status": "error", "error": str(exc), "field_case_id": field_case.id if field_case else None, "file": {"id": ingested.id, "filename": filename}}
 
     event_times = [parse_dt(first_value(row, ["timestamp", "time", "event_time", "ts"])) for row in rows]
     event_times = [item for item in event_times if item]
     first_row = rows[0] if rows else {}
+    first_asset_id = first_value(first_row, ["asset_id", "robot_id", "machine_id", "vehicle_id"], "unknown")
+    if not field_case:
+        created = create_field_case(
+            db,
+            f"Imported field case · {Path(filename).stem}",
+            first_asset_id,
+            {"source_filename": filename, "description": description, "row_count": len(rows)},
+        )
+        field_case = db.get(Investigation, created["id"])
+    ensure_asset(db, first_asset_id)
     run = RunSession(
         id=f"run-{uuid.uuid4().hex[:10]}",
+        field_case_id=field_case.id if field_case else None,
         name=first_value(first_row, ["run_id", "mission_id", "session", "session_id"], Path(filename).stem),
-        asset_id=first_value(first_row, ["asset_id", "robot_id", "machine_id", "vehicle_id"], "unknown"),
+        asset_id=first_asset_id,
         software_version=first_value(first_row, ["software_version", "release", "version"], ""),
         configuration=first_value(first_row, ["configuration", "config", "profile", "localization"], ""),
         started_at=min(event_times) if event_times else None,
@@ -167,6 +258,7 @@ def ingest_recording(db: Session, filename: str, content: bytes, description: st
     )
     ingested = IngestedFile(
         id=upload_id,
+        field_case_id=field_case.id if field_case else None,
         run_id=run.id,
         filename=filename,
         file_format=file_format,
@@ -177,15 +269,20 @@ def ingest_recording(db: Session, filename: str, content: bytes, description: st
     db.add(run)
     db.add(ingested)
     events: list[RecordedEvent] = []
+    evidence_rows: list[Evidence] = []
     for index, row in enumerate(rows, start=1):
         event_type = first_value(row, ["event_type", "type", "name", "topic"], "record")
         timestamp = parse_dt(first_value(row, ["timestamp", "time", "event_time", "ts"]))
         asset_id = first_value(row, ["asset_id", "robot_id", "machine_id", "vehicle_id"], run.asset_id)
+        ensure_asset(db, asset_id)
         software_version = first_value(row, ["software_version", "release", "version"], run.software_version)
         configuration = first_value(row, ["configuration", "config", "profile", "localization"], run.configuration)
+        event_id = f"evt-{uuid.uuid4().hex[:10]}"
+        source_reference = f"{filename}:row:{index}"
         events.append(
             RecordedEvent(
-                id=f"evt-{uuid.uuid4().hex[:10]}",
+                id=event_id,
+                field_case_id=field_case.id if field_case else None,
                 run_id=run.id,
                 file_id=ingested.id,
                 asset_id=asset_id,
@@ -194,13 +291,34 @@ def ingest_recording(db: Session, filename: str, content: bytes, description: st
                 software_version=software_version,
                 configuration=configuration,
                 payload=dict(row),
-                source_reference=f"{filename}:row:{index}",
+                source_reference=source_reference,
+            )
+        )
+        evidence_rows.append(
+            Evidence(
+                id=f"ev-{uuid.uuid4().hex[:10]}",
+                asset_id=asset_id,
+                event_type=event_type,
+                event_time=timestamp or datetime.utcnow(),
+                known_at=datetime.utcnow(),
+                ingested_at=datetime.utcnow(),
+                source="imported_recording",
+                source_id=ingested.id,
+                source_type=file_format,
+                original_reference=source_reference,
+                linkage_method="explicit_reference",
+                verification_state="verified",
+                evidence_class="OBSERVED",
+                payload=dict(row),
+                provenance={"field_case_id": field_case.id if field_case else None, "run_id": run.id, "file_id": ingested.id, "recorded_event_id": event_id},
             )
         )
     db.add_all(events)
+    db.add_all(evidence_rows)
     db.commit()
     return {
         "status": "processed",
+        "field_case": serialize_field_case(db, field_case) if field_case else None,
         "run": serialize_run(run),
         "file": {"id": ingested.id, "filename": filename, "format": file_format, "status": ingested.status, "metadata": ingested.metadata_json},
         "events_indexed": len(events),
@@ -208,8 +326,11 @@ def ingest_recording(db: Session, filename: str, content: bytes, description: st
     }
 
 
-def list_runs(db: Session) -> list[dict[str, Any]]:
-    return [serialize_run(row) for row in db.scalars(select(RunSession).order_by(RunSession.created_at.desc()))]
+def list_runs(db: Session, field_case_id: Optional[str] = None) -> list[dict[str, Any]]:
+    stmt = select(RunSession)
+    if field_case_id:
+        stmt = stmt.where(RunSession.field_case_id == field_case_id)
+    return [serialize_run(row) for row in db.scalars(stmt.order_by(RunSession.created_at.desc()))]
 
 
 def search_recorded_events(
@@ -218,8 +339,11 @@ def search_recorded_events(
     event_type: Optional[str] = None,
     software_version: Optional[str] = None,
     query: Optional[str] = None,
+    field_case_id: Optional[str] = None,
 ) -> dict[str, Any]:
     stmt = select(RecordedEvent)
+    if field_case_id:
+        stmt = stmt.where(RecordedEvent.field_case_id == field_case_id)
     if asset_id:
         stmt = stmt.where(RecordedEvent.asset_id == asset_id)
     if event_type:
@@ -233,9 +357,14 @@ def search_recorded_events(
     return {"count": len(rows), "events": [serialize_recorded_event(row) for row in rows[:200]]}
 
 
-def compare_runs(db: Session, run_ids: list[str]) -> dict[str, Any]:
-    runs = [db.get(RunSession, run_id) for run_id in run_ids]
+def compare_runs(db: Session, run_ids: Optional[list[str]] = None, field_case_id: Optional[str] = None) -> dict[str, Any]:
+    if field_case_id and not run_ids:
+        runs = list(db.scalars(select(RunSession).where(RunSession.field_case_id == field_case_id).order_by(RunSession.created_at.asc())))
+    else:
+        runs = [db.get(RunSession, run_id) for run_id in (run_ids or [])]
     runs = [row for row in runs if row]
+    if field_case_id:
+        runs = [row for row in runs if row.field_case_id == field_case_id]
     comparisons = []
     for run in runs:
         events = list(db.scalars(select(RecordedEvent).where(RecordedEvent.run_id == run.id)))
@@ -254,11 +383,13 @@ def compare_runs(db: Session, run_ids: list[str]) -> dict[str, Any]:
         "configurations": sorted({row.configuration for row in runs if row.configuration}),
         "assets": sorted({row.asset_id for row in runs if row.asset_id}),
     }
-    return {"runs_compared": len(runs), "differences": differences, "comparisons": comparisons}
+    return {"field_case_id": field_case_id, "runs_compared": len(runs), "differences": differences, "comparisons": comparisons}
 
 
-def investigate_imported_data(db: Session, question: str, run_ids: Optional[list[str]] = None) -> dict[str, Any]:
+def investigate_imported_data(db: Session, question: str, run_ids: Optional[list[str]] = None, field_case_id: Optional[str] = None) -> dict[str, Any]:
     stmt = select(RecordedEvent)
+    if field_case_id:
+        stmt = stmt.where(RecordedEvent.field_case_id == field_case_id)
     if run_ids:
         stmt = stmt.where(RecordedEvent.run_id.in_(run_ids))
     events = list(db.scalars(stmt.order_by(RecordedEvent.timestamp.asc().nulls_last(), RecordedEvent.id)))
@@ -286,6 +417,7 @@ def investigate_imported_data(db: Session, question: str, run_ids: Optional[list
         missing.append("No recovery outcome record found in the imported events.")
     return {
         "question": question,
+        "field_case_id": field_case_id,
         "answer": "This analysis is grounded only in imported records. It reports visible records, citations and missing evidence instead of declaring root cause.",
         "findings": findings,
         "missing_evidence": missing,
@@ -294,11 +426,12 @@ def investigate_imported_data(db: Session, question: str, run_ids: Optional[list
     }
 
 
-def generate_recording_report(db: Session, question: str, run_ids: Optional[list[str]] = None) -> dict[str, Any]:
-    analysis = investigate_imported_data(db, question, run_ids)
-    compared = compare_runs(db, run_ids or sorted({event["run_id"] for event in analysis["records_used"]}))
+def generate_recording_report(db: Session, question: str, run_ids: Optional[list[str]] = None, field_case_id: Optional[str] = None) -> dict[str, Any]:
+    analysis = investigate_imported_data(db, question, run_ids, field_case_id)
+    compared = compare_runs(db, run_ids or sorted({event["run_id"] for event in analysis["records_used"]}), field_case_id)
     report = {
         "title": "Imported recording investigation report",
+        "field_case_id": field_case_id,
         "question": question,
         "summary": analysis["answer"],
         "findings": analysis["findings"],
@@ -310,10 +443,11 @@ def generate_recording_report(db: Session, question: str, run_ids: Optional[list
     return report
 
 
-def save_imported_investigation(db: Session, title: str, question: str, run_ids: list[str], annotations: Optional[list[Any]] = None) -> dict[str, Any]:
-    report = generate_recording_report(db, question, run_ids)
+def save_imported_investigation(db: Session, title: str, question: str, run_ids: list[str], annotations: Optional[list[Any]] = None, field_case_id: Optional[str] = None) -> dict[str, Any]:
+    report = generate_recording_report(db, question, run_ids, field_case_id)
     saved = SavedInvestigation(
         id=f"saved-{uuid.uuid4().hex[:10]}",
+        field_case_id=field_case_id,
         title=title,
         question=question,
         run_ids=run_ids,
@@ -326,6 +460,7 @@ def save_imported_investigation(db: Session, title: str, question: str, run_ids:
     db.commit()
     return {
         "id": saved.id,
+        "field_case_id": saved.field_case_id,
         "title": saved.title,
         "question": saved.question,
         "run_ids": saved.run_ids,

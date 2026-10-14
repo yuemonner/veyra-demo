@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db, init_db
 from app.models import Asset, Decision, DecisionPackage, Evidence, Investigation, Outcome
-from app.services import attach_human_decision, build_package, compare, compare_runs, decision_context, diagnostic_checks, evidence_lineage, generate_recording_report, hypotheses_state, ingest_recording, inject_late_evidence, investigate_imported_data, list_runs, precedent_comparison, reconstruct, record_check_observation, record_cost_impact, replay_case, reset_demo, save_imported_investigation, seal_package, search_recorded_events, serialize_evidence, similar_memory, verify_package
+from app.services import attach_human_decision, build_package, compare, compare_runs, create_field_case, decision_context, diagnostic_checks, evidence_lineage, generate_recording_report, get_field_case, hypotheses_state, ingest_recording, inject_late_evidence, investigate_imported_data, list_runs, precedent_comparison, reconstruct, record_check_observation, record_cost_impact, replay_case, reset_demo, save_imported_investigation, seal_package, search_recorded_events, serialize_evidence, serialize_field_case, similar_memory, verify_package
 
 app = FastAPI(title="Veyra V0", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -44,6 +44,12 @@ class InvestigationIn(BaseModel):
     title: str
 
 
+class FieldCaseIn(BaseModel):
+    title: str
+    asset_id: str = "unknown"
+    trigger_payload: dict = {}
+
+
 class DecisionIn(BaseModel):
     decision: str
     owner: str = "Engineering"
@@ -63,6 +69,7 @@ class CheckObservationIn(BaseModel):
 class RecordingInvestigationIn(BaseModel):
     question: str
     run_ids: list[str] = []
+    field_case_id: Optional[str] = None
 
 
 class SaveRecordingInvestigationIn(BaseModel):
@@ -70,6 +77,7 @@ class SaveRecordingInvestigationIn(BaseModel):
     question: str
     run_ids: list[str]
     annotations: list = []
+    field_case_id: Optional[str] = None
 
 
 @app.on_event("startup")
@@ -100,12 +108,68 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/recordings/upload")
-async def upload_recording(file: UploadFile = File(...), description: str = Form(""), db: Session = Depends(get_db)):
+@app.post("/field-cases")
+def create_case(body: FieldCaseIn, db: Session = Depends(get_db)):
+    return create_field_case(db, body.title, body.asset_id, body.trigger_payload)
+
+
+@app.get("/field-cases/{field_case_id}")
+def read_field_case(field_case_id: str, db: Session = Depends(get_db)):
+    try:
+        return serialize_field_case(db, get_field_case(db, field_case_id))
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.post("/field-cases/{field_case_id}/evidence-files")
+async def upload_field_case_evidence(field_case_id: str, file: UploadFile = File(...), description: str = Form(""), db: Session = Depends(get_db)):
     content = await file.read()
     if not content:
         raise HTTPException(400, "uploaded file is empty")
-    return ingest_recording(db, file.filename or "recording", content, description)
+    try:
+        return ingest_recording(db, file.filename or "recording", content, description, field_case_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.get("/field-cases/{field_case_id}/evidence/search")
+def field_case_evidence_search(
+    field_case_id: str,
+    asset_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    software_version: Optional[str] = None,
+    query: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    return search_recorded_events(db, asset_id=asset_id, event_type=event_type, software_version=software_version, query=query, field_case_id=field_case_id)
+
+
+@app.get("/field-cases/{field_case_id}/compare")
+def field_case_compare(field_case_id: str, run_id: list[str] = Query(default=[]), db: Session = Depends(get_db)):
+    return compare_runs(db, run_id or None, field_case_id)
+
+
+@app.post("/field-cases/{field_case_id}/investigate")
+def field_case_investigate(field_case_id: str, body: RecordingInvestigationIn, db: Session = Depends(get_db)):
+    return investigate_imported_data(db, body.question, body.run_ids or None, field_case_id)
+
+
+@app.post("/field-cases/{field_case_id}/report")
+def field_case_report(field_case_id: str, body: RecordingInvestigationIn, db: Session = Depends(get_db)):
+    return generate_recording_report(db, body.question, body.run_ids or None, field_case_id)
+
+
+@app.post("/field-cases/{field_case_id}/saved-investigations")
+def create_field_case_saved_investigation(field_case_id: str, body: SaveRecordingInvestigationIn, db: Session = Depends(get_db)):
+    return save_imported_investigation(db, body.title, body.question, body.run_ids, body.annotations, field_case_id)
+
+
+@app.post("/recordings/upload")
+async def upload_recording(file: UploadFile = File(...), description: str = Form(""), field_case_id: Optional[str] = Form(None), db: Session = Depends(get_db)):
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "uploaded file is empty")
+    return ingest_recording(db, file.filename or "recording", content, description, field_case_id)
 
 
 @app.get("/runs")
@@ -133,17 +197,17 @@ def runs_compare(run_id: list[str] = Query(default=[]), db: Session = Depends(ge
 
 @app.post("/recordings/investigate")
 def recordings_investigate(body: RecordingInvestigationIn, db: Session = Depends(get_db)):
-    return investigate_imported_data(db, body.question, body.run_ids or None)
+    return investigate_imported_data(db, body.question, body.run_ids or None, body.field_case_id)
 
 
 @app.post("/recordings/report")
 def recordings_report(body: RecordingInvestigationIn, db: Session = Depends(get_db)):
-    return generate_recording_report(db, body.question, body.run_ids or None)
+    return generate_recording_report(db, body.question, body.run_ids or None, body.field_case_id)
 
 
 @app.post("/saved-investigations")
 def create_saved_investigation(body: SaveRecordingInvestigationIn, db: Session = Depends(get_db)):
-    return save_imported_investigation(db, body.title, body.question, body.run_ids, body.annotations)
+    return save_imported_investigation(db, body.title, body.question, body.run_ids, body.annotations, body.field_case_id)
 
 
 @app.post("/demo/reset")

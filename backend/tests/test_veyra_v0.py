@@ -242,6 +242,65 @@ def test_real_csv_ingestion_search_compare_report_and_saved_investigation():
     assert saved["evidence_references"]
 
 
+def test_field_case_native_ingestion_investigation_and_reuse_slice():
+    reset()
+    case = client.post(
+        "/field-cases",
+        json={
+            "title": "FC 021 · unexpected safe stop after autonomy 2.7",
+            "asset_id": "EX03",
+            "trigger_payload": {"scenario": "synthetic replay", "source": "design partner demo"},
+        },
+    ).json()
+    field_case_id = case["id"]
+    csv_a = b"""timestamp,asset_id,event_type,software_version,configuration,status,zone
+2026-09-03T14:11:08Z,EX03,safe_stop,autonomy-2.7,localization-L4,failed,loading-zone-B
+2026-09-03T14:18:00Z,EX05,safe_stop,autonomy-2.7,localization-L4,failed,loading-zone-B
+"""
+    csv_b = b"""timestamp,asset_id,event_type,software_version,configuration,status,zone
+2026-09-03T14:20:00Z,EX11,mission_segment,autonomy-2.7,localization-L4,healthy,loading-zone-C
+2026-09-03T14:27:00Z,EX11,operator_note,autonomy-2.7,localization-L4,no_known_issue,loading-zone-C
+"""
+    upload_a = client.post(
+        f"/field-cases/{field_case_id}/evidence-files",
+        files={"file": ("affected.csv", csv_a, "text/csv")},
+        data={"description": "affected machines"},
+    )
+    assert upload_a.status_code == 200
+    assert upload_a.json()["field_case"]["id"] == field_case_id
+    upload_b = client.post(
+        f"/field-cases/{field_case_id}/evidence-files",
+        files={"file": ("comparator.csv", csv_b, "text/csv")},
+        data={"description": "healthy comparator"},
+    )
+    assert upload_b.status_code == 200
+    case_after_upload = client.get(f"/field-cases/{field_case_id}").json()
+    assert len(case_after_upload["runs"]) == 2
+    search = client.get(f"/field-cases/{field_case_id}/evidence/search", params={"query": "safe_stop"}).json()
+    assert search["count"] == 2
+    assert all(event["field_case_id"] == field_case_id for event in search["events"])
+    compared = client.get(f"/field-cases/{field_case_id}/compare").json()
+    assert compared["field_case_id"] == field_case_id
+    assert compared["runs_compared"] == 2
+    investigated = client.post(
+        f"/field-cases/{field_case_id}/investigate",
+        json={"question": "Which evidence separates affected machines from healthy comparators?"},
+    ).json()
+    assert investigated["field_case_id"] == field_case_id
+    assert investigated["findings"]
+    report = client.post(
+        f"/field-cases/{field_case_id}/report",
+        json={"question": "What should we check next?"},
+    ).json()
+    assert report["field_case_id"] == field_case_id
+    saved = client.post(
+        f"/field-cases/{field_case_id}/saved-investigations",
+        json={"title": "FC 021 reusable precedent", "question": "What did we learn?", "run_ids": [], "annotations": ["reuse for FC 034"]},
+    ).json()
+    assert saved["field_case_id"] == field_case_id
+    assert saved["evidence_references"]
+
+
 def test_ingestion_reports_invalid_file_errors_without_indexing_fake_data():
     reset()
     response = client.post(

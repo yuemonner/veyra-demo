@@ -255,6 +255,7 @@ class PrecedentComparison(Base):
 class RunSession(Base):
     __tablename__ = "run_sessions"
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    field_case_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("investigations.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String, index=True)
     asset_id: Mapped[str] = mapped_column(String, index=True)
     software_version: Mapped[str] = mapped_column(String, default="", index=True)
@@ -268,6 +269,7 @@ class RunSession(Base):
 class IngestedFile(Base):
     __tablename__ = "ingested_files"
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    field_case_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("investigations.id"), nullable=True, index=True)
     run_id: Mapped[str] = mapped_column(String, ForeignKey("run_sessions.id"), index=True)
     filename: Mapped[str] = mapped_column(String)
     file_format: Mapped[str] = mapped_column(String, index=True)
@@ -281,6 +283,7 @@ class IngestedFile(Base):
 class RecordedEvent(Base):
     __tablename__ = "recorded_events"
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    field_case_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("investigations.id"), nullable=True, index=True)
     run_id: Mapped[str] = mapped_column(String, ForeignKey("run_sessions.id"), index=True)
     file_id: Mapped[str] = mapped_column(String, ForeignKey("ingested_files.id"), index=True)
     asset_id: Mapped[str] = mapped_column(String, index=True)
@@ -296,6 +299,7 @@ class RecordedEvent(Base):
 class SavedInvestigation(Base):
     __tablename__ = "saved_investigations"
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    field_case_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("investigations.id"), nullable=True, index=True)
     title: Mapped[str] = mapped_column(String, index=True)
     question: Mapped[str] = mapped_column(Text)
     run_ids: Mapped[list] = mapped_column(JSON, default=list)
