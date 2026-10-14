@@ -53,8 +53,12 @@ The prototype uses:
 - SQLite by default for local/demo use
 - Next.js frontend
 - deterministic demo services and local fallback data
+- optional Neon Postgres through `DATABASE_URL`
+- optional Cloudflare R2 / S3-compatible upload storage through `FILE_STORAGE_BACKEND`
 
 The backend stores canonical case objects. The frontend presents a compact Case Workspace for interacting with those objects.
+
+For a lightweight pilot setup, see [`docs/PILOT_SETUP.md`](docs/PILOT_SETUP.md).
 
 ## Three-Layer Architecture
 
@@ -121,6 +125,7 @@ Implemented now:
 - upload `.csv`, `.json`, `.jsonl` and `.ndjson`
 - parse actual file content
 - store the raw uploaded file under `uploaded_recordings/`
+- optionally store raw uploads in R2 or S3-compatible object storage
 - create a `RunSession` as evidence provenance
 - create one `RecordedEvent` per parsed row/object
 - create canonical `Evidence` rows with source references

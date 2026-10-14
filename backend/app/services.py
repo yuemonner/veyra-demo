@@ -39,12 +39,12 @@ from app.models import (
     RunSession,
     SavedInvestigation,
 )
+from app.storage import save_upload
 
 BASE = datetime(2026, 9, 3, 14, 0, 0)
 DEMO_DECISION_TIME = BASE + timedelta(minutes=27)
 DEMO_SEAL_TIME = BASE + timedelta(minutes=31)
 TIMESTAMP_AUTHORITY = "Veyra demo timestamp authority"
-UPLOAD_ROOT = Path("uploaded_recordings")
 STATE_KEYS = [
     "application_version",
     "firmware_version",
@@ -216,9 +216,12 @@ def get_field_case(db: Session, field_case_id: str) -> Investigation:
 
 def ingest_recording(db: Session, filename: str, content: bytes, description: str = "", field_case_id: Optional[str] = None) -> dict[str, Any]:
     upload_id = f"upl-{uuid.uuid4().hex[:10]}"
-    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
-    storage_path = UPLOAD_ROOT / f"{upload_id}-{Path(filename).name}"
-    storage_path.write_bytes(content)
+    stored = save_upload(upload_id, filename, content)
+    storage_metadata = {"storage_backend": stored.backend}
+    if stored.bucket:
+        storage_metadata["storage_bucket"] = stored.bucket
+    if stored.key:
+        storage_metadata["storage_key"] = stored.key
     field_case = get_field_case(db, field_case_id) if field_case_id else None
     try:
         file_format, rows, parse_metadata = parse_recording_rows(filename, content)
@@ -226,7 +229,7 @@ def ingest_recording(db: Session, filename: str, content: bytes, description: st
         if not field_case:
             field_case = db.get(Investigation, create_field_case(db, f"Imported field case · {Path(filename).stem}", "unknown")["id"])
         run = RunSession(id=f"run-{uuid.uuid4().hex[:10]}", field_case_id=field_case.id if field_case else None, name=Path(filename).stem, asset_id="unknown", metadata_json={"description": description})
-        ingested = IngestedFile(id=upload_id, field_case_id=field_case.id if field_case else None, run_id=run.id, filename=filename, file_format="unknown", storage_path=str(storage_path), status="error", error=str(exc), metadata_json={})
+        ingested = IngestedFile(id=upload_id, field_case_id=field_case.id if field_case else None, run_id=run.id, filename=filename, file_format="unknown", storage_path=stored.uri, status="error", error=str(exc), metadata_json=storage_metadata)
         db.add(run)
         db.add(ingested)
         db.commit()
@@ -262,9 +265,9 @@ def ingest_recording(db: Session, filename: str, content: bytes, description: st
         run_id=run.id,
         filename=filename,
         file_format=file_format,
-        storage_path=str(storage_path),
+        storage_path=stored.uri,
         status="processed",
-        metadata_json=parse_metadata,
+        metadata_json={**parse_metadata, **storage_metadata},
     )
     db.add(run)
     db.add(ingested)
