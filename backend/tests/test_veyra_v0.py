@@ -195,3 +195,61 @@ def test_evidence_lineage_hypotheses_checks_and_replay_are_structured():
     assert any(frame["future_evidence_hidden"] for frame in replay["frames"])
     assert replay["evaluation"]["unsupported_ai_claims"] == []
     assert replay["evaluation"]["decision_traceability"].startswith("decision snapshot")
+
+
+def test_real_csv_ingestion_search_compare_report_and_saved_investigation():
+    reset()
+    csv_a = b"""timestamp,asset_id,event_type,software_version,configuration,status,zone
+2026-09-03T14:11:08Z,EX03,safe_stop,autonomy-2.7,localization-L4,failed,loading-zone-B
+2026-09-03T14:12:00Z,EX03,operator_note,autonomy-2.7,localization-L4,review_opened,loading-zone-B
+"""
+    csv_b = b"""timestamp,asset_id,event_type,software_version,configuration,status,zone
+2026-09-03T14:11:08Z,EX11,mission_segment,autonomy-2.7,localization-L4,healthy,loading-zone-C
+2026-09-03T14:20:00Z,EX11,outcome,autonomy-2.7,localization-L4,no_safe_stop,loading-zone-C
+"""
+    upload_a = client.post(
+        "/recordings/upload",
+        files={"file": ("ex03.csv", csv_a, "text/csv")},
+        data={"description": "affected robot run"},
+    )
+    assert upload_a.status_code == 200
+    run_a = upload_a.json()["run"]["id"]
+    assert upload_a.json()["events_indexed"] == 2
+    upload_b = client.post(
+        "/recordings/upload",
+        files={"file": ("ex11.csv", csv_b, "text/csv")},
+        data={"description": "healthy comparator run"},
+    )
+    assert upload_b.status_code == 200
+    run_b = upload_b.json()["run"]["id"]
+    search = client.get("/recorded-events/search", params={"query": "safe_stop"}).json()
+    assert search["count"] >= 2
+    assert any(event["source_reference"] == "ex03.csv:row:1" for event in search["events"])
+    compared = client.get("/runs/compare", params=[("run_id", run_a), ("run_id", run_b)]).json()
+    assert compared["runs_compared"] == 2
+    assert "autonomy-2.7" in compared["differences"]["software_versions"]
+    report = client.post(
+        "/recordings/report",
+        json={"question": "Why did EX03 safe stop and what is missing?", "run_ids": [run_a, run_b]},
+    ).json()
+    assert report["citations"]
+    assert report["missing_evidence"]
+    saved = client.post(
+        "/saved-investigations",
+        json={"title": "EX03 safe-stop review", "question": "Why did EX03 safe stop?", "run_ids": [run_a, run_b], "annotations": ["review with operator"]},
+    ).json()
+    assert saved["title"] == "EX03 safe-stop review"
+    assert saved["evidence_references"]
+
+
+def test_ingestion_reports_invalid_file_errors_without_indexing_fake_data():
+    reset()
+    response = client.post(
+        "/recordings/upload",
+        files={"file": ("broken.mcap", b"not a supported parser yet", "application/octet-stream")},
+        data={"description": "unsupported binary recording"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "error"
+    assert "Supported upload formats" in data["error"]

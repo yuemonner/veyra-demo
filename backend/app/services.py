@@ -1,8 +1,10 @@
 import base64
+import csv
 import hashlib
 import json
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Optional
 
 from cryptography.hazmat.primitives import serialization
@@ -25,19 +27,24 @@ from app.models import (
     ExecutedAction,
     DiagnosticCheck,
     Hypothesis,
+    IngestedFile,
     Investigation,
     LateEvidence,
     ObservabilityState,
     Outcome,
     OutcomeAttribution,
     PrecedentComparison,
+    RecordedEvent,
     ReviewFlag,
+    RunSession,
+    SavedInvestigation,
 )
 
 BASE = datetime(2026, 9, 3, 14, 0, 0)
 DEMO_DECISION_TIME = BASE + timedelta(minutes=27)
 DEMO_SEAL_TIME = BASE + timedelta(minutes=31)
 TIMESTAMP_AUTHORITY = "Veyra demo timestamp authority"
+UPLOAD_ROOT = Path("uploaded_recordings")
 STATE_KEYS = [
     "application_version",
     "firmware_version",
@@ -51,6 +58,283 @@ STATE_KEYS = [
 
 def iso(dt: datetime) -> str:
     return dt.isoformat() + "Z"
+
+
+def parse_dt(value: Any) -> Optional[datetime]:
+    if value in {None, ""}:
+        return None
+    if isinstance(value, datetime):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=None)
+
+
+def first_value(row: dict[str, Any], keys: list[str], default: str = "") -> str:
+    for key in keys:
+        if key in row and row[key] not in {None, ""}:
+            return str(row[key])
+    return default
+
+
+def serialize_run(row: RunSession) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "name": row.name,
+        "asset_id": row.asset_id,
+        "software_version": row.software_version,
+        "configuration": row.configuration,
+        "started_at": iso(row.started_at) if row.started_at else None,
+        "ended_at": iso(row.ended_at) if row.ended_at else None,
+        "metadata": row.metadata_json,
+        "created_at": iso(row.created_at),
+    }
+
+
+def serialize_recorded_event(row: RecordedEvent) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "run_id": row.run_id,
+        "file_id": row.file_id,
+        "asset_id": row.asset_id,
+        "event_type": row.event_type,
+        "timestamp": iso(row.timestamp) if row.timestamp else None,
+        "software_version": row.software_version,
+        "configuration": row.configuration,
+        "payload": row.payload,
+        "source_reference": row.source_reference,
+    }
+
+
+def parse_recording_rows(filename: str, content: bytes) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
+    suffix = Path(filename).suffix.lower()
+    if suffix == ".csv":
+        text = content.decode("utf-8-sig")
+        rows = list(csv.DictReader(text.splitlines()))
+        return "csv", rows, {"columns": list(rows[0].keys()) if rows else []}
+    if suffix in {".json", ".jsonl", ".ndjson"}:
+        text = content.decode("utf-8")
+        if suffix in {".jsonl", ".ndjson"}:
+            rows = [json.loads(line) for line in text.splitlines() if line.strip()]
+        else:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                rows = parsed
+            elif isinstance(parsed, dict) and isinstance(parsed.get("events"), list):
+                rows = parsed["events"]
+            else:
+                rows = [parsed]
+        if not all(isinstance(row, dict) for row in rows):
+            raise ValueError("JSON recording must contain objects or an events array")
+        return "json", rows, {"top_level": "events" if text.lstrip().startswith("{") else "array"}
+    raise ValueError("Supported upload formats in this prototype: .csv, .json, .jsonl, .ndjson")
+
+
+def ingest_recording(db: Session, filename: str, content: bytes, description: str = "") -> dict[str, Any]:
+    upload_id = f"upl-{uuid.uuid4().hex[:10]}"
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    storage_path = UPLOAD_ROOT / f"{upload_id}-{Path(filename).name}"
+    storage_path.write_bytes(content)
+    try:
+        file_format, rows, parse_metadata = parse_recording_rows(filename, content)
+    except Exception as exc:
+        run = RunSession(id=f"run-{uuid.uuid4().hex[:10]}", name=Path(filename).stem, asset_id="unknown", metadata_json={"description": description})
+        ingested = IngestedFile(id=upload_id, run_id=run.id, filename=filename, file_format="unknown", storage_path=str(storage_path), status="error", error=str(exc), metadata_json={})
+        db.add(run)
+        db.add(ingested)
+        db.commit()
+        return {"status": "error", "error": str(exc), "file": {"id": ingested.id, "filename": filename}}
+
+    event_times = [parse_dt(first_value(row, ["timestamp", "time", "event_time", "ts"])) for row in rows]
+    event_times = [item for item in event_times if item]
+    first_row = rows[0] if rows else {}
+    run = RunSession(
+        id=f"run-{uuid.uuid4().hex[:10]}",
+        name=first_value(first_row, ["run_id", "mission_id", "session", "session_id"], Path(filename).stem),
+        asset_id=first_value(first_row, ["asset_id", "robot_id", "machine_id", "vehicle_id"], "unknown"),
+        software_version=first_value(first_row, ["software_version", "release", "version"], ""),
+        configuration=first_value(first_row, ["configuration", "config", "profile", "localization"], ""),
+        started_at=min(event_times) if event_times else None,
+        ended_at=max(event_times) if event_times else None,
+        metadata_json={"description": description, "row_count": len(rows), "source_filename": filename},
+    )
+    ingested = IngestedFile(
+        id=upload_id,
+        run_id=run.id,
+        filename=filename,
+        file_format=file_format,
+        storage_path=str(storage_path),
+        status="processed",
+        metadata_json=parse_metadata,
+    )
+    db.add(run)
+    db.add(ingested)
+    events: list[RecordedEvent] = []
+    for index, row in enumerate(rows, start=1):
+        event_type = first_value(row, ["event_type", "type", "name", "topic"], "record")
+        timestamp = parse_dt(first_value(row, ["timestamp", "time", "event_time", "ts"]))
+        asset_id = first_value(row, ["asset_id", "robot_id", "machine_id", "vehicle_id"], run.asset_id)
+        software_version = first_value(row, ["software_version", "release", "version"], run.software_version)
+        configuration = first_value(row, ["configuration", "config", "profile", "localization"], run.configuration)
+        events.append(
+            RecordedEvent(
+                id=f"evt-{uuid.uuid4().hex[:10]}",
+                run_id=run.id,
+                file_id=ingested.id,
+                asset_id=asset_id,
+                event_type=event_type,
+                timestamp=timestamp,
+                software_version=software_version,
+                configuration=configuration,
+                payload=dict(row),
+                source_reference=f"{filename}:row:{index}",
+            )
+        )
+    db.add_all(events)
+    db.commit()
+    return {
+        "status": "processed",
+        "run": serialize_run(run),
+        "file": {"id": ingested.id, "filename": filename, "format": file_format, "status": ingested.status, "metadata": ingested.metadata_json},
+        "events_indexed": len(events),
+        "first_event": serialize_recorded_event(events[0]) if events else None,
+    }
+
+
+def list_runs(db: Session) -> list[dict[str, Any]]:
+    return [serialize_run(row) for row in db.scalars(select(RunSession).order_by(RunSession.created_at.desc()))]
+
+
+def search_recorded_events(
+    db: Session,
+    asset_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    software_version: Optional[str] = None,
+    query: Optional[str] = None,
+) -> dict[str, Any]:
+    stmt = select(RecordedEvent)
+    if asset_id:
+        stmt = stmt.where(RecordedEvent.asset_id == asset_id)
+    if event_type:
+        stmt = stmt.where(RecordedEvent.event_type == event_type)
+    if software_version:
+        stmt = stmt.where(RecordedEvent.software_version == software_version)
+    rows = list(db.scalars(stmt.order_by(RecordedEvent.timestamp.asc().nulls_last(), RecordedEvent.id)))
+    if query:
+        needle = query.lower()
+        rows = [row for row in rows if needle in json.dumps(row.payload, default=str).lower() or needle in row.event_type.lower()]
+    return {"count": len(rows), "events": [serialize_recorded_event(row) for row in rows[:200]]}
+
+
+def compare_runs(db: Session, run_ids: list[str]) -> dict[str, Any]:
+    runs = [db.get(RunSession, run_id) for run_id in run_ids]
+    runs = [row for row in runs if row]
+    comparisons = []
+    for run in runs:
+        events = list(db.scalars(select(RecordedEvent).where(RecordedEvent.run_id == run.id)))
+        event_counts: dict[str, int] = {}
+        for event in events:
+            event_counts[event.event_type] = event_counts.get(event.event_type, 0) + 1
+        comparisons.append({
+            "run": serialize_run(run),
+            "event_count": len(events),
+            "event_types": event_counts,
+            "first_event": iso(min([e.timestamp for e in events if e.timestamp], default=run.started_at)) if (events or run.started_at) else None,
+            "last_event": iso(max([e.timestamp for e in events if e.timestamp], default=run.ended_at)) if (events or run.ended_at) else None,
+        })
+    differences = {
+        "software_versions": sorted({row.software_version for row in runs if row.software_version}),
+        "configurations": sorted({row.configuration for row in runs if row.configuration}),
+        "assets": sorted({row.asset_id for row in runs if row.asset_id}),
+    }
+    return {"runs_compared": len(runs), "differences": differences, "comparisons": comparisons}
+
+
+def investigate_imported_data(db: Session, question: str, run_ids: Optional[list[str]] = None) -> dict[str, Any]:
+    stmt = select(RecordedEvent)
+    if run_ids:
+        stmt = stmt.where(RecordedEvent.run_id.in_(run_ids))
+    events = list(db.scalars(stmt.order_by(RecordedEvent.timestamp.asc().nulls_last(), RecordedEvent.id)))
+    q = question.lower()
+    relevant = [event for event in events if any(token in json.dumps(event.payload, default=str).lower() or token in event.event_type.lower() for token in q.split() if len(token) > 3)]
+    if not relevant:
+        relevant = events[:20]
+    event_type_counts: dict[str, int] = {}
+    for event in relevant:
+        event_type_counts[event.event_type] = event_type_counts.get(event.event_type, 0) + 1
+    findings = [
+        {
+            "claim": f"Found {len(relevant)} relevant records across {len({event.run_id for event in relevant})} run(s).",
+            "citations": [event.source_reference for event in relevant[:8]],
+        },
+        {
+            "claim": f"Most visible event types: {', '.join(sorted(event_type_counts)[:5]) or 'none'}.",
+            "citations": [event.source_reference for event in relevant[:8]],
+        },
+    ]
+    missing = []
+    if not any("intervention" in event.event_type.lower() or "action" in event.event_type.lower() for event in relevant):
+        missing.append("No operator intervention record found in the imported events.")
+    if not any("outcome" in event.event_type.lower() or "recovered" in json.dumps(event.payload, default=str).lower() for event in relevant):
+        missing.append("No recovery outcome record found in the imported events.")
+    return {
+        "question": question,
+        "answer": "This analysis is grounded only in imported records. It reports visible records, citations and missing evidence instead of declaring root cause.",
+        "findings": findings,
+        "missing_evidence": missing,
+        "unsupported_conclusions": ["root cause", "causal repair"] if missing else [],
+        "records_used": [serialize_recorded_event(event) for event in relevant[:20]],
+    }
+
+
+def generate_recording_report(db: Session, question: str, run_ids: Optional[list[str]] = None) -> dict[str, Any]:
+    analysis = investigate_imported_data(db, question, run_ids)
+    compared = compare_runs(db, run_ids or sorted({event["run_id"] for event in analysis["records_used"]}))
+    report = {
+        "title": "Imported recording investigation report",
+        "question": question,
+        "summary": analysis["answer"],
+        "findings": analysis["findings"],
+        "missing_evidence": analysis["missing_evidence"],
+        "comparison": compared,
+        "citations": sorted({citation for finding in analysis["findings"] for citation in finding["citations"]}),
+        "export_format": "json",
+    }
+    return report
+
+
+def save_imported_investigation(db: Session, title: str, question: str, run_ids: list[str], annotations: Optional[list[Any]] = None) -> dict[str, Any]:
+    report = generate_recording_report(db, question, run_ids)
+    saved = SavedInvestigation(
+        id=f"saved-{uuid.uuid4().hex[:10]}",
+        title=title,
+        question=question,
+        run_ids=run_ids,
+        findings=report["findings"],
+        evidence_references=report["citations"],
+        annotations=annotations or [],
+        report=report,
+    )
+    db.add(saved)
+    db.commit()
+    return {
+        "id": saved.id,
+        "title": saved.title,
+        "question": saved.question,
+        "run_ids": saved.run_ids,
+        "findings": saved.findings,
+        "evidence_references": saved.evidence_references,
+        "annotations": saved.annotations,
+        "report": saved.report,
+        "created_at": iso(saved.created_at),
+    }
 
 
 def evidence(

@@ -56,6 +56,52 @@ The prototype uses:
 
 The backend stores canonical case objects. The frontend presents a compact Case Workspace for interacting with those objects.
 
+## Competitor-Parity Baseline
+
+Established robotics data products already cover ingestion, search, replay, AI analysis and incident workflows. Veyra treats those as the product baseline, not as defensible differentiation.
+
+| Competitor feature | Official documentation | Existing Veyra support | Implementation required |
+|---|---|---|---|
+| Browser upload for robotics recordings | Alloy browser upload and mission reports; Roboto log ingestion | Implemented for CSV, JSON, JSONL and NDJSON | Add MCAP/ROS bag parsing |
+| Parse and index imported data | Alloy parsing and metadata extraction; Roboto Actions | Implemented for structured text files | Add binary robotics formats and richer topic schemas |
+| Search across recordings | Foxglove recording/event search; Roboto query engine | Implemented via `/recorded-events/search` | Add full-text index and time-window filters |
+| Compare runs | Alloy mission comparison; Foxglove comparison mode | Implemented via `/runs/compare` | Add richer statistical and timeline diffs |
+| AI investigation with citations | Alloy AI reports; Foxglove Agents; Roboto Agents | Implemented as deterministic grounded analysis with source references | Add model-backed tool use with strict citation checks |
+| Persistent investigations | Formant incidents; Roboto persistent workflows | Implemented via `/saved-investigations` | Add auth, collaboration and annotations UI |
+| Reports | Alloy mission reports | Implemented JSON report via `/recordings/report` | Add PDF/HTML export |
+| SDK / cloud / edge ingestion | Alloy SDK, S3/GCS and Edge; Foxglove Foxlet; Roboto SDK and Actions | Not implemented | Read-only S3/API/edge-folder connectors |
+| MCP | Alloy, Foxglove and Roboto document MCP support | Not implemented | Read-only MCP server over Veyra case and recording APIs |
+
+References:
+
+- https://docs.usealloy.ai/docs/agent-platform/getting-started
+- https://docs.usealloy.ai/docs/mesh-storage/sdk
+- https://docs.foxglove.dev/docs/agents
+- https://docs.roboto.ai/
+- https://docs.formant.io/docs/incident-management
+
+## Real Ingestion Baseline
+
+Implemented now:
+
+- upload `.csv`, `.json`, `.jsonl` and `.ndjson`
+- parse actual file content
+- store the raw uploaded file under `uploaded_recordings/`
+- create a `RunSession`
+- create one `RecordedEvent` per parsed row/object
+- preserve source references such as `filename:row:17`
+- return processing status and parsing errors
+
+Not implemented yet:
+
+- MCAP
+- ROS bag
+- PX4 / ULog
+- video and multimodal replay
+- S3/GCS sync
+- edge folder watcher
+- production auth and tenancy
+
 ```mermaid
 flowchart LR
   A["Source evidence<br/>telemetry · release history · config · field notes"] --> B["Canonical Evidence<br/>event_time · known_at · ingested_at · provenance"]
@@ -177,6 +223,10 @@ Core implemented records include:
 - `ReviewFlag`
 - `PrecedentComparison`
 - `CaseEvent`
+- `RunSession`
+- `IngestedFile`
+- `RecordedEvent`
+- `SavedInvestigation`
 
 ## Evidence Provenance
 
@@ -318,6 +368,63 @@ Future evidence is not exposed in earlier snapshots.
 
 ## API Walkthrough
 
+### Imported Recording Workflow
+
+Upload a structured recording:
+
+```bash
+curl -F "file=@sample.csv" -F "description=affected run" http://127.0.0.1:8050/recordings/upload
+```
+
+Search indexed events:
+
+```bash
+GET /recorded-events/search?query=safe_stop
+GET /recorded-events/search?asset_id=EX03
+GET /recorded-events/search?event_type=safe_stop
+GET /recorded-events/search?software_version=autonomy-2.7
+```
+
+Compare runs:
+
+```bash
+GET /runs/compare?run_id=run-a&run_id=run-b
+```
+
+Investigate imported data:
+
+```bash
+POST /recordings/investigate
+{
+  "question": "Why did EX03 safe stop and what is missing?",
+  "run_ids": ["run-a", "run-b"]
+}
+```
+
+Generate a report:
+
+```bash
+POST /recordings/report
+{
+  "question": "Why did EX03 safe stop and what is missing?",
+  "run_ids": ["run-a", "run-b"]
+}
+```
+
+Save an investigation:
+
+```bash
+POST /saved-investigations
+{
+  "title": "EX03 safe-stop review",
+  "question": "Why did EX03 safe stop?",
+  "run_ids": ["run-a", "run-b"],
+  "annotations": ["review with operator"]
+}
+```
+
+### Field Case Demo Workflow
+
 Start with:
 
 ```bash
@@ -392,6 +499,15 @@ PYTHONPATH=backend python -m pytest backend/tests/test_veyra_v0.py -q
 
 Implemented in this prototype:
 
+- CSV/JSON recording ingestion
+- raw file persistence and parse status
+- run/session model
+- event indexing with source references
+- event search
+- cross-run comparison
+- grounded investigation response with citations and missing evidence
+- JSON report generation
+- saved imported investigations
 - synthetic 12-machine field case
 - evidence lineage fields and lineage API
 - affected vs healthy comparison
@@ -424,6 +540,11 @@ Planned capabilities:
 Known limitations:
 
 - data is synthetic
+- imported recording support is limited to structured text formats
+- MCAP/ROS bag are not implemented
+- no cloud storage sync
+- no edge folder watcher
+- no MCP server
 - no production authentication
 - no real customer integrations
 - no measured performance claims

@@ -250,3 +250,58 @@ class PrecedentComparison(Base):
     outcome_comparison: Mapped[dict] = mapped_column(JSON, default=dict)
     cost_comparison: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class RunSession(Base):
+    __tablename__ = "run_sessions"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, index=True)
+    asset_id: Mapped[str] = mapped_column(String, index=True)
+    software_version: Mapped[str] = mapped_column(String, default="", index=True)
+    configuration: Mapped[str] = mapped_column(String, default="", index=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class IngestedFile(Base):
+    __tablename__ = "ingested_files"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    run_id: Mapped[str] = mapped_column(String, ForeignKey("run_sessions.id"), index=True)
+    filename: Mapped[str] = mapped_column(String)
+    file_format: Mapped[str] = mapped_column(String, index=True)
+    storage_path: Mapped[str] = mapped_column(String)
+    status: Mapped[str] = mapped_column(String, default="processed", index=True)
+    error: Mapped[str] = mapped_column(Text, default="")
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class RecordedEvent(Base):
+    __tablename__ = "recorded_events"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    run_id: Mapped[str] = mapped_column(String, ForeignKey("run_sessions.id"), index=True)
+    file_id: Mapped[str] = mapped_column(String, ForeignKey("ingested_files.id"), index=True)
+    asset_id: Mapped[str] = mapped_column(String, index=True)
+    event_type: Mapped[str] = mapped_column(String, index=True)
+    timestamp: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    software_version: Mapped[str] = mapped_column(String, default="", index=True)
+    configuration: Mapped[str] = mapped_column(String, default="", index=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    source_reference: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SavedInvestigation(Base):
+    __tablename__ = "saved_investigations"
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    title: Mapped[str] = mapped_column(String, index=True)
+    question: Mapped[str] = mapped_column(Text)
+    run_ids: Mapped[list] = mapped_column(JSON, default=list)
+    findings: Mapped[list] = mapped_column(JSON, default=list)
+    evidence_references: Mapped[list] = mapped_column(JSON, default=list)
+    annotations: Mapped[list] = mapped_column(JSON, default=list)
+    report: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

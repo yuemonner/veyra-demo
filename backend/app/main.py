@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db, init_db
 from app.models import Asset, Decision, DecisionPackage, Evidence, Investigation, Outcome
-from app.services import attach_human_decision, build_package, compare, decision_context, diagnostic_checks, evidence_lineage, hypotheses_state, inject_late_evidence, precedent_comparison, reconstruct, record_check_observation, record_cost_impact, replay_case, reset_demo, seal_package, serialize_evidence, similar_memory, verify_package
+from app.services import attach_human_decision, build_package, compare, compare_runs, decision_context, diagnostic_checks, evidence_lineage, generate_recording_report, hypotheses_state, ingest_recording, inject_late_evidence, investigate_imported_data, list_runs, precedent_comparison, reconstruct, record_check_observation, record_cost_impact, replay_case, reset_demo, save_imported_investigation, seal_package, search_recorded_events, serialize_evidence, similar_memory, verify_package
 
 app = FastAPI(title="Veyra V0", version="0.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -60,6 +60,18 @@ class CheckObservationIn(BaseModel):
     observation: dict = {}
 
 
+class RecordingInvestigationIn(BaseModel):
+    question: str
+    run_ids: list[str] = []
+
+
+class SaveRecordingInvestigationIn(BaseModel):
+    title: str
+    question: str
+    run_ids: list[str]
+    annotations: list = []
+
+
 @app.on_event("startup")
 def startup():
     init_db()
@@ -86,6 +98,52 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/recordings/upload")
+async def upload_recording(file: UploadFile = File(...), description: str = Form(""), db: Session = Depends(get_db)):
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "uploaded file is empty")
+    return ingest_recording(db, file.filename or "recording", content, description)
+
+
+@app.get("/runs")
+def runs(db: Session = Depends(get_db)):
+    return {"runs": list_runs(db)}
+
+
+@app.get("/recorded-events/search")
+def recorded_events_search(
+    asset_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    software_version: Optional[str] = None,
+    query: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    return search_recorded_events(db, asset_id=asset_id, event_type=event_type, software_version=software_version, query=query)
+
+
+@app.get("/runs/compare")
+def runs_compare(run_id: list[str] = Query(default=[]), db: Session = Depends(get_db)):
+    if len(run_id) < 2:
+        raise HTTPException(400, "provide at least two run_id query parameters")
+    return compare_runs(db, run_id)
+
+
+@app.post("/recordings/investigate")
+def recordings_investigate(body: RecordingInvestigationIn, db: Session = Depends(get_db)):
+    return investigate_imported_data(db, body.question, body.run_ids or None)
+
+
+@app.post("/recordings/report")
+def recordings_report(body: RecordingInvestigationIn, db: Session = Depends(get_db)):
+    return generate_recording_report(db, body.question, body.run_ids or None)
+
+
+@app.post("/saved-investigations")
+def create_saved_investigation(body: SaveRecordingInvestigationIn, db: Session = Depends(get_db)):
+    return save_imported_investigation(db, body.title, body.question, body.run_ids, body.annotations)
 
 
 @app.post("/demo/reset")
