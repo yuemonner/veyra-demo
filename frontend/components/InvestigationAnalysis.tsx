@@ -5,7 +5,7 @@ import { API } from "../lib/api";
 import DecisionWorkspace from "./DecisionWorkspace";
 
 const DEMO = "inv-120-robots-bad-rollout";
-export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate }: { stage: string; id?: string; onNavigate?: (stage: string) => void }) {
+export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, onAnalysis }: { stage: string; id?: string; onNavigate?: (stage: string) => void; onAnalysis?: (analysis: any) => void }) {
   const [analysis, setAnalysis] = useState<any>(null);
   const [caseId, setCaseId] = useState(id);
   const [error, setError] = useState("");
@@ -62,8 +62,9 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate }: 
     try { setAnalysis(await request(`/investigations/${caseId}/hypotheses/${encodeURIComponent(challengeId)}/challenge`, {owner, reason: challengeReason, evidence_ids: []})); setChallengeReason(""); setError(""); }
     catch (e) { setError(String(e)); } finally { setBusy(false); }
   }
+  useEffect(() => { if (analysis) onAnalysis?.(analysis); }, [analysis, onAnalysis]);
   const diagnostic = stage === "checks";
-  const titles: Record<string, string> = {overview: "Current investigation", fleet: "Candidate controls", hypotheses: "Competing hypotheses", decision: "Decision workspace", checks: "Next diagnostic check", outcome: "Outcome memory", outcomes: "Action & outcome", precedents: "Outcome memory", evidence: "Evidence & timeline"};
+  const titles: Record<string, string> = {overview: "Current investigation", fleet: "Candidate controls", hypotheses: "Competing hypotheses", decision: "Decision workspace", checks: "Next diagnostic check", outcome: "Outcome memory", outcomes: "Action & outcome", precedents: "Conditional reuse", actions: "Actual actions", changes: "Configuration changes", evidence: "Evidence & timeline"};
   const short = (value: string = "") => value.replace("localization-", "").replace("loading-zone-", "Zone ").replace("lidar-fw-", "");
   const time = (value: string) => value?.slice(11, 19) || "—";
   const label = (h: any) => h.id.endsWith("h-l4-zone-b") ? "H2" : h.id.endsWith("h-l4-alone") ? "H1" : "H3";
@@ -103,10 +104,10 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate }: 
       {stage === "fleet" && <>
         <article className="investigation-card candidate-card"><div><small>EX11 · Candidate control</small><h2>{candidate?.valid_control ? "Qualified healthy observation" : candidate?.exposure_status}</h2><p>Configured: {short(candidate?.context.configuration)} + {short(candidate?.context.network_profile)}</p></div><span className="state-badge">Valid control: {candidate?.valid_control ? "Yes" : "No"}</span></article>
         <p className="muted">A counterexample needs matched operating conditions, complete telemetry and no failure.</p>
-        <details className="investigation-card"><summary>Compare all {analysis.cohorts.length} machines</summary><div className="investigation-table-wrap"><table><thead><tr><th>Machine</th><th>Configured</th><th>Operating exposure</th><th>Valid control</th></tr></thead><tbody>{analysis.cohorts.map((c: any) => <tr key={c.asset_id}><td>{c.asset_id}</td><td>{short(c.context.configuration)} · {short(c.context.network_profile)}</td><td>{c.exposure_status}</td><td>{c.valid_control ? "Yes" : "No"}</td></tr>)}</tbody></table></div></details>
+        <details className="investigation-card" open><summary>Compare all {analysis.cohorts.length} machines</summary><div className="investigation-table-wrap"><table><thead><tr><th>Machine</th><th>Configured</th><th>Operating exposure</th><th>Valid control</th></tr></thead><tbody>{analysis.cohorts.map((c: any) => <tr key={c.asset_id}><td>{c.asset_id}</td><td>{short(c.context.configuration)} · {short(c.context.network_profile)}</td><td>{c.exposure_status}</td><td>{c.valid_control ? "Yes" : "No"}</td></tr>)}</tbody></table></div></details>
       </>}
       {stage === "hypotheses" && hypothesisCards()}
-      {["decision", "outcome", "outcomes", "precedents"].includes(stage) && <DecisionWorkspace key={caseId} caseId={caseId} stage={stage} />}
+      {["decision", "actions", "outcome", "outcomes", "precedents"].includes(stage) && <DecisionWorkspace key={caseId} caseId={caseId} stage={stage} />}
       {diagnostic && <>
         <article className="investigation-card"><small>{next ? `Recommended · ${next.cost.time_minutes} min · ${next.risk.level} risk` : "Check recorded · engineer review"}</small><h2>{next ? "Verify EX11 operating exposure" : "Review the new evidence"}</h2><p>{next ? "Use its existing run records before treating it as a healthy control." : "No further discriminating check in this rule set. Plan independent replication with matched workload and site conditions."}</p>{next && <details><summary>Why this check?</summary><p>{next.why}</p></details>}</article>
         <article className="investigation-card"><h3>Try a synthetic observation</h3><p className="muted">Saved to this case and reassessed by the backend.</p><div className="investigation-scenarios"><button disabled={busy} onClick={() => sample("unknown")}>Exposure unknown</button><button disabled={busy} onClick={() => sample("same")}>Same conditions · healthy</button><button disabled={busy} onClick={() => sample("different")}>Different conditions</button></div><div className="hypothesis-statuses">{analysis.hypotheses.map((h: any) => <span key={h.id}>{label(h)} · {status(h.status)}</span>)}</div></article>
@@ -120,6 +121,7 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate }: 
       </>}
       {["outcome", "outcomes", "precedents"].includes(stage) && <details className="investigation-card historical-reference"><summary>Historical reference outcome · separate from this case</summary><p>{analysis.historical_reference.reported_result}</p><small>Preset synthetic narrative. Not independently verified. Excluded from the current hypothesis assessment and workflow reuse.</small></details>}
       {["outcome", "outcomes", "precedents"].includes(stage) && analysis.conditional_precedents.length > 0 && <details className="investigation-card"><summary>Earlier outcome records · separate legacy format ({analysis.conditional_precedents.length})</summary><p className="muted">These records predate the separate decision/action/verification workflow. They are preserved, but excluded from workflow reuse.</p>{analysis.conditional_precedents.map((p: any) => <div key={p.outcome_id}><strong>{p.outcome}</strong><p>Conditions: {p.conditions.join("; ") || "not recorded"}</p><p>Verification: {p.verification}</p><p>Reported action: {p.verification_details.action || "not recorded"}</p></div>)}</details>}
+      {stage === "changes" && <><p className="muted">Field-matched configuration records. These do not establish actual operating exposure.</p><div className="investigation-card investigation-table-wrap"><table><thead><tr><th>Machine</th><th>Recorded fields</th><th>Source</th><th>Event / Known UTC</th></tr></thead><tbody>{Array.from(new Map(analysis.hypotheses.flatMap((h: any) => h.context_evidence).map((e: any) => [e.id, e])).values()).map((e: any) => <tr key={e.id}><td>{e.asset_id}</td><td>{Object.entries(e.matched_fields || {}).map(([k,v]) => <div key={k}>{k}: {String(v)}</div>)}</td><td>{e.source}</td><td>{time(e.event_time)} / {time(e.known_at)}</td></tr>)}</tbody></table></div></>}
       {stage === "evidence" && <>
         <p className="muted">Event time is when it happened. Known time is when the source became available. All times are UTC.</p>
         <div className="investigation-card investigation-table-wrap"><table><thead><tr><th>Machine / record</th><th>Event time (UTC)</th><th>Known time (UTC)</th></tr></thead><tbody>{analysis.timeline.map((e: any) => <tr key={e.id}><td><strong>{e.asset_id}</strong> · {e.label}<small>{e.source}</small></td><td>{time(e.event_time)}</td><td>{time(e.known_at)}</td></tr>)}</tbody></table></div>
