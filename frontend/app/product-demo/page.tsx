@@ -107,7 +107,7 @@ const hypotheses: Record<HypothesisKey, {
 };
 
 const comparators: Record<ComparatorKey, { label: string; cohort: string; count: string }> = {
-  healthy: { label: "Healthy fleet", cohort: "all healthy machines", count: "9" },
+  healthy: { label: "No known signal", cohort: "unverified control candidates", count: "9" },
   "same-release": { label: "Same release", cohort: "healthy autonomy 2.7 machines", count: "9" },
   "same-localization": { label: "Same localization", cohort: "healthy L4 machines", count: "2" },
   "same-site": { label: "Same site", cohort: "healthy zone B machines", count: "1" },
@@ -319,12 +319,12 @@ export default function ProductDemoPage() {
                 {objectKey === "checks"
                   ? "Next Evidence"
                   : objectKey === "fleet"
-                    ? "Compare affected machines against healthy comparators"
+                    ? "Validate candidate controls before comparing machines"
                     : objectKey === "overview"
                       ? "One synthetic field incident, structured as a Field Case"
                     : "Active field case data"}
               </h2>
-              {objectKey === "fleet" && (
+              {!liveStages.includes(objectKey) && objectKey === "fleet" && (
                 <div className="compare-summary">
                   <span>LENS: {activeHypothesis.id}</span>
                   <span>Comparator: {activeComparator.label}</span>
@@ -332,7 +332,7 @@ export default function ProductDemoPage() {
                 </div>
               )}
               {objectKey === "checks" && (
-                <p className="workspace-note">Ranked by information value, cost and operational risk.</p>
+                <p className="workspace-note">Prioritized by explicit evidence gaps, feasibility, cost and operational risk.</p>
               )}
             </div>
             <div className="ide-lens-tabs" aria-label="possible cause lens">
@@ -367,7 +367,7 @@ export default function ProductDemoPage() {
             </div>
           )}
 
-          {(objectKey === "fleet" || objectKey === "hypotheses") && (
+          {!liveStages.includes(objectKey) && (objectKey === "fleet" || objectKey === "hypotheses") && (
             <div className="ide-table-wrap">
               <table className="ide-data-table">
                 <thead>
