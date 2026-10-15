@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import InvestigationAnalysis from "../../../components/InvestigationAnalysis";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getJson, postJson } from "../../../lib/api";
@@ -130,12 +131,12 @@ function InvestigationInner({ id }: { id: string }) {
   }
 
   const affected = comparison?.same_signal ?? 3;
-  const stageImpliesLateEvidence = stage === "outcome" || stage === "history";
+  const stageImpliesLateEvidence = false;
   const lateEvidenceVisible = affected > 3 || stageImpliesLateEvidence;
   const displayAffected = affected;
   const displayHealthy = comparison?.no_signal ?? 9;
-  const actionRecorded = Boolean(pkg?.sealed || pkg?.package?.human_decision || stage === "action" || stage === "outcome" || stage === "history");
-  const outcomeRecorded = Boolean(stage === "outcome" || stage === "history" || memory?.similar_cases?.length);
+  const actionRecorded = Boolean(pkg?.sealed || pkg?.package?.human_decision);
+  const outcomeRecorded = Boolean(memory?.similar_cases?.length);
   const detectionLead = useMemo(() => {
     if (!rec?.human_discovery?.event_time || !rec?.first_abnormal_evidence?.event_time) return "before engineer note";
     const first = new Date(rec.first_abnormal_evidence.event_time).getTime();
@@ -182,6 +183,7 @@ function InvestigationInner({ id }: { id: string }) {
         <MachineRail stage={stage} affected={displayAffected} healthy={displayHealthy} lateEvidenceVisible={lateEvidenceVisible} actionRecorded={actionRecorded} outcomeRecorded={outcomeRecorded} />
 
         <main className="workspace-main">
+          {["scope", "decision", "outcome", "history"].includes(stage) && <InvestigationAnalysis stage={stage === "scope" ? "fleet" : stage === "history" ? "precedents" : stage} id={investigationId} />}
           <StageTabs stage={stage} setStage={setStage} />
           <div className="status-strip workspace-status"><span>{notice}</span></div>
 
@@ -201,8 +203,8 @@ function InvestigationInner({ id }: { id: string }) {
             {stage === "scope" && <CompareStage comparison={comparison} precedent={precedent} onPackage={generatePackage} />}
             {stage === "decision" && <PackageStage pkg={pkg} verification={verification} rec={rec} comparison={comparison} decisionContext={decisionContext} onGenerate={generatePackage} onSeal={seal} onFetchEvidence={lateEvidence} />}
             {stage === "action" && <ActionStage pkg={pkg} onGenerate={generatePackage} onSeal={seal} onOutcome={() => setStage("outcome")} />}
-            {stage === "outcome" && <LateEvidenceStage pkg={pkg} verification={verification} comparison={comparison} onSeal={seal} onOutcome={outcome} />}
-            {stage === "history" && <MemoryStage memory={memory} precedent={precedent} onOutcome={outcome} />}
+
+
           </section>
         </main>
 
@@ -385,7 +387,7 @@ function LiveFailure({ rec, comparison, detectionLead, onChanges, onPackage }: a
           <BriefItem step="01" title="Relevant changes" value="Localization L3 to L4 · Map M18 to M19 · LiDAR 5.2 to 5.3" />
           <BriefItem step="02" title="Where else" value={`${comparison?.same_signal ?? 3}/12 affected. Release 2.7 alone does not explain the issue.`} />
           <BriefItem step="03" title="Strongest clue" value="Localization L4 + loading zone B exposure." />
-          <BriefItem step="04" title="Exception" value="EX11 shares the exposure but has no known issue at decision time." />
+          <BriefItem step="04" title="Exception" value="EX11 exposure is not verified; absence of an alert does not establish a healthy control." />
           <BriefItem step="05" title="Next check" value="Observe EX11 in Zone B." />
           <BriefItem step="06" title="Team action" value="Rollback localization L4 on EX03, EX05 and EX08." />
         </div>
@@ -460,7 +462,7 @@ function CompareStage({ comparison, precedent, onPackage }: any) {
       </table>
       <div className="callout">
         <b>What this narrows</b>
-        <p>Autonomy 2.7 is on both failed and healthy machines. Localization L4 and loading zone B are shared by the affected machines. EX11 shares both but had no known issue at decision time. This helps the team focus. It does not prove the cause.</p>
+        <p>Autonomy 2.7 is on both failed and healthy machines. Localization L4 and loading zone B are shared by the affected machines. EX11 has no known issue, but matching exposure is not verified. This helps the team focus. It does not prove the cause.</p>
       </div>
       <div className="callout">
         <b>What happened when we tried these actions before?</b>
@@ -588,7 +590,7 @@ function PackageStage({ pkg, verification, rec, comparison, decisionContext, onG
             <PackageItem title="Affected vs healthy" value={`${comparison?.same_signal ?? 3} / ${comparison?.same_change ?? 12}`} />
             <PackageItem title="Observability" value={`${observability?.status || "partial"} at decision time`} />
             <PackageItem title="Primary possible cause" value={primaryHypothesis?.hypothesis || "pending"} />
-            <PackageItem title="Confidence" value={primaryHypothesis ? `${Math.round((primaryHypothesis.confidence || 0) * 100)}% · ${primaryHypothesis.status}` : "pending"} />
+            <PackageItem title="Evidence status" value={primaryHypothesis?.status || "unresolved"} />
             <PackageItem title="Owner" value={record?.owner || pkg.package.human_decision?.owner || "pending"} />
             <PackageItem title="Chosen action" value={record?.chosen_option?.label || pkg.package.human_decision?.decision || "pending"} />
           </div>
