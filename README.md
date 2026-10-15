@@ -50,13 +50,19 @@ The SQLAlchemy-backed rules in `backend/app/investigation_engine.py` are the ana
 
 LLMs may eventually parse engineer language, propose variables/hypotheses or explain selected evidence. They do not decide whether evidence exists, whether a control is valid or whether recovery has been verified. This slice does not require an LLM.
 
+## Evidence boundaries
+
+- Configuration matches are `context_evidence`, never direct support for an operating-exposure hypothesis. The baseline has 3/3 affected and 1/9 no-known-signal machines (including EX11) configured for L4 + Zone B; none has verified comparable operating exposure.
+- Hypothesis links validate actual payload fields. Firmware context must explicitly contain `firmware_version=lidar-fw-5.3`; nearby localization records without that field do not qualify. Metadata remains context, not causal proof.
+- EX11 starts as a candidate control. Investigation priority is separate from evidence strength. Preset recovery belongs to a clearly separated historical reference and is excluded from current assessment. Event and known times have distinct columns (EX08: 14:25 / 14:26 UTC).
+
 ## Try the investigation loop
 
 1. **Fleet:** EX11 starts with `Exposure not verified`. Inspect context, control validity and missing data.
 2. **Decision:** inspect supporting, contradicting and missing evidence, confounders and the next-check rationale.
-3. **Next Checks / Outcomes:** choose an explicitly synthetic scenario: exposure unknown, same conditions and healthy, or verified different conditions. The backend persists the observation and recomputes hypotheses. You can also enter a sourced observation manually.
+3. **Next check:** choose an explicitly synthetic scenario: exposure unknown, same conditions and healthy, or verified different conditions. The backend persists the observation and recomputes hypotheses. You can also enter a sourced observation manually.
 4. **Outcome:** record who decided, the action actually taken, whether it was the only change, the recovery evidence and verification window, remaining unknowns and applicable conditions.
-5. **Precedent:** reload the case to inspect the persisted conditional outcome. An action followed by recovery is not automatically a proven fix.
+5. **Outcome memory:** reload the case to inspect the persisted conditional outcome. An action followed by recovery is not automatically a proven fix.
 
 Each browser receives an isolated synthetic investigation session. Starting a new investigation creates a fresh session without resetting another visitor's case. Browser local storage retains its session ID; database records survive browser reloads. Durability across server restarts depends on the configured database.
 
