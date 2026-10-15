@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import InvestigationAnalysis from "../../components/InvestigationAnalysis";
 import { useMemo, useState } from "react";
 
 type ObjectKey =
@@ -45,7 +46,7 @@ const machines = [
   { id: "EX08", status: "affected", release: "2.7", localization: "L4", zone: "B", lidar: "5.3", last: "safe-stop 14:26", exposure: "full" },
   { id: "EX09", status: "healthy", release: "2.7", localization: "L3", zone: "B", lidar: "5.3", last: "planner fallback", exposure: "partial" },
   { id: "EX10", status: "healthy", release: "2.7", localization: "L3", zone: "A", lidar: "5.2", last: "none", exposure: "none" },
-  { id: "EX11", status: "watch", release: "2.7", localization: "L4", zone: "C", lidar: "5.3", last: "counterexample", exposure: "counter" },
+  { id: "EX11", status: "watch", release: "2.7", localization: "L4", zone: "C", lidar: "5.3", last: "Exposure not verified", exposure: "unverified" },
   { id: "EX12", status: "healthy", release: "2.7", localization: "L3", zone: "C", lidar: "5.3", last: "none", exposure: "none" },
 ];
 
@@ -209,6 +210,7 @@ export default function ProductDemoPage() {
   const [knownCursor, setKnownCursor] = useState<KnownCursor>("14:27");
   const [traceOpen, setTraceOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const liveStages = ["fleet", "decision", "hypotheses", "checks", "outcomes", "precedents"];
   const activeHypothesis = hypotheses[hypothesisKey];
   const activeComparator = comparators[comparatorKey];
   const beliefState = getBeliefState(knownCursor);
@@ -303,12 +305,13 @@ export default function ProductDemoPage() {
             </div>
             <div className="cohort-group">
               <label>Watch</label>
-              <p>EX11</p>
+              <p>EX11 · Exposure not verified</p>
             </div>
           </div>
         </aside>
 
         <section className="ide-center">
+          {["fleet", "decision", "hypotheses", "checks", "outcomes", "precedents"].includes(objectKey) && <InvestigationAnalysis stage={objectKey} />}
           <div className="ide-center-head">
             <div>
               <span>{workspaceTitle}</span>
@@ -449,7 +452,7 @@ export default function ProductDemoPage() {
             </div>
           )}
 
-          {objectKey === "checks" && (
+          {!liveStages.includes(objectKey) && objectKey === "checks" && (
             <div className="ide-next-check">
               <div>
                 <span>Next Evidence</span>
@@ -468,7 +471,7 @@ export default function ProductDemoPage() {
             </div>
           )}
 
-          {objectKey === "decision" && (
+          {!liveStages.includes(objectKey) && objectKey === "decision" && (
             <div className="ide-table-wrap">
               <table className="ide-data-table">
                 <thead><tr><th>Decision time</th><th>Known</th><th>Unknown</th><th>Recommended check</th><th>Human choice</th></tr></thead>
@@ -512,7 +515,7 @@ export default function ProductDemoPage() {
             </div>
           )}
 
-          {objectKey === "outcomes" && (
+          {!liveStages.includes(objectKey) && objectKey === "outcomes" && (
             <div className="ide-table-wrap">
               <table className="ide-data-table">
                 <thead><tr><th>Observed result</th><th>Verification window</th><th>Attribution</th><th>Belief update</th></tr></thead>
@@ -534,7 +537,7 @@ export default function ProductDemoPage() {
             </div>
           )}
 
-          {objectKey === "precedents" && (
+          {!liveStages.includes(objectKey) && objectKey === "precedents" && (
             <div className="ide-table-wrap">
               <table className="ide-data-table">
                 <thead><tr><th>Case</th><th>Applicability</th><th>Shared conditions</th><th>Intervention</th><th>Warning</th></tr></thead>
@@ -559,6 +562,7 @@ export default function ProductDemoPage() {
         </section>
 
         <aside className="ide-right">
+          {liveStages.includes(objectKey) ? <section className="reasoning-panel"><h3>Evidence boundary</h3><p>Live investigation results appear in the workspace. EX11 requires verified operating exposure. A diagnostic observation can support or weaken explanations; causal attribution remains unresolved.</p></section> : <>
           <section className="reasoning-panel">
             <span>{beliefState.label}</span>
             <div className="uncertainty-pill">
@@ -636,6 +640,7 @@ export default function ProductDemoPage() {
               </>
             )}
           </section>
+          </>}
         </aside>
       </section>
 
