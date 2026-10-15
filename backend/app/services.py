@@ -1126,115 +1126,27 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
 
 
 def attach_human_decision(db: Session, decision: Decision) -> None:
-    options_for_record = []
-    for option in db.scalars(select(DecisionOption).where(DecisionOption.investigation_id == decision.investigation_id)):
-        option.selected = option.option_type in {"remote_fix", "pause_rollout"}
-        option.decision_id = decision.id
-        options_for_record.append(serialize_option(option))
-        db.add(option)
+    """Legacy decision endpoint: record intent, never invent execution."""
+    options = [serialize_option(o) for o in db.scalars(select(DecisionOption).where(DecisionOption.investigation_id == decision.investigation_id))]
     observability = db.scalar(select(ObservabilityState).where(ObservabilityState.investigation_id == decision.investigation_id).order_by(ObservabilityState.assessed_at.desc()).limit(1))
-    if observability:
-        observability.decision_id = decision.id
-        db.add(observability)
-    db.add(
-        ExecutedAction(
-            id=f"act-{uuid.uuid4().hex[:10]}",
-            investigation_id=decision.investigation_id,
-            decision_id=decision.id,
-            action_type="remote_fix_and_hold_rollout",
-            owner=decision.owner,
-            executed_at=DEMO_DECISION_TIME + timedelta(minutes=4),
-            scope={"remote_recovery": ["EX03", "EX05", "EX08"], "watch": ["EX11"], "held_rollout": ["localization-L4", "loading-zone-B"]},
-            payload={"operations_support": "informed", "field_dispatch": "held", "remote_fix": "remote recovery and autonomy service restart"},
-        )
-    )
     snapshot = db.scalar(select(EvidenceSnapshot).where(EvidenceSnapshot.investigation_id == decision.investigation_id).order_by(EvidenceSnapshot.snapshot_time.desc()).limit(1))
-    chosen = [item for item in options_for_record if item["selected"]]
-    record_body = {
-        "decision_id": decision.id,
-        "decision_time": iso(DEMO_DECISION_TIME),
-        "owner": decision.owner,
-        "chosen_option": chosen,
-        "options_considered": options_for_record,
-        "evidence_snapshot": {
-            "id": snapshot.id if snapshot else None,
-            "known_state": snapshot.known_state if snapshot else {},
-            "unknowns": snapshot.unknowns if snapshot else [],
-            "what_was_unknown": snapshot.unknowns if snapshot else [],
-            "hypotheses": evaluated_hypotheses(db, decision.investigation_id),
-            "primary_hypothesis": evaluated_hypotheses(db, decision.investigation_id)[0],
-        },
-        "observability_state": serialize_observability(observability),
-        "planned_action": {
-            "action_type": "remote_fix_and_hold_rollout",
-            "label": "Remote recovery on affected machines, hold field dispatch and monitor EX11",
-            "scope": {"remote_recovery": ["EX03", "EX05", "EX08"], "watch": ["EX11"], "held_rollout": ["localization-L4", "loading-zone-B"]},
-        },
-    }
-    record_digest = hashlib.sha256(json.dumps(record_body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    if not db.scalar(select(DecisionRecord.id).where(DecisionRecord.decision_id == decision.id).limit(1)):
-        db.add(
-            DecisionRecord(
-                id=f"drec-{uuid.uuid4().hex[:10]}",
-                investigation_id=decision.investigation_id,
-                decision_id=decision.id,
-                package_id=decision.package_id,
-                decision_time=DEMO_DECISION_TIME,
-                owner=decision.owner,
-                chosen_option=chosen[0] if chosen else {},
-                options_considered=options_for_record,
-                evidence_snapshot=record_body["evidence_snapshot"],
-                observability_state=record_body["observability_state"] or {},
-                immutable=True,
-                digest=record_digest,
-            )
-        )
-    if not decision.package_id:
-        return
-    dp = db.get(DecisionPackage, decision.package_id)
-    if not dp or dp.sealed:
-        return
-    package = dict(dp.package or {})
-    package["human_decision"] = {
-        "decision": decision.decision,
-        "owner": decision.owner,
-        "identity": f"human:{decision.owner.lower().replace(' ', '-')}",
-        "rationale": decision.rationale,
-        "decided_at": iso(DEMO_DECISION_TIME),
-        "signature_intent": "approved for action by named human owner",
-    }
-    package["planned_action"] = {
-        "action_type": "remote_fix_and_hold_rollout",
-        "label": "Remote recovery on affected machines, hold field dispatch and monitor EX11",
-        "owner": decision.owner,
-        "planned_at": iso(DEMO_DECISION_TIME),
-        "scope": {"remote_recovery": ["EX03", "EX05", "EX08"], "watch": ["EX11"], "held_rollout": ["localization-L4", "loading-zone-B"]},
-    }
-    package["actual_action"] = {
-        "status": "recorded",
-        "action_type": "remote_fix_and_hold_rollout",
-        "executed_at": iso(DEMO_DECISION_TIME + timedelta(minutes=4)),
-        "scope": {"remote_recovery": ["EX03", "EX05", "EX08"], "watch": ["EX11"], "field_dispatch": "held"},
-    }
-    package["outcome_follow_up"] = {
-        "required": True,
-        "due_after": "48h",
-        "question": "Did the intervention work, and what changed afterward?",
-    }
-    if package.get("decision_substantiation"):
-        checks = list(package["decision_substantiation"].get("checks", []))
-        for check in checks:
-            if check["name"] == "decision owner assigned":
-                check["status"] = "supported"
-                check["evidence"] = decision.owner
-        package["decision_substantiation"] = {
-            **package["decision_substantiation"],
-            "status": "actionable_with_open_follow_up",
-            "summary": "Human owner recorded. Action is supported for the scoped population, with unresolved evidence gaps and required outcome follow-up.",
-            "checks": checks,
-        }
-    dp.package = package
-    db.add(dp)
+    hypotheses = evaluated_hypotheses(db, decision.investigation_id)
+    evidence_snapshot = {"id": snapshot.id if snapshot else None, "known_state": snapshot.known_state if snapshot else {}, "what_was_unknown": snapshot.unknowns if snapshot else [], "hypotheses": hypotheses, "primary_hypothesis": hypotheses[0] if hypotheses else {}}
+    chosen = {"option_type": "human_reported_intent", "label": decision.decision}
+    body = {"decision_id": decision.id, "chosen_option": chosen, "options_considered": options, "evidence_snapshot": evidence_snapshot, "decision_time": iso(decision.decided_at)}
+    digest = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    db.add(DecisionRecord(id=f"drec-{uuid.uuid4().hex}", investigation_id=decision.investigation_id, decision_id=decision.id, package_id=decision.package_id, decision_time=decision.decided_at, owner=decision.owner, chosen_option=chosen, options_considered=options, evidence_snapshot=evidence_snapshot, observability_state=serialize_observability(observability) or {}, immutable=True, digest=digest))
+    if decision.package_id:
+        dp = db.get(DecisionPackage, decision.package_id)
+        if dp and not dp.sealed:
+            package = dict(dp.package or {})
+            package["human_decision"] = {"decision": decision.decision, "owner": decision.owner, "rationale": decision.rationale, "decided_at": iso(decision.decided_at), "signature_intent": "human-reported decision; no execution attested"}
+            package["planned_action"] = {"action_type": "human_reported_intent", "label": decision.decision, "owner": decision.owner}
+            package["actual_action"] = {"status": "not_reported"}
+            if package.get("decision_substantiation"):
+                package["decision_substantiation"] = {**package["decision_substantiation"], "status": "decision_recorded_execution_unconfirmed", "summary": "Human intent recorded; execution and outcome require separate evidence."}
+            dp.package = package
+            db.add(dp)
 
 
 def serialize_option(option: DecisionOption) -> dict[str, Any]:

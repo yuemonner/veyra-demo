@@ -13,7 +13,10 @@ from app.db import get_db, init_db
 from app.models import Asset, Decision, DecisionPackage, Evidence, Investigation, Outcome
 from app.services import attach_human_decision, build_package, compare, compare_runs, create_field_case, decision_context, diagnostic_checks, evidence_lineage, generate_recording_report, get_field_case, hypotheses_state, ingest_recording, inject_late_evidence, investigate_imported_data, list_runs, precedent_comparison, reconstruct, record_check_observation, record_cost_impact, replay_case, reset_demo, save_imported_investigation, seal_package, search_recorded_events, serialize_evidence, serialize_field_case, similar_memory, verify_package
 
-app = FastAPI(title="Veyra Evidence-driven Investigation", version="1.1.0")
+from app.decision_workflow import router as workflow_router
+
+app = FastAPI(title="Veyra Field Decision Support", version="1.2.0")
+app.include_router(workflow_router)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
