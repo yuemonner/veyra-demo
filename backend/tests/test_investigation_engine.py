@@ -114,3 +114,69 @@ def test_configuration_only_healthy_peers_do_not_refute_any_hypothesis():
     case = reset()
     data = client.get(f'/investigations/{case}/analysis').json()
     assert all(not h['contradicting_evidence'] for h in data['hypotheses'])
+
+
+def test_configured_pair_does_not_become_verified_exposure_support():
+    case = reset()
+    data = client.get(f'/investigations/{case}/analysis').json()
+    summary = data['configuration_summary']
+    assert summary['affected_configured_l4_zone_b'] == 3
+    assert summary['no_signal_configured_l4_zone_b'] == 1
+    assert summary['verified_affected_exposure_count'] == 0
+    assert data['comparison_quality']['valid_control_count'] == 0
+    h2 = hypothesis(data)
+    assert not h2['supporting_evidence']
+    assert len(h2['context_evidence']) == 3
+    assert all(e['matched_fields'] == {'configuration':'localization-L4','network_profile':'loading-zone-B'} for e in h2['context_evidence'])
+    assert h2['evidence_strength'] == 'context_only'
+    assert h2['investigation_priority'] == 'high'
+    assert h2['status'] == 'possible'
+
+
+def test_firmware_context_validates_payload_instead_of_trusting_localization_ids():
+    from app.db import SessionLocal
+    from app.models import Evidence
+    case = reset()
+    data = client.get(f'/investigations/{case}/analysis').json()
+    h3 = next(h for h in data['hypotheses'] if h['id'] == 'h-lidar-53')
+    assert not h3['supporting_evidence']
+    assert len(h3['context_evidence']) == 3
+    assert all(e['matched_fields'] == {'firmware_version':'lidar-fw-5.3'} for e in h3['context_evidence'])
+    with SessionLocal() as db:
+        for asset in ('EX03','EX05','EX08'):
+            e = db.get(Evidence, f'{asset}-localization-map-update')
+            e.payload = {k:v for k,v in e.payload.items() if k != 'firmware_version'}
+        db.commit()
+    changed = client.get(f'/investigations/{case}/analysis').json()
+    h3 = next(h for h in changed['hypotheses'] if h['id'] == 'h-lidar-53')
+    assert not h3['context_evidence']
+    assert not h3['supporting_evidence']
+    assert 'Firmware metadata required' in h3['missing_evidence']
+
+
+def test_current_state_and_reference_outcome_are_explicitly_separate():
+    case = reset()
+    data = client.get(f'/investigations/{case}/analysis').json()
+    assert not data['diagnostic_events']
+    assert not data['conditional_precedents']
+    assert data['historical_reference']['scope'] == 'historical_reference'
+    assert data['historical_reference']['used_in_current_analysis'] is False
+    assert data['historical_reference']['verification'] == 'illustrative_not_independently_verified'
+    assert all(h['status'] == 'possible' for h in data['hypotheses'])
+
+
+def test_ex08_event_time_and_known_time_are_not_interchangeable():
+    case = reset()
+    data = client.get(f'/investigations/{case}/analysis').json()
+    event = next(e for e in data['timeline'] if e['id'] == 'EX08-safe-stop')
+    assert event['event_time'] == '2026-09-03T14:25:00Z'
+    assert event['known_at'] == '2026-09-03T14:26:00Z'
+    early = client.get(f'/investigations/{case}/analysis?known_at=2026-09-03T14:25:30').json()
+    assert not any(e['id'] == 'EX08-safe-stop' for e in early['timeline'])
+
+
+def test_hypotheses_api_uses_same_assessment_as_analysis():
+    case = reset()
+    analysis = client.get(f'/investigations/{case}/analysis').json()
+    hypotheses = client.get(f'/investigations/{case}/hypotheses').json()
+    assert [(h['id'],h['status'],h['evidence_strength']) for h in hypotheses['hypotheses']] == [(h['id'],h['status'],h['evidence_strength']) for h in analysis['hypotheses']]

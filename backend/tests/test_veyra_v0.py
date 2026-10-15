@@ -178,7 +178,8 @@ def test_evidence_lineage_hypotheses_checks_and_replay_are_structured():
     hypotheses = client.get(f"/investigations/{investigation_id}/hypotheses").json()
     assert hypotheses["belief_snapshot"]["immutable"] is True
     h2 = [row for row in hypotheses["hypotheses"] if row["id"] == "h-l4-zone-b"][0]
-    assert h2["supporting_evidence"]
+    assert not h2["supporting_evidence"]  # Configuration is context, not verified exposure support.
+    assert h2["context_evidence"]
     assert h2["missing_evidence"]
     assert h2["would_change_conclusion"]
     checks = client.get(f"/investigations/{investigation_id}/diagnostic-checks").json()
