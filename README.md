@@ -1,10 +1,10 @@
-# Veyra Investigation Engine
+# Veyra · Field Decision Support
 
-**Evidence → Hypothesis → Test → Outcome**
+**Understand → Decide → Act → Verify → Reuse**
 
-Veyra helps engineers decide what to check next when machine evidence is incomplete, confounded and changing. It keeps the Field Case, source evidence, competing hypotheses, diagnostic checks, human decisions and conditional outcomes together.
+When a robot breaks, the hard part is deciding what to do next. Veyra helps engineering and delivery teams compare responses to field incidents, record a human decision and actual intervention, verify what happened, and carry forward experience with its applicability limits. Investigation is the entry point into this workflow.
 
-> Veyra knows what the evidence supports, what remains uncertain, and which check is worth doing next.
+> The intelligence is not just in understanding what happened. It is in learning what was worth doing next.
 
 [Open the product demo](https://frontend-livid-seven-41.vercel.app/product-demo) · [Engineering architecture](docs/VEYRA_1_1.md) · [Pilot setup](docs/PILOT_SETUP.md)
 
@@ -18,6 +18,27 @@ The engine separates configuration from actual operating exposure, preserves unk
 
 The product goal is the next defensible engineering decision. It does not claim a root-cause probability or established causal inference.
 
+
+## Decision workflow · implemented slice
+
+The existing workspace navigation is retained. Decision now contains operational options and a human decision form; Hypotheses remains a separate engineering view. Outcome contains separately persisted action and verification records. New records are append-only `CaseEvent` entries, linked as decision → action → verification. No graph database is required for these relationships.
+
+- A decision stores the options considered, selected option, owner, rationale, constraints, reported approval and an evidence snapshot that later diagnostic observations do not rewrite.
+- Actual execution is never inferred from intent. The legacy decision endpoint no longer creates a fabricated executed action. Required approval is a human-reported workflow guard, not authenticated organizational authorization.
+- Verification distinguishes recovery during a window, partial recovery, no recovery, recurrence and unknown. Updates must extend the observation window. These are sourced human reports, not independent telemetry attestation or proof of causality.
+- Cross-case retrieval compares explicit conditions with the new case's recorded context. Actual operating exposure remains unknown unless independently established; configuration never supplies it. Failures and recurrence are retained as cautionary experience, and no candidate is an automatic fix recommendation.
+- The earlier `/analysis/precedent` and fixed-scenario memory endpoints are legacy demo interfaces. The current Decision/Outcome UI uses `/workflow` and `/workflow/reuse`; old records are not silently promoted into this lifecycle.
+
+Decision–Outcome relationships are a proposed compounding data advantage, not an established moat. This synthetic demo does not demonstrate customer adoption, improved decisions, reduced downtime or economic value. Production needs authenticated approvals, durable storage, source verification and customer workflow validation. A local SQLite database or an ephemeral hosting filesystem does not guarantee records survive infrastructure replacement; configure durable `DATABASE_URL` for a pilot.
+
+| API | Behavior |
+| --- | --- |
+| `GET /investigations/{id}/workflow` | Read options, decisions, actual actions, verification updates and known context |
+| `POST /investigations/{id}/workflow/decisions` | Save intent and decision-time evidence; never execute |
+| `POST /investigations/{id}/workflow/actions` | Report actual execution linked to a decision in the same case |
+| `POST /investigations/{id}/workflow/verifications` | Append outcome evidence linked to an action |
+| `GET /investigations/{id}/workflow/reuse` | Retrieve other cases with matching, mismatched and unknown conditions |
+
 ## Architecture
 
 ```mermaid
@@ -29,8 +50,12 @@ flowchart TD
     Planner --> Test[Human diagnostic check]
     Test --> NewEvidence[New sourced observation]
     NewEvidence --> Case
-    Case --> Memory[Intervention & Outcome Memory]
-    Memory --> Precedent[Conditional precedent · Verification · Unknowns]
+    Case --> Options[Operational options · Trade-offs · Constraints]
+    Options --> Decision[Human decision · Evidence snapshot]
+    Decision --> Action[Reported actual intervention]
+    Action --> Memory[Outcome verification · Recurrence · Unknowns]
+    Memory --> Precedent[Conditional reuse · Matching / Conflicting / Unknown conditions]
+    Precedent --> Options
     Case --> Analysis[Shared deterministic analysis]
     Analysis --> UI[Field Case UI]
     Analysis --> API[API]
@@ -59,10 +84,10 @@ LLMs may eventually parse engineer language, propose variables/hypotheses or exp
 ## Try the investigation loop
 
 1. **Fleet:** EX11 starts with `Exposure not verified`. Inspect context, control validity and missing data.
-2. **Decision:** inspect supporting, contradicting and missing evidence, confounders and the next-check rationale.
-3. **Next check:** choose an explicitly synthetic scenario: exposure unknown, same conditions and healthy, or verified different conditions. The backend persists the observation and recomputes hypotheses. You can also enter a sourced observation manually.
-4. **Outcome:** record who decided, the action actually taken, whether it was the only change, the recovery evidence and verification window, remaining unknowns and applicable conditions.
-5. **Outcome memory:** reload the case to inspect the persisted conditional outcome. An action followed by recovery is not automatically a proven fix.
+2. **Decision:** compare rollback, EX11 records review and field dispatch. Inspect qualitative trade-offs and constraints, then save the human owner, rationale and approval status with the current evidence snapshot.
+3. **Outcome · actual action:** separately report what was executed, when, on which machines and from which source. Required approval must be reported before an action can be recorded. Veyra does not send machine commands.
+4. **Outcome · verification:** append an observed result, completed observation window, evidence source, remaining unknowns, applicability conditions and exclusions. A recurrence remains visible alongside the earlier recovery.
+5. **Conditional reuse:** open a new investigation and inspect experience from other cases in Decision or Outcome. The latest verification per action governs reuse. Matching, conflicting and unknown conditions are shown; exclusions and source quality still require human review.
 
 Each browser receives an isolated synthetic investigation session. Starting a new investigation creates a fresh session without resetting another visitor's case. Browser local storage retains its session ID; database records survive browser reloads. Durability across server restarts depends on the configured database.
 
