@@ -108,3 +108,9 @@ def test_engineer_can_challenge_but_cannot_invent_evidence_references():
     assert h['review_status'] == 'challenged'
     assert h['challenges'][0]['reason'] == 'Workload not matched'
     assert h['status'] == 'possible'
+
+
+def test_configuration_only_healthy_peers_do_not_refute_any_hypothesis():
+    case = reset()
+    data = client.get(f'/investigations/{case}/analysis').json()
+    assert all(not h['contradicting_evidence'] for h in data['hypotheses'])
