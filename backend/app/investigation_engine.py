@@ -41,7 +41,8 @@ def evaluate(db, investigation_id, known_at=None):
     for row in db.scalars(select(Hypothesis).where(Hypothesis.investigation_id == investigation_id)):
         support = [i for i in row.supporting_evidence if i in refs]
         # An unverified healthy peer cannot contradict an exposure-dependent claim.
-        against = [i for i in row.contradicting_evidence if i in refs and not i.startswith('EX11')]
+        qualified_controls = {c['asset_id'] for c in cohorts if c['valid_control']}
+        against = [e.id for e in evidence if e.id in row.contradicting_evidence and e.asset_id in qualified_controls]
         status = 'possible' if support else 'insufficient_evidence'
         missing = ['Verified comparable operating exposure', 'Complete diagnostic telemetry', 'Unmeasured site and workload confounders']
         canonical_id = row.id.split('::')[-1]
