@@ -59,7 +59,7 @@ def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     assert package["package"]["observability_state"]["status"] == "partial"
     assert len(package["package"]["options_considered"]) == 4
     assert package["package"]["what_was_unknown"]
-    assert package["package"]["primary_hypothesis"]["confidence"] > 0
+    assert "confidence" not in package["package"]["primary_hypothesis"]
     assert package["package"]["outcome_validation"]["status"] == "pending"
     client.post(
         f"/investigations/{investigation_id}/decision",
@@ -116,7 +116,7 @@ def test_decision_context_tracks_options_observability_actions_and_late_review_f
     assert context["decision_records"][0]["immutable"] is True
     assert context["decision_records"][0]["chosen_option"]["option_type"] in {"remote_fix", "pause_rollout"}
     assert context["decision_records"][0]["evidence_snapshot"]["what_was_unknown"]
-    assert context["decision_records"][0]["evidence_snapshot"]["primary_hypothesis"]["confidence"] > 0
+    assert "confidence" not in context["decision_records"][0]["evidence_snapshot"]["primary_hypothesis"]
     decision_record_digest = context["decision_records"][0]["digest"]
     client.post("/demo/late-evidence")
     context_after_late = client.get(f"/investigations/{investigation_id}/decision-context").json()
@@ -187,10 +187,10 @@ def test_evidence_lineage_hypotheses_checks_and_replay_are_structured():
     assert checks["checks"][0]["check_type"] == "read_only"
     observed = client.post(
         f"/investigations/{investigation_id}/diagnostic-checks/check-ex11-zone-b/observation",
-        json={"observation": {"asset_id": "EX11", "zone": "loading-zone-B", "safe_stop": True}},
+        json={"observation": {"asset_id": "EX11", "zone": "loading-zone-B", "safe_stop": True, "exposure_verified": True, "telemetry_complete": True, "source": "test runtime", "event_time": "2026-09-03T14:32:00"}},
     ).json()
-    assert observed["status"] == "observed"
-    assert observed["belief_update"]["h-l4-zone-b"] == "strengthened"
+    assert next(c for c in observed["checks"] if c["id"] == "check-ex11-zone-b")["status"] == "observed"
+    assert next(h for h in observed["hypotheses"] if h["id"] == "h-l4-zone-b")["status"] == "supported_not_proven"
     replay = client.get(f"/investigations/{investigation_id}/replay").json()
     assert any(frame["future_evidence_hidden"] for frame in replay["frames"])
     assert replay["evaluation"]["unsupported_ai_claims"] == []
