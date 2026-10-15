@@ -50,12 +50,12 @@ export default function ProductDemoPage() {
     </header>
     <section className="ide-casebar"><div><span>FIELD CASE</span><span>FC-021</span><h1>Safe-stop cluster</h1></div><b className="open">OPEN</b><b>{analysis?.cohorts.length ?? "—"} MACHINES</b><b>ROOT CAUSE UNRESOLVED</b></section>
     <section className="ide-grid">
-      <aside className="ide-left"><div className="ide-left-title">Case objects</div><nav aria-label="Case objects">{objects.map(([key,label]) => <button key={key} className={stage === key ? "active" : ""} aria-current={stage === key ? "page" : undefined} onClick={() => setStage(key)}><span>{label}</span><b>{count(key)}</b></button>)}</nav>
+      <aside className="ide-left"><div className="ide-left-title">Case objects</div><nav aria-label="Case objects">{objects.map(([key,label], index) => <div key={key}>{(index === 0 || index === 5 || index === 7) && <div className="workspace-nav-group">{index === 0 ? "UNDERSTAND" : index === 5 ? "INVESTIGATE" : "ACT & LEARN"}</div>}<button className={stage === key ? "active" : ""} aria-current={stage === key ? "page" : undefined} onClick={() => setStage(key)}><span>{label}</span><b>{count(key)}</b></button></div>)}</nav>
         <details className="ide-mini-status"><summary>Cohort context</summary><div className="cohort-group"><label>Affected</label><p>{analysis?.cohorts.filter((c: any) => c.signal_observed).map((c: any) => c.asset_id).join(" · ") || "Loading…"}</p></div><div className="cohort-group"><label>Candidate control</label><p>EX11 · Exposure requires verification</p></div></details>
       </aside>
       <section className="ide-center" aria-label={`${title} workspace`}>
         {answer && <div className="workspace-answer" role="status"><div><strong>Veyra · case guidance</strong><button aria-label="Dismiss answer" onClick={() => setAnswer("")}>×</button></div><p>{answer}</p><small>Rule-based navigation and current case data · no LLM inference</small></div>}
-        <InvestigationAnalysis stage={stage === "timeline" ? "evidence" : stage} onNavigate={setStage} onAnalysis={setAnalysis} />
+        <InvestigationAnalysis stage={stage} onNavigate={setStage} onAnalysis={setAnalysis} />
       </section>
       <aside className="ide-right" aria-label="Case context">
         <section className="reasoning-panel"><span>Current evidence</span><h3>Keep uncertainty visible</h3><p>{analysis?.comparison_quality.conclusion || "Connecting to the case engine…"}</p><div className="workspace-side-stat"><b>{analysis?.comparison_quality.valid_control_count ?? "—"}</b><span>verified controls</span></div></section>
