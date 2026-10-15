@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { API } from "../lib/api";
+import { fetchCaseJSON } from "../lib/case-data";
 
 export default function DecisionWorkspace({ caseId, stage }: {caseId: string; stage: string}) {
   const [data, setData] = useState<any>(null);
@@ -10,11 +11,7 @@ export default function DecisionWorkspace({ caseId, stage }: {caseId: string; st
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [option, setOption] = useState("inspect");
-  async function request(path = "", body?: any) {
-    const r = await fetch(`${API}/investigations/${caseId}/workflow${path}`, body === undefined ? {cache: "no-store"} : {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
-    if (!r.ok) { const text = await r.text(); throw new Error(text); }
-    return r.json();
-  }
+  function request(path = "", body?: any) { return fetchCaseJSON(API, `/investigations/${caseId}/workflow${path}`, body); }
   async function load() {
     const [d, r] = await Promise.all([request(), request("/reuse")]); setData(d); setReuse(r);
   }
@@ -34,7 +31,7 @@ export default function DecisionWorkspace({ caseId, stage }: {caseId: string; st
   }
   const field = (label: string, name: string, type = "text") => <label>{label}<input required name={name} type={type} step={type === "datetime-local" ? "1" : undefined} /></label>;
   const text = (label: string, name: string, hint?: string) => <label>{label}<textarea required name={name} placeholder={hint} /></label>;
-  if (!data) return <article className="investigation-card">{error || "Loading decision records…"}</article>;
+  if (!data) return <article className="investigation-card">{error || "Loading decision records…"}{error && <button onClick={() => { setError(""); void load().catch(e => setError(String(e))); }}>Retry loading records</button>}</article>;
   const decisionView = stage === "decision";
   return <div className="decision-workspace">
     <p className="muted">{decisionView ? `${data.affected_count} machines with reported stops · Root cause unresolved. Compare the operational choices, then record the team's decision.` : "Record what actually happened, verify the result over time, and carry forward experience with its limits."}</p>

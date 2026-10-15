@@ -3,10 +3,14 @@
 import { useEffect, useState } from "react";
 import { API } from "../lib/api";
 import DecisionWorkspace from "./DecisionWorkspace";
+import preview from "../lib/case-preview.json";
+import { fetchCaseJSON, readCaseCache } from "../lib/case-data";
 
 const DEMO = "inv-120-robots-bad-rollout";
 export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, onAnalysis }: { stage: string; id?: string; onNavigate?: (stage: string) => void; onAnalysis?: (analysis: any) => void }) {
-  const [analysis, setAnalysis] = useState<any>(null);
+  const [analysis, setAnalysis] = useState<any>(id === DEMO ? preview.analysis : null);
+  const [liveReady, setLiveReady] = useState(false);
+  const [viewTime, setViewTime] = useState(preview.captured_at);
   const [caseId, setCaseId] = useState(id);
   const [workflow, setWorkflow] = useState<any>(null);
   const [workflowError, setWorkflowError] = useState("");
@@ -21,41 +25,54 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, on
   const [owner, setOwner] = useState("");
   const [challengeReason, setChallengeReason] = useState("");
   const [challengeId, setChallengeId] = useState("");
-  async function request(path: string, body?: unknown) {
-    const response = await fetch(`${API}${path}`, body === undefined ? { cache: "no-store" } : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    if (!response.ok) throw Object.assign(new Error(await response.text()), { status: response.status });
-    return response.json();
-  }
+  function request(path: string, body?: unknown) { return fetchCaseJSON(API, path, body); }
   async function load(fresh = false) {
-    setBusy(true);
+    setBusy(true); setLiveReady(false);
     try {
-      let saved = id === DEMO ? localStorage.getItem("veyra-investigation-session-v2") : id;
+      let saved: string | null = id === DEMO ? null : id;
+      try { if (id === DEMO) saved = localStorage.getItem("veyra-investigation-session-v2"); } catch { /* Optional storage. */ }
       let data;
       if (fresh || !saved) {
         data = await request("/demo/investigation-sessions", {});
         saved = data.investigation_id;
-        localStorage.setItem("veyra-investigation-session-v2", saved!);
+        try { localStorage.setItem("veyra-investigation-session-v2", saved!); } catch { /* Optional storage. */ }
       } else {
         try { data = await request(`/investigations/${saved}/analysis`); }
         catch (e) {
           if (id !== DEMO || (e as { status?: number }).status !== 404) throw e;
           data = await request("/demo/investigation-sessions", {});
           saved = data.investigation_id;
-          localStorage.setItem("veyra-investigation-session-v2", saved!);
+          try { localStorage.setItem("veyra-investigation-session-v2", saved!); } catch { /* Optional storage. */ }
         }
       }
-      setCaseId(saved!); setAnalysis(data); setError("");
+      setCaseId(saved!); setAnalysis(data); setViewTime(new Date().toISOString()); setLiveReady(true); setError("");
     } catch (e) { setError(`Investigation engine unavailable: ${e instanceof Error ? e.message : e}`); }
     finally { setBusy(false); }
   }
-  useEffect(() => { void load(); }, [id]);
   useEffect(() => {
-    if (stage !== "overview" || !analysis) return;
+    try {
+      const saved = id === DEMO ? localStorage.getItem("veyra-investigation-session-v2") : id;
+      const cached = saved ? readCaseCache(localStorage, saved) : null;
+      if (cached) { setAnalysis(cached.analysis); setCaseId(saved!); setViewTime(cached.saved_at); }
+    } catch { /* Storage restrictions must not prevent live loading. */ }
+    void load();
+  }, [id]);
+  useEffect(() => {
+    if (!liveReady && !busy) { const timer = setTimeout(() => { void load(); }, 10000); return () => clearTimeout(timer); }
+  }, [liveReady, busy]);
+  useEffect(() => {
+    if (liveReady && analysis?.investigation_id === caseId) {
+      try { localStorage.setItem(`veyra-case-view-v1:${caseId}`, JSON.stringify({version: 1, saved_at: new Date().toISOString(), analysis})); } catch { /* Cache is optional. */ }
+    }
+  }, [analysis, caseId, liveReady]);
+  useEffect(() => {
+    if (stage !== "overview" || !analysis || !liveReady) return;
     let active = true; setWorkflow(null); setWorkflowError("");
     request(`/investigations/${caseId}/workflow`).then(data => { if (active) setWorkflow(data); }).catch(() => { if (active) setWorkflowError("Decision records unavailable. Open Decision to retry."); });
     return () => { active = false; };
-  }, [stage, caseId, analysis]);
+  }, [stage, caseId, analysis, liveReady]);
   async function record(observation: any) {
+    if (!liveReady) return;
     setBusy(true);
     try {
       const check = analysis.checks.find((c: any) => c.id.endsWith("check-ex11-zone-b"));
@@ -67,6 +84,7 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, on
     return record({ asset_id: "EX11", zone: "loading-zone-B", safe_stop: false, exposure_relation: exposure, exposure_verified: exposure !== "unknown", telemetry_complete: exposure !== "unknown", source: `synthetic://ex11/${exposure}`, event_time: new Date().toISOString(), synthetic: true });
   }
   async function challenge() {
+    if (!liveReady) return;
     setBusy(true);
     try { setAnalysis(await request(`/investigations/${caseId}/hypotheses/${encodeURIComponent(challengeId)}/challenge`, {owner, reason: challengeReason, evidence_ids: []})); setChallengeReason(""); setError(""); }
     catch (e) { setError(String(e)); } finally { setBusy(false); }
@@ -98,16 +116,17 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, on
         {h.challenges.map((c: any, i: number) => <p key={i}>Challenge by {c.owner}: {c.reason}</p>)}
       </details>
     </article>)}</div>
-    <details className="investigation-card"><summary>Challenge a hypothesis</summary><div className="investigation-form"><label>Hypothesis <select value={challengeId} onChange={e => setChallengeId(e.target.value)}><option value="">Select</option>{analysis.hypotheses.map((h: any) => <option key={h.id} value={h.id}>{label(h)} · {h.label}</option>)}</select></label><label>Engineer <input value={owner} onChange={e => setOwner(e.target.value)} /></label><label>Reason <textarea value={challengeReason} onChange={e => setChallengeReason(e.target.value)} /></label><button disabled={busy || !challengeId || !owner.trim() || !challengeReason.trim()} onClick={challenge}>Record challenge</button></div></details>
+    <details className="investigation-card"><summary>Challenge a hypothesis</summary><div className="investigation-form"><label>Hypothesis <select value={challengeId} onChange={e => setChallengeId(e.target.value)}><option value="">Select</option>{analysis.hypotheses.map((h: any) => <option key={h.id} value={h.id}>{label(h)} · {h.label}</option>)}</select></label><label>Engineer <input value={owner} onChange={e => setOwner(e.target.value)} /></label><label>Reason <textarea value={challengeReason} onChange={e => setChallengeReason(e.target.value)} /></label><button disabled={!liveReady || busy || !challengeId || !owner.trim() || !challengeReason.trim()} onClick={challenge}>Record challenge</button></div></details>
   </>;
   return <section className="investigation-analysis" aria-label="Evidence-driven investigation">
-    <header className="investigation-heading"><div><small>Understand → Decide → Act → Verify → Reuse</small><h1>{titles[stage] || "Current investigation"}</h1></div><button className="quiet-button" disabled={busy} onClick={() => load(true)}>New investigation</button></header>
+    <header className="investigation-heading"><div><small>Understand → Decide → Act → Verify → Reuse</small><h1>{titles[stage] || "Current investigation"}</h1></div><button className="quiet-button" disabled={busy || !liveReady} onClick={() => load(true)}>New investigation</button></header>
+    {!liveReady && analysis && <div className="case-connection" role="status"><strong>Read-only saved view · Connecting to live case</strong><span>Snapshot {new Date(viewTime).toISOString().slice(0,19).replace("T", " ")} UTC. You can inspect records now; saving unlocks after connection.</span><button className="quiet-button" disabled={busy} onClick={() => load()}>{busy ? "Connecting…" : "Retry connection"}</button></div>}
     {error && <p role="alert" className="investigation-error">{error}</p>}
     {!analysis ? <button disabled={busy} onClick={() => load()}>{busy ? "Loading evidence…" : "Connect investigation engine"}</button> : <>
       <div className="investigation-state"><span className="state-badge">{analysis.comparison_quality.valid_control_count ? "Control observation available" : "Exposure evidence incomplete"}</span><small>{analysis.diagnostic_events.length} diagnostic observations · current case</small></div>
       {stage === "overview" && <>
         <p className="muted">From field evidence to better operational decisions.</p>
-        <article className="investigation-card decision-required"><header><strong>Decision required</strong><span className="state-badge">{workflow?.decisions.length ? "Decision recorded" : "Open"}</span></header><h2>{cfg.affected_count} machines with reported stops. What should the team do next?</h2><p>Restore service · Investigate further · Dispatch support</p><p className="muted">Restoring operations and reducing diagnostic uncertainty are different goals. The next diagnostic check is not automatically the best operational action.</p><p>{workflowError || (!workflow ? "Loading current decision…" : workflow.decisions.length ? `Current selection: ${workflow.decisions[workflow.decisions.length - 1].selected_option.label}` : "Current selection: No human decision recorded.")}</p>{onNavigate && <button onClick={() => onNavigate("decision")}>Compare options & record decision →</button>}</article>
+        <article className="investigation-card decision-required"><header><strong>Decision required</strong><span className="state-badge">{workflow?.decisions.length ? "Decision recorded" : "Open"}</span></header><h2>{cfg.affected_count} machines with reported stops. What should the team do next?</h2><p>Restore service · Investigate further · Dispatch support</p><p className="muted">Restoring operations and reducing diagnostic uncertainty are different goals. The next diagnostic check is not automatically the best operational action.</p><p>{!liveReady ? "Current decision awaits live connection." : workflowError || (!workflow ? "Loading current decision…" : workflow.decisions.length ? `Current selection: ${workflow.decisions[workflow.decisions.length - 1].selected_option.label}` : "Current selection: No human decision recorded.")}</p>{onNavigate && <button onClick={() => onNavigate("decision")}>Compare options & record decision →</button>}</article>
         <div className="investigation-metrics"><div><b>{cfg.affected_count}</b><span>Affected machines</span></div><div><b>{analysis.comparison_quality.valid_control_count}</b><span>Verified controls</span></div><div><b>{analysis.diagnostic_events.length}</b><span>New observations</span></div></div>
         <div className="overview-grid"><article className="investigation-card"><small>What the records say</small><h2>L4 + Zone B is configured.</h2><p>{cfg.affected_configured_l4_zone_b}/{cfg.affected_count} affected and {cfg.no_signal_configured_l4_zone_b}/{cfg.no_known_signal_count} machines with no known signal share that configuration.</p><p className="muted">Comparable operating exposure is not established by configuration.</p></article><article className="investigation-card"><small>Next defensible step</small><h2>{next ? "Verify EX11 exposure." : "Review the new evidence."}</h2><p>Candidate control · {candidate?.exposure_status}</p>{onNavigate && <button onClick={() => onNavigate("checks")}>Review next check →</button>}</article></div>
         <p className="muted">{analysis.comparison_quality.conclusion}</p>
@@ -118,16 +137,16 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, on
         <details className="investigation-card" open><summary>Compare all {analysis.cohorts.length} machines</summary><div className="investigation-table-wrap"><table><thead><tr><th>Machine</th><th>Signal</th><th>Configured</th><th>Operating exposure</th><th>Valid control</th></tr></thead><tbody>{analysis.cohorts.map((c: any) => <tr key={c.asset_id} className={c.signal_observed ? "machine-affected" : c.asset_id === "EX11" ? "machine-watch" : ""}><td><strong>{c.asset_id}</strong></td><td><span className={c.signal_observed ? "signal-stop" : "signal-clear"}>{c.signal_observed ? "Stop reported" : "No reported stop"}</span></td><td>{short(c.context.configuration)} · {short(c.context.network_profile)}</td><td>{c.exposure_status}</td><td>{c.valid_control ? "Yes" : "No"}</td></tr>)}</tbody></table></div></details>
       </>}
       {stage === "hypotheses" && hypothesisCards()}
-      {["decision", "actions", "outcome", "outcomes", "precedents"].includes(stage) && <DecisionWorkspace key={caseId} caseId={caseId} stage={stage} />}
+      {["decision", "actions", "outcome", "outcomes", "precedents"].includes(stage) && (liveReady ? <DecisionWorkspace key={caseId} caseId={caseId} stage={stage} /> : <article className="investigation-card"><h3>Live decision records are connecting</h3><p>Saved evidence is available in the other case views. Decisions, actions and verification records require a live connection; no empty history is inferred.</p></article>)}
       {diagnostic && <>
         <article className="investigation-card"><small>{next ? `Recommended · ${next.cost.time_minutes} min · ${next.risk.level} risk` : "Check recorded · engineer review"}</small><h2>{next ? "Verify EX11 operating exposure" : "Review the new evidence"}</h2><p>{next ? "Use its existing run records before treating it as a healthy control." : "No further discriminating check in this rule set. Plan independent replication with matched workload and site conditions."}</p>{next && <details><summary>Why this check?</summary><p>{next.why}</p></details>}</article>
-        <article className="investigation-card"><h3>Try a synthetic observation</h3><p className="muted">Saved to this case and reassessed by the backend.</p><div className="investigation-scenarios"><button disabled={busy} onClick={() => sample("unknown")}>Exposure unknown</button><button disabled={busy} onClick={() => sample("same")}>Same conditions · healthy</button><button disabled={busy} onClick={() => sample("different")}>Different conditions</button></div><div className="hypothesis-statuses">{analysis.hypotheses.map((h: any) => <span key={h.id}>{label(h)} · {status(h.status)}</span>)}</div></article>
+        <article className="investigation-card"><h3>Try a synthetic observation</h3><p className="muted">Saved to this case and reassessed by the backend.</p><div className="investigation-scenarios"><button disabled={!liveReady || busy} onClick={() => sample("unknown")}>Exposure unknown</button><button disabled={!liveReady || busy} onClick={() => sample("same")}>Same conditions · healthy</button><button disabled={!liveReady || busy} onClick={() => sample("different")}>Different conditions</button></div><div className="hypothesis-statuses">{analysis.hypotheses.map((h: any) => <span key={h.id}>{label(h)} · {status(h.status)}</span>)}</div></article>
         <details className="investigation-card"><summary>Record a sourced diagnostic observation</summary><div className="investigation-form">
           <label>Result <select value={result} onChange={e => setResult(e.target.value)}><option value="unknown">Unknown</option><option value="safe_stop">Safe-stop observed</option><option value="healthy">Healthy throughout observation</option></select></label>
           <label>Operating exposure <select value={relation} onChange={e => setRelation(e.target.value)}><option value="unknown">Not verified</option><option value="same">Verified same conditions</option><option value="different">Verified different conditions</option></select></label>
           <label><input type="checkbox" checked={complete} onChange={e => setComplete(e.target.checked)} /> Complete telemetry window</label>
           <label>Event time <input type="datetime-local" value={eventTime} onChange={e => setEventTime(e.target.value)} /></label><label>Source reference <input value={source} onChange={e => setSource(e.target.value)} /></label>
-          <button disabled={busy || result === "unknown" || !source.trim() || !eventTime} onClick={() => record({asset_id: "EX11", zone: "loading-zone-B", safe_stop: result === "safe_stop", exposure_relation: relation, exposure_verified: relation !== "unknown", telemetry_complete: complete, source, event_time: new Date(eventTime).toISOString()})}>Save & reassess</button>
+          <button disabled={!liveReady || busy || result === "unknown" || !source.trim() || !eventTime} onClick={() => record({asset_id: "EX11", zone: "loading-zone-B", safe_stop: result === "safe_stop", exposure_relation: relation, exposure_verified: relation !== "unknown", telemetry_complete: complete, source, event_time: new Date(eventTime).toISOString()})}>Save & reassess</button>
         </div></details>
       </>}
       {["outcome", "outcomes", "precedents"].includes(stage) && <details className="investigation-card historical-reference"><summary>Historical reference outcome · separate from this case</summary><p>{analysis.historical_reference.reported_result}</p><small>Preset synthetic narrative. Not independently verified. Excluded from the current hypothesis assessment and workflow reuse.</small></details>}
