@@ -48,7 +48,7 @@ export default function ProductDemoPage() {
       </form>
       <div className="ide-source-counts"><b>{analysis ? new Set(analysis.evidence.map((e: any) => e.source)).size : "—"} sources</b><b>{analysis?.hypotheses.length ?? "—"} causes</b></div>
     </header>
-    <section className="ide-casebar"><div><span>DEMO / SYNTHETIC CASE</span><span>FC-021</span><h1>Safe-stop cluster</h1></div><b className="open">OPEN</b><b>{analysis?.cohorts.length ?? "—"} MACHINES</b><b>ROOT CAUSE UNRESOLVED</b></section>
+    <section className="ide-casebar"><div><span>FIELD CASE</span><span>FC-021</span><h1>Safe-stop cluster</h1></div><b className="open">OPEN</b><b>{analysis?.cohorts.length ?? "—"} MACHINES</b><b>ROOT CAUSE UNRESOLVED</b></section>
     <section className="ide-grid">
       <aside className="ide-left"><div className="ide-left-title">Case objects</div><nav aria-label="Case objects">{objects.map(([key,label]) => <button key={key} className={stage === key ? "active" : ""} aria-current={stage === key ? "page" : undefined} onClick={() => setStage(key)}><span>{label}</span><b>{count(key)}</b></button>)}</nav>
         <details className="ide-mini-status"><summary>Cohort context</summary><div className="cohort-group"><label>Affected</label><p>{analysis?.cohorts.filter((c: any) => c.signal_observed).map((c: any) => c.asset_id).join(" · ") || "Loading…"}</p></div><div className="cohort-group"><label>Candidate control</label><p>EX11 · Exposure requires verification</p></div></details>
@@ -64,6 +64,6 @@ export default function ProductDemoPage() {
         <section className="provenance-panel"><button className="trace-button" onClick={() => setTrace(!trace)}>{trace ? "Hide source references" : "Inspect source references"}</button>{trace && <div className="trace-list">{analysis?.timeline.map((e: any) => <button key={e.id} onClick={() => {setSelected(e); setStage("evidence");}}>{e.asset_id} · {e.label}<small>{e.source}</small></button>)}</div>}</section>
       </aside>
     </section>
-    <footer className="ide-bottom"><div className="ide-event-rail">{analysis?.timeline.filter((e: any) => e.event_type === "telemetry_anomaly" || e.event_type === "deployment" || e.event_type === "human_discovery").map((e: any) => <button key={e.id} className={selected?.id === e.id ? "active" : ""} onClick={() => {setSelected(e); setStage("timeline");}}><b>{e.event_time?.slice(11,16)}</b><span>{e.asset_id} · {e.label}</span></button>)}</div></footer>
+    <footer className="ide-bottom"><div className="ide-event-rail">{analysis?.timeline.filter((e: any) => e.event_type === "telemetry_anomaly" || e.event_type === "deployment" || e.event_type === "human_discovery").map((e: any) => <button key={e.id} className={`${selected?.id === e.id ? "active" : ""} ${e.event_type === "telemetry_anomaly" ? "stop-event" : ""}`} onClick={() => {setSelected(e); setStage("timeline");}}><b>{e.event_time?.slice(11,16)}</b><span>{e.asset_id} · {e.label}</span></button>)}</div></footer>
   </main>;
 }
