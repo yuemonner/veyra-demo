@@ -5,9 +5,7 @@ import { useState } from "react";
 import InvestigationAnalysis from "../../components/InvestigationAnalysis";
 
 const sections = [
-  ["overview", "Overview"], ["fleet", "Fleet"], ["hypotheses", "Hypotheses"],
-  ["checks", "Next check"], ["decision", "Decision"], ["outcomes", "Outcome"],
-  ["evidence", "Evidence & timeline"],
+  ["overview", "Situation"], ["checks", "Next action"], ["outcomes", "Result & learning"],
 ];
 
 export default function ProductDemoPage() {
@@ -21,11 +19,11 @@ export default function ProductDemoPage() {
     <div className="investigation-workspace">
       <nav aria-label="Investigation sections">{sections.map(([key, label]) =>
         <button key={key} className={stage === key ? "active" : ""} aria-current={stage === key ? "page" : undefined} onClick={() => setStage(key)}>{label}</button>
-      )}</nav>
+      )}<details className="investigation-nav-details"><summary>Technical review</summary>{[["fleet", "Compare machines"], ["hypotheses", "Possible causes"], ["evidence", "Evidence & timeline"]].map(([key, label]) => <button key={key} className={stage === key ? "active" : ""} aria-current={stage === key ? "page" : undefined} onClick={() => setStage(key)}>{label}</button>)}</details></nav>
       <div className="investigation-content">
         <InvestigationAnalysis stage={stage} onNavigate={setStage} />
       </div>
     </div>
-    <footer className="investigation-footer">Current investigation · Configuration ≠ operating exposure · EX11 is a candidate control</footer>
+    <footer className="investigation-footer">Evidence-led decisions · Engineer-reviewed actions · Reusable learning</footer>
   </main>;
 }
