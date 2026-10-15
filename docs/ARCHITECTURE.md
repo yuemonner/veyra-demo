@@ -1,3 +1,7 @@
+# Veyra 1.1 architecture update
+
+The implemented investigation-engine extension and its boundaries are documented in [VEYRA_1_1.md](VEYRA_1_1.md). Field Case remains the core; context validation, diagnostic evidence updates and conditional precedents extend the existing runtime.
+
 # Architecture
 
 ## Product Loop
