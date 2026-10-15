@@ -263,7 +263,7 @@ function demoEvidenceLineage() {
   return [
     { id: "EX03-safe-stop", source_id: "mission_runtime:EX03", source_type: "mission_runtime", asset_id: "EX03", original_reference: "mission_runtime/EX03/safe_stop/14:11", event_time: "2026-09-03T14:11:00Z", known_at: "2026-09-03T14:12:00Z", ingested_at: "2026-09-03T14:12:08Z", linkage_method: "exact_id", verification_state: "verified", evidence_class: "OBSERVED" },
     { id: "EX05-safe-stop", source_id: "mission_runtime:EX05", source_type: "mission_runtime", asset_id: "EX05", original_reference: "mission_runtime/EX05/safe_stop/14:18", event_time: "2026-09-03T14:18:00Z", known_at: "2026-09-03T14:19:00Z", ingested_at: "2026-09-03T14:19:08Z", linkage_method: "exact_id", verification_state: "verified", evidence_class: "OBSERVED" },
-    { id: "EX08-safe-stop", source_id: "mission_runtime:EX08", source_type: "mission_runtime", asset_id: "EX08", original_reference: "mission_runtime/EX08/safe_stop/14:26", event_time: "2026-09-03T14:26:00Z", known_at: "2026-09-03T14:27:00Z", ingested_at: "2026-09-03T14:27:08Z", linkage_method: "exact_id", verification_state: "verified", evidence_class: "OBSERVED" },
+    { id: "EX08-safe-stop", source_id: "mission_runtime:EX08", source_type: "mission_runtime", asset_id: "EX08", original_reference: "mission_runtime/EX08/safe_stop/14:25", event_time: "2026-09-03T14:25:00Z", known_at: "2026-09-03T14:26:00Z", ingested_at: "2026-09-03T14:26:08Z", linkage_method: "exact_id", verification_state: "verified", evidence_class: "OBSERVED" },
   ];
 }
 
