@@ -73,9 +73,9 @@ def test_decision_package_can_be_sealed_and_late_evidence_does_not_mutate_it():
     sealed = client.post(f"/decision-packages/{package['id']}/seal").json()
     assert sealed["sealed"] is True
     assert sealed["package"]["human_decision"]["owner"] == "Robotics Engineering"
-    assert sealed["package"]["decision_substantiation"]["status"] == "actionable_with_open_follow_up"
-    assert sealed["package"]["planned_action"]["action_type"] == "remote_fix_and_hold_rollout"
-    assert sealed["package"]["actual_action"]["scope"]["field_dispatch"] == "held"
+    assert sealed["package"]["decision_substantiation"]["status"] == "decision_recorded_execution_unconfirmed"
+    assert sealed["package"]["planned_action"]["action_type"] == "human_reported_intent"
+    assert sealed["package"]["actual_action"] == {"status": "not_reported"}
     assert sealed["package"]["_seal"]["trusted_timestamp"] == "2026-09-03T14:31:00Z"
     assert sealed["package"]["_seal"]["timestamp_authority"] == "Veyra demo timestamp authority"
     digest = sealed["digest"]
@@ -110,11 +110,11 @@ def test_decision_context_tracks_options_observability_actions_and_late_review_f
     )
     context = client.get(f"/investigations/{investigation_id}/decision-context").json()
     assert context["observability_state"]["status"] == "partial"
-    assert any(option["selected"] for option in context["options_considered"])
-    assert context["executed_actions"][0]["action_type"] == "remote_fix_and_hold_rollout"
+    assert not any(option["selected"] for option in context["options_considered"])
+    assert context["executed_actions"] == []
     assert context["evidence_snapshots"]
     assert context["decision_records"][0]["immutable"] is True
-    assert context["decision_records"][0]["chosen_option"]["option_type"] in {"remote_fix", "pause_rollout"}
+    assert context["decision_records"][0]["chosen_option"]["option_type"] == "human_reported_intent"
     assert context["decision_records"][0]["evidence_snapshot"]["what_was_unknown"]
     assert "confidence" not in context["decision_records"][0]["evidence_snapshot"]["primary_hypothesis"]
     decision_record_digest = context["decision_records"][0]["digest"]
