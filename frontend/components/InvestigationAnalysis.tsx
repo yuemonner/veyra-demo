@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API } from "../lib/api";
+import DecisionWorkspace from "./DecisionWorkspace";
 
 const DEMO = "inv-120-robots-bad-rollout";
 export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate }: { stage: string; id?: string; onNavigate?: (stage: string) => void }) {
@@ -15,14 +16,6 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate }: 
   const [source, setSource] = useState("");
   const [eventTime, setEventTime] = useState("");
   const [owner, setOwner] = useState("");
-  const [outcome, setOutcome] = useState("");
-  const [conditions, setConditions] = useState("");
-  const [action, setAction] = useState("");
-  const [onlyChange, setOnlyChange] = useState("unknown");
-  const [recovered, setRecovered] = useState(false);
-  const [window, setWindow] = useState("");
-  const [outcomeSource, setOutcomeSource] = useState("");
-  const [unknowns, setUnknowns] = useState("");
   const [challengeReason, setChallengeReason] = useState("");
   const [challengeId, setChallengeId] = useState("");
   async function request(path: string, body?: unknown) {
@@ -64,20 +57,13 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate }: 
   function sample(exposure: string) {
     return record({ asset_id: "EX11", zone: "loading-zone-B", safe_stop: false, exposure_relation: exposure, exposure_verified: exposure !== "unknown", telemetry_complete: exposure !== "unknown", source: `synthetic://ex11/${exposure}`, event_time: new Date().toISOString(), synthetic: true });
   }
-  async function save() {
-    setBusy(true);
-    try {
-      await request(`/investigations/${caseId}/analysis/precedent`, { owner, outcome, applicable_conditions: conditions.split(";").map(c => c.trim()).filter(Boolean), intervention_verification: { action, only_variable_changed: onlyChange === "unknown" ? null : onlyChange === "yes", recovery_verified: recovered, verification_window: window, source: outcomeSource, remaining_unknowns: unknowns, alternatives_excluded: null } });
-      await load();
-    } catch (e) { setError(String(e)); } finally { setBusy(false); }
-  }
   async function challenge() {
     setBusy(true);
     try { setAnalysis(await request(`/investigations/${caseId}/hypotheses/${encodeURIComponent(challengeId)}/challenge`, {owner, reason: challengeReason, evidence_ids: []})); setChallengeReason(""); setError(""); }
     catch (e) { setError(String(e)); } finally { setBusy(false); }
   }
   const diagnostic = stage === "checks";
-  const titles: Record<string, string> = {overview: "Current investigation", fleet: "Candidate controls", hypotheses: "Competing hypotheses", decision: "Decision support", checks: "Next diagnostic check", outcome: "Outcome memory", outcomes: "Outcome memory", precedents: "Outcome memory", evidence: "Evidence & timeline"};
+  const titles: Record<string, string> = {overview: "Current investigation", fleet: "Candidate controls", hypotheses: "Competing hypotheses", decision: "Decision workspace", checks: "Next diagnostic check", outcome: "Outcome memory", outcomes: "Action & outcome", precedents: "Outcome memory", evidence: "Evidence & timeline"};
   const short = (value: string = "") => value.replace("localization-", "").replace("loading-zone-", "Zone ").replace("lidar-fw-", "");
   const time = (value: string) => value?.slice(11, 19) || "—";
   const label = (h: any) => h.id.endsWith("h-l4-zone-b") ? "H2" : h.id.endsWith("h-l4-alone") ? "H1" : "H3";
@@ -105,7 +91,7 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate }: 
     <details className="investigation-card"><summary>Challenge a hypothesis</summary><div className="investigation-form"><label>Hypothesis <select value={challengeId} onChange={e => setChallengeId(e.target.value)}><option value="">Select</option>{analysis.hypotheses.map((h: any) => <option key={h.id} value={h.id}>{label(h)} · {h.label}</option>)}</select></label><label>Engineer <input value={owner} onChange={e => setOwner(e.target.value)} /></label><label>Reason <textarea value={challengeReason} onChange={e => setChallengeReason(e.target.value)} /></label><button disabled={busy || !challengeId || !owner.trim() || !challengeReason.trim()} onClick={challenge}>Record challenge</button></div></details>
   </>;
   return <section className="investigation-analysis" aria-label="Evidence-driven investigation">
-    <header className="investigation-heading"><div><small>Evidence → Hypothesis → Test → Outcome</small><h1>{titles[stage] || "Current investigation"}</h1></div><button className="quiet-button" disabled={busy} onClick={() => load(true)}>New investigation</button></header>
+    <header className="investigation-heading"><div><small>Understand → Decide → Act → Verify → Reuse</small><h1>{titles[stage] || "Current investigation"}</h1></div><button className="quiet-button" disabled={busy} onClick={() => load(true)}>New investigation</button></header>
     {error && <p role="alert" className="investigation-error">{error}</p>}
     {!analysis ? <button disabled={busy} onClick={() => load()}>{busy ? "Loading evidence…" : "Connect investigation engine"}</button> : <>
       <div className="investigation-state"><span className="state-badge">{analysis.comparison_quality.valid_control_count ? "Control observation available" : "Exposure evidence incomplete"}</span><small>{analysis.diagnostic_events.length} diagnostic observations · current case</small></div>
@@ -119,7 +105,8 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate }: 
         <p className="muted">A counterexample needs matched operating conditions, complete telemetry and no failure.</p>
         <details className="investigation-card"><summary>Compare all {analysis.cohorts.length} machines</summary><div className="investigation-table-wrap"><table><thead><tr><th>Machine</th><th>Configured</th><th>Operating exposure</th><th>Valid control</th></tr></thead><tbody>{analysis.cohorts.map((c: any) => <tr key={c.asset_id}><td>{c.asset_id}</td><td>{short(c.context.configuration)} · {short(c.context.network_profile)}</td><td>{c.exposure_status}</td><td>{c.valid_control ? "Yes" : "No"}</td></tr>)}</tbody></table></div></details>
       </>}
-      {["decision", "hypotheses"].includes(stage) && hypothesisCards()}
+      {stage === "hypotheses" && hypothesisCards()}
+      {["decision", "outcome", "outcomes", "precedents"].includes(stage) && <DecisionWorkspace key={caseId} caseId={caseId} stage={stage} />}
       {diagnostic && <>
         <article className="investigation-card"><small>{next ? `Recommended · ${next.cost.time_minutes} min · ${next.risk.level} risk` : "Check recorded · engineer review"}</small><h2>{next ? "Verify EX11 operating exposure" : "Review the new evidence"}</h2><p>{next ? "Use its existing run records before treating it as a healthy control." : "No further discriminating check in this rule set. Plan independent replication with matched workload and site conditions."}</p>{next && <details><summary>Why this check?</summary><p>{next.why}</p></details>}</article>
         <article className="investigation-card"><h3>Try a synthetic observation</h3><p className="muted">Saved to this case and reassessed by the backend.</p><div className="investigation-scenarios"><button disabled={busy} onClick={() => sample("unknown")}>Exposure unknown</button><button disabled={busy} onClick={() => sample("same")}>Same conditions · healthy</button><button disabled={busy} onClick={() => sample("different")}>Different conditions</button></div><div className="hypothesis-statuses">{analysis.hypotheses.map((h: any) => <span key={h.id}>{label(h)} · {status(h.status)}</span>)}</div></article>
@@ -131,11 +118,8 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate }: 
           <button disabled={busy || result === "unknown" || !source.trim() || !eventTime} onClick={() => record({asset_id: "EX11", zone: "loading-zone-B", safe_stop: result === "safe_stop", exposure_relation: relation, exposure_verified: relation !== "unknown", telemetry_complete: complete, source, event_time: new Date(eventTime).toISOString()})}>Save & reassess</button>
         </div></details>
       </>}
-      {["outcome", "outcomes", "precedents"].includes(stage) && <>
-        <article className="investigation-card"><small>Current investigation state</small><h2>{analysis.conditional_precedents.length ? "Recorded outcomes" : "No outcome recorded"}</h2>{analysis.conditional_precedents.map((p: any) => <div key={p.outcome_id}><h3>{p.outcome}</h3><p>Conditions: {p.conditions.join("; ")}</p><details><summary>Verification record</summary><p>{p.verification}</p><p>Action: {p.verification_details.action || "not recorded"}</p><p>Only changed variable: {String(p.verification_details.only_variable_changed ?? "unknown")}</p><p>Remaining unknowns: {p.verification_details.remaining_unknowns || "unresolved"}</p></details></div>)}</article>
-        <details className="investigation-card"><summary>Record action & outcome</summary><div className="investigation-form"><label>Decision owner <input value={owner} onChange={e => setOwner(e.target.value)} /></label><label>Action taken <input value={action} onChange={e => setAction(e.target.value)} /></label><label>Observed outcome <textarea value={outcome} onChange={e => setOutcome(e.target.value)} /></label><label>Outcome evidence reference <input value={outcomeSource} onChange={e => setOutcomeSource(e.target.value)} /></label><label>Applicable conditions (separate with ;) <input value={conditions} onChange={e => setConditions(e.target.value)} /></label><details><summary>Verification & remaining unknowns</summary><label>Only changed variable? <select value={onlyChange} onChange={e => setOnlyChange(e.target.value)}><option value="unknown">Unknown</option><option value="yes">Yes</option><option value="no">No</option></select></label><label><input type="checkbox" checked={recovered} onChange={e => setRecovered(e.target.checked)} /> Recovery verified by engineer</label><label>Verification window <input value={window} onChange={e => setWindow(e.target.value)} /></label><label>Remaining unknowns <textarea value={unknowns} onChange={e => setUnknowns(e.target.value)} /></label></details>{!analysis.diagnostic_events.length && <p className="muted">Record a diagnostic observation before saving an outcome.</p>}<button disabled={busy || !owner.trim() || !outcome.trim() || !action.trim() || !outcomeSource.trim() || !conditions.trim() || !analysis.diagnostic_events.length} onClick={save}>Save conditional precedent</button></div></details>
-        <details className="investigation-card historical-reference"><summary>Historical reference outcome · separate from this case</summary><p>{analysis.historical_reference.reported_result}</p><small>Preset synthetic narrative. Not independently verified. Excluded from the current hypothesis assessment.</small></details>
-      </>}
+      {["outcome", "outcomes", "precedents"].includes(stage) && <details className="investigation-card historical-reference"><summary>Historical reference outcome · separate from this case</summary><p>{analysis.historical_reference.reported_result}</p><small>Preset synthetic narrative. Not independently verified. Excluded from the current hypothesis assessment and workflow reuse.</small></details>}
+      {["outcome", "outcomes", "precedents"].includes(stage) && analysis.conditional_precedents.length > 0 && <details className="investigation-card"><summary>Earlier outcome records · separate legacy format ({analysis.conditional_precedents.length})</summary><p className="muted">These records predate the separate decision/action/verification workflow. They are preserved, but excluded from workflow reuse.</p>{analysis.conditional_precedents.map((p: any) => <div key={p.outcome_id}><strong>{p.outcome}</strong><p>Conditions: {p.conditions.join("; ") || "not recorded"}</p><p>Verification: {p.verification}</p><p>Reported action: {p.verification_details.action || "not recorded"}</p></div>)}</details>}
       {stage === "evidence" && <>
         <p className="muted">Event time is when it happened. Known time is when the source became available. All times are UTC.</p>
         <div className="investigation-card investigation-table-wrap"><table><thead><tr><th>Machine / record</th><th>Event time (UTC)</th><th>Known time (UTC)</th></tr></thead><tbody>{analysis.timeline.map((e: any) => <tr key={e.id}><td><strong>{e.asset_id}</strong> · {e.label}<small>{e.source}</small></td><td>{time(e.event_time)}</td><td>{time(e.known_at)}</td></tr>)}</tbody></table></div>
