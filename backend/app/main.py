@@ -429,7 +429,7 @@ def challenge_hypothesis(investigation_id: str, hypothesis_id: str, body: dict, 
     if not isinstance(references, list) or not all(isinstance(ref, str) for ref in references):
         raise HTTPException(status_code=422, detail="evidence_ids must be a list")
     state = evaluate(db, investigation_id)
-    permitted = {e['id'] for h in state['hypotheses'] for key in ('supporting_evidence', 'contradicting_evidence', 'non_discriminating_evidence') for e in h[key]}
+    permitted = {e['id'] for e in state['evidence']} | {e['id'] for h in state['hypotheses'] for key in ('supporting_evidence', 'contradicting_evidence', 'non_discriminating_evidence', 'context_evidence') for e in h[key]}
     if any(ref not in permitted for ref in references):
         raise HTTPException(status_code=422, detail="Evidence references must exist in this investigation")
     db.add(CaseEvent(id=f'challenge-{uuid4().hex}', investigation_id=investigation_id, event_kind='hypothesis_challenged', occurred_at=datetime.utcnow(), payload={'hypothesis_id': hypothesis_id, 'owner': body['owner'], 'reason': body['reason'], 'evidence_ids': references}))

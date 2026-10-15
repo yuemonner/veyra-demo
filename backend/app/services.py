@@ -723,41 +723,41 @@ def seed_field_case_reasoning(db: Session, investigation_id: str) -> None:
             id="h-l4-zone-b",
             investigation_id=investigation_id,
             label="Localization L4 with loading zone B exposure",
-            status="strong_current_explanation",
+            status="possible",
             supporting_evidence=["EX03-safe-stop", "EX05-safe-stop", "EX08-safe-stop", "EX03-localization-map-update", "EX05-localization-map-update", "EX08-localization-map-update"],
             contradicting_evidence=["EX11-localization-map-update"],
             missing_evidence=["EX11 runtime behavior in loading zone B", "healthy L4 machine observed in Zone B"],
             would_change_conclusion=["EX11 remains healthy after real Zone B exposure", "another healthy L4 + Zone B comparator appears"],
             revision_history=[
                 {"known_at": iso(BASE + timedelta(minutes=23)), "status": "not_yet_formed", "reason": "zone exposure not joined"},
-                {"known_at": iso(BASE + timedelta(minutes=24)), "status": "emerging", "reason": "EX11 weakens L4-alone explanation"},
-                {"known_at": iso(DEMO_DECISION_TIME), "status": "strong_current_explanation", "reason": "affected group shares L4 + Zone B; no known healthy comparator yet"},
+                {"known_at": iso(BASE + timedelta(minutes=24)), "status": "emerging", "reason": "EX11 is a candidate control; operating exposure remains unverified"},
+                {"known_at": iso(DEMO_DECISION_TIME), "status": "possible", "reason": "affected configuration records contain L4 + Zone B; comparable operating exposure remains unverified"},
             ],
         ),
         Hypothesis(
             id="h-l4-alone",
             investigation_id=investigation_id,
             label="Localization L4 alone",
-            status="possible_but_weakened",
+            status="possible",
             supporting_evidence=["EX03-localization-map-update", "EX05-localization-map-update", "EX08-localization-map-update"],
             contradicting_evidence=["EX11-localization-map-update"],
             missing_evidence=["EX11 behavior in loading zone B"],
             would_change_conclusion=["multiple healthy L4 machines remain stable in the same zone"],
             revision_history=[
-                {"known_at": iso(BASE + timedelta(minutes=23)), "status": "stronger", "reason": "L4 found on affected machines"},
-                {"known_at": iso(BASE + timedelta(minutes=24)), "status": "weakened", "reason": "EX11 uses L4 without known safe-stop"},
+                {"known_at": iso(BASE + timedelta(minutes=23)), "status": "possible", "reason": "L4 found on affected machines"},
+                {"known_at": iso(BASE + timedelta(minutes=24)), "status": "possible", "reason": "EX11 is a candidate control; exposure and completeness are unverified"},
             ],
         ),
         Hypothesis(
             id="h-lidar-53",
             investigation_id=investigation_id,
             label="LiDAR firmware 5.3",
-            status="weak",
+            status="possible",
             supporting_evidence=["EX03-localization-map-update", "EX05-localization-map-update", "EX08-localization-map-update"],
             contradicting_evidence=["EX02-localization-map-update", "EX04-localization-map-update", "EX09-localization-map-update", "EX11-localization-map-update"],
             missing_evidence=["no useful next check first"],
             would_change_conclusion=["LiDAR 5.3 healthy cohort begins showing the same safe-stop pattern"],
-            revision_history=[{"known_at": iso(DEMO_DECISION_TIME), "status": "weak", "reason": "too common in healthy machines"}],
+            revision_history=[{"known_at": iso(DEMO_DECISION_TIME), "status": "possible", "reason": "Firmware metadata alone cannot establish cause"}],
         ),
     ]
     checks = [
@@ -772,7 +772,7 @@ def seed_field_case_reasoning(db: Session, investigation_id: str) -> None:
             },
             estimated_cost={"time_minutes": 15, "operator_attention": "low"},
             operational_risk={"level": "low", "reason": "read-only observation; no production configuration change"},
-            why_informative="It separates L4 alone from L4 plus Zone B with one low-risk observation.",
+            why_informative="It verifies a candidate control and can challenge a simple explanation; uncontrolled confounders prevent identifying an interaction from this check alone.",
             required_approval=None,
             check_type="read_only",
             rank_score=0.91,
@@ -797,7 +797,7 @@ def seed_field_case_reasoning(db: Session, investigation_id: str) -> None:
     events = [
         CaseEvent(id="ce-1411", investigation_id=investigation_id, event_kind="signal", occurred_at=BASE + timedelta(minutes=11), payload={"text": "EX03 safe-stop", "known_at": iso(BASE + timedelta(minutes=12))}),
         CaseEvent(id="ce-1423", investigation_id=investigation_id, event_kind="belief_update", occurred_at=BASE + timedelta(minutes=23), payload={"text": "Localization L4 discovered", "hypothesis": "h-l4-alone"}),
-        CaseEvent(id="ce-1424", investigation_id=investigation_id, event_kind="counterexample", occurred_at=BASE + timedelta(minutes=24), payload={"text": "EX11 has L4 without known signal", "known_at": iso(BASE + timedelta(minutes=24))}),
+        CaseEvent(id="ce-1424", investigation_id=investigation_id, event_kind="candidate_control", occurred_at=BASE + timedelta(minutes=24), payload={"text": "EX11 candidate control; exposure not verified", "known_at": iso(BASE + timedelta(minutes=24))}),
         CaseEvent(id="ce-1427", investigation_id=investigation_id, event_kind="decision_snapshot", occurred_at=DEMO_DECISION_TIME, payload={"text": "Decision snapshot sealed", "known_affected": 3}),
     ]
     db.add_all(hypotheses + checks + events)
@@ -947,33 +947,12 @@ def evidence_lineage(db: Session, investigation_id: str) -> dict[str, Any]:
 
 
 def hypotheses_state(db: Session, investigation_id: str, known_at: Optional[datetime] = None) -> dict[str, Any]:
+    from app.investigation_engine import evaluate
     seed_field_case_reasoning(db, investigation_id)
-    rows = list(db.scalars(select(Hypothesis).where(Hypothesis.investigation_id == investigation_id).order_by(Hypothesis.id)))
-    snapshot_time = known_at or DEMO_DECISION_TIME
-    items = []
-    for row in rows:
-        item = serialize_hypothesis(row)
-        revisions = [rev for rev in row.revision_history if rev.get("known_at", "") <= iso(snapshot_time)]
-        if revisions:
-            item["snapshot_status"] = revisions[-1]["status"]
-            item["snapshot_reason"] = revisions[-1].get("reason")
-        else:
-            item["snapshot_status"] = "not_yet_formed"
-            item["snapshot_reason"] = "not knowable at this time"
-        items.append(item)
-    return {
-        "investigation_id": investigation_id,
-        "belief_snapshot": {
-            "known_at": iso(snapshot_time),
-            "immutable": True,
-            "summary": "Competing explanations as they were knowable at this time.",
-        },
-        "hypotheses": items,
-        "unresolved_uncertainty": [
-            "L4 alone vs L4 plus loading zone B",
-            "localization-related explanation vs unknown site interaction",
-        ],
-    }
+    state = evaluate(db, investigation_id, known_at)
+    return {**state, 'belief_snapshot': {'known_at': state['as_of'], 'immutable': True,
+                                      'summary': 'Evidence available at the requested time.'},
+            'hypotheses': [{**h, 'snapshot_status': h['status']} for h in state['hypotheses']]}
 
 
 def diagnostic_checks(db: Session, investigation_id: str) -> dict[str, Any]:
@@ -985,6 +964,7 @@ def diagnostic_checks(db: Session, investigation_id: str) -> dict[str, Any]:
     rows.sort(key=lambda row: (-scores[row.id]["score"], row.id))
     for row in rows:
         row.rank_score = scores[row.id]["score"]
+        row.why_informative = scores[row.id]["why"]
     return {
         "investigation_id": investigation_id,
         "ranking_method": "Deterministic heuristic: information value, cost, operational risk and whether the check changes physical state.",
@@ -1027,7 +1007,7 @@ def compare(db: Session, investigation_id: str) -> dict[str, Any]:
         "table": table,
         "interpretation": [
             "Autonomy release 2.7 ran on all twelve machines, so the release alone does not explain the split.",
-            "Localization profile L4 and loading zone B exposure co-occur across the affected machines.",
+            "Affected configuration records include localization L4 and Zone B; actual comparable operating exposure remains unverified.",
             "EX11 has no known signal, but actual operating exposure is not verified; it is not a valid control yet.",
             "LiDAR firmware 5.3 and map M19 also appear in healthy machines, so they are not sufficient on their own.",
             "This narrows the investigation; it does not establish cause.",
@@ -1664,7 +1644,7 @@ def replay_case(db: Session, investigation_id: str) -> dict[str, Any]:
     checkpoints = [
         ("14:11", BASE + timedelta(minutes=11), "First safe-stop is knowable."),
         ("14:23", BASE + timedelta(minutes=23), "Localization L4 becomes part of the case."),
-        ("14:24", BASE + timedelta(minutes=24), "EX11 appears as a counterexample for L4 alone."),
+        ("14:24", BASE + timedelta(minutes=24), "EX11 is identified as a candidate control; it is not yet a counterexample."),
         ("14:27", DEMO_DECISION_TIME, "Decision snapshot. Future evidence is hidden."),
         ("14:31", DEMO_SEAL_TIME, "Late evidence may update current view after the decision."),
     ]
@@ -1682,7 +1662,7 @@ def replay_case(db: Session, investigation_id: str) -> dict[str, Any]:
         })
     unsupported_claims = []
     for hyp in hypotheses_state(db, investigation_id)["hypotheses"]:
-        if not hyp["supporting_evidence"]:
+        if not hyp["supporting_evidence"] and not hyp["context_evidence"]:
             unsupported_claims.append(hyp["id"])
     return {
         "investigation_id": investigation_id,
@@ -1692,7 +1672,7 @@ def replay_case(db: Session, investigation_id: str) -> dict[str, Any]:
             "unsupported_ai_claims": unsupported_claims,
             "hypothesis_coverage": "3 competing possible causes maintained",
             "possible_cause_coverage": "3 competing possible causes maintained",
-            "suggested_checks_usefulness": "EX11 check separates strongest remaining possible causes",
+            "suggested_checks_usefulness": "EX11 exposure verification can challenge a simple hypothesis; it cannot identify an interaction on its own",
             "precedent_applicability": precedent_comparison(db, investigation_id)["applicability"]["status"],
             "decision_traceability": "decision snapshot and digest preserve what was knowable at 14:27",
         },

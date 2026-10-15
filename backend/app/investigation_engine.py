@@ -34,32 +34,71 @@ def evaluate(db, investigation_id, known_at=None):
         matches = all(state.get(k) == context.get(k) and state.get(k) is not None for k in ('application_version', 'configuration', 'firmware_version', 'map_version'))
         healthy = observation.get('safe_stop') is False and complete and not any(e.payload.get("safe_stop") is True for e in checks)
         cohorts.append({'asset_id': asset, 'exposure_status': 'verified' if exposed else ('Different conditions verified' if relation == 'different' else 'Exposure not verified'), 'exposure_relation': relation, 'context': state, 'missing_fields': [k for k in ('application_version', 'configuration', 'firmware_version', 'map_version') if state.get(k) is None], 'valid_control': exposed and healthy and matches and not signals, 'signal_observed': bool(signals) or observation.get('safe_stop') is True, 'reason': 'Requires matching configuration, verified Zone B exposure and complete healthy telemetry; absence of an alert is insufficient.', 'confounders': [k for k in ('configuration', 'firmware_version', 'map_version') if state.get(k) != context.get(k)], 'evidence_ids': [e.id for e in signals] + [e.id for e in checks]})
-    refs = {e.id: {'id': e.id, 'source': e.source, 'event_time': iso(e.event_time), 'known_at': iso(e.known_at)} for e in evidence}
+    refs = {e.id: {'id': e.id, 'source': e.source, 'event_time': iso(e.event_time), 'known_at': iso(e.known_at), 'asset_id': e.asset_id, 'event_type': e.event_type} for e in evidence}
     refs.update({e.id: {'id': e.id, 'source': e.payload['source'], 'event_time': e.payload['event_time'], 'known_at': iso(e.occurred_at)} for e in events})
     challenges = list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == investigation_id, CaseEvent.event_kind == 'hypothesis_challenged', CaseEvent.occurred_at <= cutoff)))
     hypotheses = []
+    # A row's legacy evidence IDs are candidate links, never proof of a claim.
+    # Validate the actual payload fields; configuration remains contextual.
+    predicates = {
+        'h-l4-zone-b': {'configuration': 'localization-L4', 'network_profile': 'loading-zone-B'},
+        'h-l4-alone': {'configuration': 'localization-L4'},
+        'h-lidar-53': {'firmware_version': 'lidar-fw-5.3'},
+    }
+    affected_assets = {c['asset_id'] for c in cohorts if c['signal_observed']}
+    proposed = [c.id for c in db.scalars(select(DiagnosticCheck).where(DiagnosticCheck.investigation_id == investigation_id))]
     for row in db.scalars(select(Hypothesis).where(Hypothesis.investigation_id == investigation_id)):
-        support = [i for i in row.supporting_evidence if i in refs]
-        # An unverified healthy peer cannot contradict an exposure-dependent claim.
-        qualified_controls = {c['asset_id'] for c in cohorts if c['valid_control']}
-        against = [e.id for e in evidence if e.id in row.contradicting_evidence and e.asset_id in qualified_controls]
-        status = 'possible' if support else 'insufficient_evidence'
-        missing = ['Verified comparable operating exposure', 'Complete diagnostic telemetry', 'Unmeasured site and workload confounders']
         canonical_id = row.id.split('::')[-1]
+        required_fields = predicates.get(canonical_id, {})
+        context_records = [
+            {**refs[e.id], 'matched_fields': {k: e.payload[k] for k in required_fields},
+             'claim': 'Configuration metadata only; actual operating exposure is not established.'}
+            for e in evidence if e.asset_id in affected_assets
+            and e.event_type == 'configuration_change' and required_fields
+            and all(e.payload.get(k) == v for k, v in required_fields.items())
+        ]
+        support, against = [], []
+        status = 'possible' if context_records else 'insufficient_evidence'
+        missing = ['Comparable operating exposure for the affected group and candidate controls',
+                   'Complete observation windows', 'Matched workload and site conditions']
+        if canonical_id == 'h-lidar-53':
+            missing = ['A firmware-specific diagnostic check', 'Comparable operating conditions']
+            if not context_records:
+                missing.insert(0, 'Firmware metadata required')
         diagnostic_results = set()
         for event in events:
             obs = event.payload
-            if not (obs.get('exposure_verified') is True and obs.get('exposure_relation', 'same') == 'same' and obs.get('telemetry_complete') is True):
+            participant = next((c for c in cohorts if c['asset_id'] == obs.get('asset_id')), None)
+            context_matches = participant is not None and all(
+                participant['context'].get(k) is not None
+                and participant['context'].get(k) == context.get(k)
+                for k in ('application_version', 'configuration', 'firmware_version', 'map_version'))
+            if not (context_matches and obs.get('exposure_verified') is True
+                    and obs.get('exposure_relation', 'same') == 'same'
+                    and obs.get('telemetry_complete') is True):
                 continue
             if canonical_id in ('h-l4-zone-b', 'h-l4-alone'):
                 diagnostic_results.add(obs['safe_stop'])
-                (support if obs['safe_stop'] else against).append(event.id)
+                (support if obs['safe_stop'] else against).append(refs[event.id])
                 status = 'supported_not_proven' if obs['safe_stop'] else 'weakened'
                 missing = ['Independent replication', 'Site and workload confounders remain unresolved']
         if len(diagnostic_results) > 1:
             status = 'conflicting_evidence'
             missing = ['Explain inconsistent diagnostic observations', 'Control workload, timing and site confounders']
-        hypotheses.append({'id': row.id, 'label': row.label, 'status': status, 'supporting_evidence': [refs[i] for i in support], 'contradicting_evidence': [refs[i] for i in against], 'missing_evidence': missing, 'review_status': 'challenged' if any(e.payload.get('hypothesis_id') == row.id for e in challenges) else 'open', 'challenges': [e.payload for e in challenges if e.payload.get('hypothesis_id') == row.id], 'non_discriminating_evidence': [refs[e.id] for e in evidence if e.event_type == 'deployment' and e.asset_id in peers], 'possible_confounders': ['software configuration', 'operating zone', 'workload', 'site conditions'], 'proposed_checks': [c.id for c in db.scalars(select(DiagnosticCheck).where(DiagnosticCheck.investigation_id == investigation_id))]})
+        hypotheses.append({
+            'id': row.id, 'label': row.label, 'status': status,
+            'supporting_evidence': support, 'contradicting_evidence': against,
+            'context_evidence': context_records, 'missing_evidence': missing,
+            'evidence_strength': 'conflicting_observations' if len(diagnostic_results) > 1 else
+                                 'diagnostic_observation' if diagnostic_results else 'context_only' if context_records else 'insufficient_evidence',
+            'investigation_priority': 'high' if canonical_id == 'h-l4-zone-b' else 'normal',
+            'priority_reason': 'Verify the missing exposure records first; priority is not causal confidence.' if canonical_id == 'h-l4-zone-b' else 'Keep as a competing explanation; direct diagnostic evidence is incomplete.',
+            'review_status': 'challenged' if any(e.payload.get('hypothesis_id') == row.id for e in challenges) else 'open',
+            'challenges': [e.payload for e in challenges if e.payload.get('hypothesis_id') == row.id],
+            'non_discriminating_evidence': [refs[e.id] for e in evidence if e.event_type == 'deployment' and e.asset_id in peers],
+            'possible_confounders': ['software configuration', 'operating zone', 'workload', 'site conditions'],
+            'proposed_checks': proposed, 'would_change_conclusion': row.would_change_conclusion,
+        })
     active = {h['id'].split('::')[-1] for h in hypotheses}
     checks = []
     for row in db.scalars(select(DiagnosticCheck).where(DiagnosticCheck.investigation_id == investigation_id)):
@@ -80,7 +119,22 @@ def evaluate(db, investigation_id, known_at=None):
     checks.sort(key=lambda c: (-c['score'], c['id']))
     next_check = next((c for c in checks if c['status'] != 'observed' and c['score'] > 0 and c['feasible']), None)
     comparison_quality = {'valid_control_count': sum(c['valid_control'] for c in cohorts), 'sample_status': 'insufficient_for_causal_estimation', 'confounded_dimensions': ['localization configuration', 'operating zone'], 'conclusion': 'Current evidence cannot distinguish software regression from environmental interaction.', 'missing_data': ['EX11 operating exposure' ] if not any(c['asset_id'] == 'EX11' and c['exposure_relation'] != 'unknown' for c in cohorts) else ['Independent replication', 'Matched workload and observation windows']}
-    return {'comparison_quality': comparison_quality, 'investigation_id': investigation_id, 'as_of': iso(cutoff), 'method': 'Deterministic evidence rules and diagnostic utility; causal inference not established', 'uncertainty': "We don't know yet, and here's what would help us find out.", 'cohorts': cohorts, 'hypotheses': hypotheses, 'checks': checks, 'next_check': next_check, 'diagnostic_events': [{'id': e.id, **e.payload} for e in events], 'conditional_precedents': [{'outcome_id': o.id, 'outcome': o.outcome, 'conditions': o.payload.get('applicable_conditions', []), 'verification': o.payload.get('validation_status', 'unverified'), 'verification_details': o.payload.get('intervention_verification', {}), 'automatic_recommendation': False} for o in db.scalars(select(Outcome).where(Outcome.investigation_id == investigation_id, Outcome.recorded_at <= cutoff))]}
+    configured_pair = lambda c: c['context'].get('configuration') == 'localization-L4' and c['context'].get('network_profile') == 'loading-zone-B'
+    config_summary = {
+        'affected_count': len(affected_assets), 'no_known_signal_count': len(cohorts) - len(affected_assets),
+        'affected_configured_l4_zone_b': sum(c['signal_observed'] and configured_pair(c) for c in cohorts),
+        'no_signal_configured_l4_zone_b': sum(not c['signal_observed'] and configured_pair(c) for c in cohorts),
+        'verified_affected_exposure_count': sum(c['signal_observed'] and c['exposure_relation'] == 'same' for c in cohorts),
+        'interpretation': 'Configuration records are not proof of comparable operating exposure.',
+    }
+    reference = {'scope': 'historical_reference', 'label': 'Historical reference outcome',
+                 'reported_result': 'Rollback L4 → 3/3 recovered', 'source': 'Synthetic FC-021 narrative',
+                 'verification': 'illustrative_not_independently_verified', 'used_in_current_analysis': False}
+    timeline = [{**refs[e.id], 'label': e.event_type.replace('_', ' ')} for e in evidence
+                if e.asset_id == inv.asset_id or e.event_type == 'telemetry_anomaly']
+    return {'configuration_summary': config_summary, 'historical_reference': reference,
+            'evidence': list(refs.values()), 'timeline': sorted(timeline, key=lambda e: (e['event_time'], e['id'])),
+            'comparison_quality': comparison_quality, 'investigation_id': investigation_id, 'as_of': iso(cutoff), 'method': 'Deterministic evidence rules and diagnostic utility; causal inference not established', 'uncertainty': "We don't know yet, and here's what would help us find out.", 'cohorts': cohorts, 'hypotheses': hypotheses, 'checks': checks, 'next_check': next_check, 'diagnostic_events': [{'id': e.id, **e.payload} for e in events], 'conditional_precedents': [{'outcome_id': o.id, 'outcome': o.outcome, 'conditions': o.payload.get('applicable_conditions', []), 'verification': o.payload.get('validation_status', 'unverified'), 'verification_details': o.payload.get('intervention_verification', {}), 'automatic_recommendation': False} for o in db.scalars(select(Outcome).where(Outcome.investigation_id == investigation_id, Outcome.recorded_at <= cutoff))]}
 
 
 def observe(db, investigation_id, check_id, observation):
