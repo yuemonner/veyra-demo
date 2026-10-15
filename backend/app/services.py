@@ -717,6 +717,14 @@ def seed_field_case_reasoning(db: Session, investigation_id: str) -> None:
     if investigation_id != "inv-120-robots-bad-rollout":
         return  # Demo-specific hypotheses must never leak into imported cases.
     if db.scalar(select(Hypothesis.id).where(Hypothesis.investigation_id == investigation_id).limit(1)):
+        from app.investigation_engine import evaluate
+        current = evaluate(db, investigation_id)
+        for item in current['hypotheses']:
+            row = db.get(Hypothesis, item['id'])
+            row.supporting_evidence = [e['id'] for e in item['supporting_evidence']]
+            row.contradicting_evidence = [e['id'] for e in item['contradicting_evidence']]
+            row.status = item['status']
+        db.commit()  # Current state only; sealed historical snapshots are untouched.
         return
     hypotheses = [
         Hypothesis(
@@ -724,8 +732,8 @@ def seed_field_case_reasoning(db: Session, investigation_id: str) -> None:
             investigation_id=investigation_id,
             label="Localization L4 with loading zone B exposure",
             status="possible",
-            supporting_evidence=["EX03-safe-stop", "EX05-safe-stop", "EX08-safe-stop", "EX03-localization-map-update", "EX05-localization-map-update", "EX08-localization-map-update"],
-            contradicting_evidence=["EX11-localization-map-update"],
+            supporting_evidence=[],
+            contradicting_evidence=[],
             missing_evidence=["EX11 runtime behavior in loading zone B", "healthy L4 machine observed in Zone B"],
             would_change_conclusion=["EX11 remains healthy after real Zone B exposure", "another healthy L4 + Zone B comparator appears"],
             revision_history=[
@@ -739,8 +747,8 @@ def seed_field_case_reasoning(db: Session, investigation_id: str) -> None:
             investigation_id=investigation_id,
             label="Localization L4 alone",
             status="possible",
-            supporting_evidence=["EX03-localization-map-update", "EX05-localization-map-update", "EX08-localization-map-update"],
-            contradicting_evidence=["EX11-localization-map-update"],
+            supporting_evidence=[],
+            contradicting_evidence=[],
             missing_evidence=["EX11 behavior in loading zone B"],
             would_change_conclusion=["multiple healthy L4 machines remain stable in the same zone"],
             revision_history=[
@@ -753,8 +761,8 @@ def seed_field_case_reasoning(db: Session, investigation_id: str) -> None:
             investigation_id=investigation_id,
             label="LiDAR firmware 5.3",
             status="possible",
-            supporting_evidence=["EX03-localization-map-update", "EX05-localization-map-update", "EX08-localization-map-update"],
-            contradicting_evidence=["EX02-localization-map-update", "EX04-localization-map-update", "EX09-localization-map-update", "EX11-localization-map-update"],
+            supporting_evidence=[],
+            contradicting_evidence=[],
             missing_evidence=["no useful next check first"],
             would_change_conclusion=["LiDAR 5.3 healthy cohort begins showing the same safe-stop pattern"],
             revision_history=[{"known_at": iso(DEMO_DECISION_TIME), "status": "possible", "reason": "Firmware metadata alone cannot establish cause"}],

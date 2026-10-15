@@ -174,6 +174,9 @@ def observe(db, investigation_id, check_id, observation):
     for item in after['hypotheses']:
         hypothesis = db.get(Hypothesis, item['id'])
         hypothesis.status = item['status']
+        hypothesis.supporting_evidence = [e['id'] for e in item['supporting_evidence']]
+        hypothesis.contradicting_evidence = [e['id'] for e in item['contradicting_evidence']]
+        hypothesis.missing_evidence = item['missing_evidence']
         hypothesis.revision_history = [*hypothesis.revision_history, {'known_at': event.occurred_at.isoformat(), 'status': item['status'], 'reason': event.id}]
     db.add(CaseEvent(id=f'update-{uuid4().hex}', investigation_id=investigation_id, event_kind='hypothesis_reassessment', occurred_at=datetime.utcnow(), payload={'evidence_id': event.id, 'before': before['hypotheses'], 'after': after['hypotheses']}))
     db.commit()
@@ -191,7 +194,7 @@ def create_demo_session(db):
     case_id = f'demo-session-{uuid4().hex}'
     db.add(Investigation(id=case_id, asset_id=inv.asset_id, trigger_id=inv.trigger_id, title='Synthetic investigation · EX11 exposure', status='active'))
     for h in db.scalars(select(Hypothesis).where(Hypothesis.investigation_id == template)):
-        db.add(Hypothesis(id=f'{case_id}::{h.id}', investigation_id=case_id, label=h.label, status='unresolved', supporting_evidence=h.supporting_evidence, contradicting_evidence=h.contradicting_evidence, missing_evidence=h.missing_evidence, would_change_conclusion=h.would_change_conclusion, revision_history=[]))
+        db.add(Hypothesis(id=f'{case_id}::{h.id}', investigation_id=case_id, label=h.label, status='unresolved', supporting_evidence=[], contradicting_evidence=[], missing_evidence=h.missing_evidence, would_change_conclusion=h.would_change_conclusion, revision_history=[]))
     for c in db.scalars(select(DiagnosticCheck).where(DiagnosticCheck.investigation_id == template)):
         db.add(DiagnosticCheck(id=f'{case_id}::{c.id}', investigation_id=case_id, question=c.question, procedure=c.procedure, expected_observations=c.expected_observations, estimated_cost=c.estimated_cost, operational_risk=c.operational_risk, why_informative=c.why_informative, required_approval=c.required_approval, check_type=c.check_type, rank_score=0))
     db.commit()
