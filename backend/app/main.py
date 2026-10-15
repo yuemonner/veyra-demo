@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -13,7 +13,7 @@ from app.db import get_db, init_db
 from app.models import Asset, Decision, DecisionPackage, Evidence, Investigation, Outcome
 from app.services import attach_human_decision, build_package, compare, compare_runs, create_field_case, decision_context, diagnostic_checks, evidence_lineage, generate_recording_report, get_field_case, hypotheses_state, ingest_recording, inject_late_evidence, investigate_imported_data, list_runs, precedent_comparison, reconstruct, record_check_observation, record_cost_impact, replay_case, reset_demo, save_imported_investigation, seal_package, search_recorded_events, serialize_evidence, serialize_field_case, similar_memory, verify_package
 
-app = FastAPI(title="Veyra V0", version="0.1.0")
+app = FastAPI(title="Veyra Evidence-driven Investigation", version="1.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -319,7 +319,10 @@ def investigation_diagnostic_checks(investigation_id: str, db: Session = Depends
 
 @app.post("/investigations/{investigation_id}/diagnostic-checks/{check_id}/observation")
 def investigation_record_check_observation(investigation_id: str, check_id: str, body: CheckObservationIn, db: Session = Depends(get_db)):
-    return record_check_observation(db, investigation_id, check_id, body.observation)
+    try:
+        return record_check_observation(db, investigation_id, check_id, body.observation)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
 
 
 @app.get("/investigations/{investigation_id}/replay")
@@ -363,3 +366,72 @@ def memory_similar(investigation_id: str, db: Session = Depends(get_db)):
 @app.get("/precedents/compare")
 def precedents_compare(investigation_id: str, db: Session = Depends(get_db)):
     return precedent_comparison(db, investigation_id)
+
+
+@app.get("/investigations/{investigation_id}/analysis")
+def investigation_analysis(investigation_id: str, known_at: Optional[datetime] = None, db: Session = Depends(get_db)):
+    from app.services import seed_field_case_reasoning
+    from app.investigation_engine import evaluate
+    if not db.get(Investigation, investigation_id):
+        raise HTTPException(status_code=404, detail="investigation not found")
+    seed_field_case_reasoning(db, investigation_id)
+    return evaluate(db, investigation_id, (known_at.astimezone(timezone.utc).replace(tzinfo=None) if known_at.tzinfo else known_at) if known_at else None)
+
+
+@app.post("/investigations/{investigation_id}/analysis/precedent")
+def save_conditional_precedent(investigation_id: str, body: dict, db: Session = Depends(get_db)):
+    from app.investigation_engine import evaluate
+    from app.models import CaseEvent
+    if not db.get(Investigation, investigation_id):
+        raise HTTPException(status_code=404, detail="investigation not found")
+    if not all(isinstance(body.get(k), str) and body[k].strip() for k in ("owner", "outcome")):
+        raise HTTPException(status_code=422, detail="owner and observed outcome are required")
+    conditions = body.get("applicable_conditions")
+    if not isinstance(conditions, list) or not conditions or not all(isinstance(c, str) and c.strip() for c in conditions):
+        raise HTTPException(status_code=422, detail="explicit applicable conditions are required")
+    analysis = evaluate(db, investigation_id)
+    events = analysis["diagnostic_events"]
+    if not events:
+        raise HTTPException(status_code=422, detail="diagnostic evidence is required")
+    verification = body.get("intervention_verification", {})
+    if not isinstance(verification, dict):
+        raise HTTPException(status_code=422, detail="intervention_verification must be an object")
+    for flag in ("only_variable_changed", "recovery_verified", "alternatives_excluded"):
+        if flag in verification and type(verification[flag]) is not bool and verification[flag] is not None:
+            raise HTTPException(status_code=422, detail=f"{flag} must be boolean or unknown")
+    now = datetime.utcnow()
+    decision = Decision(id=f"dec-{uuid4().hex}", investigation_id=investigation_id, decision="Record conditional precedent", owner=body["owner"], rationale=body["outcome"], decided_at=now)
+    outcome = Outcome(id=f"out-{uuid4().hex}", investigation_id=investigation_id, outcome=body["outcome"], recorded_at=now, payload={"decision_id": decision.id, "applicable_conditions": conditions, "diagnostic_evidence_ids": [e["id"] for e in events], "validation_status": "human_reported_requires_independent_verification", "causal_attribution": "not_established", "intervention_verification": verification})
+    db.add_all([decision, outcome, CaseEvent(id=f"precedent-{uuid4().hex}", investigation_id=investigation_id, event_kind="conditional_precedent_recorded", occurred_at=now, payload={"decision_id": decision.id, "outcome_id": outcome.id, "analysis": analysis})])
+    db.commit()
+    return {"decision_id": decision.id, "outcome_id": outcome.id, "automatic_recommendation": False}
+
+
+@app.post("/demo/investigation-sessions")
+def new_investigation_demo_session(db: Session = Depends(get_db)):
+    from app.investigation_engine import create_demo_session
+    try:
+        return create_demo_session(db)
+    except ValueError as error:
+        raise HTTPException(status_code=503, detail=str(error))
+
+
+@app.post("/investigations/{investigation_id}/hypotheses/{hypothesis_id}/challenge")
+def challenge_hypothesis(investigation_id: str, hypothesis_id: str, body: dict, db: Session = Depends(get_db)):
+    from app.models import Hypothesis, CaseEvent
+    from app.investigation_engine import evaluate
+    hypothesis = db.get(Hypothesis, hypothesis_id)
+    if not hypothesis or hypothesis.investigation_id != investigation_id:
+        raise HTTPException(status_code=404, detail="hypothesis not found")
+    if not all(isinstance(body.get(k), str) and body[k].strip() for k in ('owner', 'reason')):
+        raise HTTPException(status_code=422, detail="owner and reason are required")
+    references = body.get('evidence_ids', [])
+    if not isinstance(references, list) or not all(isinstance(ref, str) for ref in references):
+        raise HTTPException(status_code=422, detail="evidence_ids must be a list")
+    state = evaluate(db, investigation_id)
+    permitted = {e['id'] for h in state['hypotheses'] for key in ('supporting_evidence', 'contradicting_evidence', 'non_discriminating_evidence') for e in h[key]}
+    if any(ref not in permitted for ref in references):
+        raise HTTPException(status_code=422, detail="Evidence references must exist in this investigation")
+    db.add(CaseEvent(id=f'challenge-{uuid4().hex}', investigation_id=investigation_id, event_kind='hypothesis_challenged', occurred_at=datetime.utcnow(), payload={'hypothesis_id': hypothesis_id, 'owner': body['owner'], 'reason': body['reason'], 'evidence_ids': references}))
+    db.commit()
+    return evaluate(db, investigation_id)

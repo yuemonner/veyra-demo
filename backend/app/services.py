@@ -714,6 +714,8 @@ def seed_decision_primitives(db: Session, investigation_id: str) -> None:
 
 
 def seed_field_case_reasoning(db: Session, investigation_id: str) -> None:
+    if investigation_id != "inv-120-robots-bad-rollout":
+        return  # Demo-specific hypotheses must never leak into imported cases.
     if db.scalar(select(Hypothesis.id).where(Hypothesis.investigation_id == investigation_id).limit(1)):
         return
     hypotheses = [
@@ -977,6 +979,12 @@ def hypotheses_state(db: Session, investigation_id: str, known_at: Optional[date
 def diagnostic_checks(db: Session, investigation_id: str) -> dict[str, Any]:
     seed_field_case_reasoning(db, investigation_id)
     rows = list(db.scalars(select(DiagnosticCheck).where(DiagnosticCheck.investigation_id == investigation_id).order_by(DiagnosticCheck.rank_score.desc())))
+    from app.investigation_engine import evaluate
+    ranked = evaluate(db, investigation_id)["checks"]
+    scores = {item["id"]: item for item in ranked}
+    rows.sort(key=lambda row: (-scores[row.id]["score"], row.id))
+    for row in rows:
+        row.rank_score = scores[row.id]["score"]
     return {
         "investigation_id": investigation_id,
         "ranking_method": "Deterministic heuristic: information value, cost, operational risk and whether the check changes physical state.",
@@ -1020,12 +1028,12 @@ def compare(db: Session, investigation_id: str) -> dict[str, Any]:
         "interpretation": [
             "Autonomy release 2.7 ran on all twelve machines, so the release alone does not explain the split.",
             "Localization profile L4 and loading zone B exposure co-occur across the affected machines.",
-            "EX11 shares the same exposure without a known issue at decision time.",
+            "EX11 has no known signal, but actual operating exposure is not verified; it is not a valid control yet.",
             "LiDAR firmware 5.3 and map M19 also appear in healthy machines, so they are not sufficient on their own.",
             "This narrows the investigation; it does not establish cause.",
         ],
         "potentially_exposed": [
-            {"asset_id": "EX11", "reason": "Shares localization profile L4, LiDAR firmware 5.3 and loading zone B exposure without a known issue at decision time."}
+            {"asset_id": "EX11", "reason": "Exposure not verified: configuration alone does not establish matching operating conditions."}
         ],
     }
 
@@ -1040,33 +1048,10 @@ def summarize_values(values: list[Any]) -> str:
     return f"{value} · {count}/{len(values)}"
 
 
-def demo_hypotheses() -> list[dict[str, Any]]:
-    return [
-        {
-            "id": "h-localization-zone",
-            "hypothesis": "Localization profile L4 with loading zone B exposure is contributing to safe-stop events.",
-            "confidence": 0.58,
-            "status": "supported_by_current_evidence",
-            "supporting_evidence": ["EX03, EX05 and EX08 affected", "EX11 shares exposure", "localization profile and zone exposure co-occur across affected machines"],
-            "counter_evidence": ["Autonomy 2.7 is deployed across all twelve machines", "LiDAR firmware 5.3 and map M19 also appear in healthy machines"],
-        },
-        {
-            "id": "h-perception-map",
-            "hypothesis": "Perception confidence or map context near loading zone B is contributing to planner fallback.",
-            "confidence": 0.42,
-            "status": "plausible_but_unresolved",
-            "supporting_evidence": ["Affected machines share loading zone B exposure", "Exact planner fallback reason is missing"],
-            "counter_evidence": ["No local perception trace has been retrieved yet"],
-        },
-        {
-            "id": "h-release-wide",
-            "hypothesis": "Autonomy release 2.7 caused a fleet-wide safe-stop issue.",
-            "confidence": 0.18,
-            "status": "weak_support",
-            "supporting_evidence": ["Issue appeared after autonomy 2.7 rollout"],
-            "counter_evidence": ["Nine updated machines have no known signal at decision time"],
-        },
-    ]
+def evaluated_hypotheses(db: Session, investigation_id: str) -> list[dict[str, Any]]:
+    from app.investigation_engine import evaluate
+    seed_field_case_reasoning(db, investigation_id)
+    return [{**item, "hypothesis": item["label"]} for item in evaluate(db, investigation_id)["hypotheses"]]
 
 
 def build_package(db: Session, investigation_id: str) -> DecisionPackage:
@@ -1099,8 +1084,8 @@ def build_package(db: Session, investigation_id: str) -> DecisionPackage:
             "Whether remote recovery would restore service",
             "Whether localization profile L4 was causal or only correlated",
         ],
-        "hypotheses": demo_hypotheses(),
-        "primary_hypothesis": demo_hypotheses()[0],
+        "hypotheses": evaluated_hypotheses(db, investigation_id),
+        "primary_hypothesis": evaluated_hypotheses(db, investigation_id)[0],
         "current_interpretation": comp["interpretation"],
         "human_decision": None,
         "planned_action": None,
@@ -1188,8 +1173,8 @@ def attach_human_decision(db: Session, decision: Decision) -> None:
             "known_state": snapshot.known_state if snapshot else {},
             "unknowns": snapshot.unknowns if snapshot else [],
             "what_was_unknown": snapshot.unknowns if snapshot else [],
-            "hypotheses": demo_hypotheses(),
-            "primary_hypothesis": demo_hypotheses()[0],
+            "hypotheses": evaluated_hypotheses(db, decision.investigation_id),
+            "primary_hypothesis": evaluated_hypotheses(db, decision.investigation_id)[0],
         },
         "observability_state": serialize_observability(observability),
         "planned_action": {
@@ -1669,20 +1654,9 @@ def similar_memory(db: Session, investigation_id: str) -> dict[str, Any]:
 
 
 def record_check_observation(db: Session, investigation_id: str, check_id: str, observation: dict[str, Any]) -> dict[str, Any]:
+    from app.investigation_engine import observe
     seed_field_case_reasoning(db, investigation_id)
-    row = db.get(DiagnosticCheck, check_id)
-    if not row or row.investigation_id != investigation_id:
-        raise ValueError("check not found")
-    row.actual_observation = observation
-    if observation.get("safe_stop") is True:
-        row.belief_update = {"h-l4-zone-b": "strengthened", "h-l4-alone": "still_unresolved"}
-    elif observation:
-        row.belief_update = {"h-l4-zone-b": "weakened", "h-l4-alone": "weakened"}
-    row.status = "observed"
-    db.add(row)
-    db.add(CaseEvent(id=f"ce-{uuid.uuid4().hex[:10]}", investigation_id=investigation_id, event_kind="diagnostic_check_observed", occurred_at=BASE + timedelta(minutes=33), payload={"check_id": check_id, "observation": observation, "belief_update": row.belief_update}))
-    db.commit()
-    return serialize_check(row)
+    return observe(db, investigation_id, check_id, observation)
 
 
 def replay_case(db: Session, investigation_id: str) -> dict[str, Any]:
