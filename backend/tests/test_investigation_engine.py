@@ -180,3 +180,18 @@ def test_hypotheses_api_uses_same_assessment_as_analysis():
     analysis = client.get(f'/investigations/{case}/analysis').json()
     hypotheses = client.get(f'/investigations/{case}/hypotheses').json()
     assert [(h['id'],h['status'],h['evidence_strength']) for h in hypotheses['hypotheses']] == [(h['id'],h['status'],h['evidence_strength']) for h in analysis['hypotheses']]
+
+
+def test_persisted_hypothesis_support_contains_only_qualified_diagnostic_ids():
+    from app.db import SessionLocal
+    from app.models import Hypothesis
+    case = reset()
+    client.get(f'/investigations/{case}/analysis')
+    with SessionLocal() as db:
+        assert not db.get(Hypothesis,'h-l4-zone-b').supporting_evidence
+        assert not db.get(Hypothesis,'h-lidar-53').supporting_evidence
+    updated = submit(case).json()
+    evidence_id = updated['diagnostic_events'][0]['id']
+    with SessionLocal() as db:
+        assert db.get(Hypothesis,'h-l4-zone-b').supporting_evidence == [evidence_id]
+        assert not db.get(Hypothesis,'h-lidar-53').supporting_evidence
