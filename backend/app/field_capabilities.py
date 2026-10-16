@@ -180,7 +180,7 @@ def dispatch_state(rows):
     required = ['safety_scope_confirmed', 'remote_access_confirmed', 'remote_records_reviewed', 'configuration_identified', 'site_access_confirmed']
     missing = [name for name in required if not latest or not latest.get(name)]
     domains = domain_state(rows)
-    suggestions = [{'domain': d['label'], 'items': TOOLS[d['id']], 'reason': d['status']} for d in domains if d['status'] != 'reported_excluded_in_scope']
+    suggestions = [{'domain': d['label'], 'items': TOOLS[d['id']], 'reason': d['status'], 'scope_warning': 'A scoped exclusion does not justify omitting tools for different conditions.'} for d in domains]
     return {'latest_plan': latest, 'missing_verifications': missing, 'domain_tool_suggestions': suggestions,
             'status': 'preparation_incomplete' if missing else 'checklist_reported_complete_requires_approval',
             'boundary': 'Planning support only. Remote feasibility and checklist completion are engineer-reported, not a safety clearance or dispatch approval.'}
