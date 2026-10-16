@@ -158,3 +158,19 @@ The workspace renders a bundled read-only analysis captured from the case API be
 The configured free Render backend can sleep after idle time, so live writes can still wait for service startup. The read-only preview removes the blank first screen; it does not make the API always available. An always-on hosting instance and durable database remain deployment work. The preview is refreshed deliberately, not automatically at page load.
 
 Loading regression tests (Node 24+): `node --test frontend/tests/case-data.test.cjs`.
+
+## Field support extension · v1.3
+
+These tools are details inside the existing Ask Veyra workspace. No new primary navigation or machine-control integration is introduced.
+
+| Existing view | Added capability | What is actually implemented |
+| --- | --- | --- |
+| Evidence / Fleet | Mixed-machine evidence adapter | Raw field, value, unit, model, time, source and measurement scope remain intact. An engineer selects and confirms a concept definition. Supported dimensional conversions run only after that confirmation; unknown semantics/units stay unmapped. No cross-model comparability or healthy threshold is inferred. |
+| Possible Causes | Fault domain isolation | Network, control suite, vehicle interface and vehicle body remain possible without checks. Complete, explicitly scoped negative checks can be recorded as engineer-reported exclusions; contradictory reports remain conflicting. Follow-up distinctions and source records remain inspectable. |
+| Decision / Next Checks | Dispatch readiness | Save reported remote feasibility, prerequisite checks, remaining verification and a packing plan. Suggestions derive from unresolved domains. Checklist completion is not dispatch authorization or safety clearance. |
+| Evidence | Conversation-to-Case | Import redacted chat, existing voice transcripts or notes as text/.txt/.md. Conservative keyword rules produce line-linked drafts; an engineer edits and confirms each item. Original text and excerpts remain available. Planned, negated, ambiguous and mixed statements stay reviewable notes. No audio transcription, autonomous approval, executed action or verified recovery is inferred. |
+| Precedents | Retrofit experience library | Persist vehicle model, kit version, interface, harness revision, commissioning issue, reported resolution/result, applicability, exclusions and sources. Search returns exact-known-field matches, explicit exclusions and unknown fields across recorded cases. Recurrence/unresolved experience remains cautionary. |
+
+All field-tool writes append `CaseEvent` records. Confirmed conversation notes are separate from operational lifecycle facts; use their source reference when recording a human decision or actual action. “Source references provided” does not mean the system inspected attachments or independently verified a report. No tool assigns an independently-reviewed grade. The deployment's existing storage and authentication limits still apply.
+
+API prefix: `/investigations/{id}/field-tools`. `GET` reads state; `POST /signals`, `/domain-checks`, `/conversations`, `/conversations/{import_id}/confirm`, `/dispatch`, `/retrofits` save records; `POST /retrofit-search` compares explicitly supplied target configuration with library records. Retrofit notes and exclusions always require human review before reuse.
