@@ -21,7 +21,7 @@ def verification(case, a, result='recovered', **changes):
 def test_decision_freezes_evidence_and_never_fabricates_an_action():
     reset(); case = fresh()
     d = decision(case).json()
-    assert len(d['options_considered']) == 3
+    assert len(d['options_considered']) == 6
     assert d['selected_option']['id'] == 'inspect'
     assert not d['evidence_snapshot']['diagnostic_events']
     state = client.get(f'/investigations/{case}/workflow').json()
