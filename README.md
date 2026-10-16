@@ -153,7 +153,7 @@ See [architecture and implementation boundaries](docs/VEYRA_1_1.md), [domain mod
 
 ## First-load availability
 
-The workspace renders a bundled read-only analysis captured from the case API before the live backend responds. Returning browsers can show their own case-keyed cached view, labelled with its saved time. Neither preview nor cache is treated as a live decision record; recording checks, decisions and actions is locked until connection succeeds. Requests time out after 12 seconds; initial connection retries after 10 seconds. Mutations are never automatically replayed. A timed-out save has unknown status and must be checked by reloading records.
+The workspace renders a bundled read-only analysis captured from the case API before the live backend responds. Returning browsers can show their own case-keyed cached view, labelled with its saved time. Neither preview nor cache is treated as a live decision record; recording checks, decisions and actions is locked until connection succeeds. The initial read-only health probe allows up to 90 seconds for backend startup before any session-creation request. Case requests time out after 12 seconds; failed initial connections retry after 10 seconds. Concurrent connection attempts are guarded. Mutations are never automatically replayed. A timed-out save has unknown status and must be checked by reloading records.
 
 The configured free Render backend can sleep after idle time, so live writes can still wait for service startup. The read-only preview removes the blank first screen; it does not make the API always available. An always-on hosting instance and durable database remain deployment work. The preview is refreshed deliberately, not automatically at page load.
 
