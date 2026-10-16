@@ -15,8 +15,10 @@ from app.services import attach_human_decision, build_package, compare, compare_
 
 from app.decision_workflow import router as workflow_router
 
-app = FastAPI(title="Veyra Field Decision Support", version="1.2.0")
+app = FastAPI(title="Veyra Field Decision Support", version="1.3.0")
 app.include_router(workflow_router)
+from app.field_capabilities import router as field_router
+app.include_router(field_router)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
