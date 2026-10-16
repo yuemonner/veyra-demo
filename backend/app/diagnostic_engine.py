@@ -2,6 +2,7 @@
 import csv
 import io
 import json
+import math
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -59,6 +60,13 @@ class EvidenceIn(BaseModel):
     content: str = Field(min_length=1, max_length=40000)
 
 
+def finite_number(value):
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError('Non-finite numbers are not valid evidence JSON')
+    return number
+
+
 def parse_evidence(body):
     if body.format == 'csv':
         reader = csv.DictReader(io.StringIO(body.content))
@@ -70,9 +78,9 @@ def parse_evidence(body):
             raise HTTPException(422, 'CSV row has extra cells; correct the source before import')
     elif body.format == 'json':
         try:
-            parsed = json.loads(body.content)
-        except ValueError:
-            raise HTTPException(422, 'Invalid JSON; original source was not imported')
+            parsed = json.loads(body.content, parse_float=finite_number, parse_constant=finite_number)
+        except (ValueError, RecursionError):
+            raise HTTPException(422, 'Invalid/non-finite JSON; original source was not imported')
         if isinstance(parsed, dict):
             parsed = [parsed]
         if not isinstance(parsed, list) or not all(isinstance(row, dict) for row in parsed):
