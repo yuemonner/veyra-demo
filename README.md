@@ -174,3 +174,39 @@ These tools are details inside the existing Ask Veyra workspace. No new primary 
 All field-tool writes append `CaseEvent` records. Confirmed conversation notes are separate from operational lifecycle facts; use their source reference when recording a human decision or actual action. “Source references provided” does not mean the system inspected attachments or independently verified a report. No tool assigns an independently-reviewed grade. The deployment's existing storage and authentication limits still apply.
 
 API prefix: `/investigations/{id}/field-tools`. `GET` reads state; `POST /signals`, `/domain-checks`, `/conversations`, `/conversations/{import_id}/confirm`, `/dispatch`, `/retrofits` save records; `POST /retrofit-search` compares explicitly supplied target configuration with library records. Retrofit notes and exclusions always require human review before reuse.
+
+## BuilderX-oriented engineering workflow · v1.4
+
+This extends the existing workbench rather than changing its navigation. All added state is source-linked and append-only. No customer impact, machine specification, root cause, healthy control or cost is invented when it is missing.
+
+| Existing view | Engineering extension |
+| --- | --- |
+| Overview | Record customer impact, equipment location, separate remote-access and remote-diagnosis progress plus dispatch risk together with asset, OEM, model, retrofit kit, control software, interface, harness, network and environment. |
+| Evidence | Preserve controller logs, network metrics, vendor fault codes, maintenance reports and chat transcript sources in text, CSV or JSON. Keep raw contents, original keys/units/timestamps and parsed records. Import does not establish semantic equivalence, data quality or a fault cause. |
+| Changes | Versioned notes for kit, software, vehicle interface, harness and network settings. Planned versus reported-applied is explicit; notes do not silently mutate machine context or create executed actions. |
+| Fleet | Compare known OEM/model/kit/environment/interface/harness context and reported exposure/windows. Unknown or conflicting context blocks a valid reported control; a matching model does not prove health. |
+| Possible Causes | Separate an engineer's fault-domain assessment from the root-cause status. An interface-domain isolation can remain useful while the failed connector/module stays unknown. Neither is independently attested by Veyra. |
+| Next Checks | Evidence-to-Diagnostic-Check Engine returns rule IDs, available evidence, missing inputs, distinctions between domains, remote-access constraints, personnel, risk and approval needs. An asset-linked mapping is required before a normalized signal is counted as available for that machine. |
+| Decision / Action | Choose remote handling, waiting for evidence, dispatch, parts preparation or the existing case-specific options; no option is preselected. Record remote checks, remote handling, field repair, part replacement or other engineer operations separately. Parts replacement requires part/revision detail. |
+| Outcomes | Keep observed recovery/recurrence and observation window separate from causal attribution. Record optional field cost, currency, cost source, estimated/reported basis and engineering effort. A window length does not imply recovery persisted afterward. |
+| Precedents | Reuse considers recorded OEM/model/kit/interface/harness and optional symptom text. A literal symptom phrase is only a review aid; unmatched text stays unconfirmed rather than claiming semantic incompatibility. |
+
+### Evidence-to-Diagnostic-Check Engine
+
+`GET /investigations/{id}/engineering` reads engineering context, imports, changes, reported fleet comparability and diagnostic rules. `POST /context`, `/evidence`, `/changes` and `/assessments` append records under that prefix.
+
+The bounded rule catalog covers endpoint network records, controller timing/logs, vehicle interface/harness verification and OEM vehicle findings. It does not calculate causal probabilities or claim calibrated information gain. Conflicting domain reports are reviewed first; a reported isolated domain can prioritize further checks/preparation without promoting a root cause. Scoped negative checks never become universal exclusions.
+
+A human decision snapshots both the then-available evidence and diagnostic assessment/context. Subsequent evidence or updated model/kit information does not rewrite that record. New engineering records join Evidence and Timeline using their creation time; original observation timing remains in the source. Field cost and recovery are engineer reports, not billing verification or independent telemetry attestation. The existing authentication and durable-storage deployment limitations still apply.
+
+```mermaid
+flowchart TD
+    A[Data adapters: CSV / JSON / logs / codes / reports / chat] --> B[Source-preserving evidence + machine context]
+    B --> C[Fault domain + diagnostic rules / gaps / constraints]
+    C --> D[Human decision + dispatch and parts preparation]
+    D --> E[Actual action + observed outcome / recurrence / cost]
+    E --> F[Conditional experience: applicability + exclusions]
+    F --> D
+    B --> T[Timeline: event time / known time / record time]
+    T --> D
+```
