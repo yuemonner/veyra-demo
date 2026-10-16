@@ -44,6 +44,7 @@ class ContextIn(BaseModel):
     location: str = Field(min_length=1, max_length=1000)
     customer_impact: str = Field(min_length=1, max_length=3000)
     remote_status: Literal['unknown', 'accessible', 'unavailable'] = 'unknown'
+    remote_diagnostic_status: Literal['unknown', 'not_started', 'in_progress', 'awaiting_data', 'completed', 'blocked'] = 'unknown'
     dispatch_risk: str = Field(min_length=1, max_length=2000)
     exposure_scope: str = Field(min_length=1, max_length=2000)
     observation_window: str = Field(min_length=1, max_length=1000)
