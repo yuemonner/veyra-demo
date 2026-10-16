@@ -116,7 +116,7 @@ def get_workflow(case_id: str, db: Session = Depends(get_db)):
     require_case(db, case_id)
     rows = records(db, case_id)
     analysis, current = context(db, case_id)
-    return {'case_id': case_id, 'options': OPTIONS,
+    return {'case_id': case_id, 'options': OPTIONS, 'diagnostic_assessment': analysis.get('diagnostic_assessment'),
             'decisions': [serial(r) for r in rows if r.event_kind == 'workflow_decision'],
             'actions': [serial(r) for r in rows if r.event_kind == 'workflow_action'],
             'verifications': [serial(r) for r in rows if r.event_kind == 'workflow_verification'],

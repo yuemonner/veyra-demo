@@ -37,6 +37,7 @@ def evaluate(db, investigation_id, known_at=None):
     refs = {e.id: {'id': e.id, 'source': e.source, 'event_time': iso(e.event_time), 'known_at': iso(e.known_at), 'asset_id': e.asset_id, 'event_type': e.event_type} for e in evidence}
     refs.update({e.id: {'id': e.id, 'source': e.payload['source'], 'event_time': e.payload['event_time'], 'known_at': iso(e.occurred_at)} for e in events})
     field_rows = list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == investigation_id, CaseEvent.event_kind.in_(['adapted_signal', 'domain_check', 'conversation_import', 'conversation_confirmation', 'dispatch_plan', 'retrofit_experience', 'machine_context_recorded', 'engineering_evidence_imported', 'engineering_change_recorded', 'diagnostic_assessment_recorded']), CaseEvent.occurred_at <= cutoff).order_by(CaseEvent.occurred_at, CaseEvent.id)))
+    diagnostic_assessment = next(({'id': row.id, **row.payload} for row in reversed(field_rows) if row.event_kind == 'diagnostic_assessment_recorded'), None)
     field_refs = []
     for row in field_rows:
         payload = row.payload
@@ -142,7 +143,7 @@ def evaluate(db, investigation_id, known_at=None):
     timeline = [{**refs[e.id], 'label': e.event_type.replace('_', ' ')} for e in evidence
                 if e.asset_id == inv.asset_id or e.event_type == 'telemetry_anomaly']
     timeline.extend(field_refs)
-    return {'configuration_summary': config_summary, 'historical_reference': reference,
+    return {'configuration_summary': config_summary, 'diagnostic_assessment': diagnostic_assessment, 'historical_reference': reference,
             'evidence': list(refs.values()), 'timeline': sorted(timeline, key=lambda e: (e['event_time'], e['id'])),
             'comparison_quality': comparison_quality, 'investigation_id': investigation_id, 'as_of': iso(cutoff), 'method': 'Deterministic evidence rules and diagnostic utility; causal inference not established', 'uncertainty': "We don't know yet, and here's what would help us find out.", 'cohorts': cohorts, 'hypotheses': hypotheses, 'checks': checks, 'next_check': next_check, 'diagnostic_events': [{'id': e.id, **e.payload} for e in events], 'conditional_precedents': [{'outcome_id': o.id, 'outcome': o.outcome, 'conditions': o.payload.get('applicable_conditions', []), 'verification': o.payload.get('validation_status', 'unverified'), 'verification_details': o.payload.get('intervention_verification', {}), 'automatic_recommendation': False} for o in db.scalars(select(Outcome).where(Outcome.investigation_id == investigation_id, Outcome.recorded_at <= cutoff))]}
 
