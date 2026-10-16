@@ -50,6 +50,7 @@ def test_fault_domain_isolation_does_not_promote_a_root_cause():
     ref=client.post(f'/investigations/{case}/field-tools/domain-checks',json=domain()).json()
     assessment['evidence_ids']=[ref['id']]
     assert post(case,'assessments',assessment).status_code==200
+    assert client.get(f'/investigations/{case}/analysis').json()['diagnostic_assessment']['root_cause_status']=='unresolved'
     state=client.get(f'/investigations/{case}/engineering').json()['diagnostics']
     assert state['assessment']['fault_domain']=='vehicle_interface'
     assert state['assessment']['root_cause_status']=='unresolved' and state['assessment']['root_cause'] is None
