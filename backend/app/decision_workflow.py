@@ -1,6 +1,6 @@
 """Human decision workflow. Append-only records; no machine commands are executed."""
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Literal, Optional
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -16,16 +16,23 @@ OPTIONS = [
     {'id': 'inspect', 'label': 'Inspect EX11 operating exposure', 'goal': 'Reduce uncertainty before intervention', 'tradeoff': 'Read-only records review; does not restore the three stopped machines.', 'constraint': 'Run records and a complete observation window must be available.', 'time_cost': '15 min illustrative check estimate; confirm locally', 'approval_required': False},
     {'id': 'dispatch', 'label': 'Dispatch a field engineer', 'goal': 'Enable on-site diagnosis and intervention', 'tradeoff': 'Requires travel and field capacity; findings and recovery remain uncertain.', 'constraint': 'Confirm availability, site access and authorization.', 'time_cost': 'Travel, cost and availability unknown', 'approval_required': True},
 ]
-FIELDS = {'application_version', 'configuration', 'firmware_version', 'map_version', 'network_profile', 'site', 'actual_exposure'}
+OPTIONS.extend([
+    {'id':'remote_triage','label':'Remote diagnosis / approved remote handling','goal':'Attempt remote progress','tradeoff':'May avoid travel; state-changing recovery requires authorization and a recovery plan.','constraint':'Confirm remote access, safety scope and compatible procedure.','time_cost':'Unknown; record team estimate','approval_required':True},
+    {'id':'await_evidence','label':'Wait for additional evidence','goal':'Avoid premature intervention','tradeoff':'Preserves state but may extend customer downtime.','constraint':'Define owner, evidence needed and review deadline.','time_cost':'Downtime and waiting cost not yet measured','approval_required':False},
+    {'id':'prepare_parts','label':'Prepare compatible spare parts','goal':'Reduce readiness delay','tradeoff':'May tie up parts or lead to unnecessary replacement if diagnosis changes.','constraint':'Verify model, interface, harness revision, availability and approval before dispatch or replacement.','time_cost':'Parts and logistics cost unknown','approval_required':True},
+])
+FIELDS = {'oem','model','retrofit_version','environment','vehicle_interface','harness_revision','control_software','network_configuration','application_version', 'configuration', 'firmware_version', 'map_version', 'network_profile', 'site', 'actual_exposure'}
 
 class DecisionInput(BaseModel):
-    option_id: Literal['rollback', 'inspect', 'dispatch']
+    option_id: Literal['rollback', 'inspect', 'dispatch', 'remote_triage', 'await_evidence', 'prepare_parts']
     owner: str = Field(min_length=1, max_length=200)
     rationale: str = Field(min_length=1, max_length=4000)
     constraints: str = Field(min_length=1, max_length=4000)
     approval: Literal['pending', 'approved', 'not_required'] = 'pending'
 
 class ActionInput(BaseModel):
+    action_type: Literal["remote_check", "remote_handling", "onsite_repair", "part_replacement", "engineer_operation", "other"] = "other"
+    part_details: Optional[str] = Field(default=None, max_length=2000)
     decision_id: str
     owner: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1, max_length=4000)
@@ -35,6 +42,11 @@ class ActionInput(BaseModel):
     deviation_reason: str = Field(min_length=1, max_length=2000)
 
 class VerificationInput(BaseModel):
+    field_cost: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    engineering_hours: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
+    currency: Optional[str] = Field(default=None, min_length=3, max_length=8)
+    cost_source: Optional[str] = Field(default=None, max_length=2000)
+    cost_basis: Literal["not_recorded", "estimated", "engineer_reported_actual"] = "not_recorded"
     action_id: str
     owner: str = Field(min_length=1, max_length=200)
     result: Literal['recovered', 'partially_recovered', 'not_recovered', 'recurred', 'unknown']
@@ -92,6 +104,10 @@ def context(db, case_id):
     current = dict(peer['context']) if peer else {}
     # A configuration label is never an actual exposure assertion.
     current['actual_exposure'] = 'unknown'
+    from app.diagnostic_engine import machine_context
+    profile = machine_context(db, case_id)
+    if profile:
+        current.update({key:profile[key] for key in FIELDS if key in profile})
     return analysis, current
 
 
@@ -116,7 +132,9 @@ def decide(case_id: str, body: DecisionInput, db: Session = Depends(get_db)):
     option = next(o for o in OPTIONS if o['id'] == body.option_id)
     if option['approval_required'] and body.approval == 'not_required':
         raise HTTPException(422, 'This option requires approval')
-    return append(db, case_id, 'workflow_decision', {**body.model_dump(), 'selected_option': option, 'options_considered': OPTIONS,
+    from app.diagnostic_engine import evaluate_checks
+    diagnostic_snapshot = evaluate_checks(db, case_id)
+    return append(db, case_id, 'workflow_decision', {'diagnostic_snapshot': diagnostic_snapshot, **body.model_dump(), 'selected_option': option, 'options_considered': OPTIONS,
         'evidence_snapshot': analysis, 'context_at_decision': {k: current.get(k, 'unknown') for k in sorted(FIELDS)},
         'status': 'decision_recorded_action_not_confirmed'})
 
@@ -127,6 +145,8 @@ def act(case_id: str, body: ActionInput, db: Session = Depends(get_db)):
     decision = linked(db, case_id, body.decision_id, 'workflow_decision')
     if decision.payload['selected_option']['approval_required'] and decision.payload['approval'] != 'approved':
         raise HTTPException(422, 'Record an approved decision before reporting this action')
+    if body.action_type == 'part_replacement' and not body.part_details:
+        raise HTTPException(422, 'Part replacement requires model/part/revision details')
     executed = utc(body.executed_at)
     if executed > datetime.utcnow() or executed < decision.occurred_at:
         raise HTTPException(422, 'Execution must be after the decision and not in the future')
@@ -143,9 +163,11 @@ def verify(case_id: str, body: VerificationInput, db: Session = Depends(get_db))
     previous = [r for r in records(db, case_id) if r.event_kind == 'workflow_verification' and r.payload['action_id'] == body.action_id]
     if previous and end <= max(datetime.fromisoformat(r.payload['window_end']) for r in previous):
         raise HTTPException(422, 'A verification update must extend the observation window')
+    if body.field_cost is not None and (not body.currency or not body.cost_source or body.cost_basis=='not_recorded'):
+        raise HTTPException(422, 'A cost requires currency, source and an explicit estimated/reported basis')
     if not body.conditions or set(body.conditions) - FIELDS or any(not v.strip() or v.strip().lower() == 'unknown' for v in body.conditions.values()):
         raise HTTPException(422, 'Explicit known applicability conditions are required; use the supported context fields')
-    return append(db, case_id, 'workflow_verification', {**body.model_dump(mode='json'), 'window_start': start.isoformat(), 'window_end': end.isoformat(), 'decision_id': action.payload['decision_id'], 'verification_status': 'human_reported_source_requires_review', 'causal_attribution': 'not_established'})
+    return append(db, case_id, 'workflow_verification', {**body.model_dump(mode='json'), 'window_start': start.isoformat(), 'window_end': end.isoformat(), 'decision_id': action.payload['decision_id'], 'observed_window_minutes': (end-start).total_seconds()/60, 'verification_status': 'human_reported_source_requires_review', 'causal_attribution': 'not_established'})
 
 
 @router.get('/reuse')
@@ -162,7 +184,7 @@ def reuse(case_id: str, db: Session = Depends(get_db)):
         matched, mismatched, unknown = [], [], []
         for key, value in v['conditions'].items():
             actual = current.get(key)
-            (unknown if actual in (None, '', 'unknown') else matched if actual == value else mismatched).append(key)
+            (unknown if actual is None or str(actual).strip().casefold() in ('', 'unknown', 'not recorded', '未知') else matched if str(actual).strip().casefold() == value.strip().casefold() else mismatched).append(key)
         eligible = not mismatched and not unknown
         action = linked(db, row.investigation_id, v['action_id'], 'workflow_action')
         decision = linked(db, row.investigation_id, v['decision_id'], 'workflow_decision')

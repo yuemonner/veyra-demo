@@ -36,12 +36,12 @@ def evaluate(db, investigation_id, known_at=None):
         cohorts.append({'asset_id': asset, 'exposure_status': 'verified' if exposed else ('Different conditions verified' if relation == 'different' else 'Exposure not verified'), 'exposure_relation': relation, 'context': state, 'missing_fields': [k for k in ('application_version', 'configuration', 'firmware_version', 'map_version') if state.get(k) is None], 'valid_control': exposed and healthy and matches and not signals, 'signal_observed': bool(signals) or observation.get('safe_stop') is True, 'reason': 'Requires matching configuration, verified Zone B exposure and complete healthy telemetry; absence of an alert is insufficient.', 'confounders': [k for k in ('configuration', 'firmware_version', 'map_version') if state.get(k) != context.get(k)], 'evidence_ids': [e.id for e in signals] + [e.id for e in checks]})
     refs = {e.id: {'id': e.id, 'source': e.source, 'event_time': iso(e.event_time), 'known_at': iso(e.known_at), 'asset_id': e.asset_id, 'event_type': e.event_type} for e in evidence}
     refs.update({e.id: {'id': e.id, 'source': e.payload['source'], 'event_time': e.payload['event_time'], 'known_at': iso(e.occurred_at)} for e in events})
-    field_rows = list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == investigation_id, CaseEvent.event_kind.in_(['adapted_signal', 'domain_check', 'conversation_import', 'conversation_confirmation', 'dispatch_plan', 'retrofit_experience']), CaseEvent.occurred_at <= cutoff).order_by(CaseEvent.occurred_at, CaseEvent.id)))
+    field_rows = list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == investigation_id, CaseEvent.event_kind.in_(['adapted_signal', 'domain_check', 'conversation_import', 'conversation_confirmation', 'dispatch_plan', 'retrofit_experience', 'machine_context_recorded', 'engineering_evidence_imported', 'engineering_change_recorded', 'diagnostic_assessment_recorded']), CaseEvent.occurred_at <= cutoff).order_by(CaseEvent.occurred_at, CaseEvent.id)))
     field_refs = []
     for row in field_rows:
         payload = row.payload
         source = payload.get('source') or '; '.join(payload.get('source_references', []))
-        field_refs.append({'id': row.id, 'asset_id': inv.asset_id, 'source': source, 'event_time': iso(row.occurred_at), 'known_at': iso(row.occurred_at),
+        field_refs.append({'id': row.id, 'asset_id': payload.get('asset_id') or inv.asset_id, 'source': source, 'event_time': iso(row.occurred_at), 'known_at': iso(row.occurred_at),
                            'event_type': row.event_kind + '_recorded', 'label': row.event_kind.replace('_', ' ') + ' recorded',
                            'evidence_grade': payload.get('evidence_grade', 'engineer_reported'), 'time_basis': 'record_created_at_not_original_observation_time'})
     refs.update({ref['id']: ref for ref in field_refs})

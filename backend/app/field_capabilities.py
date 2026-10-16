@@ -37,6 +37,7 @@ def text_fields(body):
 
 
 class SignalIn(BaseModel):
+    asset_id: Optional[str] = None
     owner: str = Field(min_length=1, max_length=200)
     device_model: str = Field(min_length=1, max_length=300)
     source: str = Field(min_length=1, max_length=2000)
@@ -154,6 +155,8 @@ class DispatchIn(BaseModel):
 
 
 class RetrofitIn(BaseModel):
+    oem: Optional[str] = Field(default=None, max_length=300)
+    symptom: Optional[str] = Field(default=None, max_length=2000)
     owner: str = Field(min_length=1, max_length=200)
     vehicle_model: str = Field(min_length=1, max_length=300)
     kit_version: str = Field(min_length=1, max_length=300)
@@ -168,6 +171,8 @@ class RetrofitIn(BaseModel):
 
 
 class RetrofitQuery(BaseModel):
+    oem: Optional[str] = None
+    symptom: Optional[str] = None
     vehicle_model: str = ''
     kit_version: str = ''
     interface: str = ''
@@ -192,8 +197,14 @@ def state(case_id: str, db: Session = Depends(get_db)):
     rows = events(db, case_id)
     imports = [serial(r) for r in rows if r.event_kind == 'conversation_import']
     confirmations = [serial(r) for r in rows if r.event_kind == 'conversation_confirmation']
+    assessment = db.scalar(select(CaseEvent).where(CaseEvent.investigation_id == case_id, CaseEvent.event_kind == 'diagnostic_assessment_recorded').order_by(CaseEvent.occurred_at.desc(), CaseEvent.id.desc()).limit(1))
+    dispatch = dispatch_state(rows)
+    dispatch['fault_domain_assessment'] = serial(assessment) if assessment else None
+    if assessment and assessment.payload['fault_domain'] != 'unknown':
+        focus = DOMAINS[assessment.payload['fault_domain']]
+        dispatch['domain_tool_suggestions'].sort(key=lambda s: s['domain'] != focus)
     return {'domains': domain_state(rows), 'concepts': CONCEPTS, 'signals': [serial(r) for r in rows if r.event_kind == 'adapted_signal'],
-            'imports': imports, 'confirmations': confirmations, 'dispatch': dispatch_state(rows), 'retrofits': [serial(r) for r in rows if r.event_kind == 'retrofit_experience'],
+            'imports': imports, 'confirmations': confirmations, 'dispatch': dispatch, 'retrofits': [serial(r) for r in rows if r.event_kind == 'retrofit_experience'],
             'boundary': 'Source-preserving deterministic tools. Raw documents are untrusted data. No independent evidence review, autonomous execution or causal probability.'}
 
 
@@ -202,6 +213,10 @@ def signal(case_id: str, body: SignalIn, db: Session = Depends(get_db)):
     require_case(db, case_id)
     if not all(getattr(body, key).strip() for key in ['owner','device_model','source','observed_at','raw_field','raw_value','raw_unit','measurement_scope']):
         raise HTTPException(422, 'Raw provenance fields are required')
+    if body.asset_id:
+        from app.models import Asset
+        if not db.get(Asset, body.asset_id):
+            raise HTTPException(422, 'Unknown asset reference')
     return append(db, case_id, 'adapted_signal', {**body.model_dump(), 'mapping': map_signal(body), 'evidence_grade': 'engineer_reported', 'independent_review': 'not_performed'})
 
 
@@ -250,7 +265,8 @@ def confirm(case_id: str, import_id: str, body: ConfirmIn, db: Session = Depends
 @router.post('/dispatch')
 def dispatch(case_id: str, body: DispatchIn, db: Session = Depends(get_db)):
     require_case(db, case_id); text_fields(body)
-    return append(db, case_id, 'dispatch_plan', {**body.model_dump(), 'domain_snapshot': domain_state(events(db, case_id)), 'evidence_grade': 'engineer_reported', 'independent_review': 'not_performed'})
+    assessment = db.scalar(select(CaseEvent).where(CaseEvent.investigation_id == case_id, CaseEvent.event_kind == 'diagnostic_assessment_recorded').order_by(CaseEvent.occurred_at.desc(), CaseEvent.id.desc()).limit(1))
+    return append(db, case_id, 'dispatch_plan', {'fault_domain_assessment_snapshot': serial(assessment) if assessment else None, **body.model_dump(), 'domain_snapshot': domain_state(events(db, case_id)), 'evidence_grade': 'engineer_reported', 'independent_review': 'not_performed'})
 
 
 @router.post('/retrofits')
@@ -268,8 +284,15 @@ def search(case_id: str, body: RetrofitQuery, db: Session = Depends(get_db)):
     results = []
     for row in rows:
         matched, mismatched, unknown = [], [], []
-        for field, value in body.model_dump().items():
+        for field in ("vehicle_model", "kit_version", "interface", "harness_revision"):
+            value = getattr(body, field)
             (unknown if not value.strip() or value.strip().casefold() == 'unknown' or row.payload[field].strip().casefold() in ('unknown', 'not recorded', '') else matched if value.strip().casefold() == row.payload[field].strip().casefold() else mismatched).append(field)
+        if body.oem and body.oem.strip():
+            actual = row.payload.get('oem')
+            (unknown if not actual or actual.strip().casefold() in ('unknown', 'not recorded') else matched if actual.strip().casefold() == body.oem.strip().casefold() else mismatched).append('oem')
+        if body.symptom and body.symptom.strip():
+            symptom_text = row.payload.get('symptom') or row.payload['commissioning_issue']
+            (matched if body.symptom.strip().casefold() in symptom_text.casefold() else unknown).append('symptom_text')
         status = 'excluded_configuration_mismatch' if mismatched else 'applicability_unconfirmed' if unknown else 'conditions_match_requires_review'
         results.append({'case_id': row.investigation_id, 'record': serial(row), 'status': status, 'matched_fields': matched, 'mismatched_fields': mismatched, 'unknown_fields': unknown,
                         'automatic_recommendation': False, 'use': 'cautionary_experience' if row.payload['result'] != 'reported_recovered' else 'reported_resolution_requires_review'})
