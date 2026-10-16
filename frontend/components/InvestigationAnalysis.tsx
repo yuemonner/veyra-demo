@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { API } from "../lib/api";
 import DecisionWorkspace from "./DecisionWorkspace";
+import FieldTools from "./FieldTools";
 import preview from "../lib/case-preview.json";
 import { fetchCaseJSON, readCaseCache } from "../lib/case-data";
 
@@ -136,6 +137,7 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, on
         <p className="muted">A counterexample needs matched operating conditions, complete telemetry and no failure.</p>
         <details className="investigation-card" open><summary>Compare all {analysis.cohorts.length} machines</summary><div className="investigation-table-wrap"><table><thead><tr><th>Machine</th><th>Signal</th><th>Configured</th><th>Operating exposure</th><th>Valid control</th></tr></thead><tbody>{analysis.cohorts.map((c: any) => <tr key={c.asset_id} className={c.signal_observed ? "machine-affected" : c.asset_id === "EX11" ? "machine-watch" : ""}><td><strong>{c.asset_id}</strong></td><td><span className={c.signal_observed ? "signal-stop" : "signal-clear"}>{c.signal_observed ? "Stop reported" : "No reported stop"}</span></td><td>{short(c.context.configuration)} · {short(c.context.network_profile)}</td><td>{c.exposure_status}</td><td>{c.valid_control ? "Yes" : "No"}</td></tr>)}</tbody></table></div></details>
       </>}
+      {liveReady && ["hypotheses", "fleet", "evidence", "checks", "decision", "precedents"].includes(stage) && <FieldTools key={`${caseId}:${stage}`} caseId={caseId} stage={stage} onSaved={() => { void request(`/investigations/${caseId}/analysis`).then(setAnalysis).catch(() => {}); }} />}
       {stage === "hypotheses" && hypothesisCards()}
       {["decision", "actions", "outcome", "outcomes", "precedents"].includes(stage) && (liveReady ? <DecisionWorkspace key={caseId} caseId={caseId} stage={stage} /> : <article className="investigation-card"><h3>Live decision records are connecting</h3><p>Saved evidence is available in the other case views. Decisions, actions and verification records require a live connection; no empty history is inferred.</p></article>)}
       {diagnostic && <>
@@ -158,7 +160,7 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, on
       </>}
       {stage === "timeline" && <>
         <div className="timeline-toggle"><button className={timelineBasis === "event_time" ? "active" : ""} onClick={() => setTimelineBasis("event_time")}>When it happened</button><button className={timelineBasis === "known_at" ? "active" : ""} onClick={() => setTimelineBasis("known_at")}>When it became known</button></div>
-        <p className="muted">Event time is when it happened. Known time is when the source became available. All times are UTC.</p>
+        <p className="muted">Event time is when it happened. Known time is when the source became available. Field-tool entries use the time the record was created; original measurement/chat timing remains in its source record. All times are UTC.</p>
         <div className="investigation-card investigation-table-wrap"><table><thead><tr><th>Machine / record</th><th>Event time (UTC)</th><th>Known time (UTC)</th></tr></thead><tbody>{[...analysis.timeline].sort((a: any,b: any) => a[timelineBasis].localeCompare(b[timelineBasis])).map((e: any) => <tr key={e.id}><td><strong>{e.asset_id}</strong> · {e.label}<small>{e.source}</small></td><td>{time(e.event_time)}</td><td>{time(e.known_at)}</td></tr>)}</tbody></table></div>
         <details className="investigation-card"><summary>New diagnostic observations ({analysis.diagnostic_events.length})</summary>{analysis.diagnostic_events.map((e: any) => <p key={e.id}>{e.source} · Event {time(e.event_time)} · Exposure {e.exposure_relation}</p>)}</details>
       </>}
