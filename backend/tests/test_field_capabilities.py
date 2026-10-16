@@ -46,6 +46,7 @@ def test_domains_keep_unknowns_scoped_exclusions_and_conflicts():
     result=client.get(f'/investigations/{case}/field-tools').json()
     assert result['domains'][0]['status']=='reported_excluded_in_scope'
     assert result['domains'][1]['status']=='still_possible'
+    assert len(result['dispatch']['domain_tool_suggestions'])==4
     assert post(case,'domain-checks',domain(finding='anomaly',request_exclusion=False)).status_code==200
     assert client.get(f'/investigations/{case}/field-tools').json()['domains'][0]['status']=='conflicting_reports'
     assert post(case,'domain-checks',domain(evidence_ids=['other-case-id'])).status_code==422
