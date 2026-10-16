@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API } from "../lib/api";
 import DecisionWorkspace from "./DecisionWorkspace";
 import FieldTools from "./FieldTools";
 import EngineeringPanel from "./EngineeringPanel";
 import preview from "../lib/case-preview.json";
-import { fetchCaseJSON, readCaseCache } from "../lib/case-data";
+import { fetchCaseJSON, readCaseCache, waitForCaseService } from "../lib/case-data";
 
 const DEMO = "inv-120-robots-bad-rollout";
 export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, onAnalysis }: { stage: string; id?: string; onNavigate?: (stage: string) => void; onAnalysis?: (analysis: any) => void }) {
+  const connecting = useRef(false);
   const [analysis, setAnalysis] = useState<any>(id === DEMO ? preview.analysis : null);
   const [liveReady, setLiveReady] = useState(false);
   const [viewTime, setViewTime] = useState(preview.captured_at);
@@ -29,8 +30,11 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, on
   const [challengeId, setChallengeId] = useState("");
   function request(path: string, body?: unknown) { return fetchCaseJSON(API, path, body); }
   async function load(fresh = false) {
-    setBusy(true); setLiveReady(false);
+    if (connecting.current) return;
+    connecting.current = true;
+    setBusy(true); setLiveReady(false); setError("");
     try {
+      await waitForCaseService(API);
       let saved: string | null = id === DEMO ? null : id;
       try { if (id === DEMO) saved = localStorage.getItem("veyra-investigation-session-v2"); } catch { /* Optional storage. */ }
       let data;
@@ -49,7 +53,7 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, on
       }
       setCaseId(saved!); setAnalysis(data); setViewTime(new Date().toISOString()); setLiveReady(true); setError("");
     } catch (e) { setError(`Investigation engine unavailable: ${e instanceof Error ? e.message : e}`); }
-    finally { setBusy(false); }
+    finally { connecting.current = false; setBusy(false); }
   }
   useEffect(() => {
     try {
@@ -122,7 +126,7 @@ export default function InvestigationAnalysis({ stage, id = DEMO, onNavigate, on
   </>;
   return <section className="investigation-analysis" aria-label="Evidence-driven investigation">
     <header className="investigation-heading"><div><small>Understand → Decide → Act → Verify → Reuse</small><h1>{titles[stage] || "Current investigation"}</h1></div><button className="quiet-button" disabled={busy || !liveReady} onClick={() => load(true)}>New investigation</button></header>
-    {!liveReady && analysis && <div className="case-connection" role="status"><strong>Read-only saved view · Connecting to live case</strong><span>Snapshot {new Date(viewTime).toISOString().slice(0,19).replace("T", " ")} UTC. You can inspect records now; saving unlocks after connection.</span><button className="quiet-button" disabled={busy} onClick={() => load()}>{busy ? "Connecting…" : "Retry connection"}</button></div>}
+    {!liveReady && analysis && <div className="case-connection" role="status"><strong>Read-only saved view · Connecting to case service</strong><span>Snapshot {new Date(viewTime).toISOString().slice(0,19).replace("T", " ")} UTC. You can inspect records now; saving unlocks after connection. An idle service can take up to 90 seconds to start.</span><button className="quiet-button" disabled={busy} onClick={() => load()}>{busy ? "Connecting…" : "Retry connection"}</button></div>}
     {error && <p role="alert" className="investigation-error">{error}</p>}
     {!analysis ? <button disabled={busy} onClick={() => load()}>{busy ? "Loading evidence…" : "Connect investigation engine"}</button> : <>
       <div className="investigation-state"><span className="state-badge">{analysis.comparison_quality.valid_control_count ? "Control observation available" : "Exposure evidence incomplete"}</span><small>{analysis.diagnostic_events.length} diagnostic observations · current case</small></div>
