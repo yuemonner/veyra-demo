@@ -19,13 +19,13 @@ MATCH_FIELDS = ['oem', 'model', 'retrofit_version', 'environment', 'vehicle_inte
 UNKNOWN = ('', 'unknown', 'not recorded', '未知')
 
 
-def rows(db, case_id):
-    return list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == case_id, CaseEvent.event_kind.in_(KINDS)).order_by(CaseEvent.occurred_at, CaseEvent.id)))
+def rows(db, case_id, cutoff=None):
+    return list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == case_id, CaseEvent.event_kind.in_(KINDS), *([CaseEvent.occurred_at<=cutoff] if cutoff else [])).order_by(CaseEvent.occurred_at, CaseEvent.id)))
 
 
 def machine_context(db, case_id, asset_id=None, cutoff=None):
     case = require_case(db, case_id)
-    candidates = [r for r in rows(db, case_id) if r.event_kind == 'machine_context_recorded' and r.payload['asset_id'] == (asset_id or case.asset_id) and (cutoff is None or r.occurred_at <= cutoff)]
+    candidates = [r for r in rows(db, case_id, cutoff) if r.event_kind == 'machine_context_recorded' and r.payload['asset_id'] == (asset_id or case.asset_id) and (cutoff is None or r.occurred_at <= cutoff)]
     return serial(candidates[-1]) if candidates else None
 
 
@@ -161,16 +161,18 @@ CATALOG = [
 ]
 
 
-def evaluate_checks(db, case_id):
+def evaluate_checks(db, case_id, cutoff=None):
     case = require_case(db, case_id)
-    saved = rows(db, case_id)
-    field = field_events(db, case_id)
+    saved = rows(db, case_id, cutoff)
+    field = [r for r in field_events(db, case_id) if cutoff is None or r.occurred_at<=cutoff]
     domains = domain_state(field)
-    profile = machine_context(db, case_id)
+    profile = machine_context(db, case_id, cutoff=cutoff)
     imports = [r for r in saved if r.event_kind=='engineering_evidence_imported' and r.payload['asset_id']==case.asset_id]
     mapped = [r for r in field if r.event_kind=='adapted_signal' and r.payload['mapping']['status']=='engineer_confirmed_mapping']
     assessment_rows = [r for r in saved if r.event_kind=='diagnostic_assessment_recorded']
     assessment = serial(assessment_rows[-1]) if assessment_rows else {'fault_domain':'unknown','domain_status':'unresolved','root_cause_status':'unresolved','root_cause':None}
+    from app.automatic_analysis import first_pass
+    automatic = first_pass([serial(r) for r in imports], case.asset_id, [serial(r) for r in field if r.event_kind=='conversation_import'])
     checks = []
     for template in CATALOG:
         state = next(d for d in domains if d['id']==template['domain'])
@@ -190,12 +192,26 @@ def evaluate_checks(db, case_id):
         if raw_refs: gaps.append('Imported source timing and quality still require engineer review')
         remote = 'access_not_confirmed' if not profile or profile['remote_status']!='accessible' else template['remote_mode']
         priority = 'review_conflict_first' if state['status']=='conflicting_reports' else 'investigate_reported_anomaly' if state['status']=='reported_anomaly' else 'scope_review_before_repeating' if state['status']=='reported_excluded_in_scope' else 'verify_reported_domain' if assessment['fault_domain']==template['domain'] and assessment['domain_status'] in ('suspected','engineer_reported_isolated') else 'close_evidence_gap'
-        checks.append({**template, 'rule_id':'domain-evidence-gap-v1:'+template['domain'], 'priority':priority, 'available_evidence_ids':raw_refs+signal_refs+[r['id'] for r in state['checks']],
-                       'missing_evidence':gaps, 'remote_feasibility':remote, 'domain_status':state['status'], 'reason':f"Domain status: {state['status']}. This check distinguishes {' vs '.join(template['separates'])}; {len(gaps)} source/context gaps remain.",
+        auto = next(d for d in automatic['domains'] if d['domain']==template['domain'])
+        auto_refs = sorted({f['import_id'] for f in automatic['findings'] if f['domain']==template['domain']})
+        if auto['status']=='conflicting_measurements': priority='review_conflict_first'
+        elif auto['finding_count']: priority='investigate_detected_pattern'
+        label = 'Review base-station and vehicle-router records in the anomaly/symptom window' if template['domain']=='network' and auto['finding_count'] else template['label']
+        checks.append({**template, 'label':label, 'automatic_status':auto['status'], 'rule_id':'domain-evidence-gap-v1:'+template['domain'], 'priority':priority, 'available_evidence_ids':sorted(set(auto_refs+raw_refs+signal_refs))+[r['id'] for r in state['checks']],
+                       'missing_evidence':gaps, 'remote_feasibility':remote, 'domain_status':state['status'], 'reason':f"Automatic pattern findings: {auto['finding_count']}; {auto['status']}. Domain status: {state['status']}. This check distinguishes {' vs '.join(template['separates'])}; {len(gaps)} source/context gaps remain.",
                        'boundary':'Diagnostic priority is not operational action priority; no root-cause probability is estimated.'})
-    order = {'review_conflict_first':0, 'investigate_reported_anomaly':1,'close_evidence_gap':3,'verify_reported_domain':2,'scope_review_before_repeating':4}
+    order = {'review_conflict_first':0, 'investigate_reported_anomaly':1, 'investigate_detected_pattern':1,'close_evidence_gap':3,'verify_reported_domain':2,'scope_review_before_repeating':4}
+    from app.models import Evidence
+    remote = db.get(Evidence,case.trigger_id).payload.get('case_type')=='remote_support'
+    if not remote:
+        # Fleet-specific check shares the same ranked list. Domain checks appear only with relevant inputs.
+        checks = [c for c in checks if c['available_evidence_ids'] or c['priority'] in ('review_conflict_first','verify_reported_domain')]
+        from app.investigation_engine import evaluate
+        fleet_next = evaluate(db,case_id,known_at=cutoff).get('next_check')
+        if fleet_next:
+            checks.append({'id':fleet_next['id'],'domain':'fleet_comparison','label':'Verify EX11 operating exposure','rule_id':'fleet-comparable-exposure-v1','priority':'close_evidence_gap','available_evidence_ids':[], 'missing_evidence':['Matched operating exposure and complete healthy window'], 'remote_feasibility':'read_only_records_access_required','personnel':'Fleet engineer','risk':'Read-only records review','approval_required':False,'separates':['L4 alone','L4 and operating conditions'],'expected':'Only matched, complete healthy exposure qualifies EX11 as a counterexample.','reason':fleet_next['why']})
     checks.sort(key=lambda c:(order[c['priority']],c['id']))
-    return {'method':'Evidence-to-Diagnostic-Check Engine · explicit rules v1', 'machine_context':profile, 'assessment':assessment, 'checks':checks,
+    return {'method':'Evidence-to-Diagnostic-Check Engine · source patterns v2', 'machine_context':profile, 'assessment':assessment, 'automatic_analysis':automatic, 'checks':checks,
             'boundary':'Fault domain and root cause are separate human assessments. Rules explain available inputs, missing evidence, differentiating checks, personnel, remote constraints and risk.'}
 
 
@@ -203,9 +219,10 @@ def evaluate_checks(db, case_id):
 def state(case_id: str, db: Session = Depends(get_db)):
     case = require_case(db, case_id)
     saved = rows(db, case_id)
-    return {'asset_id':case.asset_id, 'assets':[{'id':a.id,'name':a.name} for a in db.scalars(select(Asset).order_by(Asset.id))],
+    return {'asset_id':case.asset_id, 'assets':[{'id':a.id,'name':a.name} for a in db.scalars(select(Asset).order_by(Asset.id)) if not a.id.startswith('REMOTE-') or a.id==case.asset_id],
             'context':machine_context(db,case_id), 'contexts':[serial(r) for r in saved if r.event_kind=='machine_context_recorded'],
             'evidence_imports':[serial(r) for r in saved if r.event_kind=='engineering_evidence_imported'], 'changes':[serial(r) for r in saved if r.event_kind=='engineering_change_recorded'],
+            'draft_reviews':[serial(r) for r in db.scalars(select(CaseEvent).where(CaseEvent.investigation_id==case_id,CaseEvent.event_kind=='case_draft_reviewed').order_by(CaseEvent.occurred_at))],
             'fleet':compare_fleet(db,case_id,case.asset_id), 'diagnostics':evaluate_checks(db,case_id)}
 
 
@@ -246,3 +263,19 @@ def save_assessment(case_id: str, body: AssessmentIn, db: Session = Depends(get_
     if body.root_cause_status=='engineer_reported_confirmed' and (not body.root_cause or not body.evidence_ids):
         raise HTTPException(422,'A reported root cause needs a separate explanation and source evidence')
     return append(db,case_id,'diagnostic_assessment_recorded',{**body.model_dump(),'evidence_grade':'engineer_reported','independent_review':'not_performed'})
+
+
+class DraftReviewIn(BaseModel):
+    owner: str = Field(min_length=1,max_length=200)
+    import_id: str
+    record: int = Field(ge=1)
+    text: str = Field(min_length=1,max_length=4000)
+
+
+@router.post('/draft-reviews')
+def review_draft(case_id: str, body: DraftReviewIn, db: Session = Depends(get_db)):
+    require_case(db,case_id);validate_text(body)
+    automatic=evaluate_checks(db,case_id)['automatic_analysis']
+    original=next((n for n in automatic['case_draft'] if n['import_id']==body.import_id and n['record']==body.record),None)
+    if not original: raise HTTPException(422,'Draft source must belong to this case')
+    return append(db,case_id,'case_draft_reviewed',{'owner':body.owner,'source':original['source'],'source_draft':original,'reviewed_text':body.text,'grade':'engineer_reviewed_note','independent_review':'not_performed','creates_workflow_record':False})

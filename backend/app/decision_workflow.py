@@ -116,7 +116,7 @@ def get_workflow(case_id: str, db: Session = Depends(get_db)):
     require_case(db, case_id)
     rows = records(db, case_id)
     analysis, current = context(db, case_id)
-    return {'case_id': case_id, 'options': OPTIONS, 'diagnostic_assessment': analysis.get('diagnostic_assessment'),
+    return {'case_id': case_id, 'options': options_for_case(db, case_id), 'case_type':analysis.get('case_type'), 'diagnostic_assessment': analysis.get('diagnostic_assessment'),
             'decisions': [serial(r) for r in rows if r.event_kind == 'workflow_decision'],
             'actions': [serial(r) for r in rows if r.event_kind == 'workflow_action'],
             'verifications': [serial(r) for r in rows if r.event_kind == 'workflow_verification'],
@@ -129,12 +129,14 @@ def get_workflow(case_id: str, db: Session = Depends(get_db)):
 def decide(case_id: str, body: DecisionInput, db: Session = Depends(get_db)):
     nonblank(body)
     analysis, current = context(db, case_id)
-    option = next(o for o in OPTIONS if o['id'] == body.option_id)
+    options = options_for_case(db, case_id)
+    option = next((o for o in options if o['id'] == body.option_id), None)
+    if option is None: raise HTTPException(422, 'Option does not apply to this case type')
     if option['approval_required'] and body.approval == 'not_required':
         raise HTTPException(422, 'This option requires approval')
     from app.diagnostic_engine import evaluate_checks
     diagnostic_snapshot = evaluate_checks(db, case_id)
-    return append(db, case_id, 'workflow_decision', {'diagnostic_snapshot': diagnostic_snapshot, **body.model_dump(), 'selected_option': option, 'options_considered': OPTIONS,
+    return append(db, case_id, 'workflow_decision', {'diagnostic_snapshot': diagnostic_snapshot, **body.model_dump(), 'selected_option': option, 'options_considered': options,
         'evidence_snapshot': analysis, 'context_at_decision': {k: current.get(k, 'unknown') for k in sorted(FIELDS)},
         'status': 'decision_recorded_action_not_confirmed'})
 
@@ -193,3 +195,10 @@ def reuse(case_id: str, db: Session = Depends(get_db)):
             'status': 'candidate_for_review' if eligible else 'conditions_not_established', 'matched_fields': matched, 'mismatched_fields': mismatched, 'unknown_fields': unknown,
             'use': 'cautionary_experience' if v['result'] != 'recovered' else 'reported_recovery_requires_review', 'automatic_recommendation': False})
     return {'candidates': matches, 'boundary': 'Conditions are checked against recorded context, not configuration-inferred exposure. Exclusions and evidence sources require human review. No automatic fix recommendation.'}
+
+
+def options_for_case(db, case_id):
+    from app.models import Evidence
+    case = require_case(db,case_id)
+    remote = db.get(Evidence,case.trigger_id).payload.get('case_type')=='remote_support'
+    return [o for o in OPTIONS if not remote or o['id'] not in ('rollback','inspect')]

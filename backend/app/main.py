@@ -15,7 +15,7 @@ from app.services import attach_human_decision, build_package, compare, compare_
 
 from app.decision_workflow import router as workflow_router
 
-app = FastAPI(title="Veyra Field Decision Support", version="1.4.0")
+app = FastAPI(title="Veyra Field Decision Support", version="1.5.0")
 app.include_router(workflow_router)
 from app.field_capabilities import router as field_router
 app.include_router(field_router)
@@ -442,3 +442,9 @@ def challenge_hypothesis(investigation_id: str, hypothesis_id: str, body: dict, 
     db.add(CaseEvent(id=f'challenge-{uuid4().hex}', investigation_id=investigation_id, event_kind='hypothesis_challenged', occurred_at=datetime.utcnow(), payload={'hypothesis_id': hypothesis_id, 'owner': body['owner'], 'reason': body['reason'], 'evidence_ids': references}))
     db.commit()
     return evaluate(db, investigation_id)
+
+
+@app.post('/demo/remote-support-sessions')
+def new_remote_support_session(db: Session = Depends(get_db)):
+    from app.investigation_engine import create_remote_session
+    return create_remote_session(db)

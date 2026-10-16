@@ -18,6 +18,8 @@ def evaluate(db, investigation_id, known_at=None):
         raise ValueError('investigation not found')
     cutoff = known_at or datetime.utcnow()
     trigger = db.get(Evidence, inv.trigger_id)
+    if trigger.payload.get("case_type") == "remote_support":
+        return evaluate_remote(db, inv, cutoff)
     context = latest_state(db, inv.asset_id, trigger.event_time, cutoff)
     events = list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == investigation_id, CaseEvent.event_kind == 'diagnostic_evidence', CaseEvent.occurred_at <= cutoff).order_by(CaseEvent.occurred_at, CaseEvent.id)))
     evidence = list(db.scalars(select(Evidence).where(Evidence.known_at <= cutoff, Evidence.event_time <= cutoff, Evidence.verification_state == "verified", Evidence.superseded_by.is_(None))))
@@ -36,7 +38,7 @@ def evaluate(db, investigation_id, known_at=None):
         cohorts.append({'asset_id': asset, 'exposure_status': 'verified' if exposed else ('Different conditions verified' if relation == 'different' else 'Exposure not verified'), 'exposure_relation': relation, 'context': state, 'missing_fields': [k for k in ('application_version', 'configuration', 'firmware_version', 'map_version') if state.get(k) is None], 'valid_control': exposed and healthy and matches and not signals, 'signal_observed': bool(signals) or observation.get('safe_stop') is True, 'reason': 'Requires matching configuration, verified Zone B exposure and complete healthy telemetry; absence of an alert is insufficient.', 'confounders': [k for k in ('configuration', 'firmware_version', 'map_version') if state.get(k) != context.get(k)], 'evidence_ids': [e.id for e in signals] + [e.id for e in checks]})
     refs = {e.id: {'id': e.id, 'source': e.source, 'event_time': iso(e.event_time), 'known_at': iso(e.known_at), 'asset_id': e.asset_id, 'event_type': e.event_type} for e in evidence}
     refs.update({e.id: {'id': e.id, 'source': e.payload['source'], 'event_time': e.payload['event_time'], 'known_at': iso(e.occurred_at)} for e in events})
-    field_rows = list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == investigation_id, CaseEvent.event_kind.in_(['adapted_signal', 'domain_check', 'conversation_import', 'conversation_confirmation', 'dispatch_plan', 'retrofit_experience', 'machine_context_recorded', 'engineering_evidence_imported', 'engineering_change_recorded', 'diagnostic_assessment_recorded']), CaseEvent.occurred_at <= cutoff).order_by(CaseEvent.occurred_at, CaseEvent.id)))
+    field_rows = list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == investigation_id, CaseEvent.event_kind.in_(['adapted_signal', 'domain_check', 'conversation_import', 'conversation_confirmation', 'dispatch_plan', 'retrofit_experience', 'machine_context_recorded', 'engineering_evidence_imported', 'engineering_change_recorded', 'diagnostic_assessment_recorded', 'case_draft_reviewed']), CaseEvent.occurred_at <= cutoff).order_by(CaseEvent.occurred_at, CaseEvent.id)))
     diagnostic_assessment = next(({'id': row.id, **row.payload} for row in reversed(field_rows) if row.event_kind == 'diagnostic_assessment_recorded'), None)
     field_refs = []
     for row in field_rows:
@@ -143,7 +145,7 @@ def evaluate(db, investigation_id, known_at=None):
     timeline = [{**refs[e.id], 'label': e.event_type.replace('_', ' ')} for e in evidence
                 if e.asset_id == inv.asset_id or e.event_type == 'telemetry_anomaly']
     timeline.extend(field_refs)
-    return {'configuration_summary': config_summary, 'diagnostic_assessment': diagnostic_assessment, 'historical_reference': reference,
+    return {'case_type':'fleet_incident', 'title': 'Safe-stop cluster', 'configuration_summary': config_summary, 'diagnostic_assessment': diagnostic_assessment, 'historical_reference': reference,
             'evidence': list(refs.values()), 'timeline': sorted(timeline, key=lambda e: (e['event_time'], e['id'])),
             'comparison_quality': comparison_quality, 'investigation_id': investigation_id, 'as_of': iso(cutoff), 'method': 'Deterministic evidence rules and diagnostic utility; causal inference not established', 'uncertainty': "We don't know yet, and here's what would help us find out.", 'cohorts': cohorts, 'hypotheses': hypotheses, 'checks': checks, 'next_check': next_check, 'diagnostic_events': [{'id': e.id, **e.payload} for e in events], 'conditional_precedents': [{'outcome_id': o.id, 'outcome': o.outcome, 'conditions': o.payload.get('applicable_conditions', []), 'verification': o.payload.get('validation_status', 'unverified'), 'verification_details': o.payload.get('intervention_verification', {}), 'automatic_recommendation': False} for o in db.scalars(select(Outcome).where(Outcome.investigation_id == investigation_id, Outcome.recorded_at <= cutoff))]}
 
@@ -210,3 +212,34 @@ def create_demo_session(db):
         db.add(DiagnosticCheck(id=f'{case_id}::{c.id}', investigation_id=case_id, question=c.question, procedure=c.procedure, expected_observations=c.expected_observations, estimated_cost=c.estimated_cost, operational_risk=c.operational_risk, why_informative=c.why_informative, required_approval=c.required_approval, check_type=c.check_type, rank_score=0))
     db.commit()
     return evaluate(db, case_id)
+
+
+def create_remote_session(db):
+    """Explicit synthetic fixture, isolated from FC-021 and every other visitor."""
+    from app.models import Asset
+    token = uuid4().hex
+    asset_id, case_id, trigger_id = 'REMOTE-'+token[:8], 'remote-session-'+token, 'remote-trigger-'+token
+    now = datetime.utcnow()
+    db.add(Asset(id=asset_id,name='Synthetic remote-control machine',asset_type='Heavy equipment',family='Synthetic test',site='Synthetic yard',environment='test'))
+    db.flush()
+    db.add(Evidence(id=trigger_id,asset_id=asset_id,event_type='human_discovery',event_time=now,known_at=now,ingested_at=now,source='synthetic://remote-control-delay/trigger',evidence_class='human_observation',payload={'case_type':'remote_support','synthetic':True,'symptom':'Remote control delay reported; network, control, interface and vehicle unresolved'}))
+    db.flush()
+    db.add(Investigation(id=case_id,asset_id=asset_id,trigger_id=trigger_id,title='Synthetic test · Remote control delay',status='active'))
+    db.commit()
+    return evaluate(db,case_id)
+
+
+def evaluate_remote(db, inv, cutoff):
+    from app.services import iso
+    from app.diagnostic_engine import evaluate_checks
+    diagnostics = evaluate_checks(db, inv.id, cutoff=cutoff)
+    auto = diagnostics['automatic_analysis']
+    rows = list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id==inv.id,CaseEvent.occurred_at<=cutoff).order_by(CaseEvent.occurred_at,CaseEvent.id)))
+    refs = [{'id':r.id,'asset_id':r.payload.get('asset_id',inv.asset_id),'source':r.payload.get('source','case-workflow'),'event_type':r.event_kind,'event_time':iso(r.occurred_at),'known_at':iso(r.occurred_at),'label':r.event_kind.replace('_',' '),'time_basis':'record_created_at_not_original_observation_time'} for r in rows]
+    profile=diagnostics['machine_context'] or {}
+    return {'case_type':'remote_support','title':inv.title,'synthetic':True,'investigation_id':inv.id,'as_of':iso(cutoff),
+            'configuration_summary':{'affected_count':1,'no_known_signal_count':0},'diagnostic_assessment':diagnostics['assessment'],
+            'automatic_analysis':auto,'method':auto['version'],'uncertainty':auto['boundary'],
+            'comparison_quality':{'valid_control_count':0,'conclusion':'Network pattern warrants investigation; root cause remains unresolved.' if any(d['finding_count'] for d in auto['domains'] if d['domain']=='network') else 'Evidence is insufficient to isolate a fault domain.','missing_data':['Endpoint scope and complete symptom-window coverage']},
+            'cohorts':[{'asset_id':inv.asset_id,'signal_observed':True,'context':profile,'valid_control':False,'exposure_status':'Single-machine support case'}],
+            'hypotheses':[], 'checks':diagnostics['checks'],'next_check':None,'diagnostic_events':[], 'conditional_precedents':[], 'evidence':refs,'timeline':refs, 'historical_reference':None}
