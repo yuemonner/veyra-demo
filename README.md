@@ -210,3 +210,20 @@ flowchart TD
     B --> T[Timeline: event time / known time / record time]
     T --> D
 ```
+
+
+### v1.5 · Automatic first-pass evidence analysis
+
+The existing workspace now connects source import → defined anomaly detection → fault-domain investigation priority → evidence-backed checks → reviewable case draft. Human decisions, actions and outcome verification remain separate append-only records. Diagnostic snapshots include the detected findings and sources available when the decision was recorded.
+
+- **Two separate cases:** FC-021 Fleet Incident retains its exposure/control logic. **Remote Support · Synthetic test** creates an isolated single-machine case with no L4/Zone B/LiDAR/EX11 narrative. Use the case selector in the existing Ask Veyra workspace.
+- **Running test:** select Remote Support → Evidence → expand **SYNTHETIC TEST · Remote control delay** → **Import anomaly test logs**. The normal import endpoint processes the timestamped 42 → 470 ms RTT, 18% packet-loss and 14:07 operator report. Network becomes a priority, with source record IDs, raw values and provisional temporal links. Next Checks prioritizes base-station and vehicle-router records.
+- **Counter-test:** import later normal test logs. Earlier anomalies remain visible; sparse normal samples do not establish complete symptom-window coverage or exclude Network. Contradictory normal/abnormal values at the same reported asset/time/scope trigger source-conflict review.
+- **Explicit supported patterns:** JSON/CSV `rtt_ms`, `rtt_s`, `packet_loss_pct`, `packet_loss_percent`; `signal=rtt|network_rtt|packet_loss` with `value` and supported `unit`; text/log `RTT 470 ms`, `packet loss 18%`; explicit controller-restarted reports; source fault-code observations/changes. Generic vendor fields are not guessed into these concepts. Original units/fields and per-row asset mismatches are preserved.
+- **Screening definitions:** RTT > 200 ms, packet loss > 5%, RTT rise ≥ 3× with RTT > 200 ms. These are illustrative review thresholds, not OEM safety limits or calibrated causal probabilities. Fault-code meaning requires OEM context. Complete coverage, clock alignment, endpoints and operating conditions still require review.
+- **Drafts:** checks, candidate judgments, decisions, actions, outcomes and planned/uncertain notes are extracted conservatively with source excerpts. Engineers can edit and save reviewed notes via `/engineering/draft-reviews`; notes do not create approved decisions, executed actions or verified recovery. Transcript extraction remains bounded pattern matching, not general language understanding.
+- **Unified Next Checks:** one case-aware ranked list. Fleet exposure checks appear for the fleet case; domain checks are added when relevant evidence exists. Remote support starts with four evidence gaps and changes priority when imported patterns or source conflicts appear.
+
+API additions: `POST /demo/remote-support-sessions`; `GET /investigations/{id}/engineering` includes `diagnostics.automatic_analysis` and saved `draft_reviews`; `POST /investigations/{id}/engineering/draft-reviews`. Existing `POST /engineering/evidence` drives recomputation without a separate manual diagnosis step. No LLM/API key is required.
+
+This release does not change hosting plans. The free Render backend still has cold starts and ephemeral storage; it is not a durable authenticated customer pilot.
