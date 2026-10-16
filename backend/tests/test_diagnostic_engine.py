@@ -85,6 +85,8 @@ def test_decision_snapshot_preserves_context_and_diagnostic_state_at_decision_ti
     saved=decision(case).json()
     assert saved['context_at_decision']['retrofit_version']=='K2'
     assert saved['diagnostic_snapshot']['assessment']['root_cause_status']=='unresolved'
+    assert saved['diagnostic_snapshot']['machine_context']['customer_impact']==profile()['customer_impact']
+    assert saved['diagnostic_snapshot']['machine_context']['dispatch_risk']==profile()['dispatch_risk']
     post(case,'context',profile(retrofit_version='K3'))
     reread=client.get(f'/investigations/{case}/workflow').json()['decisions'][0]
     assert reread['context_at_decision']['retrofit_version']=='K2'
