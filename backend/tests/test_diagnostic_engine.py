@@ -67,8 +67,8 @@ def test_fault_domain_isolation_does_not_promote_a_root_cause():
 def test_diagnostic_planner_explains_evidence_gaps_constraints_and_asset_linkage():
     reset(); case=fresh()
     base=client.get(f'/investigations/{case}/engineering').json()['diagnostics']
-    assert len(base['checks'])==4
-    assert all(c['remote_feasibility']=='access_not_confirmed' and c['missing_evidence'] for c in base['checks'])
+    assert len(base['checks'])==1 and base['checks'][0]['domain']=='fleet_comparison'
+    assert all(c['missing_evidence'] for c in base['checks'])
     ref=post(case,'evidence',{'owner':'Engineer','source':'log://network','asset_id':'EX03','evidence_type':'network_metrics','format':'text','content':'rtt=125ms during symptom'}).json()['id']
     post(case,'context',profile())
     unlinked=client.post(f'/investigations/{case}/field-tools/signals',json=signal()).json()['id']
