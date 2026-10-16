@@ -27,3 +27,9 @@ export function readCaseCache(storage: Pick<Storage, "getItem">, caseId: string)
     return cached;
   } catch { return null; }
 }
+
+// Only the read-only readiness probe gets the cold-start budget. Never replay writes.
+export async function waitForCaseService(base: string, timeoutMs = 90000) {
+  const result = await fetchCaseJSON(base, "/health", undefined, timeoutMs);
+  if (result?.status !== "ok") throw new Error("Case service is not ready. Please retry.");
+}
