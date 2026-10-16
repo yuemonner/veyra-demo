@@ -37,6 +37,8 @@ def test_import_preserves_csv_units_raw_fault_codes_and_rejects_malformed_record
     assert record['semantic_mapping']=='not_inferred'
     assert post(case,'evidence',{**body,'content':'x,x\n1,2'}).status_code==422
     assert post(case,'evidence',{**body,'format':'json','content':'[1,2]'}).status_code==422
+    assert post(case,'evidence',{**body,'format':'json','content':'{"value":1e999}'}).status_code==422
+    assert post(case,'evidence',{**body,'format':'json','content':'{"value":NaN}'}).status_code==422
     assert post(case,'evidence',{**body,'format':'json','evidence_type':'fault_codes','content':'{"vendor_code":"U-0100","unit":"vendor-code"}'}).json()['records'][0]['vendor_code']=='U-0100'
     analysis=client.get(f'/investigations/{case}/analysis').json()
     assert any(e['id']==record['id'] for e in analysis['evidence'])
