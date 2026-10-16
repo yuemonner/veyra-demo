@@ -195,7 +195,7 @@ def evaluate_checks(db, case_id):
                        'boundary':'Diagnostic priority is not operational action priority; no root-cause probability is estimated.'})
     order = {'review_conflict_first':0, 'investigate_reported_anomaly':1,'close_evidence_gap':3,'verify_reported_domain':2,'scope_review_before_repeating':4}
     checks.sort(key=lambda c:(order[c['priority']],c['id']))
-    return {'method':'Evidence-to-Diagnostic-Check Engine · explicit rules v1', 'assessment':assessment, 'checks':checks,
+    return {'method':'Evidence-to-Diagnostic-Check Engine · explicit rules v1', 'machine_context':profile, 'assessment':assessment, 'checks':checks,
             'boundary':'Fault domain and root cause are separate human assessments. Rules explain available inputs, missing evidence, differentiating checks, personnel, remote constraints and risk.'}
 
 
