@@ -108,3 +108,13 @@ def test_unstructured_notes_are_candidates_not_automatic_workflow_facts():
     lines = extract('Li: measured gateway RTT at the console\n王工：已更换型号匹配的转接线\nWe will dispatch tomorrow\n赵工：已恢复，继续观察')
     assert [line['kind'] for line in lines] == ['check', 'action', 'note', 'outcome']
     assert all(line['requires_review'] for line in lines)
+
+
+def test_field_records_join_source_inventory_without_becoming_causal_support():
+    reset(); case=fresh()
+    row=post(case,'signals',signal()).json()
+    analysis=client.get(f'/investigations/{case}/analysis').json()
+    ref=next(e for e in analysis['evidence'] if e['id']==row['id'])
+    assert ref['time_basis']=='record_created_at_not_original_observation_time'
+    assert any(e['id']==row['id'] for e in analysis['timeline'])
+    assert not any(e['id']==row['id'] for h in analysis['hypotheses'] for e in h['supporting_evidence'])
