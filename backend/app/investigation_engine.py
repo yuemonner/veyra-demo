@@ -36,6 +36,15 @@ def evaluate(db, investigation_id, known_at=None):
         cohorts.append({'asset_id': asset, 'exposure_status': 'verified' if exposed else ('Different conditions verified' if relation == 'different' else 'Exposure not verified'), 'exposure_relation': relation, 'context': state, 'missing_fields': [k for k in ('application_version', 'configuration', 'firmware_version', 'map_version') if state.get(k) is None], 'valid_control': exposed and healthy and matches and not signals, 'signal_observed': bool(signals) or observation.get('safe_stop') is True, 'reason': 'Requires matching configuration, verified Zone B exposure and complete healthy telemetry; absence of an alert is insufficient.', 'confounders': [k for k in ('configuration', 'firmware_version', 'map_version') if state.get(k) != context.get(k)], 'evidence_ids': [e.id for e in signals] + [e.id for e in checks]})
     refs = {e.id: {'id': e.id, 'source': e.source, 'event_time': iso(e.event_time), 'known_at': iso(e.known_at), 'asset_id': e.asset_id, 'event_type': e.event_type} for e in evidence}
     refs.update({e.id: {'id': e.id, 'source': e.payload['source'], 'event_time': e.payload['event_time'], 'known_at': iso(e.occurred_at)} for e in events})
+    field_rows = list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == investigation_id, CaseEvent.event_kind.in_(['adapted_signal', 'domain_check', 'conversation_import', 'conversation_confirmation', 'dispatch_plan', 'retrofit_experience']), CaseEvent.occurred_at <= cutoff).order_by(CaseEvent.occurred_at, CaseEvent.id)))
+    field_refs = []
+    for row in field_rows:
+        payload = row.payload
+        source = payload.get('source') or '; '.join(payload.get('source_references', []))
+        field_refs.append({'id': row.id, 'asset_id': inv.asset_id, 'source': source, 'event_time': iso(row.occurred_at), 'known_at': iso(row.occurred_at),
+                           'event_type': row.event_kind + '_recorded', 'label': row.event_kind.replace('_', ' ') + ' recorded',
+                           'evidence_grade': payload.get('evidence_grade', 'engineer_reported'), 'time_basis': 'record_created_at_not_original_observation_time'})
+    refs.update({ref['id']: ref for ref in field_refs})
     challenges = list(db.scalars(select(CaseEvent).where(CaseEvent.investigation_id == investigation_id, CaseEvent.event_kind == 'hypothesis_challenged', CaseEvent.occurred_at <= cutoff)))
     hypotheses = []
     # A row's legacy evidence IDs are candidate links, never proof of a claim.
@@ -132,6 +141,7 @@ def evaluate(db, investigation_id, known_at=None):
                  'verification': 'illustrative_not_independently_verified', 'used_in_current_analysis': False}
     timeline = [{**refs[e.id], 'label': e.event_type.replace('_', ' ')} for e in evidence
                 if e.asset_id == inv.asset_id or e.event_type == 'telemetry_anomaly']
+    timeline.extend(field_refs)
     return {'configuration_summary': config_summary, 'historical_reference': reference,
             'evidence': list(refs.values()), 'timeline': sorted(timeline, key=lambda e: (e['event_time'], e['id'])),
             'comparison_quality': comparison_quality, 'investigation_id': investigation_id, 'as_of': iso(cutoff), 'method': 'Deterministic evidence rules and diagnostic utility; causal inference not established', 'uncertainty': "We don't know yet, and here's what would help us find out.", 'cohorts': cohorts, 'hypotheses': hypotheses, 'checks': checks, 'next_check': next_check, 'diagnostic_events': [{'id': e.id, **e.payload} for e in events], 'conditional_precedents': [{'outcome_id': o.id, 'outcome': o.outcome, 'conditions': o.payload.get('applicable_conditions', []), 'verification': o.payload.get('validation_status', 'unverified'), 'verification_details': o.payload.get('intervention_verification', {}), 'automatic_recommendation': False} for o in db.scalars(select(Outcome).where(Outcome.investigation_id == investigation_id, Outcome.recorded_at <= cutoff))]}
