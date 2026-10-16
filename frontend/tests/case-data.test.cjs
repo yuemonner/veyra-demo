@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {fetchCaseJSON, readCaseCache} = require('../lib/case-data.ts');
+const {fetchCaseJSON, readCaseCache, waitForCaseService} = require('../lib/case-data.ts');
 
 test('cache is scoped to its case and rejects corrupt or incompatible views', () => {
   const analysis = {investigation_id:'case-A', cohorts:[], hypotheses:[]};
@@ -37,4 +37,19 @@ test('proxy HTML is not exposed as an enormous error message', async () => {
 test('invalid successful response does not leave an unbounded JSON failure', async () => {
   const original=global.fetch;global.fetch=async()=>({ok:true,json:async()=>{throw SyntaxError('bad HTML');}});
   try {await assert.rejects(fetchCaseJSON('','/case'),/unexpected response/);}finally{global.fetch=original;}
+});
+
+test('readiness waits for health without creating or replaying a case', async () => {
+  const original=global.fetch; const requests=[];
+  global.fetch=async(url,options)=>{requests.push([url,options.method]); return {ok:true,json:async()=>({status:'ok'})};};
+  try {await waitForCaseService('https://example.test',30);assert.deepEqual(requests,[['https://example.test/health',undefined]]);}finally{global.fetch=original;}
+});
+test('readiness rejects an unhealthy service and has a bounded startup budget', async () => {
+  const original=global.fetch;
+  try {
+    global.fetch=async()=>({ok:true,json:async()=>({status:'starting'})});
+    await assert.rejects(waitForCaseService('',10),/not ready/);
+    global.fetch=(_,options)=>new Promise((_,reject)=>options.signal.addEventListener('abort',()=>reject(Error('aborted'))));
+    await assert.rejects(waitForCaseService('',10),/timed out/);
+  }finally{global.fetch=original;}
 });
