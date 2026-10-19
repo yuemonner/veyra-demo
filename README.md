@@ -28,6 +28,8 @@ python3 scripts/validate_export.py export.csv profile.json --asset EX1   # offli
 | Input–Response Baseline | Optional delay–gain model per channel, run only when data and confirmed context support it |
 | Intervention Ledger | Append-only, hash-chained decisions, checks, actions, outcomes, reviews and recurrence; episode export separates decision-time data from hindsight |
 
+Review hardening: automatic execution receipts are engine-generated only, concurrent ledger appends are transactional, and outcome evidence must contain actual in-window samples. **146 backend tests and 9 connection tests pass**; see [review fixes and remaining release gates](docs/ENGINE_V2_REVIEW_FIXES.md).
+
 Fault domains are observations, not causes; root cause stays unconfirmed. Status and gates: [production plan §6](docs/BUILDERX_PRODUCTION_PLAN.md).
 
 ## The engineering problem

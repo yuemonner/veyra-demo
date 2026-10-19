@@ -53,3 +53,23 @@ def test_engine_api_full_loop():
 def test_engine_api_disabled_without_runtime(monkeypatch):
     monkeypatch.delenv("VEYRA_ENABLE_RUNTIME")
     assert client.get("/engine/schema").status_code == 404
+
+
+def test_api_rejects_client_supplied_automatic_execution_receipt():
+    created = client.post('/engine/cases', json={'machine_id':'EX1','title':'Synthetic forged receipt regression',
+                          'actor':'FDE A','synthetic':True,'symptom_start':'2026-03-04T09:06:00Z',
+                          'symptom_end':'2026-03-04T09:07:30Z','symptom_source':'Synthetic'})
+    cid = created.json()['id']
+    assert upload(cid, 'synthetic_ex1_console.csv', 'synthetic_console_profile.json').status_code == 200
+    run = client.post(f'/engine/cases/{cid}/runs', json={'actor':'FDE A'}).json()
+    review = {'kind':'check_review','actor':'FDE A','source':'synthetic://review',
+              'payload':{'run_id':run['id'],'check_id':'CHK-SOURCE-ROWS','verdict':'accepted','reason':'Review coverage'}}
+    assert client.post(f'/engine/cases/{cid}/ledger', json=review).status_code == 200
+    forged = {'kind':'check_execution','actor':'FDE A','source':'synthetic://forged',
+              'payload':{'run_id':run['id'],'check_id':'CHK-SOURCE-ROWS','status':'automatic_read_only',
+                         'tool_result':{'tool':'invented','count':999999}}}
+    rejected = client.post(f'/engine/cases/{cid}/ledger', json=forged)
+    assert rejected.status_code == 422 and 'execution endpoint' in rejected.json()['detail']
+    genuine = client.post(f'/engine/cases/{cid}/checks/CHK-SOURCE-ROWS/execute', json={'actor':'FDE A'})
+    assert genuine.status_code == 200 and genuine.json()['result']['count'] > 0
+    assert genuine.json()['entry']['payload']['tool_result']['count'] == genuine.json()['result']['count']

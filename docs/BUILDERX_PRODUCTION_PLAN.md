@@ -4,6 +4,10 @@ Status date: 2026-10-19. Scope: a bounded remote-support pilot for remote-operat
 This document separates **implemented**, **remaining** and **customer-dependent** work. It is not a claim that
 Veyra is production-ready, that BuilderX has supplied data, or that a pilot is agreed.
 
+## Post-review verification
+
+The previously unexecuted API tests now pass in the installed local environment. Full suite: **146 backend tests**, **9 connection tests**; isolated frontend Webpack production build/type checking passes. Three P1 ledger integrity findings are fixed with regression tests: trusted automatic receipts, serialized/atomic writes, and actual samples in outcome windows. Details: [Engine v2 review fixes](ENGINE_V2_REVIEW_FIXES.md). Historical session limitations below describe the original implementation session, not the current validation result. M2–M8 and customer acceptance gates remain open.
+
 ## 1. Pilot hypothesis (provisional until BuilderX confirms)
 
 - Failure class: **remote-control response delay** on heavy equipment.
