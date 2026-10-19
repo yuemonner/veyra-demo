@@ -15,8 +15,15 @@ from app.services import attach_human_decision, build_package, compare, compare_
 
 from app.decision_workflow import router as workflow_router
 
+from app.runtime_engine import router as runtime_router
+from app.runtime_imports import router as runtime_imports_router
+from app.engine_api import router as engine_router
+
 app = FastAPI(title="Veyra Field Decision Support", version="1.5.0")
 app.include_router(workflow_router)
+app.include_router(runtime_router)
+app.include_router(runtime_imports_router)
+app.include_router(engine_router)
 from app.field_capabilities import router as field_router
 app.include_router(field_router)
 from app.diagnostic_engine import router as diagnostic_router
@@ -95,7 +102,12 @@ def startup():
         try:
             has_investigation = db.scalar(select(Investigation.id).limit(1))
             if not has_investigation:
-                reset_demo(db)
+                from app.safety import ProtectedDataError
+                try:
+                    reset_demo(db)
+                except ProtectedDataError as error:
+                    # Seeding must never destroy recorded runtime investigations.
+                    print(f"[veyra] demo auto-seed skipped: {error}")
         finally:
             db.close()
 
@@ -219,7 +231,13 @@ def create_saved_investigation(body: SaveRecordingInvestigationIn, db: Session =
 
 @app.post("/demo/reset")
 def demo_reset(db: Session = Depends(get_db)):
-    return reset_demo(db)
+    if os.getenv("VEYRA_ENABLE_RUNTIME")=="true":
+        raise HTTPException(409,"Destructive legacy reset is disabled while local investigation records are enabled")
+    from app.safety import ProtectedDataError
+    try:
+        return reset_demo(db)
+    except ProtectedDataError as error:
+        raise HTTPException(409, str(error))
 
 
 @app.post("/demo/late-evidence")

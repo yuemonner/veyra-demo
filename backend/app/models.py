@@ -309,3 +309,29 @@ class SavedInvestigation(Base):
     report: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class RuntimeCase(Base):
+    __tablename__ = 'runtime_cases'
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class RuntimeSource(Base):
+    __tablename__ = 'runtime_sources'
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    case_id: Mapped[str] = mapped_column(String, index=True)
+    sha256: Mapped[str] = mapped_column(String)
+    content: Mapped[str] = mapped_column(Text)
+    payload: Mapped[dict] = mapped_column(JSON)
+    samples: Mapped[list] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class RuntimeRun(Base):
+    __tablename__ = 'runtime_runs'
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    case_id: Mapped[str] = mapped_column(String, index=True)
+    payload: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

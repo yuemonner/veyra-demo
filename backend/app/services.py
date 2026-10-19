@@ -515,8 +515,11 @@ def evidence(
 
 
 def reset_demo(db: Session) -> dict[str, Any]:
-    from app.db import Base, engine, init_db
+    from app.db import DATABASE_URL, Base, engine, init_db
+    from app.safety import assert_reset_permitted
 
+    # Never drop runtime investigation records outside a disposable test database.
+    assert_reset_permitted(engine, DATABASE_URL)
     Base.metadata.drop_all(bind=engine)
     init_db()
     for model in [

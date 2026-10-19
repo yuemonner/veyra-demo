@@ -1,7 +1,8 @@
 import os
 import tempfile
 
-os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.gettempdir()}/veyra_test.db"
+# conftest.py sets an isolated per-session database; this fallback only applies when run without it.
+os.environ.setdefault("DATABASE_URL", f"sqlite:///{tempfile.gettempdir()}/veyra_test.db")
 
 from fastapi.testclient import TestClient
 
