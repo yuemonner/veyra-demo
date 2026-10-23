@@ -35,9 +35,10 @@ combination is post-hoc and ignores the internal model's 7 early alarms.
   alone. The internal model sees that the throttle went idle *while the controller wanted thrust*: 15 of 22 vs 10.
 - **It is not a replacement.** Worse on control surfaces (outputs that freeze are caught faster and more reliably by
   the existing freeze/split rules), slower, and 7 early alarms.
-- **The early alarms have one cause:** the normal flights are short and don't include the emergency-trajectory
-  manoeuvres flown in the `with_emr_traj` flights. The model is asked about situations it never saw and reports them
-  as faults. A residual is only meaningful where the model has been validated.
+- **The early alarms come from too little normal data.** First guess: the normal flights don't include the
+  emergency-trajectory manoeuvres of the `with_emr_traj` flights. The follow-up below did not confirm that; the
+  likelier cause is day-to-day differences in normal throttle. Either way, a residual is only meaningful where the
+  model has been validated.
 
 ## Follow-up: "know when the model doesn't know" (v2, v3)
 
@@ -57,7 +58,8 @@ combination is post-hoc and ignores the internal model's 7 early alarms.
 
 ## Fresh data: what exists
 
-ALFA's raw recordings (downloaded, CC0) add 8 sessions not in the processed set. Of the 7 readable ones, only one
+ALFA's raw recordings (downloaded, CC0) add 8 sessions not in the processed set; 7 were examined (the eighth is a
+4.6 GB recording, not extracted). Only one
 contains an injected fault during autonomous flight (2018-07-30-16-28-00, engine); the other autonomous stretches are
 shorter than the 20 s reference window. One labelled flight is not a test. RflyMAD's 497 real flights are the right
 next source, but its download page could not be read from here and no licence is stated.
@@ -68,5 +70,6 @@ next source, but its download page could not be read from here and no licence is
    to idle while the autopilot wanted thrust" (engine failures), not as a general detector.
 2. Get RflyMAD real flights (or customer normal flights) with enough normal data per machine and per flying day,
    pre-register, and test once.
+
 Reference: Keipour, Mousaei, Scherer, *ALFA: A Dataset for UAV Fault and Anomaly Detection*, IJRR 2021,
 doi:10.1184/R1/12707963.
