@@ -22,4 +22,6 @@ Legend: **pass** verified by a test or by looking; **fixed** was broken, fixed l
 | 12 | **Public write access** | **fixed (blocker)** | Production accepted anonymous writes: the access code was never set on Render, so the gate stayed open (verified with an empty request: 422 instead of 401). The gate now fails closed: `VEYRA_PUBLIC_DEMO=true` without a code refuses every write (test added). Needs deploy. |
 | 13 | Frontend/backend parity, smoke test | open | Production still runs the previous version. After approval: deploy, then smoke-test the four views of each demo case and one refused write. |
 
-Tests: backend 319 passed on the Mac before items 11–12 (27 new in `tests/test_release_guards.py`); type check clean.
+| 14 | Brief "Do next" vs Next action | open | On ALFA the Brief proposes a read-only look at the records while Next action says no remote check would change the balance. Both are true (different questions), but a visitor may read them as disagreeing. Word it as one story before sharing widely. |
+
+Tests (local, on the Mac, final code): backend **320 passed** (27 new in `tests/test_release_guards.py`, 1 new public-demo gate test); frontend type check clean. Looked at locally: the ALFA case shows the rudder plot (held at 1900 µs against its normal range) and the roll plot (command vs measured), each finding sentence once in Evidence.
