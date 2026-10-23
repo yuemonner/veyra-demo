@@ -2,7 +2,8 @@
 
 Goal: an engineer who has never seen Veyra opens the link and, within ten minutes, understands what it found, why it
 recommends the next step, and can't find a factual or consistency error. Research is paused (`docs/research/`).
-Nothing in this checklist is deployed yet; deployment needs approval.
+Deployed 2026-10-23 (approved): API on Render and web on Vercel from commit `ed2c0fb` (main, the Render branch and the
+review branch all point to it), then a wording-only web fix (see the end).
 
 Legend: **pass** verified by a test or by looking; **fixed** was broken, fixed locally, needs deploy; **open** known, not fixed.
 
@@ -19,8 +20,9 @@ Legend: **pass** verified by a test or by looking; **fixed** was broken, fixed l
 | 9 | Units and provenance (demo cases) | pass | ALFA outputs are PWM µs (ArduPlane RC out); ANYmal and QD-1 checked earlier. |
 | 10 | Units for uploaded PX4 logs | open | VOXL actuator outputs are not PWM µs (PX4 benchmark fix 2). Not reachable on the public demo (uploads are off); fix before uploads open. |
 | 11 | Visitor text | fixed | Raw keys (`firmware_version`) and a stray ")" in tracking sentences; case titles cut mid-word in the picker. |
-| 12 | **Public write access** | **fixed (blocker)** | Production accepted anonymous writes: the access code was never set on Render, so the gate stayed open (verified with an empty request: 422 instead of 401). The gate now fails closed: `VEYRA_PUBLIC_DEMO=true` without a code refuses every write (test added). Needs deploy. |
-| 13 | Frontend/backend parity, smoke test | open | Production still runs the previous version. After approval: deploy, then smoke-test the four views of each demo case and one refused write. |
-| 14 | Brief "Do next" vs Next action | open | On ALFA the Brief proposes a read-only look at the records while Next action says no remote check would change the balance. Both are true (different questions), but a visitor may read them as disagreeing. Word it as one story before sharing widely. |
+| 12 | **Public write access** | **pass (live)** | Production accepted anonymous writes: the access code was never set on Render, so the gate stayed open (an empty request got 422 instead of 401). Now a hosted, non-private server refuses every write without a code (`RENDER` set, or `VEYRA_PUBLIC_DEMO=true`), so it no longer depends on dashboard settings. Live check after deploy: POST, PUT, PATCH, DELETE on cases, ledger, runs, the demo builder and the older API routes all answer 403 `read_only_demo`; a guessed code too; webhooks refuse (not configured); 19 cases before and after. |
+| 13 | Frontend/backend parity, smoke test | pass (live) | Web and API from `ed2c0fb`; the new `/states` and `/series` endpoints answer on the live API. Live: ALFA rudder and roll plots render; each finding sentence once in Evidence; Brief and Next action agree; all 9 visitor cases have a valid record chain; real-data cases stop at "anomaly", synthetic stories reach a cause only through their closure; outcomes show "recorded", not "verified". |
+| 14 | Brief "Do next" vs Next action | pass (live) | When no remote check can change which part is more likely, the Brief now says "Next step: on site, or a decision" (Next action's own reading) and offers the remaining check as optional context. The conclusion is unchanged. |
+| 15 | Public reads | pass (live) | The hosted API holds only public research data (CMU AirLab ALFA, ETH GrandTour ANYmal) and synthetic cases; no private instance data is on it. Do not invite real uploads to this server. |
 
-Tests (local, on the Mac, final code): backend **320 passed** (27 new in `tests/test_release_guards.py`, 1 new public-demo gate test); frontend type check clean. Looked at locally: the ALFA case shows the rudder plot (held at 1900 µs against its normal range) and the roll plot (command vs measured), each finding sentence once in Evidence.
+Tests (local, on the Mac, release code `ed2c0fb`): backend **321 passed** (27 new in `tests/test_release_guards.py`, 1 new public-demo gate test); frontend type check clean. Looked at locally: the ALFA case shows the rudder plot (held at 1900 µs against its normal range) and the roll plot (command vs measured), each finding sentence once in Evidence.

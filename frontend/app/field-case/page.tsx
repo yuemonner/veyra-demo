@@ -78,7 +78,7 @@ const plain = (t?: string | null) => plainEngine(t || "").replace(/\d{4}-\d{2}-\
   .replace(/(inside|within|in) the symptom window/gi, "during the problem").replace(/symptom window/gi, "problem window")
   .replace(/known-good/gi, (m: string) => (m[0] === "K" ? "Normal" : "normal")).replace(/ than reference/g, " than normal").replace(/screening rule/g, "usual limit")
   .replace(/^Unconfirmed context blocks comparisons: /, "Not confirmed yet: ").replace(/^Records exist during the problem$/, "The raw data covers the problem")
-  .replace(/control_version/g, "control software version").replace(/\b(firmware_version|kit_version|harness_revision|vehicle_interface|operating_conditions|measurement_endpoints|network_path|clock_sync_method)\b/g, (k: string) => k.replace(/_/g, " ")).replace(/(?<!robot )\bmodel\b(?=,|$)/g, "robot model");
+  .replace(/control_version/g, "control software version").replace(/\b(firmware_version|kit_version|harness_revision|vehicle_interface|operating_conditions|measurement_endpoints|network_path|clock_sync_method)\b/g, (k: string) => k.replace(/_/g, " ")).replace(/(?<!(?:robot|airframe|aircraft) )\bmodel\b(?=,|$)/g, "robot model");
 // Case titles in the picker: the "Synthetic / Real data" prefix already says what the title repeats; cut at a word.
 const caseLabel = (title: string, max = 72) => {
   const t = title.replace(/\s*\(SYNTHETIC[^)]*\)\s*$/, "").replace(/\s*[—-]\s*SYNTHETIC\b[^—]*$/i, "").replace(/\s*\(real data[^)]*\)/i, "")
