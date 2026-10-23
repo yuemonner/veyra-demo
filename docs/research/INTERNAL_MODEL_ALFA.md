@@ -21,13 +21,16 @@ Honest false-alarm test: each normal flight is scored with a model and threshold
 | Detected in window, right part | 18 (21 with tracking) | 20 (21 in window, 1 wrong part) |
 | Engine failures (22) | 10 | **15** |
 | Aileron (7) / elevator (2) / rudder (3) | 6–7 / 0–2 / 3 | **3 / 1 / 2** |
-| Fired too early or too late | 0 | **8** (7 early, all throttle, on engine flights) |
+| Fired too early or too late | 0 | **8** (6 early, all throttle, on engine flights; 2 late) |
 | False alarms on normal flights (11) | 1 | 1 |
 | Median delay | 0.28 s | 1.2 s |
 
 Flight by flight (held-out faults, counting tracking for v2.2): both catch 14, only the internal model 6 (all engine
 failures), only v2.2 7 (5 aileron, 1 elevator, 1 engine), neither 6. Either one would cover 27 of 33, but that
-combination is post-hoc and ignores the internal model's 7 early alarms.
+combination is post-hoc and ignores the internal model's 6 early alarms.
+
+Correction (re-count from `results.json`): earlier versions of this note said "7 early". Seven early alarms exist, but one
+is on a development flight (2018-07-30-16-39-00), which is not scored. Held out: 6 early, 2 late.
 
 ## What it means
 
@@ -36,7 +39,7 @@ combination is post-hoc and ignores the internal model's 7 early alarms.
   7 engine failures are still not caught in time. What it shows is an inconsistency between control intent and output,
   not by itself a mechanical engine fault.
 - **It is not a replacement.** Worse on control surfaces (outputs that freeze are caught faster and more reliably by
-  the existing freeze/split rules), slower, and 7 early alarms.
+  the existing freeze/split rules), slower, and 6 early alarms.
 - **The early alarms come from too little normal data.** First guess: the normal flights don't include the
   emergency-trajectory manoeuvres of the `with_emr_traj` flights. The follow-up below did not confirm that; the
   likelier cause is day-to-day differences in normal throttle. Either way, a residual is only meaningful where the
@@ -56,8 +59,8 @@ combination is post-hoc and ignores the internal model's 7 early alarms.
 - **False-alarm evidence is thin**: after the 20 s reference window, the 11 normal flights give only 535 s (9 minutes)
   of scorable flight; four of them give under 15 s each. One false alarm (the same flight on which the existing
   checks also false-alarm).
-- **Alarms before the fault**: yes, the 7 "early" alarms on engine flights fire 7 to 111 s before the injected failure.
-  All 7 are July flights; the July normal flights give 68 s of scorable data.
+- **Alarms before the fault**: yes, the 6 held-out "early" alarms on engine flights fire 7 to 111 s before the injected
+  failure (a 7th is on a development flight). All are July flights; the July normal flights give 68 s of scorable data.
 
 Per flight, engine failures (held-out, 22): both detectors 9; **only the internal model 6**
 (07-18-15-53-31_2, 09-11-14-22-07_1, 10-18-11-03-57, 10-18-11-04-00, 10-18-11-04-08_1, 10-18-11-04-08_2);
@@ -84,20 +87,50 @@ Control surfaces (12): the existing checks (output rules plus tracking) catch al
   flying day (median 0.31–0.44 in July, 0.53–0.57 in September), and the July normal flights are few and short.
 - **Stopped here.** Each further change would be tuned on flights already seen.
 
+## Three-state output (design check on seen flights, not a performance result)
+
+v1 is frozen; nothing is suppressed. Each alarm keeps v1's timing and part, and carries two separate quantities:
+D (the residual that fired) and U (whether the inputs at the alarm lie inside the range covered by the normal training
+flights). Output: *no anomaly detected*; *model-based anomaly, supported conditions*; *model-based anomaly,
+insufficient model coverage* (an alarm reported with a warning, never hidden; the existing deterministic checks run
+unchanged). `--three-state`, results in `results_three_state.json` (local).
+
+| Held-out outcome (v1, unchanged) | Supported conditions | Insufficient model coverage |
+|---|---|---|
+| In window (21, incl. 1 wrong part) | 14 | 7 |
+| Early (6) | 2 | 4 |
+| Late (2) | 2 | 0 |
+| False alarm on a normal flight (1) | 1 | 0 |
+
+- The label helps a little: 4 of 6 early alarms carry the warning, against 7 of 21 correct ones. It does **not**
+  separate them: a third of correct detections would be flagged, and the one false alarm is "supported".
+- Using the label to *suppress* would have cost 7 correct detections for 4 early alarms (v2 showed the same).
+- These counts come from the same 44 flights the method was built on; they say the label is honest, not that it works.
+
 ## Fresh data: what exists
 
 ALFA's raw recordings (downloaded, CC0) add 8 sessions not in the processed set; 7 were examined (the eighth is a
 4.6 GB recording, not extracted). Only one
 contains an injected fault during autonomous flight (2018-07-30-16-28-00, engine); the other autonomous stretches are
-shorter than the 20 s reference window. One labelled flight is not a test. RflyMAD's 497 real flights are the right
-next source, but its download page could not be read from here and no licence is stated.
+shorter than the 20 s reference window. One labelled flight is not a test.
+
+- **RflyMAD** (real multicopter flights): the licence restricts use to non-commercial research; commercial use needs
+  the authors' permission. Not downloaded.
+- **UAV-SEAD** (Hugging Face `aykutkabaoglu/uav-flight-anomaly-dataset`, CC BY 4.0): real PX4 multicopters, about 1,400
+  annotated flights (about 900 normal, 78 with altitude anomalies), about 30 GB. Not downloaded yet.
+- **No compatible unseen fixed-wing data was found.** The ALFA throttle model needs an ArduPlane-style output law
+  (airspeed and altitude errors driving throttle). Multicopter logs don't have those signals, so testing this model on
+  them would mean substituting unrelated features. Reported as a limitation, not worked around.
 
 ## Next
 
-1. Use the internal model as an *additional, labelled* finding for one question it answers well: "the throttle went
-   to idle while the autopilot wanted thrust" (engine failures), not as a general detector.
-2. Get RflyMAD real flights (or customer normal flights) with enough normal data per machine and per flying day,
-   pre-register, and test once.
+1. Keep the internal model as research. If it is ever integrated, only as an *additional, labelled* finding for the
+   one question it answers well ("throttle went to idle while the autopilot wanted thrust"), with the coverage label,
+   beside the unchanged deterministic checks.
+2. Unseen test of what *does* transfer: the multicopter height cross-check (estimator vs barometer vs GPS) found in the
+   PX4 #26910 case, on UAV-SEAD, pre-registered before any scored run. Needs approval for the download.
+3. Unseen test of the fixed-wing model: only with new ArduPlane normal flights (several per flying day) and faults,
+   e.g. from a customer.
 
 Reference: Keipour, Mousaei, Scherer, *ALFA: A Dataset for UAV Fault and Anomaly Detection*, IJRR 2021,
 doi:10.1184/R1/12707963.
