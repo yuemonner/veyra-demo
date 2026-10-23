@@ -1727,13 +1727,17 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
   }, [data.case.id, run.id, ledgerSize]);
   const noSplit = assistant?.stage === "nothing_to_split" && assistant.run_id === run.id && !b.recommendation && !b.prepared && !b.oldRules;
   // What the case's own records already answer (GET, computed on view). When available, the Brief states facts first.
-  const [qa, setQa] = useState<Any>(null);
+  // undefined = still loading: the Brief shows a short placeholder instead of one layout that then jumps to another.
+  const [qaFor, setQaFor] = useState<{ id: string; v: Any } | null>(null);   // answers belong to one case
+  const qa = qaFor && qaFor.id === data.case.id ? qaFor.v : undefined;
   useEffect(() => {
     let live = true;
-    call(`/engine/cases/${data.case.id}/questions`).then((v) => { if (live) setQa(v); }).catch(() => { if (live) setQa(null); });
+    const id = data.case.id;
+    call(`/engine/cases/${id}/questions`).then((v) => { if (live) setQaFor({ id, v }); }).catch(() => { if (live) setQaFor({ id, v: null }); });
     return () => { live = false; };
   }, [data.case.id, run.id, ledgerSize]);
   const facts = qa?.applicable && qa.brief ? qa : null;
+  const qaPending = qa === undefined;
   const factFindings: Any[] = Object.values(run.domains || {}).flatMap((d: Any) => (d.observations || []))
     .filter((o: Any) => ["R-OUTPUT-STUCK", "R-TRACKING"].includes(o.rule));
   const nextCheck = facts?.next?.check_id ? (run.checks || []).find((c: Any) => c.check_id === facts.next.check_id) : null;
@@ -1829,7 +1833,12 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
         </div>}
       </>}
 
-      {!facts && <div className={s.row}>
+      {qaPending && <div className={s.row}>
+        <span className={s.rowLabel}>What we established</span>
+        <p className={s.dim} style={{ margin: 0 }} aria-live="polite">Checking the case&apos;s records…</p>
+      </div>}
+
+      {!facts && !qaPending && <div className={s.row}>
         <span className={s.rowLabel}>Look here first</span>
         <div>
           {b.top ? <>
@@ -1861,7 +1870,7 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
         </div>
       )}
 
-      <div className={s.row}>
+      {!qaPending && <div className={s.row}>
         <span className={s.rowLabel}>{facts && !b.recommendation && !b.prepared && !b.oldRules ? "Investigate next" : "Do next"}</span>
         <div>
           {facts?.next && !b.recommendation && !b.prepared && !b.oldRules ? <div className={s.nextBox}>
@@ -1917,7 +1926,7 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
           </div> : <p className={s.answer}>Nothing left to check. Record a decision.</p>}
           {error && <p className={s.warning}>{error}</p>}
         </div>
-      </div>
+      </div>}
 
       {facts && <div className={s.row}>
         <span className={s.rowLabel}>Decision status</span>

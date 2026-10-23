@@ -159,3 +159,35 @@ def test_7_source_coverage_answers_before_asking_and_names_the_missing_record():
     # without coverage the old question stands, and nothing claims the recording was read
     plain_out = questions.answer(run, [], [])
     assert {q["id"].split(":")[0] for q in plain_out["questions"]} >= {"commanded"} and "SD card" not in plain_out["next"]["why_a_person"]
+
+
+def test_8_read_caches_are_shared_across_connections_and_invalidated_by_new_records(tmp_path):
+    """Each request opens its own connection; cached answers must be reused across them and refreshed by any new record."""
+    import json as _json
+    from app.ingest.profile import parse_profile
+    from app.store import sqlite_store
+    from app.store.sqlite_store import CaseStore
+    prof = parse_profile({"profile_id": "t", "version": 1, "format": "jsonl", "synthetic": False,
+                          "columns": {"timestamp": "t", "asset": "asset", "signal": "signal", "value": "value", "unit": "unit", "scope": "scope"},
+                          "signal_map": {"rc_out": "actuator.output"}, "clock_domain": "c", "timestamp_format": "epoch", "epoch_unit": "ns"})
+    db = tmp_path / "c.db"
+    s1 = CaseStore(db)
+    c = s1.create_case(machine_id="M1", title="t", actor="a", synthetic=False)
+    rows = "".join(_json.dumps({"t": int((1_700_000_000 + i) * 1e9), "asset": "M1", "signal": "rc_out", "value": 1500 + i, "unit": "us", "scope": "x"}) + "\n" for i in range(50))
+    s1.commit_import(c["id"], rows.encode(), "a.jsonl", prof, actor="a")
+    s1.investigate(c["id"], actor="a")
+    calls = []
+    real = s1._questions.__func__
+    sqlite_store.CaseStore._questions = lambda self, cid: (calls.append(cid), real(self, cid))[1]
+    try:
+        first = s1.questions(c["id"]); s1.close()
+        s2 = CaseStore(db)
+        assert s2.questions(c["id"]) == first and len(calls) == 1          # a new connection reuses the answer
+        series = s2.series(c["id"], "actuator.output", "x", 1_700_000_000, 1_700_000_049)
+        assert series["samples"] == 50 and series["points"][0][1] == 1500.0
+        s2.append(c["id"], "triage", {"severity": "low", "owner": "Team", "reason": "r"}, actor="a")
+        s2.questions(c["id"])
+        assert len(calls) == 2                                              # a new record invalidates it
+        s2.close()
+    finally:
+        sqlite_store.CaseStore._questions = real

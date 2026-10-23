@@ -169,6 +169,20 @@ def startup():
             store.close()
             from app.memory import release
             release()
+        # Warm the read caches in the background so the first visitor doesn't wait for them (the server answers meanwhile).
+        import threading
+
+        def _warm():
+            warm = CaseStore(Path(os.getenv("VEYRA_ENGINE_DB") or DEFAULT_DB))
+            try:
+                print(f"[veyra] read caches: {warm.warm_read_caches()}")
+            except Exception as error:  # a cold cache only costs time; never stop the server for it
+                print(f"[veyra] read-cache warm-up skipped: {error}")
+            finally:
+                warm.close()
+                from app.memory import release
+                release()
+        threading.Thread(target=_warm, name="veyra-warm-read-caches", daemon=True).start()
     if os.getenv("VEYRA_AUTO_SEED", "").lower() in {"1", "true", "yes"}:
         db = next(get_db())
         try:

@@ -6,12 +6,14 @@ Plain SQL keeps the schema portable to PostgreSQL (M2) without changing the engi
 """
 from __future__ import annotations
 
+import bisect
 import gc
 import hashlib
 import json
 import sqlite3
 import uuid
 from array import array
+from collections import OrderedDict
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -54,6 +56,12 @@ CREATE INDEX IF NOT EXISTS ledger_by_case ON ledger(case_id, seq);
 """
 
 
+# Read-side caches shared by every request of this process (each request opens its own connection, so per-instance
+# caches were always cold). Safe because imports are append-only (UPDATE/DELETE refused by triggers): an import id and
+# its sha256 always mean the same rows. Answers are keyed by the database state, so any new record invalidates them.
+_SERIES_INDEX: "OrderedDict[tuple, Dict[tuple, tuple]]" = OrderedDict()   # (db, import id, sha) -> {(signal, scope): (t[], v[], unit)}
+_QUESTIONS_CACHE: "OrderedDict[tuple, Dict[str, Any]]" = OrderedDict()     # (db, case, state signature) -> answers
+_CACHE_MAX = 64
 _INTEGRITY_CACHE: Dict[tuple, tuple] = {}  # (db path, import id, sha256, normalized sha256, size) -> (integrity_ok, span)
 
 
@@ -223,8 +231,62 @@ class CaseStore:
         columns = "*" if include_rows else self._IMPORT_META
         return [self._import(r, include_rows) for r in self.db.execute(f"SELECT {columns} FROM imports WHERE case_id = ? ORDER BY created_at, id", (case_id,)).fetchall()]
 
+    def _state_signature(self, case_id: str) -> tuple:
+        """Changes whenever anything a read-side answer depends on changes (this case's run and record, any case's records or files)."""
+        q = lambda sql, *a: self.db.execute(sql, a).fetchone()[0]
+        return (q("SELECT COUNT(*) FROM runs WHERE case_id = ?", case_id), q("SELECT COUNT(*) FROM ledger WHERE case_id = ?", case_id),
+                q("SELECT COUNT(*) FROM ledger"), q("SELECT COUNT(*) FROM imports"), q("SELECT COUNT(*) FROM cases"))
+
+    def _series_index(self, import_id: str, sha: str) -> Dict[tuple, tuple]:
+        """Numeric samples of one import as sorted float arrays per (signal, scope): about 16 bytes a sample, parsed once per process."""
+        key = (str(self.path), import_id, sha)
+        if key in _SERIES_INDEX:
+            _SERIES_INDEX.move_to_end(key)
+            return _SERIES_INDEX[key]
+        raw = self.db.execute("SELECT rows_json FROM imports WHERE id = ?", (import_id,)).fetchone()[0]
+        groups: Dict[tuple, list] = {}
+        units: Dict[tuple, Optional[str]] = {}
+        for r in json.loads(raw):
+            if isinstance(r.get("value"), (int, float)) and not isinstance(r.get("value"), bool):
+                k = (r.get("signal"), r.get("scope") or None)
+                groups.setdefault(k, []).append((r["t"], float(r["value"])))
+                units.setdefault(k, r.get("unit"))
+        del raw
+        index = {}
+        for k, pts in groups.items():
+            pts.sort()
+            index[k] = (array("d", (p[0] for p in pts)), array("d", (p[1] for p in pts)), units[k])
+        _SERIES_INDEX[key] = index
+        while len(_SERIES_INDEX) > _CACHE_MAX:
+            _SERIES_INDEX.popitem(last=False)
+        return index
+
+    def warm_read_caches(self) -> Dict[str, Any]:
+        """Compute what a first visitor would otherwise wait for: each case's answers and its plot index."""
+        done = []
+        for c in self.cases():
+            if c.get("fault_type") == "known_good_run":
+                continue
+            for import_id, sha in self.db.execute("SELECT id, sha256 FROM imports WHERE case_id = ?", (c["id"],)).fetchall():
+                self._series_index(import_id, sha)
+            self.questions(c["id"])
+            done.append(c["id"])
+        return {"warmed": len(done)}
+
     def questions(self, case_id: str) -> Dict[str, Any]:
-        """What the case's own records (and known-good runs of the machine) answer before anyone is asked for more."""
+        """What the case's own records (and known-good runs of the machine) answer before anyone is asked for more.
+        Cached per database state: the first view computes it (the known-good runs are the slow part), later views reuse it."""
+        key = (str(self.path), case_id, self._state_signature(case_id))
+        if key in _QUESTIONS_CACHE:
+            _QUESTIONS_CACHE.move_to_end(key)
+            return _QUESTIONS_CACHE[key]
+        out = self._questions(case_id)
+        _QUESTIONS_CACHE[key] = out
+        while len(_QUESTIONS_CACHE) > _CACHE_MAX:
+            _QUESTIONS_CACHE.popitem(last=False)
+        return out
+
+    def _questions(self, case_id: str) -> Dict[str, Any]:
         from app.engine import questions as data_questions
         case = self.case(case_id)
         run = self.latest_run(case_id)
@@ -248,13 +310,13 @@ class CaseStore:
             raise StoreError("end must be after start")
         self.case(case_id)
         points, unit, total = [], None, 0
-        for (raw,) in self.db.execute("SELECT rows_json FROM imports WHERE case_id = ? ORDER BY created_at, id", (case_id,)):
-            for r in json.loads(raw):
-                if r.get("signal") != signal or (scope is not None and (r.get("scope") or None) != scope) or not isinstance(r.get("value"), (int, float)):
+        for import_id, sha in self.db.execute("SELECT id, sha256 FROM imports WHERE case_id = ? ORDER BY created_at, id", (case_id,)).fetchall():
+            for (sig, sc), (ts, vs, u) in self._series_index(import_id, sha).items():
+                if sig != signal or (scope is not None and sc != scope):
                     continue
-                if start <= r["t"] <= end:
-                    points.append((r["t"], r["value"]))
-                    unit = unit or r.get("unit")
+                lo, hi = bisect.bisect_left(ts, start), bisect.bisect_right(ts, end)
+                points.extend(zip(ts[lo:hi], vs[lo:hi]))
+                unit = unit or u
         points.sort()
         total = len(points)
         if total > max_points:
