@@ -31,14 +31,42 @@ combination is post-hoc and ignores the internal model's 7 early alarms.
 
 ## What it means
 
-- **It fixes the known weakness**: engine failures, where an idle throttle looks like a normal glide on the output
-  alone. The internal model sees that the throttle went idle *while the controller wanted thrust*: 15 of 22 vs 10.
+- **It partially closes a known gap**: engine failures, where an idle throttle looks like a normal glide on the output
+  alone. The internal model sees that the throttle went idle *while the controller wanted thrust*: 15 of 22 vs 10;
+  7 engine failures are still not caught in time. What it shows is an inconsistency between control intent and output,
+  not by itself a mechanical engine fault.
 - **It is not a replacement.** Worse on control surfaces (outputs that freeze are caught faster and more reliably by
   the existing freeze/split rules), slower, and 7 early alarms.
 - **The early alarms come from too little normal data.** First guess: the normal flights don't include the
   emergency-trajectory manoeuvres of the `with_emr_traj` flights. The follow-up below did not confirm that; the
   likelier cause is day-to-day differences in normal throttle. Either way, a residual is only meaningful where the
   model has been validated.
+
+## Audit of the evaluation (v1)
+
+- **The 47 flights**: 3 development flights (one engine, one rudder, one aileron failure) are excluded from scoring, as in
+  `docs/ALFA_BENCHMARK.md`; 44 are scored: 33 with an injected fault and 11 without. Of those 11, 10 are labelled
+  `no_failure` and 1 is labelled `no_ground_truth` (no fault record, which is not the same as a verified normal flight).
+- **Training and scoring are separated by flight.** The 10 `no_failure` flights are the only training data. Each of them
+  is scored with a model and thresholds fitted on the other 9; fault flights and the `no_ground_truth` flight are scored
+  with the model fitted on all 10. No time-window splitting.
+- **Thresholds and preprocessing used no fault flight.** The features were chosen from how an ArduPlane autopilot
+  works, not by searching. But the designer (Claude) already knew from earlier benchmark runs on these same flights
+  that engine failures were the weak spot, so the choice of a throttle model was not blind to the dataset.
+- **False-alarm evidence is thin**: after the 20 s reference window, the 11 normal flights give only 535 s (9 minutes)
+  of scorable flight; four of them give under 15 s each. One false alarm (the same flight on which the existing
+  checks also false-alarm).
+- **Alarms before the fault**: yes, the 7 "early" alarms on engine flights fire 7 to 111 s before the injected failure.
+  All 7 are July flights; the July normal flights give 68 s of scorable data.
+
+Per flight, engine failures (held-out, 22): both detectors 9; **only the internal model 6**
+(07-18-15-53-31_2, 09-11-14-22-07_1, 10-18-11-03-57, 10-18-11-04-00, 10-18-11-04-08_1, 10-18-11-04-08_2);
+only the existing checks 1 (07-30-17-20-01, where the internal model alarmed 10 s early); neither 6.
+Four of the six extra detections come from one session on 2018-10-18 (consecutive flights, same day), so they are
+not six independent confirmations.
+
+Control surfaces (12): the existing checks (output rules plus tracking) catch all 12; the internal model 7 in window,
+2 late, 1 wrong part, 2 missed. Its only surface gain is none: every surface it catches, the existing checks also catch.
 
 ## Follow-up: "know when the model doesn't know" (v2, v3)
 
