@@ -66,7 +66,7 @@ Four of the six extra detections come from one session on 2018-10-18 (consecutiv
 not six independent confirmations.
 
 Control surfaces (12): the existing checks (output rules plus tracking) catch all 12; the internal model 7 in window,
-2 late, 1 wrong part, 2 missed. Its only surface gain is none: every surface it catches, the existing checks also catch.
+2 late, 1 wrong part, 2 missed. It adds no surface detection the existing checks miss.
 
 ## Follow-up: "know when the model doesn't know" (v2, v3)
 
