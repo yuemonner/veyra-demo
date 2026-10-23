@@ -84,12 +84,15 @@ def nearest(ts, vs, t):
 
 
 def tilt_cos(log):
-    rows = series(log, "vehicle_attitude", ["q[0]", "q[1]", "q[2]", "q[3]"])
+    # v1.1 bug fix (after the first run): the quaternion is one array field "q"; v1 asked for "q[0]".."q[3]", found
+    # nothing, so every distance-sensor sample was dropped. The rule and the threshold procedure are unchanged.
+    rows = series(log, "vehicle_attitude", ["q"])
     ts, vs = [], []
     for t, v in rows:
-        w, x, y, z = (v.get(f"q[{i}]") for i in range(4))
-        if None in (w, x, y, z):
+        q = v.get("q")
+        if not q or len(q) != 4:
             continue
+        w, x, y, z = q
         roll = math.atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y))
         pitch = math.asin(max(-1.0, min(1.0, 2 * (w * y - z * x))))
         ts.append(t); vs.append(math.cos(roll) * math.cos(pitch))
@@ -240,7 +243,7 @@ def main(folder: Path, out_path: Path):
             entry["delay_s"] = round(hits[0][0] - hits[0][2], 2) if hits else None
             entry["ranges_hit"] = len({h[2] for h in hits})
         results.append(entry)
-    out_path.write_text(json.dumps({"version": "uavsead-height-check-v1", "selection": sel["version"], "thresholds_m": thresholds,
+    out_path.write_text(json.dumps({"version": "uavsead-height-check-v1.1", "selection": sel["version"], "thresholds_m": thresholds,
                                     "calibration": cal_report, "results": results}, indent=1, default=float))
     print(f"wrote {out_path}")
 
