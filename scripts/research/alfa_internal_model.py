@@ -30,7 +30,15 @@ V2 (pre-registered 2026-10-23, after v1's results; the only change): "outside wh
 - To be judged on flights not used in v1 (see docs/research/INTERNAL_MODEL_ALFA.md); results on the 47 processed
   flights are reported only as "seen data".
 
-Usage: python3 scripts/research/alfa_internal_model.py <processed folder> <out.json> [--cache-only] [--v2]   (numpy)
+V2 RESULT on the seen flights (13:3x): worse than v1 (15 vs 20 right-part detections, 3 vs 1 false alarms). Faults
+themselves push the controller's errors outside the envelope, so v2 abstained exactly when a fault happened, and
+masking the worst normal stretches lowered the elevator threshold.
+
+V3 (exploratory, written after v2's result on the same seen flights; post-hoc by construction): the envelope covers
+only the mission-side inputs (commanded pitch, commanded roll), which a fault does not move directly, not the
+controller's errors or the measured state. Everything else as v2.
+
+Usage: python3 scripts/research/alfa_internal_model.py <processed folder> <out.json> [--cache-only] [--v2 | --v3]   (numpy)
 """
 import csv
 import glob
@@ -45,7 +53,9 @@ STEP = 0.25
 REF_S = 20.0
 WINDOW = (-1.0, 10.0)
 ROLL_S, HOLD_S, MARGIN = 2.0, 1.0, 1.1
-V2 = "--v2" in sys.argv
+V3 = "--v3" in sys.argv
+V2 = "--v2" in sys.argv or V3
+COMMANDS = {"pitch_cmd", "roll_cmd"}
 ENVELOPE_Q, ENVELOPE_WIDEN = (1.0, 99.0), 0.10
 DEVELOPMENT = {"carbonZ_2018-09-11-15-06-34_1_rudder_right_failure", "carbonZ_2018-07-30-16-39-00_1_engine_failure",
                "carbonZ_2018-09-11-17-55-30_2_left_aileron_failure"}
@@ -133,7 +143,13 @@ def familiar(model, f, ch):
     if not V2:
         return np.ones(len(f["t"]), dtype=bool)
     X = design(f, ch)
-    return np.all((X >= model["lo"]) & (X <= model["hi"]), axis=1)
+    inside = (X >= model["lo"]) & (X <= model["hi"])
+    if V3:
+        cols = [i for i, c in enumerate(FEATURES[ch]) if c in COMMANDS]
+        if not cols:
+            return np.ones(len(f["t"]), dtype=bool)
+        inside = inside[:, cols]
+    return np.all(inside, axis=1)
 
 
 def residual(model, f, ch):
@@ -249,7 +265,7 @@ def main(processed, out_path, cache=None, only_cache=False):
                 "median_delay_s": round(statistics.median([r["delay_s"] for r in det]), 2) if det else None,
                 "by_fault": {k: {"flights": sum(k in r["truth"]["kinds"] for r in faults), "detected": sum(k in r["truth"]["kinds"] for r in det),
                                  "isolated": sum(k in r["truth"]["kinds"] and r["isolated"] for r in det)} for k in ("engines", "aileron", "elevator", "rudder")}}
-    summary = {"version": "v2" if V2 else "v1", "method": "internal-model residual (autopilot output law, linear, learned from normal flights only)", "design": __doc__.split("PRE-REGISTERED")[1][:1800],
+    summary = {"version": "v3" if V3 else "v2" if V2 else "v1", "method": "internal-model residual (autopilot output law, linear, learned from normal flights only)", "design": __doc__.split("PRE-REGISTERED")[1][:1800],
                "normal_flights_used": [f["name"] for f in normal], "thresholds_all_normal": {ch: round(c["k"], 2) for ch, c in cal_all.items()},
                "held_out": score("held_out"), "all": score("all"), "results": results}
     with open(out_path, "w") as h:
