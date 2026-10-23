@@ -223,6 +223,18 @@ class CaseStore:
         columns = "*" if include_rows else self._IMPORT_META
         return [self._import(r, include_rows) for r in self.db.execute(f"SELECT {columns} FROM imports WHERE case_id = ? ORDER BY created_at, id", (case_id,)).fetchall()]
 
+    def questions(self, case_id: str) -> Dict[str, Any]:
+        """What the case's own records (and known-good runs of the machine) answer before anyone is asked for more."""
+        from app.engine import questions as data_questions
+        case = self.case(case_id)
+        run = self.latest_run(case_id)
+        if run is None:
+            return {"version": data_questions.QUESTIONS_VERSION, "applicable": False, "questions": []}
+        keep = {"actuator.output", *data_questions.EVENT_SIGNALS, *data_questions.FEEDBACK_SIGNALS}
+        rows = [r for (raw,) in self.db.execute("SELECT rows_json FROM imports WHERE case_id = ?", (case_id,)) for r in json.loads(raw) if r.get("signal") in keep]
+        closure = next((e["payload"] for e in reversed(self.ledger(case_id)) if e["kind"] == "case_closure"), None)
+        return data_questions.answer(run, rows, self.known_good_runs(case), closure)
+
     def series(self, case_id: str, signal: str, scope: Optional[str], start: float, end: float, max_points: int = 400) -> Dict[str, Any]:
         """Samples of one signal (and scope) of this case between start and end (epoch s), for plotting. Read-only.
         Above max_points the window is cut into buckets and each keeps its first, lowest and highest sample, so a

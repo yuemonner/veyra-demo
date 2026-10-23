@@ -116,3 +116,26 @@ def test_5_cross_clock_delay_change_stays_conditional():
     assert domains["network"]["status"] != "delay_observed"
     board = {b["domain"]: b for b in triage.hypothesis_board(domains, [])}
     assert board["network"]["column"] != "supported"
+
+
+# ---- second review (2026-10-23 evening): facts before requests ----
+def test_6_questions_answer_from_records_and_name_no_cause():
+    from app.engine import questions
+    t0 = 1000.0
+    run = {"findings": {"actuator_outputs": {"findings": [{"rule": "STUCK", "channel": "rudder_rc4", "held_value": 1900.0, "t_start": t0,
+                                                            "end": "1970-01-01T00:17:00Z", "unit": "us", "reference_range": [1479.0, 1516.0]}]},
+                        "tracking": {"findings": [{"axis": "roll", "t_start": t0 + 0.74}]}}}
+    rows = [{"signal": "actuator.output", "scope": ch, "t": t0 + dt, "value": v}
+            for ch, before, after in (("aileron_rc5", 1496, 1325), ("elevator_rc2", 1548, 1546)) for dt, v in ((-2, before), (-1, before), (1, after), (2, after))]
+    kg = [{"rows": [{"signal": "actuator.output", "scope": "rudder_rc4", "value": v} for v in (1355, 1615)]}]
+    out = questions.answer(run, rows, kg)
+    by = {q["id"].split(":")[0]: q for q in out["questions"]}
+    assert "above anything rudder_rc4 output in 1 known-good run" in by["range"]["answer"]
+    assert "aileron_rc5 1496→1325" in by["others"]["answer"] and "unchanged: elevator_rc2" in by["others"]["answer"]
+    assert "0.74 s later" in by["order"]["answer"]
+    assert by["commanded"]["status"] == "not_answerable" and by["commanded"]["check_id"] == "CHK-CONTROLLER-LOGS"
+    assert by["physical"]["status"] == "not_answerable"
+    assert out["next"]["check_id"] == "CHK-CONTROLLER-LOGS"          # a log someone can send comes before travel
+    assert out["decision_status"] == "Further investigation needed · No cause confirmed"
+    text = " ".join(out["established"]).lower()
+    assert not any(w in text for w in ("servo path", "controller output", "most likely", "cause"))

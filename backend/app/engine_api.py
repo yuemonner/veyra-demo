@@ -313,6 +313,12 @@ def case_series(case_id: str, signal: str, start: float, end: float, scope: Opti
     return _guard(store.series, case_id, signal, scope, start, end, max_points)
 
 
+@router.get("/cases/{case_id}/questions")
+def case_questions(case_id: str, store: CaseStore = Depends(get_store)):
+    """Questions the case's own data answers before Veyra asks anyone for more evidence. Read-only."""
+    return _guard(store.questions, case_id)
+
+
 @router.get("/cases/{case_id}/states")
 def case_states_view(case_id: str, store: CaseStore = Depends(get_store)):
     """Each part's evidence stage, each check's state and each decision's state, derived from the ledger."""

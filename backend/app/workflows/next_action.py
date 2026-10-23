@@ -53,9 +53,12 @@ def nothing_to_ask(run: Dict[str, Any], assessment: Dict[str, Any], checks: List
         return None
     info = [c["question"] for c in run.get("checks") or [] if check_policy.eligible(c) and c.get("mode") != "automatic_read_only"
             and c["availability"]["state"] != "onsite_required" and c["objective"] == "reduce_uncertainty"][:3]
-    return ("No remote check's result would change which of " + (" and ".join(x["label"] for x in assessment["cannot_tell_apart"]) or "the open explanations")
-            + " is more likely. " + (f"Checks like '{info[0]}' add context but don't move that balance. " if info else "")
-            + "The next step is on site, or a decision.")
+    # Scoped to what it is: a limit of Veyra's written rules, not an engineering finding that more evidence is useless.
+    return ("Under Veyra's current rules, none of the remote checks it knows would change whether "
+            + (" or ".join(x["label"] for x in assessment["cannot_tell_apart"]) or "one open explanation or another") + " ranks higher. "
+            + "That is a limit of these rules, not a finding that more evidence is useless. "
+            + (f"Checks like '{info[0]}' still answer open questions. " if info else "")
+            + "Below: what the records already answer, what they can't, and which record would answer it. A person decides what to retrieve, or whether to inspect the aircraft.")
 
 
 def make_plan(store, case_id: str) -> Dict[str, Any]:

@@ -1497,6 +1497,8 @@ function NextAction({ caseId, data, onChanged, me, onEvidence }: { caseId: strin
   const refresh = useCallback(async () => { try { setSt(await call(`/engine/cases/${caseId}/next-action`)); } catch (e: Any) { setError(e.message); } }, [caseId]);
   useEffect(() => { refresh(); }, [refresh, data]);
   const after = async () => { await onChanged(); await refresh(); };
+  const [qa, setQa] = useState<Any>(null);
+  useEffect(() => { call(`/engine/cases/${caseId}/questions`).then(setQa).catch(() => setQa(null)); }, [caseId, data]);
   async function post(path: string) {
     setBusy(true); setError("");
     try { setSt(await call(`/engine/cases/${caseId}/next-action/${path}`, { method: "POST", body: "{}" })); await onChanged(); } catch (e: Any) { setError(e.message); }
@@ -1511,6 +1513,13 @@ function NextAction({ caseId, data, onChanged, me, onEvidence }: { caseId: strin
   return (
     <section className={s.panel} id="next">
       <h2 style={{ margin: "0 0 12px" }}>From incident to dispatch decision</h2>
+      {qa?.applicable && <div className={s.answered}>
+        <p className={s.kicker}>Checked in the records already (before asking anyone)</p>
+        <ul className={s.factList}>
+          {qa.questions.map((q: Any) => <li key={q.id}><b>{q.question}</b><br />
+            {q.status === "answered" ? <span>{q.answer}</span> : <span className={s.dim}>Not in these records. Needs: {q.needs}.</span>}</li>)}
+        </ul>
+      </div>}
       <Assistant caseId={caseId} me={me} onChanged={after} stamp={(data.ledger || []).length} onDecideOther={() => document.getElementById("your-decision")?.scrollIntoView({ behavior: "smooth" })} />
       <details className={s.reasoning}>
       <summary>Show the full reasoning</summary>
@@ -1717,6 +1726,17 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
     return () => { live = false; };
   }, [data.case.id, run.id, ledgerSize]);
   const noSplit = assistant?.stage === "nothing_to_split" && assistant.run_id === run.id && !b.recommendation && !b.prepared && !b.oldRules;
+  // What the case's own records already answer (GET, computed on view). When available, the Brief states facts first.
+  const [qa, setQa] = useState<Any>(null);
+  useEffect(() => {
+    let live = true;
+    call(`/engine/cases/${data.case.id}/questions`).then((v) => { if (live) setQa(v); }).catch(() => { if (live) setQa(null); });
+    return () => { live = false; };
+  }, [data.case.id, run.id, ledgerSize]);
+  const facts = qa?.applicable ? qa : null;
+  const factFindings: Any[] = Object.values(run.domains || {}).flatMap((d: Any) => (d.observations || []))
+    .filter((o: Any) => ["R-OUTPUT-STUCK", "R-TRACKING"].includes(o.rule));
+  const nextCheck = facts?.next?.check_id ? (run.checks || []).find((c: Any) => c.check_id === facts.next.check_id) : null;
   const t = run.triage;
   const closure = [...data.ledger].reverse().find((e: Any) => e.kind === "case_closure");
   const learned: Any[] = (run.machine_history?.prior_cases || []).filter((c: Any) => c.closure);
@@ -1787,7 +1807,29 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
         </div>
       )}
 
-      <div className={s.row}>
+      {facts && <>
+        <div className={s.row}>
+          <span className={s.rowLabel}>What we established</span>
+          <div>
+            <ul className={s.factList}>
+              {factFindings.map((o: Any, i: number) => <li key={`f${i}`}>{plain(o.text).replace(/^(\S+) output held (\S+) /, (_m: string, ch: string, v: string) => `${ch} output held at ${v}${/rc\d/.test(ch) ? " µs" : ""} `)}</li>)}
+              {facts.established.map((t: string, i: number) => <li key={`e${i}`}>{t}</li>)}
+            </ul>
+            {(() => { const lead = factFindings.map((o: Any) => plotFor(run, o.rule, o.text)).find(Boolean);
+              return lead ? <Waveform caseId={data.case.id} spec={lead} load={call} compact /> : null; })()}
+          </div>
+        </div>
+        {facts.cannot_establish.length > 0 && <div className={s.row}>
+          <span className={s.rowLabel}>What we can&apos;t establish</span>
+          <div>
+            <ul className={s.factList}>{facts.cannot_establish.map((q: Any, i: number) => <li key={i}><b>{q.question}</b><br /><span className={s.dim}>Needs: {q.needs}</span></li>)}</ul>
+            {agentLead && <p className={s.answerSmall} style={{ marginTop: 8 }}>One explanation to test (AI agent, not confirmed): {firstSentence(agentLead.statement)}{" "}
+              <button className={s.link} onClick={() => go("agent")}>Why</button></p>}
+          </div>
+        </div>}
+      </>}
+
+      {!facts && <div className={s.row}>
         <span className={s.rowLabel}>Look here first</span>
         <div>
           {b.top ? <>
@@ -1809,7 +1851,7 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
             })()}
           </> : <p className={s.answer}>Nothing stands out yet. <button className={s.link} onClick={() => go("hypotheses")}>See the data</button></p>}
         </div>
-      </div>
+      </div>}
 
       {b.ruledOut.length > 0 && (
         <div className={s.row}>
@@ -1820,9 +1862,18 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
       )}
 
       <div className={s.row}>
-        <span className={s.rowLabel}>Do next</span>
+        <span className={s.rowLabel}>{facts && !b.recommendation && !b.prepared && !b.oldRules ? "Investigate next" : "Do next"}</span>
         <div>
-          {b.recommendation ? <div className={s.nextBox}>
+          {facts?.next && !b.recommendation && !b.prepared && !b.oldRules ? <div className={s.nextBox}>
+            <div>
+              <p className={s.answer} style={{ margin: 0 }}><b>{facts.next.question}</b></p>
+              <p className={s.answerSmall}>Needs: {facts.next.needs}.</p>
+              <p className={s.dim} style={{ margin: "2px 0 0", fontSize: 13 }}>Why a person: {facts.next.why_a_person}</p>
+            </div>
+            {nextCheck && isEligible(nextCheck) ? (accepted(nextCheck.check_id) ? <span className={`${s.pill} ${s.verified}`}>Accepted</span>
+              : <button className={s.button} disabled={acceptBusy} onClick={() => onAccept(nextCheck)}>{acceptBusy ? "Recording…" : "Ask for it"}</button>)
+              : <button className={s.button} onClick={() => go("next")}>Open</button>}
+          </div> : b.recommendation ? <div className={s.nextBox}>
             <div>
               <p className={s.answer} style={{ margin: 0 }}><b>{plain(b.recommendation)}</b></p>
               <p className={s.dim} style={{ margin: "2px 0 0", fontSize: 13 }}>Veyra's recommendation, checked against the evidence · your decision</p>
@@ -1843,7 +1894,7 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
           </div> : noSplit ? <div>
             <div className={s.nextBox}>
               <div>
-                <p className={s.answer} style={{ margin: 0 }}><b>Next step: on site, or a decision</b></p>
+                <p className={s.answer} style={{ margin: 0 }}><b>Veyra&apos;s rules can&apos;t separate the open explanations</b></p>
                 <p className={s.answerSmall}>{plain(firstSentence(assistant.say))}</p>
                 <p className={s.dim} style={{ margin: "2px 0 0", fontSize: 13 }}>Veyra&apos;s reading of the evidence · your decision</p>
               </div>
@@ -1868,7 +1919,12 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
         </div>
       </div>
 
-      {b.unknown && (
+      {facts && <div className={s.row}>
+        <span className={s.rowLabel}>Decision status</span>
+        <p className={s.answerSmall} style={{ margin: 0 }}><b>{facts.decision_status}</b></p>
+      </div>}
+
+      {b.unknown && !facts && (
         <div className={s.row}>
           <span className={s.rowLabel}>Still unknown</span>
           <p className={s.answerSmall} style={{ margin: 0 }}>{plain(b.unknown)}</p>
