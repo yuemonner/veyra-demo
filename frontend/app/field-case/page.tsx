@@ -1733,7 +1733,7 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
     call(`/engine/cases/${data.case.id}/questions`).then((v) => { if (live) setQa(v); }).catch(() => { if (live) setQa(null); });
     return () => { live = false; };
   }, [data.case.id, run.id, ledgerSize]);
-  const facts = qa?.applicable ? qa : null;
+  const facts = qa?.applicable && qa.brief ? qa : null;
   const factFindings: Any[] = Object.values(run.domains || {}).flatMap((d: Any) => (d.observations || []))
     .filter((o: Any) => ["R-OUTPUT-STUCK", "R-TRACKING"].includes(o.rule));
   const nextCheck = facts?.next?.check_id ? (run.checks || []).find((c: Any) => c.check_id === facts.next.check_id) : null;

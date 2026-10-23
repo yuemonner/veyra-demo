@@ -133,7 +133,9 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
     nxt = min(open_q, key=lambda q: order.get(q.get("check_id"), 1)) if open_q else None
     status = (f"Cause {closure['investigation_status'].replace('cause_', '').replace('_', ' ')}" if closure and closure.get("investigation_status")
               else "Further investigation needed · No cause confirmed")
-    return {"version": QUESTIONS_VERSION, "applicable": True, "questions": questions, "established": established,
+    # The Brief leads with these facts only when the data answers enough (today: output-hold findings); otherwise the
+    # questions are still shown in Next action, and the Brief keeps its finding-led summary.
+    return {"version": QUESTIONS_VERSION, "applicable": True, "brief": bool(outputs) and len(established) >= 2, "questions": questions, "established": established,
             "cannot_establish": [{"question": q["question"], "needs": q["needs"], "check_id": q.get("check_id")} for q in open_q],
             "next": None if not nxt else {"question": nxt["question"], "needs": nxt["needs"], "check_id": nxt.get("check_id"),
                                           "why_a_person": "That record is not in this case. Veyra cannot reach the machine; someone with access has to retrieve it, or inspect the part."},
