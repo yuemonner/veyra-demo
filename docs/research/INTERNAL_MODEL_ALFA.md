@@ -39,13 +39,34 @@ combination is post-hoc and ignores the internal model's 7 early alarms.
   manoeuvres flown in the `with_emr_traj` flights. The model is asked about situations it never saw and reports them
   as faults. A residual is only meaningful where the model has been validated.
 
-## Next (needs fresh flights, because ALFA has now been seen)
+## Follow-up: "know when the model doesn't know" (v2, v3)
 
-1. Report "outside what the model has seen" separately from "fault-like residual" (inputs outside the normal
-   flights' range → abstain, not alarm). That is the precision idea in engineering form.
-2. Run the internal model *alongside* the existing rules, as a separate, labelled finding.
-3. Pre-register v2 and test it on data not used here: ALFA's raw recordings with further scenarios, or the real-flight
-   part of RflyMAD (licence to be checked).
+| Held-out (33 faults, 11 normal) | v1 | v2: abstain outside the inputs seen in normal flights | v3: abstain only on unusual *commands* (exploratory) |
+|---|---|---|---|
+| Right part, in window | 20 | 15 | 21 |
+| Engine / aileron / elevator / rudder | 15 / 2 / 1 / 2 | 11 / 2 / 0 / 2 | 15 / 2 / 2 / 2 |
+| Too early or late | 8 | 9 | 8 |
+| False alarms (normal flights) | 1 | 3 | 1 |
 
+- **v2 (pre-registered) made it worse.** A fault itself pushes the controller's errors outside anything seen in normal
+  flight, so v2 abstained exactly when a fault happened; masking the worst normal stretches also lowered a threshold.
+- **v3 (written after seeing v2, so post-hoc) is about level with v1**: one more elevator failure, same early alarms.
+  The early throttle alarms are not explained by unusual pitch commands. The likelier cause: normal throttle differs by
+  flying day (median 0.31–0.44 in July, 0.53–0.57 in September), and the July normal flights are few and short.
+- **Stopped here.** Each further change would be tuned on flights already seen.
+
+## Fresh data: what exists
+
+ALFA's raw recordings (downloaded, CC0) add 8 sessions not in the processed set. Of the 7 readable ones, only one
+contains an injected fault during autonomous flight (2018-07-30-16-28-00, engine); the other autonomous stretches are
+shorter than the 20 s reference window. One labelled flight is not a test. RflyMAD's 497 real flights are the right
+next source, but its download page could not be read from here and no licence is stated.
+
+## Next
+
+1. Use the internal model as an *additional, labelled* finding for one question it answers well: "the throttle went
+   to idle while the autopilot wanted thrust" (engine failures), not as a general detector.
+2. Get RflyMAD real flights (or customer normal flights) with enough normal data per machine and per flying day,
+   pre-register, and test once.
 Reference: Keipour, Mousaei, Scherer, *ALFA: A Dataset for UAV Fault and Anomaly Detection*, IJRR 2021,
 doi:10.1184/R1/12707963.
