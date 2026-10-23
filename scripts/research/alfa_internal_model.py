@@ -21,7 +21,16 @@ PRE-REGISTERED DESIGN (written before any fault flight is scored; fault labels a
 - Scoring identical to scripts/alfa_benchmark.py: detection counts within -1 s .. +10 s of the true onset and must
   name the right part. Baseline numbers come from docs/ALFA_BENCHMARK.md (engine v2.2, held-out flights).
 
-Usage: python3 scripts/research/alfa_internal_model.py <processed folder> <out.json> [--cache-only]   (numpy)
+V2 (pre-registered 2026-10-23, after v1's results; the only change): "outside what the model has seen".
+- For each channel, the envelope of its inputs on the training (normal) flights: per input, the 1st..99th percentile,
+  widened by 10% of that span on each side.
+- Grid points with any input outside the envelope are not scored: no alarm can start there. They are counted and
+  reported as "unfamiliar" time instead (abstention, not a fault).
+- Thresholds are recalibrated the same way as v1, on held-out normal flights, with the same masking applied.
+- To be judged on flights not used in v1 (see docs/research/INTERNAL_MODEL_ALFA.md); results on the 47 processed
+  flights are reported only as "seen data".
+
+Usage: python3 scripts/research/alfa_internal_model.py <processed folder> <out.json> [--cache-only] [--v2]   (numpy)
 """
 import csv
 import glob
@@ -36,6 +45,8 @@ STEP = 0.25
 REF_S = 20.0
 WINDOW = (-1.0, 10.0)
 ROLL_S, HOLD_S, MARGIN = 2.0, 1.0, 1.1
+V2 = "--v2" in sys.argv
+ENVELOPE_Q, ENVELOPE_WIDEN = (1.0, 99.0), 0.10
 DEVELOPMENT = {"carbonZ_2018-09-11-15-06-34_1_rudder_right_failure", "carbonZ_2018-07-30-16-39-00_1_engine_failure",
                "carbonZ_2018-09-11-17-55-30_2_left_aileron_failure"}
 CH = {"elevator": "field.channels1", "throttle": "field.channels2", "rudder": "field.channels3", "aileron_l": "field.channels4", "aileron_r": "field.channels5"}
@@ -112,7 +123,17 @@ def fit(flights, ch, lam=1.0):
     mu, sd = X.mean(0), X.std(0) + 1e-9
     Z = np.column_stack([np.ones(len(X)), (X - mu) / sd])
     w = np.linalg.solve(Z.T @ Z + lam * np.eye(Z.shape[1]), Z.T @ y)
-    return {"w": w, "mu": mu, "sd": sd}
+    lo, hi = np.percentile(X, ENVELOPE_Q[0], axis=0), np.percentile(X, ENVELOPE_Q[1], axis=0)
+    pad = ENVELOPE_WIDEN * (hi - lo)
+    return {"w": w, "mu": mu, "sd": sd, "lo": lo - pad, "hi": hi + pad}
+
+
+def familiar(model, f, ch):
+    """True where every input lies inside the training envelope (v2); always True in v1."""
+    if not V2:
+        return np.ones(len(f["t"]), dtype=bool)
+    X = design(f, ch)
+    return np.all((X >= model["lo"]) & (X <= model["hi"]), axis=1)
 
 
 def residual(model, f, ch):
@@ -140,7 +161,12 @@ def calibrate(train):
             held.append(residual(m, f, ch))
         allr = np.concatenate(held)
         scale = 1.4826 * np.median(np.abs(allr - np.median(allr))) + 1e-6
-        worst = max(float(rolling_median_abs(r[f["t"] > REF_S] / scale).max(initial=0.0)) for r, f in zip(held, train))
+        worst = 0.0
+        for i, (r, f) in enumerate(zip(held, train)):
+            m = fit(train[:i] + train[i + 1:], ch) if len(train) > 2 else model
+            med = rolling_median_abs(r / scale)
+            ok = (f["t"] > REF_S) & familiar(m, f, ch)
+            worst = max(worst, float(med[ok].max(initial=0.0)))
         out[ch] = {"model": model, "scale": scale, "k": MARGIN * worst}
     return out
 
@@ -151,6 +177,7 @@ def first_alarm(cal, f):
     for ch, c in cal.items():
         m = rolling_median_abs(residual(c["model"], f, ch) / c["scale"])
         m[f["t"] <= REF_S] = 0.0
+        m[~familiar(c["model"], f, ch)] = 0.0
         over = m >= c["k"]
         run = 0
         for i, o in enumerate(over):
@@ -194,9 +221,12 @@ def main(processed, out_path, cache=None, only_cache=False):
         else:
             cal = cal_all
         alarm = first_alarm(cal, f)                      # blind: truth not consulted above this line
+        after = f["t"] > REF_S
+        unfamiliar = {ch: round(float((~familiar(c["model"], f, ch) & after).sum() * STEP), 1) for ch, c in cal.items()}
         kinds, onset = f["truth"]["kinds"], f["truth"]["onset_s"]
         entry = {"flight": f["name"], "split": "development" if f["name"] in DEVELOPMENT else "held_out", "truth": f["truth"],
-                 "alarm": {"t_s": round(alarm[0], 2), "channel": alarm[1], "part": PART[alarm[1]]} if alarm else None}
+                 "alarm": {"t_s": round(alarm[0], 2), "channel": alarm[1], "part": PART[alarm[1]]} if alarm else None,
+                 "unfamiliar_s": unfamiliar, "flight_s": round(float(f["t"][-1]), 1)}
         if not kinds:
             entry["outcome"] = "false_alarm" if alarm else "correct_quiet"
         elif not alarm:
@@ -219,7 +249,7 @@ def main(processed, out_path, cache=None, only_cache=False):
                 "median_delay_s": round(statistics.median([r["delay_s"] for r in det]), 2) if det else None,
                 "by_fault": {k: {"flights": sum(k in r["truth"]["kinds"] for r in faults), "detected": sum(k in r["truth"]["kinds"] for r in det),
                                  "isolated": sum(k in r["truth"]["kinds"] and r["isolated"] for r in det)} for k in ("engines", "aileron", "elevator", "rudder")}}
-    summary = {"method": "internal-model residual (autopilot output law, linear, learned from normal flights only)", "design": __doc__.split("PRE-REGISTERED")[1][:1800],
+    summary = {"version": "v2" if V2 else "v1", "method": "internal-model residual (autopilot output law, linear, learned from normal flights only)", "design": __doc__.split("PRE-REGISTERED")[1][:1800],
                "normal_flights_used": [f["name"] for f in normal], "thresholds_all_normal": {ch: round(c["k"], 2) for ch, c in cal_all.items()},
                "held_out": score("held_out"), "all": score("all"), "results": results}
     with open(out_path, "w") as h:
