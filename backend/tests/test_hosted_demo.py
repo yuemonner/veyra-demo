@@ -48,6 +48,17 @@ def test_public_demo_without_a_code_is_read_only_not_open(tmp_path, monkeypatch)
         assert c.get("/engine/cases").json() == []                     # nothing was created
 
 
+def test_hosted_server_is_read_only_by_default(monkeypatch):
+    main = importlib.import_module("app.main")
+    for env, expected in (({"RENDER": "true"}, True), ({"RENDER": "true", "VEYRA_PRIVATE": "true"}, False),
+                          ({"RENDER": "true", "VEYRA_PUBLIC_DEMO": "false"}, False), ({}, False), ({"VEYRA_PUBLIC_DEMO": "true"}, True)):
+        for k in ("RENDER", "VEYRA_PRIVATE", "VEYRA_PUBLIC_DEMO"):
+            monkeypatch.delenv(k, raising=False)
+        for k, v in env.items():
+            monkeypatch.setenv(k, v)
+        assert main._public_demo() is expected, env
+
+
 def test_cors_origins_setting():
     from app.main import cors_origins
     assert cors_origins("https://a.vercel.app/, https://b.vercel.app") == ["https://a.vercel.app", "https://b.vercel.app"]

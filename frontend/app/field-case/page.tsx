@@ -1701,6 +1701,16 @@ function Precedent({ m }: { m: Any }) {
 
 function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { data: Any; run: Any; verification: Any; go: (s: string) => void; onAccept: (c: Any) => void; acceptBusy: boolean; error: string }) {
   const b = buildBrief(data, run);
+  // The same reading Next action shows (GET only, nothing is written): when no remote check could change which part
+  // is more likely, the Brief says so too, instead of offering a context check as if it were the next step.
+  const [assistant, setAssistant] = useState<Any>(null);
+  const ledgerSize = (data.ledger || []).length;
+  useEffect(() => {
+    let live = true;
+    call(`/engine/cases/${data.case.id}/autopilot`).then((v) => { if (live) setAssistant(v); }).catch(() => { if (live) setAssistant(null); });
+    return () => { live = false; };
+  }, [data.case.id, run.id, ledgerSize]);
+  const noSplit = assistant?.stage === "nothing_to_split" && assistant.run_id === run.id && !b.recommendation && !b.prepared && !b.oldRules;
   const t = run.triage;
   const closure = [...data.ledger].reverse().find((e: Any) => e.kind === "case_closure");
   const learned: Any[] = (run.machine_history?.prior_cases || []).filter((c: Any) => c.closure);
@@ -1824,6 +1834,20 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
               <p className={s.dim} style={{ margin: "2px 0 0", fontSize: 13 }}>Drafted by Veyra · {b.prepared.status}</p>
             </div>
             <button className={s.button} onClick={() => go("next")}>{b.prepared.action}</button>
+          </div> : noSplit ? <div>
+            <div className={s.nextBox}>
+              <div>
+                <p className={s.answer} style={{ margin: 0 }}><b>Next step: on site, or a decision</b></p>
+                <p className={s.answerSmall}>{plain(firstSentence(assistant.say))}</p>
+                <p className={s.dim} style={{ margin: "2px 0 0", fontSize: 13 }}>Veyra&apos;s reading of the evidence · your decision</p>
+              </div>
+              <button className={s.button} onClick={() => go("next")}>Decide</button>
+            </div>
+            {b.next && <p className={s.answerSmall} style={{ marginTop: 8 }}>
+              Optional, for context: {plain(b.next.question).replace(/^./, (c: string) => c.toLowerCase())}. <span className={s.dim}>Under Veyra&apos;s rules its result would not change which part is more likely.</span>{" "}
+              {accepted(b.next.check_id) ? <span className={`${s.pill} ${s.verified}`}>Accepted</span>
+                : <button className={s.link} disabled={acceptBusy} onClick={() => onAccept(b.next)}>{acceptBusy ? "Recording…" : "Accept"}</button>}
+            </p>}
           </div> : b.next ? <div className={s.nextBox}>
             <div>
               <p className={s.answer} style={{ margin: 0 }}><b>{plain(b.next.question)}</b></p>

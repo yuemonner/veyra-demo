@@ -130,7 +130,7 @@ shorter than the 20 s reference window. One labelled flight is not a test.
 2. Unseen test of what *does* transfer: the multicopter height cross-check (estimator vs barometer vs GPS) found in the
    PX4 #26910 case, on UAV-SEAD, pre-registered before any scored run. Needs approval for the download.
 3. Unseen test of the fixed-wing model: only with new ArduPlane normal flights (several per flying day) and faults,
-   e.g. from a customer.
+   e.g. from an operator of such aircraft.
 
 Reference: Keipour, Mousaei, Scherer, *ALFA: A Dataset for UAV Fault and Anomaly Detection*, IJRR 2021,
 doi:10.1184/R1/12707963.

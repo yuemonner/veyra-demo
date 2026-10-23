@@ -38,6 +38,15 @@ from fastapi.responses import JSONResponse
 _READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
+def _public_demo() -> bool:
+    """A hosted, non-private server is the public demo unless VEYRA_PUBLIC_DEMO=false says otherwise. Render sets
+    RENDER=true on its servers, so the rule holds even if render.yaml's variables were never applied to the service."""
+    flag = os.getenv("VEYRA_PUBLIC_DEMO", "").strip().lower()
+    if flag in ("true", "false"):
+        return flag == "true"
+    return bool(os.getenv("RENDER")) and os.getenv("VEYRA_PRIVATE", "").lower() != "true"
+
+
 @app.middleware("http")
 async def access_code_gate(request: Request, call_next):
     """Hosted demo: when VEYRA_ACCESS_CODE is set, every write needs header x-veyra-access with that code. With
@@ -45,7 +54,7 @@ async def access_code_gate(request: Request, call_next):
     Reads stay open so visitors can view the demo cases. Signed webhooks keep their own HMAC check."""
     code = os.getenv("VEYRA_ACCESS_CODE", "")
     writing = request.method not in _READ_METHODS and not request.url.path.startswith("/engine/webhooks/")
-    if writing and not code and os.getenv("VEYRA_PUBLIC_DEMO", "").lower() == "true":
+    if writing and not code and _public_demo():
         # Fail closed: a public demo whose access code was never set is read-only, not open to anyone.
         return JSONResponse({"detail": "This public demo is read-only. Uploading and recording are switched off.", "code": "read_only_demo"}, status_code=403)
     if code and writing:
