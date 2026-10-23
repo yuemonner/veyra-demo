@@ -233,7 +233,12 @@ class CaseStore:
         keep = {"actuator.output", *data_questions.EVENT_SIGNALS, *data_questions.FEEDBACK_SIGNALS}
         rows = [r for (raw,) in self.db.execute("SELECT rows_json FROM imports WHERE case_id = ?", (case_id,)) for r in json.loads(raw) if r.get("signal") in keep]
         closure = next((e["payload"] for e in reversed(self.ledger(case_id)) if e["kind"] == "case_closure"), None)
-        return data_questions.answer(run, rows, self.known_good_runs(case), closure)
+        # Coverage of the ORIGINAL recording (topics not imported), shipped beside the demo seeds, matched by source flight.
+        from app.engine_seed import SEED_DIR
+        names = " ".join(i["filename"] for i in self.imports(case_id, include_rows=False))
+        coverage = next((c for c in (json.loads(p.read_text()) for p in sorted(SEED_DIR.glob("*_source_coverage.json")))
+                         if c.get("source_flight") and c["source_flight"] in names), None)
+        return data_questions.answer(run, rows, self.known_good_runs(case), closure, source_coverage=coverage)
 
     def series(self, case_id: str, signal: str, scope: Optional[str], start: float, end: float, max_points: int = 400) -> Dict[str, Any]:
         """Samples of one signal (and scope) of this case between start and end (epoch s), for plotting. Read-only.

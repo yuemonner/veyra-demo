@@ -34,7 +34,30 @@ def _unit(u: Optional[str]) -> str:
     return " µs" if u == "us" else f" {u}" if u else ""
 
 
-def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[Dict[str, Any]], closure: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def _from_source(cov: Dict[str, Any], ch: str) -> Dict[str, Any]:
+    """The 'commanded?' question, answered from topics of the original recording that were not imported."""
+    modes = cov["mode_changes"]
+    span = cov["recorded_span_s"]
+    mode_text = (f"flight mode {modes[0]['mode']} and {'armed' if modes[0]['armed'] else 'disarmed'} for the whole recorded segment "
+                 f"({span[0]:+.0f} s to {span[1]:+.0f} s around the onset; sampled about every {cov['mode_sample_interval_s']:g} s), no mode change"
+                 if len(modes) == 1 else "mode changes: " + ", ".join(f"{m['mode']} at {m['t_s']:+.1f} s" for m in modes))
+    pilot = cov["pilot_rudder_input_us"]
+    parts = [mode_text,
+             (f"the pilot's rudder input stayed at {pilot['min']} µs while the output was {cov['rudder_output_us']['min']} µs, so it was not a stick input"
+              if pilot["min"] == pilot["max"] else f"the pilot's rudder input ranged {pilot['min']}–{pilot['max']} µs during the hold")]
+    if cov.get("switch_changes"):
+        parts.append("; ".join(f"transmitter switch {x['rc_input']} changed {x['from']}→{x['to']} µs at {x['t_s']:+.1f} s" for x in cov["switch_changes"]))
+    for k, w in (cov.get("diagnostic_warnings") or {}).items():
+        parts.append(f"'{k.split(': ', 1)[-1]}' warning present from {w['first_t_s']:+.0f} s to {w['last_t_s']:+.0f} s (not new at the onset)")
+    parts.append("no autopilot status-text messages anywhere in the recording" if not cov.get("statustext_messages")
+                 else f"{cov['statustext_messages']} autopilot status-text messages")
+    return {"id": f"commanded:{ch}", "question": f"Was the hold on {ch} commanded by the pilot or a mode change?", "status": "answered",
+            "answer": "From topics of the original recording Veyra had not imported: " + "; ".join(parts) + ".",
+            "source": {"flight": cov["source_flight"], "files": cov["files"], "excluded": cov.get("excluded")}}
+
+
+def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[Dict[str, Any]], closure: Optional[Dict[str, Any]] = None,
+           source_coverage: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     outputs = [f for f in ((run.get("findings") or {}).get("actuator_outputs") or {}).get("findings", []) if f.get("rule") == "STUCK"]
     tracking = ((run.get("findings") or {}).get("tracking") or {}).get("findings", [])
     signals = {r.get("signal") for r in rows}
@@ -93,8 +116,18 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
                                          f"{'later' if dt >= 0 else 'earlier'} and the hold lasted {t1 - t0:.1f} s."),
                               "facts": {"output_onset": t0, "departure_onset": first["t_start"], "seconds_between": round(dt, 3)}})
         # 4. Commanded? Mode changes, failsafes, controller events or fault codes around the onset.
-        ev = [r for r in rows if r.get("signal") in EVENT_SIGNALS and t0 - EVENT_MARGIN_S <= r["t"] <= t1 + EVENT_MARGIN_S]
-        if ev:
+        cov = source_coverage if source_coverage and abs(source_coverage.get("onset_epoch_s", 0) - t0) < 0.5 else None
+        if cov:  # the original recording holds more than was imported: read it before asking anyone
+            questions.append(_from_source(cov, ch))
+            questions.append({"id": f"autopilot:{ch}", "question": f"Did the autopilot itself log a failsafe, an error, or a servo limit that explains {v:g}{_unit(unit)}?",
+                              "status": "not_answerable",
+                              "needs": ("The ArduPilot on-board (dataflash) log, with its ERR and EV event records, and the servo parameters "
+                                        "SERVO4_MIN, SERVO4_MAX, SERVO4_TRIM and SERVO4_REVERSED. Neither is in this recording or published with the dataset"),
+                              "check_id": "CHK-CONTROLLER-LOGS"})
+        ev = [] if cov else [r for r in rows if r.get("signal") in EVENT_SIGNALS and t0 - EVENT_MARGIN_S <= r["t"] <= t1 + EVENT_MARGIN_S]
+        if cov:
+            pass
+        elif ev:
             questions.append({"id": f"commanded:{ch}", "question": f"Did a mode change, failsafe or controller event come with the hold on {ch}?", "status": "answered",
                               "answer": "; ".join(f"{_clock(r['t'])} {r.get('code') or r.get('event_value') or r['signal']}" for r in ev[:6]) + ".",
                               "facts": {"events": len(ev)}})
@@ -138,6 +171,8 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
     return {"version": QUESTIONS_VERSION, "applicable": True, "brief": bool(outputs) and len(established) >= 2, "questions": questions, "established": established,
             "cannot_establish": [{"question": q["question"], "needs": q["needs"], "check_id": q.get("check_id")} for q in open_q],
             "next": None if not nxt else {"question": nxt["question"], "needs": nxt["needs"], "check_id": nxt.get("check_id"),
-                                          "why_a_person": "That record is not in this case. Veyra cannot reach the machine; someone with access has to retrieve it, or inspect the part."},
+                                          "why_a_person": ("Veyra read the recording's flight-mode, pilot-input, diagnostics and MAVLink records; this log is not among them. "
+                                                           "Only someone with the aircraft or its SD card can provide it." if source_coverage else
+                                                           "That record is not in this case. Veyra cannot reach the machine; someone with access has to retrieve it, or inspect the part.")},
             "decision_status": status,
             "boundary": "Answered only from records in this case and known-good runs of the same machine. Facts, not a cause."}
