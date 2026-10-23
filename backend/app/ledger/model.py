@@ -127,6 +127,24 @@ def _require_current_run(entries, run_id, state) -> Dict[str, Any]:
 REQUEST_CHANNELS = ("email", "phone", "chat", "ticket", "in_person", "other")
 
 
+def _exclusion(payload: Dict[str, Any], belief: Dict[str, Any], rules: List[str], run: Dict[str, Any]) -> Dict[str, Any]:
+    """What a 'ruled out' verdict covers: named findings (rule|signal|scope) of this run, on these files. Default: the
+    findings of the named rules, else every finding of the part at the time. Never the part as such."""
+    flagged = belief.get("flagged_keys")
+    named = payload.get("excludes")
+    if named is not None:
+        if not isinstance(named, list) or not all(isinstance(k, str) and k.count("|") == 2 for k in named):
+            raise LedgerError("'excludes' must list findings as rule|signal|scope")
+        if flagged is not None and any(k not in flagged for k in named):
+            raise LedgerError("'excludes' names a finding this run did not flag for this part")
+        excluded = named
+    elif flagged is not None:
+        excluded = [k for k in flagged if not rules or k.split("|")[0] in rules]
+    else:  # runs recorded before flagged keys existed
+        excluded = [f"{r}|*|*" for r in rules] or ["*"]
+    return {"excluded_observations": excluded, "input_hashes": run["payload"].get("input_hashes")}
+
+
 def _transition(kind: str, entries: Sequence[Dict[str, Any]], run_id: str, check_id: str) -> None:
     try:
         case_states.require_check_transition(kind, entries, run_id, check_id)
@@ -417,6 +435,7 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
         out = {"run_id": run["payload"]["run_id"], "domain": domain, "status": status, "basis": _text(payload, "basis"),
                "scope": _text(payload, "scope", required=status in ("ruled_out", "weakened"), limit=1000),
                "evidence_entries": evidence_entries, "finding_rules": rules, "engine_status_at_review": belief.get(domain, {}).get("status"),
+               **(_exclusion(payload, belief.get(domain, {}), rules, run) if status == "ruled_out" else {}),
                "boundary": "A person's judgement about one domain, limited to the stated scope. Ruled out here means: not supported by what was examined."}
         links = [run["id"], *evidence_entries]
 

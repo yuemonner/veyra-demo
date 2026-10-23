@@ -77,7 +77,10 @@ def _cross_clock_assessment(inside: Dict[str, Any], outside: Dict[str, Any]) -> 
                 "absolute_latency": absolute}
     change = inside["cross_clock_raw_median_ms"] - outside["cross_clock_raw_median_ms"]
     observed = inside["cross_clock_raw_median_ms"] > outside["cross_clock_raw_p95_ms"] and change > SEGMENT_RULE["min_increase_ms"]
-    return {"status": "delay_change_observed_assuming_stable_offset" if observed else "no_delay_change_observed_assuming_stable_offset",
+    slow = [v for v in inside.get("raw_ms") or [] if v > outside["cross_clock_raw_p95_ms"] + SEGMENT_RULE["min_increase_ms"]]
+    status = ("delay_change_observed_assuming_stable_offset" if observed else
+              "slow_commands_assuming_stable_offset" if slow else "no_delay_change_observed_assuming_stable_offset")
+    return {"status": status, "slow_commands": len(slow),
             "relative_change_ms": change, "commands_inside": n_in, "commands_outside": n_out, "absolute_latency": absolute,
             "assumption": "The offset between the two clocks stayed constant across the compared commands (no clock step or large drift).",
             "rule": f"inside raw median > outside raw p95 and change > {SEGMENT_RULE['min_increase_ms']:g} ms"}
@@ -90,13 +93,21 @@ def _segment_assessment(inside: Dict[str, Any], outside: Dict[str, Any]) -> Dict
     if n_in < SEGMENT_RULE["min_commands"] or n_out < SEGMENT_RULE["min_commands"]:
         return {"status": "insufficient_matched_commands", "detail": f"{n_in} matched commands inside, {n_out} outside (rule needs ≥{SEGMENT_RULE['min_commands']} each)"}
     increase = inside["median_ms"] - outside["median_ms"]
-    rule = f"inside median > outside p95 and increase > {SEGMENT_RULE['min_increase_ms']:g} ms"
+    # Two questions, not one: did the batch slow down (population shift), and did any single command take longer than
+    # normal allows (a stop or release command can be the one that was late). "No delay" needs both to be no.
+    limit = outside["p95_ms"] + SEGMENT_RULE["min_increase_ms"]
+    slow = [v for v in inside.get("latencies_ms") or [] if v > limit]
+    rule = (f"population shift: inside median > outside p95 and increase > {SEGMENT_RULE['min_increase_ms']:g} ms; "
+            f"single command: any inside command > outside p95 + {SEGMENT_RULE['min_increase_ms']:g} ms")
     if inside["median_ms"] > outside["p95_ms"] and increase > SEGMENT_RULE["min_increase_ms"]:
         status = "delay_observed_in_segment"
+    elif slow:
+        status = "slow_commands_in_window"
     else:
         status = "no_delay_observed_in_segment"
     return {"status": status, "inside_median_ms": inside["median_ms"], "outside_median_ms": outside["median_ms"],
-            "outside_p95_ms": outside["p95_ms"], "increase_ms": increase, "commands_inside": n_in, "commands_outside": n_out, "rule": rule}
+            "outside_p95_ms": outside["p95_ms"], "increase_ms": increase, "commands_inside": n_in, "commands_outside": n_out,
+            "max_inside_ms": inside.get("max_ms"), "single_command_limit_ms": limit, "slow_commands": len(slow), "rule": rule}
 
 
 def _command_chain(rows: List[Dict[str, Any]], window: Optional[Tuple[float, float]], skew: Dict[str, Optional[float]]) -> Dict[str, Any]:
@@ -108,13 +119,17 @@ def _command_chain(rows: List[Dict[str, Any]], window: Optional[Tuple[float, flo
     anchor_signal = next((s for s in command_chain.STAGES if any(r.get("signal") == s for r in rows)), None)
     anchor_clock = next(r["clock_domain"] for r in rows if r.get("signal") == anchor_signal)
     inside = command_chain.stage_latencies(rows, skew, window=(window[0], window[1], anchor_clock))
-    inside_ids = {c["command_id"] for c in inside["commands"]}
+    inside_ids = set(inside["command_ids"])  # the full set: inside["commands"] is a capped display list
     outside_rows = [r for r in rows if r.get("command_id") not in inside_ids]
     outside = command_chain.stage_latencies(outside_rows, skew)
     segments = {}
     for first, second, domain in command_chain.SEGMENTS:
         key = f"{first}->{second}"
         segments[key] = {"domain": domain, **_segment_assessment(inside["segments"][key], outside["segments"][key])}
+    for part in (inside, outside):  # per-command values were needed only for the assessment above
+        for seg in part["segments"].values():
+            seg.pop("latencies_ms", None)
+            seg.pop("raw_ms", None)
     return {"status": "computed", "window_clock": anchor_clock, "inside_commands": inside["command_count"], "outside_commands": outside["command_count"],
             "segments": segments, "inside": inside["segments"], "outside": outside["segments"], "declared_skew_s": skew,
             "window_note": f"Symptom window applied in {anchor_clock}; edges are uncertain by any unknown offset between clocks.",
@@ -183,14 +198,30 @@ def _domains(findings: Dict[str, Any], context_now: Dict[str, Any], normals: Seq
     for key, segment in (chain.get("segments") or {}).items():
         targets = ["vehicle_interface", "vehicle_body"] if segment["domain"] == "vehicle_interface_or_body" else [segment["domain"]]
         for d in targets:
+            seg_key = {"signal": key, "scope": None}
+            # Across two clocks the measured change = real delay change + change of the clock offset. Until the offset is
+            # bounded it is CONDITIONAL evidence: it calls for a clock check, it never makes a part "supported".
+            conditional = {"measurement": "relative_delay_change", "clock_stability": "unverified", "attribution_eligible": False}
             if segment["status"] == "delay_change_observed_assuming_stable_offset":
-                obs[d].append({"rule": "R-SEGMENT-RELATIVE", "kind": "delay", "text": f"Delay in {key} rose by {segment['relative_change_ms']:.0f} ms for {segment['commands_inside']} commands inside the window, assuming a stable clock offset (absolute latency {segment['absolute_latency']['status']})"})
+                obs[d].append({"rule": "R-SEGMENT-RELATIVE", "kind": "anomaly", "key": seg_key, **conditional, "value_ms": round(segment["relative_change_ms"], 1),
+                               "text": f"Time across {key} rose by {segment['relative_change_ms']:.0f} ms for {segment['commands_inside']} commands inside the window, "
+                                       "measured between two clocks whose offset is not verified: real delay or a clock step (conditional, not a measured delay)"})
+            elif segment["status"] == "slow_commands_assuming_stable_offset":
+                obs[d].append({"rule": "R-SEGMENT-RELATIVE", "kind": "anomaly", "key": seg_key, **conditional, "value_ms": None,
+                               "text": f"{segment['slow_commands']} of {segment['commands_inside']} commands across {key} took longer than any normal command, "
+                                       "measured between two clocks whose offset is not verified (conditional)"})
             elif segment["status"] == "no_delay_change_observed_assuming_stable_offset":
-                obs[d].append({"rule": "R-SEGMENT-RELATIVE", "kind": "no_delay", "text": f"No delay change in {key} ({segment['relative_change_ms']:+.0f} ms), assuming a stable clock offset"})
+                obs[d].append({"rule": "R-SEGMENT-RELATIVE", "kind": "unmeasured", "key": seg_key,
+                               "text": f"No change in {key} ({segment['relative_change_ms']:+.0f} ms) between two clocks whose offset is not verified; not evidence of no delay"})
             elif segment["status"] == "delay_observed_in_segment":
-                obs[d].append({"rule": "R-SEGMENT", "kind": "delay", "text": f"Delay observed in {key}: median {segment['inside_median_ms']:.0f} ms vs {segment['outside_median_ms']:.0f} ms outside"})
+                obs[d].append({"rule": "R-SEGMENT", "kind": "delay", "key": seg_key, "text": f"Delay observed in {key}: median {segment['inside_median_ms']:.0f} ms vs {segment['outside_median_ms']:.0f} ms outside"})
+            elif segment["status"] == "slow_commands_in_window":
+                obs[d].append({"rule": "R-SEGMENT", "kind": "anomaly", "key": seg_key,
+                               "text": f"{segment['slow_commands']} of {segment['commands_inside']} matched commands in {key} took longer than normal allows "
+                                       f"(slowest {segment['max_inside_ms']:.0f} ms vs normal p95 {segment['outside_p95_ms']:.0f} ms); the batch as a whole did not slow down"})
             elif segment["status"] == "no_delay_observed_in_segment":
-                obs[d].append({"rule": "R-SEGMENT", "kind": "no_delay", "text": f"No delay observed in {key} for {segment['commands_inside']} matched commands (median {segment['inside_median_ms']:.0f} ms vs {segment['outside_median_ms']:.0f} ms)"})
+                obs[d].append({"rule": "R-SEGMENT", "kind": "no_delay", "key": seg_key,
+                               "text": f"No delay in {key}: each of {segment['commands_inside']} matched commands within normal (slowest {segment['max_inside_ms']:.0f} ms, normal p95 {segment['outside_p95_ms']:.0f} ms)"})
             else:
                 obs[d].append({"rule": "R-SEGMENT", "kind": "unmeasured", "text": f"{key}: {segment['status'].replace('_', ' ')}"})
     for signal in (findings.get("transients") or {}).get("signals", []):
@@ -362,7 +393,7 @@ def investigate(*, case: Dict[str, Any], imports: List[Dict[str, Any]], assertio
     assessed = trace.call("assess_domains", {"rules": DOMAIN_RULES_VERSION, "approved_normals": [n["proposal_id"] for n in applicable]},
                           lambda: _domains(findings, context_incident, applicable), [n["proposal_id"] for n in applicable])
     domains, unscoped = assessed
-    board = trace.call("hypothesis_board", {}, lambda: triage_rules.hypothesis_board(domains, ledger, owners), [e["id"] for e in ledger if e["kind"] == "hypothesis_status"])
+    board = trace.call("hypothesis_board", {}, lambda: triage_rules.hypothesis_board(domains, ledger, owners, input_hashes={i["id"]: i["sha256"] for i in usable}), [e["id"] for e in ledger if e["kind"] == "hypothesis_status"])
     ruled_out = {b["domain"] for b in board if b["column"] == "ruled_out"}
     reports = [{**e["payload"], "entry_id": e["id"], "recorded_by": e["actor"]} for e in ledger if e["kind"] == "intervention_report"]
     reviewed = {e["payload"]["intervention_id"]: e for e in ledger if e["kind"] == "intervention_review"}
@@ -485,7 +516,9 @@ def investigate(*, case: Dict[str, Any], imports: List[Dict[str, Any]], assertio
 
 
 def belief_summary(run: Dict[str, Any]) -> List[Dict[str, Any]]:
-    return [{"domain": d, "status": v["status"], "observation_rules": sorted({o["rule"] for o in v["observations"]})} for d, v in run["domains"].items()]
+    return [{"domain": d, "status": v["status"], "observation_rules": sorted({o["rule"] for o in v["observations"]}),
+             "flagged_keys": sorted({triage_rules.observation_key(o) for o in v["observations"] if o.get("kind") in ("anomaly", "delay")})}
+            for d, v in run["domains"].items()]
 
 
 def candidate_summary(run: Dict[str, Any]) -> List[Dict[str, Any]]:

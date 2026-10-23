@@ -50,11 +50,14 @@ def test_engine_localizes_synthetic_delay_without_claiming_a_cause(store):
     confirm_identity(store)
     run = store.investigate(cid, actor="Engineer A")
     domains = {k: v["status"] for k, v in run["domains"].items()}
-    assert domains == {"network": "delay_observed", "control_suite": "anomaly_observed",
+    # The transport change is measured across two clocks with an unverified offset: conditional, so a finding, not a delay.
+    assert domains == {"network": "anomaly_observed", "control_suite": "anomaly_observed",
                        "vehicle_interface": "no_delay_observed_in_measured_part", "vehicle_body": "no_delay_observed_in_measured_part"}
     transport = run["findings"]["command_chain"]["segments"]["command.sent->command.received"]
     assert transport["status"] == "delay_change_observed_assuming_stable_offset" and 380 < transport["relative_change_ms"] < 520
     assert transport["absolute_latency"]["status"] == "unavailable" and "constant" in transport["assumption"]
+    relative = next(o for o in run["domains"]["network"]["observations"] if o["rule"] == "R-SEGMENT-RELATIVE")
+    assert relative["clock_stability"] == "unverified" and relative["attribution_eligible"] is False and 380 < relative["value_ms"] < 520
     assert run["findings"]["input_response"]["channels"][0]["status"] == "no_change_detected"
     order = [c["check_id"] for c in run["checks"]]
     assert order[:2] == ["CHK-SOURCE-ROWS", "CHK-CLOCK-OFFSET"] and order[-1] == "CHK-RESTORE"
@@ -176,7 +179,7 @@ def test_cli_full_loop_as_an_fde(tmp_path, capsys):
                           "--actor", "Engineer A", "--effective-from", "2026-03-01T00:00:00Z", "--evidence", "photo-1"]) == 0
     assert main(ws + ["investigate", cid, "--actor", "Engineer A"]) == 0
     out = capsys.readouterr().out
-    assert "network            delay_observed" in out and "CHK-CLOCK-OFFSET" in out
+    assert "network            anomaly_observed" in out and "CHK-CLOCK-OFFSET" in out
     assert main(ws + ["review", cid, "CHK-SOURCE-ROWS", "--verdict", "accepted", "--reason", "coverage", "--actor", "Engineer A"]) == 0
     assert main(ws + ["execute", cid, "CHK-SOURCE-ROWS", "--actor", "Engineer A"]) == 0
     assert main(ws + ["record", cid, "decision", "--actor", "Engineer A", "--source", "call", "--add", "options_considered=Remote fix",

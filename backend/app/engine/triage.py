@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Sequence
 
 TRIAGE_RULES_VERSION = "triage-rules-v1"
+BOARD_RULES_VERSION = "hypothesis-board-v2"
 RECURRENCE_RULES_VERSION = "recurrence-rules-v1"
 
 OWNERS = {
@@ -24,8 +25,34 @@ SAFETY_INTERVENTIONS = ("takeover", "emergency_stop")
 HANDOFF_WARNING = 2
 
 
-def hypothesis_board(domains: Dict[str, Dict[str, Any]], ledger: Sequence[Dict[str, Any]], owners: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
-    """Engine status per domain next to the latest human verdict (ruled out / weakened / supported / reopened)."""
+FLAGGED = ("anomaly", "delay")
+
+
+def observation_key(o: Dict[str, Any]) -> str:
+    """What a finding is about: rule + signal (or command segment) + scope (channel/axis). An exclusion names these."""
+    k = o.get("key") or {}
+    return f"{o.get('rule')}|{k.get('signal') or '*'}|{k.get('scope') or '*'}"
+
+
+def _covered(key: str, excluded: Sequence[str]) -> bool:
+    rule, signal, scope = key.split("|")
+    for x in excluded:
+        r, sg, sc = x.split("|")
+        if r == rule and sg in ("*", signal) and sc in ("*", scope):
+            return True
+    return False
+
+
+def hypothesis_board(domains: Dict[str, Dict[str, Any]], ledger: Sequence[Dict[str, Any]], owners: Optional[Dict[str, str]] = None,
+                     input_hashes: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
+    """Engine status per domain next to the latest human verdict (ruled out / weakened / supported / reopened).
+
+    Rules (hypothesis-board-v2):
+    - a person's verdict is never overwritten by the engine: "reopened" and "weakened" stay open even when the engine
+      measures a delay there (shown as a clue);
+    - "ruled out" covers only the findings it names (excluded_observations: rule|signal|scope), and only while the
+      evidence is the same files it was made on. A finding it does not cover, or new data, keeps the part open; the
+      old verdict stays in the record."""
     latest: Dict[str, Dict[str, Any]] = {}
     for entry in ledger:
         if entry["kind"] == "hypothesis_status":
@@ -34,19 +61,40 @@ def hypothesis_board(domains: Dict[str, Dict[str, Any]], ledger: Sequence[Dict[s
     for domain, assessment in domains.items():
         human = latest.get(domain)
         human_status = human["payload"]["status"] if human else None
+        flagged = [o for o in assessment["observations"] if o.get("kind") in FLAGGED]
+        keys = sorted({observation_key(o) for o in flagged})
+        partly, note = None, None
         if human_status == "ruled_out":
-            column = "ruled_out"
-        elif human_status == "supported" or (human_status != "weakened" and assessment["status"] == "delay_observed"):
+            p = human["payload"]
+            excluded = p.get("excluded_observations")
+            if excluded is None:  # verdicts recorded before v2: the rules they named, else everything flagged at the time
+                excluded = [f"{r}|*|*" for r in p.get("finding_rules") or []] or ["*"]
+            remaining = [] if excluded == ["*"] else [k for k in keys if not _covered(k, excluded)]
+            new_data = bool(p.get("input_hashes")) and input_hashes is not None and p["input_hashes"] != input_hashes
+            if new_data:
+                note = "Ruled out on earlier data; new data has been added since, so it is open again until someone reviews it"
+            if remaining or new_data:
+                partly = {"excluded": list(excluded), "remaining": remaining}
+                column = "supported" if any(o.get("kind") == "delay" and observation_key(o) in remaining for o in flagged) else "open"
+            else:
+                column = "ruled_out"
+        elif human_status == "supported":
             column = "supported"
-        else:
+        elif human_status in ("reopened", "weakened"):
             column = "open"
+        else:
+            column = "supported" if assessment["status"] == "delay_observed" else "open"
+        hint = None
+        if human_status in ("reopened", "weakened") and assessment["status"] == "delay_observed":
+            hint = f"{'Reopened' if human_status == 'reopened' else 'Weakened'} by a person; the engine still measures a delay here (a clue, not a verdict)"
+        elif assessment["status"] == "no_delay_observed_in_measured_part" and column != "ruled_out":
+            hint = "Measured part showed no delay; a person may rule this out for the measured scope only"
         board.append({
             "domain": domain, "owner": (owners or OWNERS).get(domain), "engine_status": assessment["status"], "column": column,
             "human": None if not human else {"status": human_status, "basis": human["payload"]["basis"], "scope": human["payload"].get("scope"),
-                                             "by": human["actor"], "at": human["recorded_at"], "entry_id": human["id"],
+                                             "by": human["actor"], "at": human["recorded_at"], "entry_id": human["id"], "note": note,
                                              "evidence_entries": human["payload"]["evidence_entries"], "finding_rules": human["payload"]["finding_rules"]},
-            "engine_hint": ("Measured part showed no delay; a person may rule this out for the measured scope only"
-                            if assessment["status"] == "no_delay_observed_in_measured_part" and human_status != "ruled_out" else None),
+            "partly_ruled_out": partly, "engine_hint": hint,
             "evidence_count": len(assessment["observations"]),
         })
     return board

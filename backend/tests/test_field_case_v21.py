@@ -120,7 +120,8 @@ def test_triage_handoffs_are_counted_and_warned(store):
         store.append(cid, "triage", {"severity": "medium", "owner": owner, "reason": "evidence moved"}, actor="Engineer")
     run = store.investigate(cid, actor="Engineer")
     assert run["triage"]["handoffs"] == 2 and run["triage"]["handoff_warning"]
-    assert run["triage"]["proposed"]["owner"]["team"] == "Network & connectivity"
+    # Network's delay is conditional on the clock offset, so no single team is named yet.
+    assert run["triage"]["proposed"]["owner"]["team"] == "Joint review: Remote-control software, Network & connectivity"
     assert run["triage"]["differs_from_proposal"] is True
 
 
@@ -140,7 +141,7 @@ def test_hypothesis_status_needs_evidence_and_shapes_the_board(store):
     run = store.investigate(cid, actor="Engineer")
     board = {b["domain"]: b for b in run["hypotheses"]}
     assert board["vehicle_interface"]["column"] == "ruled_out" and board["vehicle_interface"]["human"]["scope"] == "matched commands"
-    assert board["network"]["column"] == "supported"
+    assert board["network"]["column"] == "open"  # a clock-conditional delay never makes a part "supported"
     assert all("vehicle_interface" not in c["informs_open_domains"] for c in run["checks"])
     assert "vehicle_interface" not in [d["domain"] for d in run["triage"]["proposed"]["also_open"]]
 

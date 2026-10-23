@@ -560,6 +560,10 @@ function Hypotheses({ run, ledger }: { run: Any; ledger: Any[] }) {
                       <p className={s.by}>{human(b.human.status)} by {b.human.by} · evidence: {[...b.human.evidence_entries.map(evidenceName), ...b.human.finding_rules.map((r: string) => `finding ${r}`)].join(", ") || "—"}</p>
                     </>
                   ) : <p className={s.by}>{b.engine_hint ?? "Nobody has checked yet"}</p>}
+                  {b.human && b.engine_hint && <p className={s.by}>{b.engine_hint}</p>}
+                  {b.human?.note && <p className={s.by}><b>{b.human.note}</b></p>}
+                  {b.partly_ruled_out && b.partly_ruled_out.remaining.length > 0 && <p className={s.by}>
+                    Ruled out for what was named only. Still open: {b.partly_ruled_out.remaining.map((k: string) => k.split("|").filter((x) => x !== "*").slice(1).join(" ") || k.split("|")[0]).join("; ")}</p>}
                 </article>
               ))}
             </div>
@@ -976,6 +980,8 @@ function Findings({ run, ledger, caseId, onSaved }: { run: Any; ledger: Any[]; c
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <b>{dl(o.domain)}</b>
                   <div title={o.text}>{plain(o.text)}</div>
+                  {o.attribution_eligible === false && <p className={s.by} style={{ margin: "4px 0 0" }}>
+                    <span className={s.pill}>Conditional</span> Measured between two clocks whose offset is not verified. It calls for a clock check; it can&apos;t point at a part on its own.</p>}
                   {(() => { const spec = plotFor(run, o.rule, o.text); return spec ? <Waveform caseId={caseId} spec={spec} load={call} /> : null; })()}
                 </div>
                 {!o.key ? null : last ? (

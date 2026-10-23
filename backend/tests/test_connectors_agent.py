@@ -100,7 +100,7 @@ def test_event_opens_case_pulls_all_connectors_and_investigates(store):
         assert set(acquisitions) == {"fleet-api", "export-folder", "robot-logs"}
         assert acquisitions["fleet-api"]["imported"] == 2 and acquisitions["robot-logs"]["items"][0]["notes"][0].startswith("Converted from MCAP")
         run = store.latest_run(cid)
-        assert run["domains"]["network"]["status"] == "delay_observed"
+        assert run["domains"]["network"]["status"] == "anomaly_observed"  # cross-clock change: conditional
         assert run["findings"]["transients"]["events_in_window"] >= 1
         assert run["interventions"][0]["operator"] == "Operator A (synthetic)"
         # The same event again is not a second case.

@@ -147,10 +147,10 @@ def criteria(variant: str, r: Dict[str, Any]) -> Dict[str, bool]:
         return {**common, "matched on findings and the reported symptom": p.get("match_basis") == "findings and reported symptom",
                 "3. nothing differs": not p.get("only_now") and not p.get("only_then"),
                 "2. the check that settled incident 1 is first in Next checks": top_after[:1] == ["CHK-NETWORK-LOGS"],
-                "owner proposed from this case's evidence: network": r["own_conclusions"]["triage"]["owner"]["domains"] == ["network"]}
+                "owner proposed from this case's evidence: includes network": "network" in r["own_conclusions"]["triage"]["owner"]["domains"]}
     return {**common, "matched on the reported symptom only": p.get("match_basis") == "reported symptom only",
             "3. says the evidence points elsewhere": p.get("evidence_points_elsewhere") is True,
-            "3. says where incident 1 found its problem is quiet now": any(x["part"] == "Network" and x["status_now"] == "no_delay_observed_in_measured_part"
+            "3. says where incident 1 found its problem is quiet now": any(x["part"] == "Network" and x["status_now"] in ("no_delay_observed_in_measured_part", "not_observed")
                                                                          for x in p.get("earlier_parts_now", [])),
             "3. lists what is only in this case": any("Machine body" in x for x in p.get("only_now", [])),
             "2. incident 1's check shown but NOT moved up": bool(p.get("check_not_moved_up")) and "CHK-NETWORK-LOGS" not in top_after,

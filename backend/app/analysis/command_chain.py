@@ -90,7 +90,8 @@ def stage_latencies(rows: Iterable[Dict[str, Any]], declared_skew_s: Mapping[str
         counts: Dict[str, int] = {}
         for r in results:
             counts[r["status"]] = counts.get(r["status"], 0) + 1
-        entry: Dict[str, Any] = {"domain": domain, "status_counts": counts, "computed_count": len(exact)}
+        # latencies_ms / raw_ms: every value, for the per-command test; the caller drops them before storing the run.
+        entry: Dict[str, Any] = {"domain": domain, "status_counts": counts, "computed_count": len(exact), "latencies_ms": exact}
         if exact:
             entry.update(median_ms=_percentile(exact, 0.5), p95_ms=_percentile(exact, 0.95), max_ms=exact[-1], min_ms=exact[0])
         if uncertain:
@@ -99,7 +100,7 @@ def stage_latencies(rows: Iterable[Dict[str, Any]], declared_skew_s: Mapping[str
                          uncertainty_ms=max(r["uncertainty_ms"] for r in uncertain))
         raw = sorted(r["raw_clock_difference_ms"] for r in results if "raw_clock_difference_ms" in r)
         if raw:
-            entry.update(cross_clock_count=len(raw), cross_clock_raw_median_ms=_percentile(raw, 0.5), cross_clock_raw_p95_ms=_percentile(raw, 0.95),
+            entry.update(raw_ms=raw, cross_clock_count=len(raw), cross_clock_raw_median_ms=_percentile(raw, 0.5), cross_clock_raw_p95_ms=_percentile(raw, 0.95),
                          cross_clock_note="Raw differences between clocks include an unknown offset; only changes between groups of commands are meaningful, assuming the offset is stable.")
         if not exact and not uncertain:
             entry["availability"] = "unavailable"
@@ -107,6 +108,8 @@ def stage_latencies(rows: Iterable[Dict[str, Any]], declared_skew_s: Mapping[str
 
     return {
         "tool": TOOL_VERSION, "command_count": len(commands), "segments": summary,
+        # command_ids is the full analysis set; `commands` is only a display list, capped. Never derive analysis from it.
+        "command_ids": [c["command_id"] for c in commands],
         "commands": commands[:MAX_COMMANDS_LISTED], "truncated": len(commands) > MAX_COMMANDS_LISTED,
         "declared_skew_s": dict(declared_skew_s), "window": list(window) if window else None,
         "boundary": "Elapsed time between matched records of the same command. Not a cause. Cross-clock latency is "
