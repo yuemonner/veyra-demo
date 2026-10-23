@@ -1,0 +1,3478 @@
+{
+ "dataset": "CMU AirLab ALFA, real flights (CC0 per README)",
+ "rules": "precedent-rules-v1",
+ "assumption": "ALFA labels stand in for the engineer's confirmed cause when a case is closed",
+ "retrieval": {
+  "fault_flights": {
+   "queries": 36,
+   "top1_same_kind": 21,
+   "any_shown_same_kind": 22,
+   "nothing_shown": 11,
+   "top1_different_kind": 4
+  },
+  "by_kind": {
+   "aileron": {
+    "queries": 8,
+    "top1_same_kind": 7,
+    "any_shown_same_kind": 8,
+    "nothing_shown": 0,
+    "top1_different_kind": 1
+   },
+   "elevator": {
+    "queries": 2,
+    "top1_same_kind": 2,
+    "any_shown_same_kind": 2,
+    "nothing_shown": 0,
+    "top1_different_kind": 0
+   },
+   "rudder": {
+    "queries": 4,
+    "top1_same_kind": 4,
+    "any_shown_same_kind": 4,
+    "nothing_shown": 0,
+    "top1_different_kind": 0
+   },
+   "engines": {
+    "queries": 23,
+    "top1_same_kind": 9,
+    "any_shown_same_kind": 9,
+    "nothing_shown": 11,
+    "top1_different_kind": 3
+   }
+  },
+  "normal_flights_queried": 11,
+  "normal_flights_with_a_precedent_shown": 1,
+  "chance_top1_same_kind": 0.457
+ },
+ "replay_in_time_order": {
+  "flights_replayed": 36,
+  "with_earlier_closed_cases": 35,
+  "a_precedent_shown": 22,
+  "top_precedent_same_kind": 19,
+  "top_precedent_different_kind": 3,
+  "nothing_shown": 13,
+  "own_evidence_unchanged_on_every_flight": true,
+  "root_cause_still_unconfirmed_on_every_flight": true
+ },
+ "replay": [
+  {
+   "flight": "carbonZ_2018-07-18-15-53-31_1_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "throttle_rc3"
+    }
+   ],
+   "closed_before": 0,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     "Evidence points at Actuation (servos & outputs); no reproduction attempt recorded"
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-07-18-15-53-31_2_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 1,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-07-18-16-22-01_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 2,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-07-18-16-37-39_2_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "throttle_rc3"
+    }
+   ],
+   "closed_before": 3,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-07-18-15-53-31_1_engine_failure",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-07-18-15-53-31_1_engine_failure (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-07-30-16-29-45_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "throttle_rc3"
+    }
+   ],
+   "closed_before": 4,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-07-18-16-37-39_2_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-18-15-53-31_1_engine_failure",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-07-18-16-37-39_2_engine_failure_with_emr_traj (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-07-30-16-39-00_1_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 5,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-07-30-16-39-00_2_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "pitch"
+    }
+   ],
+   "closed_before": 6,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     "Evidence points at Airframe & propulsion; no reproduction attempt recorded"
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-07-30-17-10-45_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 7,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-07-30-17-20-01_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "throttle_rc3"
+    }
+   ],
+   "closed_before": 8,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-16-29-45_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-18-16-37-39_2_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-18-15-53-31_1_engine_failure",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-07-30-16-29-45_engine_failure_with_emr_traj (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "roll"
+    }
+   ],
+   "closed_before": 9,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-16-39-00_2_engine_failure",
+     "similarity": 0.5,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [],
+     "only_now": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_then": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (pitch)"
+     ]
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-07-30-16-39-00_2_engine_failure (similarity 0.5); Stopped following its commands: roll"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-07-30-17-46-31_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 10,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-09-11-11-56-30_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "roll"
+    },
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "throttle_rc3"
+    }
+   ],
+   "closed_before": 11,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj",
+     "similarity": 0.5,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-20-01_engine_failure_with_emr_traj",
+     "similarity": 0.5,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-16-29-45_engine_failure_with_emr_traj",
+     "similarity": 0.5,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj (similarity 0.5); Stopped following its commands: roll"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 2
+  },
+  {
+   "flight": "carbonZ_2018-09-11-14-22-07_1_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 12,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-09-11-14-22-07_2_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "throttle_rc3"
+    }
+   ],
+   "closed_before": 13,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-20-01_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-16-29-45_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-18-16-37-39_2_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-07-30-17-20-01_engine_failure_with_emr_traj (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 2
+  },
+  {
+   "flight": "carbonZ_2018-09-11-14-41-51_elevator_failure",
+   "kinds": [
+    "elevator"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "pitch"
+    }
+   ],
+   "closed_before": 14,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-16-39-00_2_engine_failure",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (pitch)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj",
+     "similarity": 0.5,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [],
+     "only_now": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (pitch)"
+     ],
+     "only_then": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ]
+    }
+   ],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-07-30-16-39-00_2_engine_failure (similarity 1); Stopped following its commands: pitch"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-09-11-14-52-54_left_aileron__right_aileron__failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-MIRROR",
+     "signal": "actuator.output",
+     "scope": "aileron_rc5|aileron_rc6"
+    }
+   ],
+   "closed_before": 15,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     "Evidence points at Actuation (servos & outputs); no reproduction attempt recorded"
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-09-11-15-05-11_1_elevator_failure",
+   "kinds": [
+    "elevator"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "pitch"
+    }
+   ],
+   "closed_before": 16,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-14-41-51_elevator_failure",
+     "similarity": 1.0,
+     "earlier_cause": "elevator failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (pitch)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-16-39-00_2_engine_failure",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (pitch)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj",
+     "similarity": 0.5,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [],
+     "only_now": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (pitch)"
+     ],
+     "only_then": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ]
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-09-11-14-41-51_elevator_failure (similarity 1); Stopped following its commands: pitch"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-09-11-15-06-34_1_rudder_right_failure",
+   "kinds": [
+    "rudder"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "roll"
+    },
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "rudder_rc4"
+    }
+   ],
+   "closed_before": 17,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-11-56-30_engine_failure",
+     "similarity": 0.667,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (rudder_rc4)"
+     ],
+     "only_then": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ]
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj",
+     "similarity": 0.5,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (rudder_rc4)"
+     ],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-09-11-11-56-30_engine_failure (similarity 0.667); Stopped following its commands: roll"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-09-11-15-06-34_2_rudder_right_failure",
+   "kinds": [
+    "rudder"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "roll"
+    },
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "rudder_rc4"
+    }
+   ],
+   "closed_before": 18,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-15-06-34_1_rudder_right_failure",
+     "similarity": 1.0,
+     "earlier_cause": "rudder failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)",
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (rudder_rc4)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-11-56-30_engine_failure",
+     "similarity": 0.667,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (rudder_rc4)"
+     ],
+     "only_then": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ]
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj",
+     "similarity": 0.5,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (rudder_rc4)"
+     ],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-09-11-15-06-34_1_rudder_right_failure (similarity 1); Stopped following its commands: roll"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-09-11-15-06-34_3_rudder_left_failure",
+   "kinds": [
+    "rudder"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "roll"
+    },
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "rudder_rc4"
+    }
+   ],
+   "closed_before": 19,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-15-06-34_2_rudder_right_failure",
+     "similarity": 1.0,
+     "earlier_cause": "rudder failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)",
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (rudder_rc4)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-15-06-34_1_rudder_right_failure",
+     "similarity": 1.0,
+     "earlier_cause": "rudder failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)",
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (rudder_rc4)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-11-56-30_engine_failure",
+     "similarity": 0.667,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (rudder_rc4)"
+     ],
+     "only_then": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ]
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-09-11-15-06-34_2_rudder_right_failure (similarity 1); Stopped following its commands: roll"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 1
+  },
+  {
+   "flight": "carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure",
+   "kinds": [
+    "aileron",
+    "rudder"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "roll"
+    },
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-MIRROR",
+     "signal": "actuator.output",
+     "scope": "aileron_rc5|aileron_rc6"
+    }
+   ],
+   "closed_before": 20,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-14-52-54_left_aileron__right_aileron__failure",
+     "similarity": 0.5,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj",
+     "similarity": 0.5,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-15-06-34_3_rudder_left_failure",
+     "similarity": 0.467,
+     "earlier_cause": "rudder failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_then": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (rudder_rc4)"
+     ]
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-09-11-14-52-54_left_aileron__right_aileron__failure (similarity 0.5); Stopped following its commands: roll"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 3
+  },
+  {
+   "flight": "carbonZ_2018-09-11-17-27-13_2_both_ailerons_failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "roll"
+    }
+   ],
+   "closed_before": 21,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure",
+     "similarity": 0.5,
+     "earlier_cause": "aileron+rudder failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [],
+     "only_then": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ]
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-15-06-34_3_rudder_left_failure",
+     "similarity": 0.5,
+     "earlier_cause": "rudder failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_now": [],
+     "only_then": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (rudder_rc4)"
+     ]
+    }
+   ],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj (similarity 1); Stopped following its commands: roll"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 6
+  },
+  {
+   "flight": "carbonZ_2018-09-11-17-55-30_1_right_aileron_failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-MIRROR",
+     "signal": "actuator.output",
+     "scope": "aileron_rc5|aileron_rc6"
+    }
+   ],
+   "closed_before": 22,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-14-52-54_left_aileron__right_aileron__failure",
+     "similarity": 1.0,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure",
+     "similarity": 0.5,
+     "earlier_cause": "aileron+rudder failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ]
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-09-11-14-52-54_left_aileron__right_aileron__failure (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-09-11-17-55-30_2_left_aileron_failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-MIRROR",
+     "signal": "actuator.output",
+     "scope": "aileron_rc5|aileron_rc6"
+    }
+   ],
+   "closed_before": 23,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-17-55-30_1_right_aileron_failure",
+     "similarity": 1.0,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-14-52-54_left_aileron__right_aileron__failure",
+     "similarity": 1.0,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure",
+     "similarity": 0.5,
+     "earlier_cause": "aileron+rudder failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ]
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-09-11-17-55-30_1_right_aileron_failure (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+   "kinds": [
+    "aileron"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-MIRROR",
+     "signal": "actuator.output",
+     "scope": "aileron_rc5|aileron_rc6"
+    }
+   ],
+   "closed_before": 24,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-17-55-30_2_left_aileron_failure",
+     "similarity": 1.0,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-17-55-30_1_right_aileron_failure",
+     "similarity": 1.0,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-14-52-54_left_aileron__right_aileron__failure",
+     "similarity": 1.0,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-09-11-17-55-30_2_left_aileron_failure (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 1
+  },
+  {
+   "flight": "carbonZ_2018-10-05-14-37-22_2_right_aileron_failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_body",
+     "rule": "R-TRACKING",
+     "signal": "vehicle.attitude",
+     "scope": "roll"
+    },
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-MIRROR",
+     "signal": "actuator.output",
+     "scope": "aileron_rc5|aileron_rc6"
+    }
+   ],
+   "closed_before": 25,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure",
+     "similarity": 1.0,
+     "earlier_cause": "aileron+rudder failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)",
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+     "similarity": 0.5,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-17-55-30_2_left_aileron_failure",
+     "similarity": 0.5,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [
+      "Airframe & propulsion: R-TRACKING on vehicle.attitude (roll)"
+     ],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure (similarity 1); Stopped following its commands: roll"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 8
+  },
+  {
+   "flight": "carbonZ_2018-10-05-14-37-22_3_left_aileron_failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-MIRROR",
+     "signal": "actuator.output",
+     "scope": "aileron_rc5|aileron_rc6"
+    }
+   ],
+   "closed_before": 26,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-17-55-30_2_left_aileron_failure",
+     "similarity": 1.0,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-17-55-30_1_right_aileron_failure",
+     "similarity": 1.0,
+     "earlier_cause": "aileron failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-MIRROR on actuator.output (aileron_rc5|aileron_rc6)"
+     ],
+     "only_now": [],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 3
+  },
+  {
+   "flight": "carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "throttle_rc3"
+    }
+   ],
+   "closed_before": 27,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-14-22-07_2_engine_failure",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-20-01_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-16-29-45_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-09-11-14-22-07_2_engine_failure (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 3
+  },
+  {
+   "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "throttle_rc3"
+    }
+   ],
+   "closed_before": 28,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-14-22-07_2_engine_failure",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-07-30-17-20-01_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 4
+  },
+  {
+   "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "throttle_rc3"
+    }
+   ],
+   "closed_before": 29,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-09-11-14-22-07_2_engine_failure",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 5
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-03-57_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 30,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-04-00_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 31,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-04-08_1_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 32,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-04-08_2_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 33,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-04-35_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [],
+   "closed_before": 34,
+   "shown": [],
+   "top_same_kind": false,
+   "next_checks": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ],
+    [
+     "CHK-REPRODUCE",
+     null
+    ]
+   ],
+   "precedent_check_first_actionable": null,
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 0
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature": [
+    {
+     "domain": "vehicle_interface",
+     "rule": "R-OUTPUT-STUCK",
+     "signal": "actuator.output",
+     "scope": "throttle_rc3"
+    }
+   ],
+   "closed_before": 35,
+   "shown": [
+    {
+     "title": "ALFA flight carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    },
+    {
+     "title": "ALFA flight carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj",
+     "similarity": 1.0,
+     "earlier_cause": "engines failure (ALFA label)",
+     "status": "cause_confirmed",
+     "evidence_strength": "direct",
+     "decisive_check": "CHK-ONSITE-ACTUATOR",
+     "same": [
+      "Actuation (servos & outputs): R-OUTPUT-STUCK on actuator.output (throttle_rc3)"
+     ],
+     "only_now": [],
+     "only_then": []
+    }
+   ],
+   "top_same_kind": true,
+   "next_checks": [
+    [
+     "CHK-ONSITE-ACTUATOR",
+     "Settled a similar earlier case: ALFA flight carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj (similarity 1)"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: control_version, firmware_version, model"
+    ]
+   ],
+   "precedent_check_first_actionable": "CHK-ONSITE-ACTUATOR",
+   "own_evidence_unchanged": true,
+   "root_cause": "unconfirmed",
+   "not_shown": 6
+  }
+ ],
+ "flights": [
+  {
+   "flight": "carbonZ_2018-07-18-12-10-11_no_ground_truth",
+   "kinds": [],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  },
+  {
+   "flight": "carbonZ_2018-07-18-15-53-31_1_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-07-18-15-53-31_2_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-07-18-16-22-01_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-07-18-16-37-39_1_no_failure",
+   "kinds": [],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  },
+  {
+   "flight": "carbonZ_2018-07-18-16-37-39_2_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-07-30-16-29-45_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-07-30-16-39-00_1_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-07-30-16-39-00_2_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-09-11-15-05-11_1_elevator_failure",
+     "kinds": [
+      "elevator"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-14-41-51_elevator_failure",
+     "kinds": [
+      "elevator"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-27-13_2_both_ailerons_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 0.5,
+     "different": 2
+    }
+   ],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-07-30-16-39-00_3_no_failure",
+   "kinds": [],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  },
+  {
+   "flight": "carbonZ_2018-07-30-17-10-45_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-07-30-17-20-01_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-09-11-17-27-13_2_both_ailerons_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-14-37-22_2_right_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 0.5,
+     "different": 1
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure",
+     "kinds": [
+      "aileron",
+      "rudder"
+     ],
+     "similarity": 0.5,
+     "different": 1
+    }
+   ],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-07-30-17-46-31_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-09-11-11-56-30_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 2,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-09-11-15-06-34_2_rudder_right_failure",
+     "kinds": [
+      "rudder"
+     ],
+     "similarity": 0.667,
+     "different": 2
+    },
+    {
+     "flight": "carbonZ_2018-09-11-15-06-34_1_rudder_right_failure",
+     "kinds": [
+      "rudder"
+     ],
+     "similarity": 0.667,
+     "different": 2
+    },
+    {
+     "flight": "carbonZ_2018-09-11-15-06-34_3_rudder_left_failure",
+     "kinds": [
+      "rudder"
+     ],
+     "similarity": 0.667,
+     "different": 2
+    }
+   ],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-09-11-14-16-55_no_failure",
+   "kinds": [],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  },
+  {
+   "flight": "carbonZ_2018-09-11-14-22-07_1_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-09-11-14-22-07_2_engine_failure",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-09-11-14-41-38_no_failure",
+   "kinds": [],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  },
+  {
+   "flight": "carbonZ_2018-09-11-14-41-51_elevator_failure",
+   "kinds": [
+    "elevator"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-09-11-15-05-11_1_elevator_failure",
+     "kinds": [
+      "elevator"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-07-30-16-39-00_2_engine_failure",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-27-13_2_both_ailerons_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 0.5,
+     "different": 2
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-09-11-14-52-54_left_aileron__right_aileron__failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-05-14-37-22_3_left_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-55-30_1_right_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-09-11-15-05-11_1_elevator_failure",
+   "kinds": [
+    "elevator"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-09-11-14-41-51_elevator_failure",
+     "kinds": [
+      "elevator"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-07-30-16-39-00_2_engine_failure",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-27-13_2_both_ailerons_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 0.5,
+     "different": 2
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-09-11-15-05-11_2_no_failure",
+   "kinds": [],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  },
+  {
+   "flight": "carbonZ_2018-09-11-15-06-34_1_rudder_right_failure",
+   "kinds": [
+    "rudder"
+   ],
+   "signature_size": 2,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-09-11-15-06-34_2_rudder_right_failure",
+     "kinds": [
+      "rudder"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-15-06-34_3_rudder_left_failure",
+     "kinds": [
+      "rudder"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-11-56-30_engine_failure",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 0.667,
+     "different": 2
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-09-11-15-06-34_2_rudder_right_failure",
+   "kinds": [
+    "rudder"
+   ],
+   "signature_size": 2,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-09-11-15-06-34_1_rudder_right_failure",
+     "kinds": [
+      "rudder"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-15-06-34_3_rudder_left_failure",
+     "kinds": [
+      "rudder"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-11-56-30_engine_failure",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 0.667,
+     "different": 2
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-09-11-15-06-34_3_rudder_left_failure",
+   "kinds": [
+    "rudder"
+   ],
+   "signature_size": 2,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-09-11-15-06-34_2_rudder_right_failure",
+     "kinds": [
+      "rudder"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-15-06-34_1_rudder_right_failure",
+     "kinds": [
+      "rudder"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-11-56-30_engine_failure",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 0.667,
+     "different": 2
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure",
+   "kinds": [
+    "aileron",
+    "rudder"
+   ],
+   "signature_size": 2,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-05-14-37-22_2_right_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-14-37-22_3_left_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 0.5,
+     "different": 1
+    },
+    {
+     "flight": "carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 0.5,
+     "different": 1
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-09-11-17-27-13_2_both_ailerons_failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-14-37-22_2_right_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 0.5,
+     "different": 1
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure",
+     "kinds": [
+      "aileron",
+      "rudder"
+     ],
+     "similarity": 0.5,
+     "different": 1
+    }
+   ],
+   "top1_same_kind": false,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-09-11-17-55-30_1_right_aileron_failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-05-14-37-22_3_left_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-55-30_2_left_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-09-11-17-55-30_2_left_aileron_failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-05-14-37-22_3_left_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-55-30_1_right_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-10-05-14-34-20_1_no_failure",
+   "kinds": [],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  },
+  {
+   "flight": "carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+   "kinds": [
+    "aileron"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-05-14-37-22_3_left_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-55-30_1_right_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-55-30_2_left_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-10-05-14-37-22_1_no_failure",
+   "kinds": [],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  },
+  {
+   "flight": "carbonZ_2018-10-05-14-37-22_2_right_aileron_failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature_size": 2,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure",
+     "kinds": [
+      "aileron",
+      "rudder"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-14-37-22_3_left_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 0.5,
+     "different": 1
+    },
+    {
+     "flight": "carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 0.5,
+     "different": 1
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-10-05-14-37-22_3_left_aileron_failure",
+   "kinds": [
+    "aileron"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-55-30_1_right_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-09-11-17-55-30_2_left_aileron_failure",
+     "kinds": [
+      "aileron"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-10-05-15-52-12_1_no_failure",
+   "kinds": [],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  },
+  {
+   "flight": "carbonZ_2018-10-05-15-52-12_2_no_failure",
+   "kinds": [],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  },
+  {
+   "flight": "carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-03-57_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-04-00_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-04-08_1_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-04-08_2_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-04-35_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": false,
+   "any_same_kind": false
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj",
+   "kinds": [
+    "engines"
+   ],
+   "signature_size": 1,
+   "shown": [
+    {
+     "flight": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    },
+    {
+     "flight": "carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj",
+     "kinds": [
+      "engines"
+     ],
+     "similarity": 1.0,
+     "different": 0
+    }
+   ],
+   "top1_same_kind": true,
+   "any_same_kind": true
+  },
+  {
+   "flight": "carbonZ_2018-10-18-11-08-24_no_failure",
+   "kinds": [],
+   "signature_size": 0,
+   "shown": [],
+   "top1_same_kind": null,
+   "any_same_kind": null
+  }
+ ],
+ "signatures": {
+  "carbonZ_2018-07-18-12-10-11_no_ground_truth": [],
+  "carbonZ_2018-07-18-15-53-31_1_engine_failure": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-07-18-15-53-31_2_engine_failure": [],
+  "carbonZ_2018-07-18-16-22-01_engine_failure_with_emr_traj": [],
+  "carbonZ_2018-07-18-16-37-39_1_no_failure": [],
+  "carbonZ_2018-07-18-16-37-39_2_engine_failure_with_emr_traj": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-07-30-16-29-45_engine_failure_with_emr_traj": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-07-30-16-39-00_1_engine_failure": [],
+  "carbonZ_2018-07-30-16-39-00_2_engine_failure": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "pitch"
+   }
+  ],
+  "carbonZ_2018-07-30-16-39-00_3_no_failure": [],
+  "carbonZ_2018-07-30-17-10-45_engine_failure_with_emr_traj": [],
+  "carbonZ_2018-07-30-17-20-01_engine_failure_with_emr_traj": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-07-30-17-36-35_engine_failure_with_emr_traj": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "roll"
+   }
+  ],
+  "carbonZ_2018-07-30-17-46-31_engine_failure_with_emr_traj": [],
+  "carbonZ_2018-09-11-11-56-30_engine_failure": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "roll"
+   },
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-09-11-14-16-55_no_failure": [],
+  "carbonZ_2018-09-11-14-22-07_1_engine_failure": [],
+  "carbonZ_2018-09-11-14-22-07_2_engine_failure": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-09-11-14-41-38_no_failure": [],
+  "carbonZ_2018-09-11-14-41-51_elevator_failure": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "pitch"
+   }
+  ],
+  "carbonZ_2018-09-11-14-52-54_left_aileron__right_aileron__failure": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-MIRROR",
+    "signal": "actuator.output",
+    "scope": "aileron_rc5|aileron_rc6"
+   }
+  ],
+  "carbonZ_2018-09-11-15-05-11_1_elevator_failure": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "pitch"
+   }
+  ],
+  "carbonZ_2018-09-11-15-05-11_2_no_failure": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-09-11-15-06-34_1_rudder_right_failure": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "roll"
+   },
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "rudder_rc4"
+   }
+  ],
+  "carbonZ_2018-09-11-15-06-34_2_rudder_right_failure": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "roll"
+   },
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "rudder_rc4"
+   }
+  ],
+  "carbonZ_2018-09-11-15-06-34_3_rudder_left_failure": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "roll"
+   },
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "rudder_rc4"
+   }
+  ],
+  "carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "roll"
+   },
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-MIRROR",
+    "signal": "actuator.output",
+    "scope": "aileron_rc5|aileron_rc6"
+   }
+  ],
+  "carbonZ_2018-09-11-17-27-13_2_both_ailerons_failure": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "roll"
+   }
+  ],
+  "carbonZ_2018-09-11-17-55-30_1_right_aileron_failure": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-MIRROR",
+    "signal": "actuator.output",
+    "scope": "aileron_rc5|aileron_rc6"
+   }
+  ],
+  "carbonZ_2018-09-11-17-55-30_2_left_aileron_failure": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-MIRROR",
+    "signal": "actuator.output",
+    "scope": "aileron_rc5|aileron_rc6"
+   }
+  ],
+  "carbonZ_2018-10-05-14-34-20_1_no_failure": [],
+  "carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-MIRROR",
+    "signal": "actuator.output",
+    "scope": "aileron_rc5|aileron_rc6"
+   }
+  ],
+  "carbonZ_2018-10-05-14-37-22_1_no_failure": [],
+  "carbonZ_2018-10-05-14-37-22_2_right_aileron_failure": [
+   {
+    "domain": "vehicle_body",
+    "rule": "R-TRACKING",
+    "signal": "vehicle.attitude",
+    "scope": "roll"
+   },
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-MIRROR",
+    "signal": "actuator.output",
+    "scope": "aileron_rc5|aileron_rc6"
+   }
+  ],
+  "carbonZ_2018-10-05-14-37-22_3_left_aileron_failure": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-MIRROR",
+    "signal": "actuator.output",
+    "scope": "aileron_rc5|aileron_rc6"
+   }
+  ],
+  "carbonZ_2018-10-05-15-52-12_1_no_failure": [],
+  "carbonZ_2018-10-05-15-52-12_2_no_failure": [],
+  "carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-10-18-11-03-57_engine_failure_with_emr_traj": [],
+  "carbonZ_2018-10-18-11-04-00_engine_failure_with_emr_traj": [],
+  "carbonZ_2018-10-18-11-04-08_1_engine_failure_with_emr_traj": [],
+  "carbonZ_2018-10-18-11-04-08_2_engine_failure_with_emr_traj": [],
+  "carbonZ_2018-10-18-11-04-35_engine_failure_with_emr_traj": [],
+  "carbonZ_2018-10-18-11-06-06_engine_failure_with_emr_traj": [
+   {
+    "domain": "vehicle_interface",
+    "rule": "R-OUTPUT-STUCK",
+    "signal": "actuator.output",
+    "scope": "throttle_rc3"
+   }
+  ],
+  "carbonZ_2018-10-18-11-08-24_no_failure": []
+ }
+}

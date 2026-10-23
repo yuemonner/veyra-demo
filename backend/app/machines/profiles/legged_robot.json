@@ -1,0 +1,103 @@
+{
+  "id": "legged_robot",
+  "name": "Legged robot (quadruped)",
+  "description": "Walking robot whose locomotion controller drives one actuator per joint (e.g. ANYmal D: 4 legs x 3 joints).",
+  "domains": {
+    "network": {
+      "label": "Communication (operator & mission link)",
+      "owner": "Field communications"
+    },
+    "control_suite": {
+      "label": "Locomotion controller & autonomy",
+      "owner": "Locomotion & autonomy software"
+    },
+    "vehicle_interface": {
+      "label": "Joint drives (actuators)",
+      "owner": "Actuators & drives"
+    },
+    "vehicle_body": {
+      "label": "Legs, body & terrain contact",
+      "owner": "Mechanics & field operations"
+    }
+  },
+  "signal_roles": {
+    "joint.position": "vehicle_interface",
+    "joint.torque": "vehicle_interface",
+    "actuator.status": "vehicle_interface",
+    "vehicle.velocity": "vehicle_body",
+    "vehicle.yaw_rate": "vehicle_body",
+    "vehicle.attitude": "vehicle_body"
+  },
+  "checks": {
+    "CHK-CONTROLLER-LOGS": {
+      "question": "Retrieve the locomotion controller and robot state-machine log (mode changes, protective stops, controller switches) for this mission",
+      "why": "A controller switch, protective stop or e-stop at the onset is recorded only by the robot's own software log.",
+      "who": "Locomotion software engineer",
+      "tools": [
+        "Robot software log (e.g. ANYmal state machine / ROS bag of controller topics)"
+      ]
+    },
+    "CHK-NETWORK-LOGS": {
+      "question": "Export the operator link logs (Wi-Fi or mesh signal, joystick message rate) for the mission",
+      "who": "Field communications engineer",
+      "tools": [
+        "Base station and radio logs",
+        "Operator console log"
+      ]
+    },
+    "CHK-PROBE-PATH": {
+      "applicable": false
+    },
+    "CHK-ONSITE-ACTUATOR": {
+      "question": "Inspect the joint drive named in the evidence: drive error register, temperature, encoder and cabling, then the leg it moves",
+      "why": "A joint that stops following its commands is first a drive question (drive fault, encoder, temperature derating), then a mechanical one (leg, foot, obstruction).",
+      "who": "Actuator technician",
+      "tools": [
+        "Drive status and error log",
+        "Joint calibration check",
+        "Leg inspection on the stand"
+      ]
+    },
+    "CHK-CLOCK-OFFSET": {
+      "question": "Establish the clock offset between the operator console and the robot's onboard computers",
+      "who": "Locomotion software engineer",
+      "tools": [
+        "Onboard time-sync (PTP/chrony) status",
+        "A shared timestamped event"
+      ],
+      "why": "Without a bounded offset between the operator console and the robot's clocks, delays between a command sent and the robot's motion cannot be measured."
+    },
+    "CHK-CONFIRM-CONTEXT": {
+      "question": "Confirm the robot model, onboard software release and locomotion controller version for this mission",
+      "who": "Field operations"
+    },
+    "CHK-REPRODUCE": {
+      "question": "Replay the recorded commands on the same robot on a test stand or in simulation, on the same terrain type",
+      "who": "Locomotion software engineer",
+      "tools": [
+        "Robot simulator",
+        "Test stand"
+      ]
+    }
+  },
+  "context_keys": [
+    "model",
+    "control_version"
+  ],
+  "routine_events": [
+    {
+      "signal": "controller.event",
+      "pattern": "command mode (1 -> 13|13 -> 1)$",
+      "min_scopes": 12,
+      "within_s": 1.0,
+      "why": "all 12 joint drives switched between freeze (1) and position control (13) together: the robot standing up or lying down (ANYdrive command modes)"
+    },
+    {
+      "signal": "actuator.status",
+      "pattern": "status 0x000000(17|d7) -> 0x000000(17|d7)$",
+      "min_scopes": 12,
+      "within_s": 1.0,
+      "why": "all 12 joint drives changed status word together with that command-mode switch"
+    }
+  ]
+}

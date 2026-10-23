@@ -1,0 +1,48 @@
+{
+  "id": "agricultural_robot",
+  "name": "Agricultural field robot",
+  "description": "Autonomous field robot (driving base plus implement) with RTK positioning and remote supervision. Configuration only: no engine code is specific to it.",
+  "domains": {
+    "network": {
+      "label": "Connectivity (RTK, LTE, Wi-Fi)",
+      "owner": "Connectivity"
+    },
+    "control_suite": {
+      "label": "Autonomy & control software",
+      "owner": "Autonomy software"
+    },
+    "vehicle_interface": {
+      "label": "Drive & implement actuation",
+      "owner": "Controls & actuation"
+    },
+    "vehicle_body": {
+      "label": "Vehicle, implement & hydraulics",
+      "owner": "Field service"
+    }
+  },
+  "signal_roles": {
+    "vehicle.hydraulic_pressure": "vehicle_body"
+  },
+  "checks": {
+    "CHK-CONTROLLER-LOGS": {
+      "question": "Retrieve the autonomy stack's mission and event logs around the onset",
+      "who": "Autonomy engineer",
+      "tools": [
+        "Robot log export (e.g. ROS bag or MCAP)"
+      ]
+    },
+    "CHK-ONSITE-ACTUATOR": {
+      "question": "Inspect drive motors, implement actuators and hydraulics on the machine",
+      "who": "Field service technician",
+      "tools": [
+        "Service tooling approved by the OEM"
+      ]
+    }
+  },
+  "context_keys": [
+    "model",
+    "firmware_version",
+    "control_version",
+    "operating_conditions"
+  ]
+}

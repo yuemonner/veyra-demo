@@ -1,0 +1,54 @@
+services:
+  - type: web
+    name: veyra-demo-api
+    runtime: python
+    # Free plan: kept awake by workers/keepalive (Cloudflare cron). Its disk is wiped on every restart or
+    # deploy; the demo cases reload from fixtures/seed, uploads and decisions do not survive. Real use needs a
+    # paid instance with a disk (plan: starter + disk at /var/data).
+    plan: free
+    region: oregon
+    branch: engine-v2-machine-context-ledger
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: PORT
+        value: "10000"
+      - key: VEYRA_ENABLE_RUNTIME
+        value: "true"
+      - key: VEYRA_ENGINE_DB
+        value: /tmp/veyra-engine.db
+      - key: VEYRA_ENGINE_SEED
+        value: demo
+      - key: DATABASE_URL
+        value: sqlite:////tmp/veyra.db
+      - key: VEYRA_AUTO_SEED
+        value: "true"
+      # Veyra drafts the next step and checks it itself; people approve, send and decide. No AI agent here (no model key).
+      - key: VEYRA_AUTOPILOT
+        value: "true"
+      # The synthetic live-takeover demo reads the mock fleet API served by this same process.
+      - key: VEYRA_API_BASE
+        value: http://127.0.0.1:10000
+      - key: VEYRA_CORS_ORIGINS
+        value: https://frontend-livid-seven-41.vercel.app,https://frontend-silkenwind.vercel.app
+      - key: VEYRA_CORS_ORIGIN_REGEX
+        value: https://frontend-[a-z0-9]+-silkenwind\.vercel\.app
+      # Set in the Render dashboard; never committed. Writes (uploads, decisions) need this code.
+      - key: VEYRA_ACCESS_CODE
+        sync: false
+
+  - type: web
+    name: veyra-demo
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://veyra-demo-api.onrender.com

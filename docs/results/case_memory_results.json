@@ -1,0 +1,435 @@
+{
+ "synthetic": true,
+ "test": "case memory",
+ "rules": "precedent-rules-v2",
+ "results": [
+  {
+   "variant": "repeat",
+   "incident_1_flags": [
+    [
+     "control_suite",
+     "R-EVENT"
+    ],
+    [
+     "control_suite",
+     "R-HEARTBEAT"
+    ],
+    [
+     "network",
+     "R-REFERENCE"
+    ],
+    [
+     "network",
+     "R-SCREEN"
+    ],
+    [
+     "network",
+     "R-SEGMENT-RELATIVE"
+    ]
+   ],
+   "incident_2_flags": [
+    [
+     "control_suite",
+     "R-EVENT"
+    ],
+    [
+     "control_suite",
+     "R-HEARTBEAT"
+    ],
+    [
+     "network",
+     "R-REFERENCE"
+    ],
+    [
+     "network",
+     "R-SCREEN"
+    ],
+    [
+     "network",
+     "R-SEGMENT-RELATIVE"
+    ]
+   ],
+   "found_incident_1": true,
+   "precedent": {
+    "match_basis": "findings and reported symptom",
+    "similarity": 1.0,
+    "same_reported_symptom": [
+     {
+      "symptom": "late_response",
+      "function": "boom"
+     }
+    ],
+    "parts_then": [
+     "Network",
+     "Remote-control software"
+    ],
+    "parts_now": [
+     "Network",
+     "Remote-control software"
+    ],
+    "evidence_points_elsewhere": false,
+    "earlier_parts_now": [
+     {
+      "part": "Remote-control software",
+      "status_now": "anomaly_observed"
+     },
+     {
+      "part": "Network",
+      "status_now": "delay_observed"
+     }
+    ],
+    "same": [
+     "Remote-control software: event recorded (R-EVENT) on controller.reset",
+     "Remote-control software: event recorded (R-EVENT) on fault.code",
+     "Remote-control software: heartbeat gap (R-HEARTBEAT) on app.heartbeat (vehicle_controller_clock)",
+     "Network: differs from the known-good window (R-REFERENCE) on network.packet_loss (console->vehicle-router)",
+     "Network: differs from the known-good window (R-REFERENCE) on network.rtt (console->vehicle-router)",
+     "Network: changed inside the symptom window (R-SCREEN) on network.packet_loss (console->vehicle-router)",
+     "Network: changed inside the symptom window (R-SCREEN) on network.rtt (console->vehicle-router)",
+     "Network: command delay grew in one stretch of the command chain (R-SEGMENT-RELATIVE)"
+    ],
+    "only_now": [],
+    "only_then": [],
+    "earlier_cause": "Synthetic: LTE cell handover storm; commands queued before reaching the machine",
+    "status": "cause_confirmed",
+    "evidence_strength": "indirect",
+    "resolution": "resolved"
+   },
+   "next_checks_before": [
+    "CHK-SOURCE-ROWS",
+    "CHK-CLOCK-OFFSET",
+    "CHK-CONFIRM-CONTEXT",
+    "CHK-INTERVENTION-REVIEW"
+   ],
+   "next_checks_after": [
+    [
+     "CHK-NETWORK-LOGS",
+     "Settled a similar earlier case: EX2 boom reacts late (SYNTHETIC, incident 1) (similarity 1); Network probe crossing inside the symptom window"
+    ],
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CLOCK-OFFSET",
+     "Transport delay is measured only relative to an assumed-stable offset between unsynchronized clocks; bound and check the offset"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: measurement_endpoints, network_path"
+    ]
+   ],
+   "own_conclusions": {
+    "hypotheses": [
+     [
+      "network",
+      "delay_observed",
+      "supported"
+     ],
+     [
+      "control_suite",
+      "anomaly_observed",
+      "open"
+     ],
+     [
+      "vehicle_interface",
+      "no_delay_observed_in_measured_part",
+      "open"
+     ],
+     [
+      "vehicle_body",
+      "no_delay_observed_in_measured_part",
+      "open"
+     ]
+    ],
+    "triage": {
+     "severity": {
+      "level": "medium",
+      "rule": "T2",
+      "basis": "Delay or anomaly observed in at least one domain; no safety intervention recorded"
+     },
+     "owner": {
+      "team": "Network & connectivity",
+      "domains": [
+       "network"
+      ],
+      "rule": "O1",
+      "basis": "Strongest measured evidence: Network: delay observed"
+     }
+    },
+    "root_cause": "unconfirmed"
+   },
+   "own_conclusions_unchanged": true,
+   "criteria": {
+    "1. finds incident 1": true,
+    "4. incident 1's cause not applied (hypotheses, triage, root cause unchanged)": true,
+    "root cause still unconfirmed": true,
+    "matched on findings and the reported symptom": true,
+    "3. nothing differs": true,
+    "2. the check that settled incident 1 is first in Next checks": true,
+    "owner proposed from this case's evidence: network": true
+   },
+   "passed": true
+  },
+  {
+   "variant": "changed",
+   "incident_1_flags": [
+    [
+     "control_suite",
+     "R-EVENT"
+    ],
+    [
+     "control_suite",
+     "R-HEARTBEAT"
+    ],
+    [
+     "network",
+     "R-REFERENCE"
+    ],
+    [
+     "network",
+     "R-SCREEN"
+    ],
+    [
+     "network",
+     "R-SEGMENT-RELATIVE"
+    ]
+   ],
+   "incident_2_flags": [
+    [
+     "vehicle_body",
+     "R-IO"
+    ]
+   ],
+   "found_incident_1": true,
+   "precedent": {
+    "match_basis": "reported symptom only",
+    "similarity": 0.0,
+    "same_reported_symptom": [
+     {
+      "symptom": "late_response",
+      "function": "boom"
+     }
+    ],
+    "parts_then": [
+     "Network",
+     "Remote-control software"
+    ],
+    "parts_now": [
+     "Machine body & hydraulics"
+    ],
+    "evidence_points_elsewhere": true,
+    "earlier_parts_now": [
+     {
+      "part": "Remote-control software",
+      "status_now": "no_delay_observed_in_measured_part"
+     },
+     {
+      "part": "Network",
+      "status_now": "no_delay_observed_in_measured_part"
+     }
+    ],
+    "same": [],
+    "only_now": [
+     "Machine body & hydraulics: response to its input changed (R-IO)"
+    ],
+    "only_then": [
+     "Remote-control software: event recorded (R-EVENT) on controller.reset",
+     "Remote-control software: event recorded (R-EVENT) on fault.code",
+     "Remote-control software: heartbeat gap (R-HEARTBEAT) on app.heartbeat (vehicle_controller_clock)",
+     "Network: differs from the known-good window (R-REFERENCE) on network.packet_loss (console->vehicle-router)",
+     "Network: differs from the known-good window (R-REFERENCE) on network.rtt (console->vehicle-router)",
+     "Network: changed inside the symptom window (R-SCREEN) on network.packet_loss (console->vehicle-router)",
+     "Network: changed inside the symptom window (R-SCREEN) on network.rtt (console->vehicle-router)",
+     "Network: command delay grew in one stretch of the command chain (R-SEGMENT-RELATIVE)"
+    ],
+    "check_not_moved_up": "Not moved up in Next checks: this case's findings differ from the earlier case's",
+    "earlier_cause": "Synthetic: LTE cell handover storm; commands queued before reaching the machine",
+    "status": "cause_confirmed",
+    "evidence_strength": "indirect",
+    "resolution": "resolved"
+   },
+   "next_checks_before": [
+    "CHK-SOURCE-ROWS",
+    "CHK-CONFIRM-CONTEXT",
+    "CHK-INTERVENTION-REVIEW",
+    "CHK-REPRODUCE"
+   ],
+   "next_checks_after": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: measurement_endpoints, network_path"
+    ],
+    [
+     "CHK-INTERVENTION-REVIEW",
+     "1 operator intervention(s) not yet reviewed"
+    ],
+    [
+     "CHK-REPRODUCE",
+     "Evidence points at Machine body & hydraulics; no reproduction attempt recorded"
+    ]
+   ],
+   "own_conclusions": {
+    "hypotheses": [
+     [
+      "network",
+      "no_delay_observed_in_measured_part",
+      "open"
+     ],
+     [
+      "control_suite",
+      "no_delay_observed_in_measured_part",
+      "open"
+     ],
+     [
+      "vehicle_interface",
+      "no_delay_observed_in_measured_part",
+      "open"
+     ],
+     [
+      "vehicle_body",
+      "delay_observed",
+      "supported"
+     ]
+    ],
+    "triage": {
+     "severity": {
+      "level": "medium",
+      "rule": "T2",
+      "basis": "Delay or anomaly observed in at least one domain; no safety intervention recorded"
+     },
+     "owner": {
+      "team": "Machine & hydraulics service",
+      "domains": [
+       "vehicle_body"
+      ],
+      "rule": "O1",
+      "basis": "Strongest measured evidence: Machine body & hydraulics: delay observed"
+     }
+    },
+    "root_cause": "unconfirmed"
+   },
+   "own_conclusions_unchanged": true,
+   "criteria": {
+    "1. finds incident 1": true,
+    "4. incident 1's cause not applied (hypotheses, triage, root cause unchanged)": true,
+    "root cause still unconfirmed": true,
+    "matched on the reported symptom only": true,
+    "3. says the evidence points elsewhere": true,
+    "3. says where incident 1 found its problem is quiet now": true,
+    "3. lists what is only in this case": true,
+    "2. incident 1's check shown but NOT moved up": true,
+    "Next checks identical to before incident 1 was closed": true,
+    "owner proposed from this case's evidence: machine body": true
+   },
+   "passed": true
+  },
+  {
+   "variant": "unrelated",
+   "incident_1_flags": [
+    [
+     "control_suite",
+     "R-EVENT"
+    ],
+    [
+     "control_suite",
+     "R-HEARTBEAT"
+    ],
+    [
+     "network",
+     "R-REFERENCE"
+    ],
+    [
+     "network",
+     "R-SCREEN"
+    ],
+    [
+     "network",
+     "R-SEGMENT-RELATIVE"
+    ]
+   ],
+   "incident_2_flags": [
+    [
+     "vehicle_body",
+     "R-IO"
+    ]
+   ],
+   "found_incident_1": false,
+   "precedent": null,
+   "next_checks_before": [
+    "CHK-SOURCE-ROWS",
+    "CHK-CONFIRM-CONTEXT",
+    "CHK-INTERVENTION-REVIEW",
+    "CHK-REPRODUCE"
+   ],
+   "next_checks_after": [
+    [
+     "CHK-SOURCE-ROWS",
+     "Records exist inside the symptom window"
+    ],
+    [
+     "CHK-CONFIRM-CONTEXT",
+     "Unconfirmed context blocks comparisons: measurement_endpoints, network_path"
+    ],
+    [
+     "CHK-INTERVENTION-REVIEW",
+     "1 operator intervention(s) not yet reviewed"
+    ],
+    [
+     "CHK-REPRODUCE",
+     "Evidence points at Machine body & hydraulics; no reproduction attempt recorded"
+    ]
+   ],
+   "own_conclusions": {
+    "hypotheses": [
+     [
+      "network",
+      "no_delay_observed_in_measured_part",
+      "open"
+     ],
+     [
+      "control_suite",
+      "no_delay_observed_in_measured_part",
+      "open"
+     ],
+     [
+      "vehicle_interface",
+      "no_delay_observed_in_measured_part",
+      "open"
+     ],
+     [
+      "vehicle_body",
+      "delay_observed",
+      "supported"
+     ]
+    ],
+    "triage": {
+     "severity": {
+      "level": "medium",
+      "rule": "T2",
+      "basis": "Delay or anomaly observed in at least one domain; no safety intervention recorded"
+     },
+     "owner": {
+      "team": "Machine & hydraulics service",
+      "domains": [
+       "vehicle_body"
+      ],
+      "rule": "O1",
+      "basis": "Strongest measured evidence: Machine body & hydraulics: delay observed"
+     }
+    },
+    "root_cause": "unconfirmed"
+   },
+   "own_conclusions_unchanged": true,
+   "criteria": {
+    "incident 1 not shown (different complaint, no shared findings)": true,
+    "own conclusions unchanged": true
+   },
+   "passed": true
+  }
+ ]
+}

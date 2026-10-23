@@ -1,0 +1,72 @@
+{
+  "id": "fixed_wing_uav",
+  "name": "Fixed-wing UAV",
+  "description": "Autonomous fixed-wing aircraft with a flight controller (autopilot) driving servos and a motor.",
+  "domains": {
+    "network": {
+      "label": "Communication (telemetry & command link)",
+      "owner": "Communications"
+    },
+    "control_suite": {
+      "label": "Flight controller & autopilot",
+      "owner": "Flight software"
+    },
+    "vehicle_interface": {
+      "label": "Actuation (servos & outputs)",
+      "owner": "Avionics & actuation"
+    },
+    "vehicle_body": {
+      "label": "Airframe & propulsion",
+      "owner": "Airframe & propulsion"
+    }
+  },
+  "checks": {
+    "CHK-CONTROLLER-LOGS": {
+      "question": "Retrieve the flight-controller log (mode, failsafe and event messages) for this flight",
+      "why": "A failsafe, mode change or output override at the onset is recorded only by the flight controller.",
+      "who": "Flight software engineer",
+      "tools": [
+        "Flight-controller log (e.g. ArduPilot DataFlash)"
+      ]
+    },
+    "CHK-NETWORK-LOGS": {
+      "question": "Export telemetry-link logs (signal strength, packet loss) for the flight",
+      "who": "Communications engineer",
+      "tools": [
+        "Ground-station and radio logs"
+      ]
+    },
+    "CHK-PROBE-PATH": {
+      "applicable": false
+    },
+    "CHK-ONSITE-ACTUATOR": {
+      "question": "Inspect the servo, linkage and control surface on the airframe",
+      "who": "Avionics technician",
+      "tools": [
+        "Servo tester",
+        "Control-surface throw check"
+      ]
+    },
+    "CHK-CLOCK-OFFSET": {
+      "question": "Establish the clock offset between the ground station and the flight controller",
+      "who": "Flight software engineer",
+      "tools": [
+        "GPS time in both logs",
+        "A shared timestamped event"
+      ],
+      "why": "Without a bounded offset between ground-station and flight-controller clocks, delays between a command sent and its effect on the aircraft cannot be measured."
+    },
+    "CHK-CONFIRM-CONTEXT": {
+      "question": "Confirm the airframe model, autopilot firmware and parameter set for this flight",
+      "who": "Flight operations"
+    },
+    "CHK-DRIVE-LOGS": {
+      "applicable": false
+    }
+  },
+  "context_keys": [
+    "model",
+    "firmware_version",
+    "control_version"
+  ]
+}

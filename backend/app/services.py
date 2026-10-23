@@ -1,0 +1,1602 @@
+import base64
+import csv
+import hashlib
+import json
+import uuid
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Optional
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from sqlalchemy import delete, select
+from sqlalchemy.orm import Session
+
+from app.models import (
+    Asset,
+    CaseEvent,
+    CostImpact,
+    Decision,
+    DecisionOption,
+    DecisionPackage,
+    DecisionRecord,
+    Evidence,
+    EvidenceSnapshot,
+    ExecutedAction,
+    DiagnosticCheck,
+    Hypothesis,
+    IngestedFile,
+    Investigation,
+    LateEvidence,
+    ObservabilityState,
+    Outcome,
+    OutcomeAttribution,
+    PrecedentComparison,
+    RecordedEvent,
+    ReviewFlag,
+    RunSession,
+    SavedInvestigation,
+)
+from app.storage import save_upload
+
+BASE = datetime(2026, 9, 3, 14, 0, 0)
+DEMO_DECISION_TIME = BASE + timedelta(minutes=27)
+DEMO_SEAL_TIME = BASE + timedelta(minutes=31)
+TIMESTAMP_AUTHORITY = "Veyra demo timestamp authority"
+STATE_KEYS = [
+    "application_version",
+    "firmware_version",
+    "configuration",
+    "map_version",
+    "network_profile",
+    "connection_type",
+    "process_health",
+]
+
+
+def iso(dt: datetime) -> str:
+    return dt.isoformat() + "Z"
+
+
+def parse_dt(value: Any) -> Optional[datetime]:
+    if value in {None, ""}:
+        return None
+    if isinstance(value, datetime):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=None)
+
+
+def first_value(row: dict[str, Any], keys: list[str], default: str = "") -> str:
+    for key in keys:
+        if key in row and row[key] not in {None, ""}:
+            return str(row[key])
+    return default
+
+
+def serialize_run(row: RunSession) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "field_case_id": row.field_case_id,
+        "name": row.name,
+        "asset_id": row.asset_id,
+        "software_version": row.software_version,
+        "configuration": row.configuration,
+        "started_at": iso(row.started_at) if row.started_at else None,
+        "ended_at": iso(row.ended_at) if row.ended_at else None,
+        "metadata": row.metadata_json,
+        "created_at": iso(row.created_at),
+    }
+
+
+def serialize_recorded_event(row: RecordedEvent) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "field_case_id": row.field_case_id,
+        "run_id": row.run_id,
+        "file_id": row.file_id,
+        "asset_id": row.asset_id,
+        "event_type": row.event_type,
+        "timestamp": iso(row.timestamp) if row.timestamp else None,
+        "software_version": row.software_version,
+        "configuration": row.configuration,
+        "payload": row.payload,
+        "source_reference": row.source_reference,
+    }
+
+
+def parse_recording_rows(filename: str, content: bytes) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
+    suffix = Path(filename).suffix.lower()
+    if suffix == ".csv":
+        text = content.decode("utf-8-sig")
+        rows = list(csv.DictReader(text.splitlines()))
+        return "csv", rows, {"columns": list(rows[0].keys()) if rows else []}
+    if suffix in {".json", ".jsonl", ".ndjson"}:
+        text = content.decode("utf-8")
+        if suffix in {".jsonl", ".ndjson"}:
+            rows = [json.loads(line) for line in text.splitlines() if line.strip()]
+        else:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                rows = parsed
+            elif isinstance(parsed, dict) and isinstance(parsed.get("events"), list):
+                rows = parsed["events"]
+            else:
+                rows = [parsed]
+        if not all(isinstance(row, dict) for row in rows):
+            raise ValueError("JSON recording must contain objects or an events array")
+        return "json", rows, {"top_level": "events" if text.lstrip().startswith("{") else "array"}
+    raise ValueError("Supported upload formats in this prototype: .csv, .json, .jsonl, .ndjson")
+
+
+def ensure_asset(db: Session, asset_id: str, name: Optional[str] = None) -> Asset:
+    asset = db.get(Asset, asset_id)
+    if asset:
+        return asset
+    asset = Asset(id=asset_id, name=name or asset_id, asset_type="Physical AI system", family="Imported field case", site="unknown", environment="unknown")
+    db.add(asset)
+    return asset
+
+
+def create_field_case(db: Session, title: str, asset_id: str = "unknown", trigger_payload: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    now = datetime.utcnow()
+    ensure_asset(db, asset_id)
+    trigger = Evidence(
+        id=f"ev-{uuid.uuid4().hex[:10]}",
+        asset_id=asset_id,
+        event_type="field_case_created",
+        event_time=now,
+        known_at=now,
+        ingested_at=now,
+        source="field_case_api",
+        source_id="field_case_api",
+        source_type="api",
+        original_reference=f"field_case:{title}",
+        linkage_method="explicit_reference",
+        verification_state="verified",
+        evidence_class="OBSERVED",
+        payload=trigger_payload or {"title": title},
+        provenance={"created_by": "field_case_api"},
+    )
+    case = Investigation(
+        id=f"fc-{uuid.uuid4().hex[:10]}",
+        asset_id=asset_id,
+        trigger_id=trigger.id,
+        title=title,
+        status="active",
+    )
+    db.add(trigger)
+    db.add(case)
+    db.commit()
+    return serialize_field_case(db, case)
+
+
+def serialize_field_case(db: Session, case: Investigation) -> dict[str, Any]:
+    runs = list(db.scalars(select(RunSession).where(RunSession.field_case_id == case.id).order_by(RunSession.created_at.desc())))
+    events = list(db.scalars(select(RecordedEvent).where(RecordedEvent.field_case_id == case.id).order_by(RecordedEvent.timestamp.asc().nulls_last(), RecordedEvent.id).limit(200)))
+    saved = list(db.scalars(select(SavedInvestigation).where(SavedInvestigation.field_case_id == case.id).order_by(SavedInvestigation.created_at.desc())))
+    return {
+        "id": case.id,
+        "title": case.title,
+        "asset_id": case.asset_id,
+        "trigger_id": case.trigger_id,
+        "status": case.status,
+        "created_at": iso(case.created_at),
+        "runs": [serialize_run(run) for run in runs],
+        "event_count": len(events),
+        "events_preview": [serialize_recorded_event(event) for event in events[:20]],
+        "saved_investigations": [
+            {
+                "id": item.id,
+                "title": item.title,
+                "question": item.question,
+                "created_at": iso(item.created_at),
+            }
+            for item in saved
+        ],
+    }
+
+
+def get_field_case(db: Session, field_case_id: str) -> Investigation:
+    case = db.get(Investigation, field_case_id)
+    if not case:
+        raise ValueError(f"Field Case {field_case_id} was not found")
+    return case
+
+
+def ingest_recording(db: Session, filename: str, content: bytes, description: str = "", field_case_id: Optional[str] = None) -> dict[str, Any]:
+    upload_id = f"upl-{uuid.uuid4().hex[:10]}"
+    stored = save_upload(upload_id, filename, content)
+    storage_metadata = {"storage_backend": stored.backend}
+    if stored.bucket:
+        storage_metadata["storage_bucket"] = stored.bucket
+    if stored.key:
+        storage_metadata["storage_key"] = stored.key
+    field_case = get_field_case(db, field_case_id) if field_case_id else None
+    try:
+        file_format, rows, parse_metadata = parse_recording_rows(filename, content)
+    except Exception as exc:
+        if not field_case:
+            field_case = db.get(Investigation, create_field_case(db, f"Imported field case · {Path(filename).stem}", "unknown")["id"])
+        run = RunSession(id=f"run-{uuid.uuid4().hex[:10]}", field_case_id=field_case.id if field_case else None, name=Path(filename).stem, asset_id="unknown", metadata_json={"description": description})
+        ingested = IngestedFile(id=upload_id, field_case_id=field_case.id if field_case else None, run_id=run.id, filename=filename, file_format="unknown", storage_path=stored.uri, status="error", error=str(exc), metadata_json=storage_metadata)
+        db.add(run)
+        db.add(ingested)
+        db.commit()
+        return {"status": "error", "error": str(exc), "field_case_id": field_case.id if field_case else None, "file": {"id": ingested.id, "filename": filename}}
+
+    event_times = [parse_dt(first_value(row, ["timestamp", "time", "event_time", "ts"])) for row in rows]
+    event_times = [item for item in event_times if item]
+    first_row = rows[0] if rows else {}
+    first_asset_id = first_value(first_row, ["asset_id", "robot_id", "machine_id", "vehicle_id"], "unknown")
+    if not field_case:
+        created = create_field_case(
+            db,
+            f"Imported field case · {Path(filename).stem}",
+            first_asset_id,
+            {"source_filename": filename, "description": description, "row_count": len(rows)},
+        )
+        field_case = db.get(Investigation, created["id"])
+    ensure_asset(db, first_asset_id)
+    run = RunSession(
+        id=f"run-{uuid.uuid4().hex[:10]}",
+        field_case_id=field_case.id if field_case else None,
+        name=first_value(first_row, ["run_id", "mission_id", "session", "session_id"], Path(filename).stem),
+        asset_id=first_asset_id,
+        software_version=first_value(first_row, ["software_version", "release", "version"], ""),
+        configuration=first_value(first_row, ["configuration", "config", "profile", "localization"], ""),
+        started_at=min(event_times) if event_times else None,
+        ended_at=max(event_times) if event_times else None,
+        metadata_json={"description": description, "row_count": len(rows), "source_filename": filename},
+    )
+    ingested = IngestedFile(
+        id=upload_id,
+        field_case_id=field_case.id if field_case else None,
+        run_id=run.id,
+        filename=filename,
+        file_format=file_format,
+        storage_path=stored.uri,
+        status="processed",
+        metadata_json={**parse_metadata, **storage_metadata},
+    )
+    db.add(run)
+    db.add(ingested)
+    events: list[RecordedEvent] = []
+    evidence_rows: list[Evidence] = []
+    for index, row in enumerate(rows, start=1):
+        event_type = first_value(row, ["event_type", "type", "name", "topic"], "record")
+        timestamp = parse_dt(first_value(row, ["timestamp", "time", "event_time", "ts"]))
+        asset_id = first_value(row, ["asset_id", "robot_id", "machine_id", "vehicle_id"], run.asset_id)
+        ensure_asset(db, asset_id)
+        software_version = first_value(row, ["software_version", "release", "version"], run.software_version)
+        configuration = first_value(row, ["configuration", "config", "profile", "localization"], run.configuration)
+        event_id = f"evt-{uuid.uuid4().hex[:10]}"
+        source_reference = f"{filename}:row:{index}"
+        events.append(
+            RecordedEvent(
+                id=event_id,
+                field_case_id=field_case.id if field_case else None,
+                run_id=run.id,
+                file_id=ingested.id,
+                asset_id=asset_id,
+                event_type=event_type,
+                timestamp=timestamp,
+                software_version=software_version,
+                configuration=configuration,
+                payload=dict(row),
+                source_reference=source_reference,
+            )
+        )
+        evidence_rows.append(
+            Evidence(
+                id=f"ev-{uuid.uuid4().hex[:10]}",
+                asset_id=asset_id,
+                event_type=event_type,
+                event_time=timestamp or datetime.utcnow(),
+                known_at=datetime.utcnow(),
+                ingested_at=datetime.utcnow(),
+                source="imported_recording",
+                source_id=ingested.id,
+                source_type=file_format,
+                original_reference=source_reference,
+                linkage_method="explicit_reference",
+                verification_state="verified",
+                evidence_class="OBSERVED",
+                payload=dict(row),
+                provenance={"field_case_id": field_case.id if field_case else None, "run_id": run.id, "file_id": ingested.id, "recorded_event_id": event_id},
+            )
+        )
+    db.add_all(events)
+    db.add_all(evidence_rows)
+    db.commit()
+    return {
+        "status": "processed",
+        "field_case": serialize_field_case(db, field_case) if field_case else None,
+        "run": serialize_run(run),
+        "file": {"id": ingested.id, "filename": filename, "format": file_format, "status": ingested.status, "metadata": ingested.metadata_json},
+        "events_indexed": len(events),
+        "first_event": serialize_recorded_event(events[0]) if events else None,
+    }
+
+
+def list_runs(db: Session, field_case_id: Optional[str] = None) -> list[dict[str, Any]]:
+    stmt = select(RunSession)
+    if field_case_id:
+        stmt = stmt.where(RunSession.field_case_id == field_case_id)
+    return [serialize_run(row) for row in db.scalars(stmt.order_by(RunSession.created_at.desc()))]
+
+
+def search_recorded_events(
+    db: Session,
+    asset_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    software_version: Optional[str] = None,
+    query: Optional[str] = None,
+    field_case_id: Optional[str] = None,
+) -> dict[str, Any]:
+    stmt = select(RecordedEvent)
+    if field_case_id:
+        stmt = stmt.where(RecordedEvent.field_case_id == field_case_id)
+    if asset_id:
+        stmt = stmt.where(RecordedEvent.asset_id == asset_id)
+    if event_type:
+        stmt = stmt.where(RecordedEvent.event_type == event_type)
+    if software_version:
+        stmt = stmt.where(RecordedEvent.software_version == software_version)
+    rows = list(db.scalars(stmt.order_by(RecordedEvent.timestamp.asc().nulls_last(), RecordedEvent.id)))
+    if query:
+        needle = query.lower()
+        rows = [row for row in rows if needle in json.dumps(row.payload, default=str).lower() or needle in row.event_type.lower()]
+    return {"count": len(rows), "events": [serialize_recorded_event(row) for row in rows[:200]]}
+
+
+def compare_runs(db: Session, run_ids: Optional[list[str]] = None, field_case_id: Optional[str] = None) -> dict[str, Any]:
+    if field_case_id and not run_ids:
+        runs = list(db.scalars(select(RunSession).where(RunSession.field_case_id == field_case_id).order_by(RunSession.created_at.asc())))
+    else:
+        runs = [db.get(RunSession, run_id) for run_id in (run_ids or [])]
+    runs = [row for row in runs if row]
+    if field_case_id:
+        runs = [row for row in runs if row.field_case_id == field_case_id]
+    comparisons = []
+    for run in runs:
+        events = list(db.scalars(select(RecordedEvent).where(RecordedEvent.run_id == run.id)))
+        event_counts: dict[str, int] = {}
+        for event in events:
+            event_counts[event.event_type] = event_counts.get(event.event_type, 0) + 1
+        comparisons.append({
+            "run": serialize_run(run),
+            "event_count": len(events),
+            "event_types": event_counts,
+            "first_event": iso(min([e.timestamp for e in events if e.timestamp], default=run.started_at)) if (events or run.started_at) else None,
+            "last_event": iso(max([e.timestamp for e in events if e.timestamp], default=run.ended_at)) if (events or run.ended_at) else None,
+        })
+    differences = {
+        "software_versions": sorted({row.software_version for row in runs if row.software_version}),
+        "configurations": sorted({row.configuration for row in runs if row.configuration}),
+        "assets": sorted({row.asset_id for row in runs if row.asset_id}),
+    }
+    return {"field_case_id": field_case_id, "runs_compared": len(runs), "differences": differences, "comparisons": comparisons}
+
+
+def investigate_imported_data(db: Session, question: str, run_ids: Optional[list[str]] = None, field_case_id: Optional[str] = None) -> dict[str, Any]:
+    stmt = select(RecordedEvent)
+    if field_case_id:
+        stmt = stmt.where(RecordedEvent.field_case_id == field_case_id)
+    if run_ids:
+        stmt = stmt.where(RecordedEvent.run_id.in_(run_ids))
+    events = list(db.scalars(stmt.order_by(RecordedEvent.timestamp.asc().nulls_last(), RecordedEvent.id)))
+    q = question.lower()
+    relevant = [event for event in events if any(token in json.dumps(event.payload, default=str).lower() or token in event.event_type.lower() for token in q.split() if len(token) > 3)]
+    if not relevant:
+        relevant = events[:20]
+    event_type_counts: dict[str, int] = {}
+    for event in relevant:
+        event_type_counts[event.event_type] = event_type_counts.get(event.event_type, 0) + 1
+    findings = [
+        {
+            "claim": f"Found {len(relevant)} relevant records across {len({event.run_id for event in relevant})} run(s).",
+            "citations": [event.source_reference for event in relevant[:8]],
+        },
+        {
+            "claim": f"Most visible event types: {', '.join(sorted(event_type_counts)[:5]) or 'none'}.",
+            "citations": [event.source_reference for event in relevant[:8]],
+        },
+    ]
+    missing = []
+    if not any("intervention" in event.event_type.lower() or "action" in event.event_type.lower() for event in relevant):
+        missing.append("No operator intervention record found in the imported events.")
+    if not any("outcome" in event.event_type.lower() or "recovered" in json.dumps(event.payload, default=str).lower() for event in relevant):
+        missing.append("No recovery outcome record found in the imported events.")
+    return {
+        "question": question,
+        "field_case_id": field_case_id,
+        "answer": "This analysis is grounded only in imported records. It reports visible records, citations and missing evidence instead of declaring root cause.",
+        "findings": findings,
+        "missing_evidence": missing,
+        "unsupported_conclusions": ["root cause", "causal repair"] if missing else [],
+        "records_used": [serialize_recorded_event(event) for event in relevant[:20]],
+    }
+
+
+def generate_recording_report(db: Session, question: str, run_ids: Optional[list[str]] = None, field_case_id: Optional[str] = None) -> dict[str, Any]:
+    analysis = investigate_imported_data(db, question, run_ids, field_case_id)
+    compared = compare_runs(db, run_ids or sorted({event["run_id"] for event in analysis["records_used"]}), field_case_id)
+    report = {
+        "title": "Imported recording investigation report",
+        "field_case_id": field_case_id,
+        "question": question,
+        "summary": analysis["answer"],
+        "findings": analysis["findings"],
+        "missing_evidence": analysis["missing_evidence"],
+        "comparison": compared,
+        "citations": sorted({citation for finding in analysis["findings"] for citation in finding["citations"]}),
+        "export_format": "json",
+    }
+    return report
+
+
+def save_imported_investigation(db: Session, title: str, question: str, run_ids: list[str], annotations: Optional[list[Any]] = None, field_case_id: Optional[str] = None) -> dict[str, Any]:
+    report = generate_recording_report(db, question, run_ids, field_case_id)
+    saved = SavedInvestigation(
+        id=f"saved-{uuid.uuid4().hex[:10]}",
+        field_case_id=field_case_id,
+        title=title,
+        question=question,
+        run_ids=run_ids,
+        findings=report["findings"],
+        evidence_references=report["citations"],
+        annotations=annotations or [],
+        report=report,
+    )
+    db.add(saved)
+    db.commit()
+    return {
+        "id": saved.id,
+        "field_case_id": saved.field_case_id,
+        "title": saved.title,
+        "question": saved.question,
+        "run_ids": saved.run_ids,
+        "findings": saved.findings,
+        "evidence_references": saved.evidence_references,
+        "annotations": saved.annotations,
+        "report": saved.report,
+        "created_at": iso(saved.created_at),
+    }
+
+
+def evidence(
+    asset_id: str,
+    event_type: str,
+    minutes: int,
+    known_delay: int,
+    source: str,
+    evidence_class: str,
+    payload: dict[str, Any],
+    eid: Optional[str] = None,
+    ingested_delay_seconds: int = 8,
+    linkage_method: str = "exact_id",
+    verification_state: str = "verified",
+    source_type: Optional[str] = None,
+    unresolved_assumptions: Optional[list[str]] = None,
+) -> Evidence:
+    event_time = BASE + timedelta(minutes=minutes)
+    known_at = event_time + timedelta(minutes=known_delay)
+    return Evidence(
+        id=eid or f"ev-{uuid.uuid4().hex[:10]}",
+        asset_id=asset_id,
+        event_type=event_type,
+        event_time=event_time,
+        known_at=known_at,
+        ingested_at=known_at + timedelta(seconds=ingested_delay_seconds),
+        source=source,
+        source_id=f"{source}:{asset_id}",
+        source_type=source_type or source,
+        original_reference=f"{source}/{asset_id}/{event_type}/{minutes}",
+        linkage_method=linkage_method,
+        verification_state=verification_state,
+        evidence_class=evidence_class,
+        payload=payload,
+        confidence=1.0,
+        provenance={"source_ref": f"{source}:{asset_id}:{event_type}:{minutes}", "lineage": "demo synthetic source adapter"},
+        supporting_references=[f"{source}:{asset_id}:{event_type}:{minutes}"],
+        unresolved_assumptions=unresolved_assumptions or [],
+    )
+
+
+def reset_demo(db: Session) -> dict[str, Any]:
+    from app.db import DATABASE_URL, Base, engine, init_db
+    from app.safety import assert_reset_permitted
+
+    # Never drop runtime investigation records outside a disposable test database.
+    assert_reset_permitted(engine, DATABASE_URL)
+    Base.metadata.drop_all(bind=engine)
+    init_db()
+    for model in [
+        PrecedentComparison,
+        ReviewFlag,
+        LateEvidence,
+        CostImpact,
+        OutcomeAttribution,
+        Outcome,
+        CaseEvent,
+        DiagnosticCheck,
+        Hypothesis,
+        DecisionRecord,
+        ExecutedAction,
+        ObservabilityState,
+        DecisionOption,
+        EvidenceSnapshot,
+        Decision,
+        DecisionPackage,
+        Investigation,
+        Evidence,
+        Asset,
+    ]:
+        db.execute(delete(model))
+    assets = [
+        Asset(
+            id=f"EX{i:02d}",
+            name=f"EX{i:02d}",
+            asset_type="Remote-operated excavator",
+            family="Heavy equipment robotics",
+            site="Quarry North" if i <= 6 else "Port Yard East",
+            environment="deployed industrial site",
+        )
+        for i in range(1, 13)
+    ]
+    db.add_all(assets)
+    affected_ids = {"EX03", "EX05", "EX08"}
+    for a in assets:
+        asset_num = int(a.id[2:])
+        localization_profile = "localization-L4" if asset_num in {2, 3, 5, 8, 11} else "localization-L3"
+        lidar_firmware = "lidar-fw-5.3" if asset_num in {2, 3, 4, 5, 8, 9, 11} else "lidar-fw-5.2"
+        map_version = "map-M19" if asset_num in {2, 3, 4, 5, 6, 8, 9, 11} else "map-M18"
+        zone_profile = "loading-zone-B" if asset_num in {3, 5, 8, 11} else "standard-route"
+        connection_type = "private-5g" if asset_num in {1, 3, 5, 8, 10, 11} else "site-wifi"
+        db.add(
+            evidence(
+                a.id,
+                "state_snapshot",
+                2,
+                0,
+                "robot_runtime",
+                "OBSERVED",
+                {
+                    "application_version": "autonomy-2.6",
+                    "firmware_version": "lidar-fw-5.2",
+                    "configuration": "localization-L3",
+                    "map_version": "map-M18",
+                    "network_profile": zone_profile,
+                    "connection_type": connection_type,
+                    "process_health": "healthy",
+                    "health": "healthy",
+                },
+                f"{a.id}-healthy-run",
+            )
+        )
+        db.add(
+            evidence(
+                a.id,
+                "deployment",
+                4,
+                1,
+                "release_manifest",
+                "OBSERVED",
+                {"application_version": "autonomy-2.7", "previous_application_version": "autonomy-2.6", "deployment_id": "autonomy-release-27", "rollout_size": 12},
+                f"{a.id}-autonomy-27",
+            )
+        )
+    for aid in ["EX02", "EX03", "EX04", "EX05", "EX06", "EX08", "EX09", "EX11"]:
+        asset_num = int(aid[2:])
+        localization_profile = "localization-L4" if asset_num in {2, 3, 5, 8, 11} else "localization-L3"
+        lidar_firmware = "lidar-fw-5.3" if asset_num in {2, 3, 4, 5, 8, 9, 11} else "lidar-fw-5.2"
+        map_version = "map-M19"
+        zone_profile = "loading-zone-B" if asset_num in {3, 5, 8, 11} else "standard-route"
+        db.add(
+            evidence(
+                aid,
+                "configuration_change",
+                6,
+                1,
+                "robot_config_registry",
+                "OBSERVED",
+                {"configuration": localization_profile, "previous_configuration": "localization-L3", "firmware_version": lidar_firmware, "map_version": map_version, "network_profile": zone_profile},
+                f"{aid}-localization-map-update",
+            )
+        )
+    for index, aid in enumerate(sorted(affected_ids)):
+        db.add(
+            evidence(
+                aid,
+                "telemetry_anomaly",
+                11 + (index * 7),
+                1,
+                "mission_runtime",
+                "OBSERVED",
+                {"signal": "safe_stop_near_loading_zone", "process_health": "safe_stop", "severity": "review", "safe_stop_count": 1 + index, "zone": "loading-zone-B"},
+                f"{aid}-safe-stop",
+            )
+        )
+    db.add(
+        evidence(
+            "EX03",
+            "human_discovery",
+            31,
+            0,
+            "operator_review",
+            "HUMAN_ASSERTED",
+            {"observation": "Operator review opened after three machines entered safe-stop near loading zone B after autonomy release 2.7", "reported_by": "fleet_operator"},
+            "EX03-operator-review-1431",
+        )
+    )
+    inv = Investigation(id="inv-120-robots-bad-rollout", asset_id="EX03", trigger_id="EX03-safe-stop", title="Safe-stop after autonomy release")
+    db.add(inv)
+    db.commit()
+    seed_decision_primitives(db, inv.id)
+    return {"assets": len(assets), "affected": len(affected_ids), "investigation_id": inv.id}
+
+
+def seed_decision_primitives(db: Session, investigation_id: str) -> None:
+    if db.scalar(select(DecisionOption.id).where(DecisionOption.investigation_id == investigation_id).limit(1)):
+        return
+    options = [
+        DecisionOption(
+            id=f"opt-{uuid.uuid4().hex[:10]}",
+            investigation_id=investigation_id,
+            option_type="remote_fix",
+            label="Remote recovery on EX03, EX05 and EX08, hold technician dispatch",
+            expected_cost={"engineering_hours": 1.2, "field_visit": False, "rollout_delay_minutes": 43},
+            expected_risk={"risk": "medium", "reason": "EX11 remains exposed but has no known issue at decision time"},
+            historical_support={"status": "none_yet", "summary": "No prior outcome in this workspace"},
+        ),
+        DecisionOption(
+            id=f"opt-{uuid.uuid4().hex[:10]}",
+            investigation_id=investigation_id,
+            option_type="monitor",
+            label="Continue monitoring without intervention",
+            expected_cost={"engineering_hours": 0.5, "field_visit": False, "rollout_delay_minutes": 0},
+            expected_risk={"risk": "high", "reason": "Affected machines may keep entering safe-stop during production missions"},
+            historical_support={"status": "weak", "summary": "No recovery evidence yet"},
+        ),
+        DecisionOption(
+            id=f"opt-{uuid.uuid4().hex[:10]}",
+            investigation_id=investigation_id,
+            option_type="dispatch",
+            label="Dispatch field engineer",
+            expected_cost={"engineering_hours": 0.5, "field_visit": True, "estimated_cost_usd": 1200},
+            expected_risk={"risk": "low", "reason": "Fast onsite inspection, but current evidence does not yet justify the visit"},
+            historical_support={"status": "not_supported", "summary": "No hardware fault confirmed"},
+        ),
+        DecisionOption(
+            id=f"opt-{uuid.uuid4().hex[:10]}",
+            investigation_id=investigation_id,
+            option_type="pause_rollout",
+            label="Pause autonomy 2.7 rollout for exposed machines",
+            expected_cost={"engineering_hours": 1.0, "field_visit": False, "rollout_delay_minutes": 60},
+            expected_risk={"risk": "low", "reason": "Contains exposed group while preserving investigation time"},
+            historical_support={"status": "reasonable", "summary": "Matches current evidence boundary"},
+        ),
+    ]
+    db.add_all(options)
+    db.add(
+        ObservabilityState(
+            id=f"obs-{uuid.uuid4().hex[:10]}",
+            investigation_id=investigation_id,
+            assessed_at=DEMO_DECISION_TIME,
+            status="partial",
+            connected_sources=["release_manifest", "robot_config_registry", "mission_runtime", "operator_review"],
+            freshness={
+                "release_manifest": "fresh",
+                "robot_config_registry": "fresh",
+                "mission_runtime": "partial",
+                "operator_review": "fresh",
+            },
+            completeness={
+                "EX03": "complete",
+                "EX05": "complete",
+                "EX08": "complete",
+                "EX11": "no known issue at decision time",
+            },
+            delayed_sources=["edge_buffer"],
+            missing_windows=["operator intent at safe-stop", "exact planner fallback reason", "EX11 runtime buffer not known at 14:27"],
+        )
+    )
+    db.commit()
+    seed_field_case_reasoning(db, investigation_id)
+
+
+def seed_field_case_reasoning(db: Session, investigation_id: str) -> None:
+    if investigation_id != "inv-120-robots-bad-rollout":
+        return  # Demo-specific hypotheses must never leak into imported cases.
+    if db.scalar(select(Hypothesis.id).where(Hypothesis.investigation_id == investigation_id).limit(1)):
+        from app.investigation_engine import evaluate
+        current = evaluate(db, investigation_id)
+        for item in current['hypotheses']:
+            row = db.get(Hypothesis, item['id'])
+            row.supporting_evidence = [e['id'] for e in item['supporting_evidence']]
+            row.contradicting_evidence = [e['id'] for e in item['contradicting_evidence']]
+            row.status = item['status']
+        db.commit()  # Current state only; sealed historical snapshots are untouched.
+        return
+    hypotheses = [
+        Hypothesis(
+            id="h-l4-zone-b",
+            investigation_id=investigation_id,
+            label="Localization L4 with loading zone B exposure",
+            status="possible",
+            supporting_evidence=[],
+            contradicting_evidence=[],
+            missing_evidence=["EX11 runtime behavior in loading zone B", "healthy L4 machine observed in Zone B"],
+            would_change_conclusion=["EX11 remains healthy after real Zone B exposure", "another healthy L4 + Zone B comparator appears"],
+            revision_history=[
+                {"known_at": iso(BASE + timedelta(minutes=23)), "status": "not_yet_formed", "reason": "zone exposure not joined"},
+                {"known_at": iso(BASE + timedelta(minutes=24)), "status": "emerging", "reason": "EX11 is a candidate control; operating exposure remains unverified"},
+                {"known_at": iso(DEMO_DECISION_TIME), "status": "possible", "reason": "affected configuration records contain L4 + Zone B; comparable operating exposure remains unverified"},
+            ],
+        ),
+        Hypothesis(
+            id="h-l4-alone",
+            investigation_id=investigation_id,
+            label="Localization L4 alone",
+            status="possible",
+            supporting_evidence=[],
+            contradicting_evidence=[],
+            missing_evidence=["EX11 behavior in loading zone B"],
+            would_change_conclusion=["multiple healthy L4 machines remain stable in the same zone"],
+            revision_history=[
+                {"known_at": iso(BASE + timedelta(minutes=23)), "status": "possible", "reason": "L4 found on affected machines"},
+                {"known_at": iso(BASE + timedelta(minutes=24)), "status": "possible", "reason": "EX11 is a candidate control; exposure and completeness are unverified"},
+            ],
+        ),
+        Hypothesis(
+            id="h-lidar-53",
+            investigation_id=investigation_id,
+            label="LiDAR firmware 5.3",
+            status="possible",
+            supporting_evidence=[],
+            contradicting_evidence=[],
+            missing_evidence=["no useful next check first"],
+            would_change_conclusion=["LiDAR 5.3 healthy cohort begins showing the same safe-stop pattern"],
+            revision_history=[{"known_at": iso(DEMO_DECISION_TIME), "status": "possible", "reason": "Firmware metadata alone cannot establish cause"}],
+        ),
+    ]
+    checks = [
+        DiagnosticCheck(
+            id="check-ex11-zone-b",
+            investigation_id=investigation_id,
+            question="Does EX11 safe-stop when observed in loading zone B?",
+            procedure={"type": "read_only_observation", "asset_id": "EX11", "route_segment": "loading-zone-B", "do_not_modify_machine": True},
+            expected_observations={
+                "if_safe_stop": {"belief_update": {"h-l4-zone-b": "strengthens"}, "reason": "L4 + Zone B remains the best split"},
+                "if_healthy": {"belief_update": {"h-l4-zone-b": "weakens"}, "reason": "healthy L4 + Zone B comparator appears"},
+            },
+            estimated_cost={"time_minutes": 15, "operator_attention": "low"},
+            operational_risk={"level": "low", "reason": "read-only observation; no production configuration change"},
+            why_informative="It verifies a candidate control and can challenge a simple explanation; uncontrolled confounders prevent identifying an interaction from this check alone.",
+            required_approval=None,
+            check_type="read_only",
+            rank_score=0.91,
+        ),
+        DiagnosticCheck(
+            id="check-rollback-ex03",
+            investigation_id=investigation_id,
+            question="Does rolling back L4 on EX03 restore service?",
+            procedure={"type": "intervention", "asset_id": "EX03", "change": "revert localization profile L4 to L3"},
+            expected_observations={
+                "if_recovered": {"belief_update": {"localization_related": "strengthens"}, "caveat": "does not prove L4 alone"},
+                "if_not_recovered": {"belief_update": {"localization_related": "weakens"}},
+            },
+            estimated_cost={"time_minutes": 30, "operational_disruption": "medium"},
+            operational_risk={"level": "medium", "reason": "modifies a production machine"},
+            why_informative="Useful for recovery, but less clean diagnostically than observing EX11 first.",
+            required_approval="operations lead",
+            check_type="intervention",
+            rank_score=0.64,
+        ),
+    ]
+    events = [
+        CaseEvent(id="ce-1411", investigation_id=investigation_id, event_kind="signal", occurred_at=BASE + timedelta(minutes=11), payload={"text": "EX03 safe-stop", "known_at": iso(BASE + timedelta(minutes=12))}),
+        CaseEvent(id="ce-1423", investigation_id=investigation_id, event_kind="belief_update", occurred_at=BASE + timedelta(minutes=23), payload={"text": "Localization L4 discovered", "hypothesis": "h-l4-alone"}),
+        CaseEvent(id="ce-1424", investigation_id=investigation_id, event_kind="candidate_control", occurred_at=BASE + timedelta(minutes=24), payload={"text": "EX11 candidate control; exposure not verified", "known_at": iso(BASE + timedelta(minutes=24))}),
+        CaseEvent(id="ce-1427", investigation_id=investigation_id, event_kind="decision_snapshot", occurred_at=DEMO_DECISION_TIME, payload={"text": "Decision snapshot sealed", "known_affected": 3}),
+    ]
+    db.add_all(hypotheses + checks + events)
+    db.commit()
+
+
+def evidence_rows(db: Session, asset_id: Optional[str] = None, known_at: Optional[datetime] = None) -> list[Evidence]:
+    stmt = select(Evidence).order_by(Evidence.event_time)
+    if asset_id:
+        stmt = stmt.where(Evidence.asset_id == asset_id)
+    if known_at:
+        stmt = stmt.where(Evidence.known_at <= known_at)
+    return list(db.scalars(stmt))
+
+
+def latest_state(db: Session, asset_id: str, at: datetime, known_at: Optional[datetime] = None) -> dict[str, Any]:
+    state: dict[str, Any] = {}
+    stmt = select(Evidence).where(Evidence.asset_id == asset_id, Evidence.event_time <= at).order_by(Evidence.event_time)
+    if known_at:
+        stmt = stmt.where(Evidence.known_at <= known_at)
+    for ev in db.scalars(stmt):
+        payload = ev.payload or {}
+        if ev.event_type == "deployment":
+            state["application_version"] = payload.get("application_version")
+        if ev.event_type == "configuration_change":
+            if payload.get("configuration") is not None:
+                state["configuration"] = payload.get("configuration")
+            if payload.get("network_profile") is not None:
+                state["network_profile"] = payload.get("network_profile")
+            if payload.get("firmware_version") is not None:
+                state["firmware_version"] = payload.get("firmware_version")
+            if payload.get("map_version") is not None:
+                state["map_version"] = payload.get("map_version")
+        if ev.event_type in ["state_snapshot", "telemetry_anomaly"]:
+            for key in STATE_KEYS:
+                if payload.get(key) is not None:
+                    state[key] = payload.get(key)
+            if ev.event_type == "telemetry_anomaly":
+                state["health"] = "degraded"
+        if payload.get("health"):
+            state["health"] = payload.get("health")
+        if payload.get("signal"):
+            state["last_signal"] = payload.get("signal")
+    return state
+
+
+def reconstruct(db: Session, investigation_id: str, knowledge_time: Optional[datetime] = None) -> dict[str, Any]:
+    inv = db.get(Investigation, investigation_id)
+    if not inv:
+        raise ValueError("investigation not found")
+    trigger = db.get(Evidence, inv.trigger_id)
+    known_at = knowledge_time or BASE + timedelta(days=1)
+    rows = evidence_rows(db, inv.asset_id, known_at)
+    healthy = [e for e in rows if e.event_time <= trigger.event_time and (e.payload or {}).get("health") == "healthy"]
+    last_healthy = healthy[-1] if healthy else None
+    lookback_start = trigger.event_time - timedelta(hours=2)
+    changes = [e for e in rows if lookback_start <= e.event_time <= trigger.event_time and e.event_type in ["deployment", "configuration_change"]]
+    abnormalities = [e for e in rows if e.event_type == "telemetry_anomaly"]
+    first_abnormal = abnormalities[0] if abnormalities else trigger
+    discoveries = [e for e in rows if e.event_type == "human_discovery"]
+    human_discovery = discoveries[0] if discoveries else None
+    detection_latency = None
+    if human_discovery and first_abnormal:
+        delta = human_discovery.event_time - first_abnormal.event_time
+        detection_latency = f"{delta.seconds // 3600}h{(delta.seconds % 3600) // 60:02d}m"
+    current = latest_state(db, inv.asset_id, trigger.event_time, known_at)
+    required = ["application_version", "configuration", "firmware_version", "process_health"]
+    gaps = [f for f in required if not current.get(f)]
+    if not human_discovery:
+        gaps.append("human discovery context")
+    for contextual_gap in ["operator intent at safe-stop", "exact planner fallback reason", "local perception trace near loading zone B", "operator workaround rationale"]:
+        if contextual_gap not in gaps:
+            gaps.append(contextual_gap)
+    return {
+        "investigation": {"id": inv.id, "asset_id": inv.asset_id, "title": inv.title, "status": inv.status},
+        "trigger": serialize_evidence(trigger),
+        "last_known_healthy": serialize_evidence(last_healthy) if last_healthy else None,
+        "changes_since_healthy": [serialize_evidence(e) for e in changes],
+        "first_abnormal_evidence": serialize_evidence(first_abnormal),
+        "human_discovery": serialize_evidence(human_discovery) if human_discovery else None,
+        "detection_latency": detection_latency,
+        "current_state": current,
+        "evidence_gaps": gaps,
+        "timeline": [serialize_evidence(e) for e in rows],
+        "known_at": iso(known_at),
+    }
+
+
+def serialize_hypothesis(row: Hypothesis) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "label": row.label,
+        "status": row.status,
+        "supporting_evidence": row.supporting_evidence,
+        "contradicting_evidence": row.contradicting_evidence,
+        "missing_evidence": row.missing_evidence,
+        "would_change_conclusion": row.would_change_conclusion,
+        "revision_history": row.revision_history,
+    }
+
+
+def serialize_check(row: DiagnosticCheck) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "question": row.question,
+        "procedure": row.procedure,
+        "expected_observations": row.expected_observations,
+        "estimated_cost": row.estimated_cost,
+        "operational_risk": row.operational_risk,
+        "why_informative": row.why_informative,
+        "required_approval": row.required_approval,
+        "check_type": row.check_type,
+        "rank_score": row.rank_score,
+        "actual_observation": row.actual_observation,
+        "belief_update": row.belief_update,
+        "status": row.status,
+    }
+
+
+def evidence_lineage(db: Session, investigation_id: str) -> dict[str, Any]:
+    inv = db.get(Investigation, investigation_id)
+    if not inv:
+        raise ValueError("investigation not found")
+    rows = evidence_rows(db)
+    linked = []
+    for ev in rows:
+        payload = ev.payload or {}
+        is_linked = ev.id == inv.trigger_id or ev.asset_id in {"EX03", "EX05", "EX08", "EX11"} or ev.event_type in {"deployment", "configuration_change", "telemetry_anomaly", "human_discovery"}
+        if not is_linked:
+            continue
+        linked.append({
+            **serialize_evidence(ev),
+            "source_id": ev.source_id,
+            "source_type": ev.source_type,
+            "original_reference": ev.original_reference,
+            "linkage_method": ev.linkage_method,
+            "verification_state": ev.verification_state,
+            "supporting_references": ev.supporting_references,
+            "unresolved_assumptions": ev.unresolved_assumptions,
+            "claim_support": payload.get("signal") or payload.get("application_version") or payload.get("configuration") or payload.get("observation") or ev.event_type,
+        })
+    return {
+        "investigation_id": investigation_id,
+        "rule": "Evidence can support a claim only when it has explicit reference, exact id, human verification or stated inference. Temporal proximity alone is never causation.",
+        "evidence": linked,
+    }
+
+
+def hypotheses_state(db: Session, investigation_id: str, known_at: Optional[datetime] = None) -> dict[str, Any]:
+    from app.investigation_engine import evaluate
+    seed_field_case_reasoning(db, investigation_id)
+    state = evaluate(db, investigation_id, known_at)
+    return {**state, 'belief_snapshot': {'known_at': state['as_of'], 'immutable': True,
+                                      'summary': 'Evidence available at the requested time.'},
+            'hypotheses': [{**h, 'snapshot_status': h['status']} for h in state['hypotheses']]}
+
+
+def diagnostic_checks(db: Session, investigation_id: str) -> dict[str, Any]:
+    seed_field_case_reasoning(db, investigation_id)
+    rows = list(db.scalars(select(DiagnosticCheck).where(DiagnosticCheck.investigation_id == investigation_id).order_by(DiagnosticCheck.rank_score.desc())))
+    from app.investigation_engine import evaluate
+    ranked = evaluate(db, investigation_id)["checks"]
+    scores = {item["id"]: item for item in ranked}
+    rows.sort(key=lambda row: (-scores[row.id]["score"], row.id))
+    for row in rows:
+        row.rank_score = scores[row.id]["score"]
+        row.why_informative = scores[row.id]["why"]
+    return {
+        "investigation_id": investigation_id,
+        "ranking_method": "Deterministic heuristic: information value, cost, operational risk and whether the check changes physical state.",
+        "checks": [serialize_check(row) for row in rows],
+    }
+
+
+def compare(db: Session, investigation_id: str) -> dict[str, Any]:
+    rec = reconstruct(db, investigation_id)
+    trigger = db.get(Evidence, rec["trigger"]["id"])
+    target_state = latest_state(db, trigger.asset_id, trigger.event_time)
+    all_assets = list(db.scalars(select(Asset).order_by(Asset.id)))
+    exposed, affected, unaffected = [], [], []
+    for asset in all_assets:
+        state = latest_state(db, asset.id, trigger.event_time)
+        same_app = state.get("application_version") == target_state.get("application_version")
+        if same_app:
+            exposed.append(asset.id)
+            anomalies = [e for e in evidence_rows(db, asset.id) if e.event_type == "telemetry_anomaly"]
+            (affected if anomalies else unaffected).append(asset.id)
+    table = []
+    dimensions = [
+        ("Autonomy release 2.7", "application_version", "autonomy-2.7"),
+        ("Localization profile L4", "configuration", "localization-L4"),
+        ("LiDAR firmware 5.3", "firmware_version", "lidar-fw-5.3"),
+        ("Map M19", "map_version", "map-M19"),
+        ("Loading zone B", "network_profile", "loading-zone-B"),
+    ]
+    for label, key, expected in dimensions:
+        affected_count = sum(1 for aid in affected if latest_state(db, aid, trigger.event_time).get(key) == expected)
+        unaffected_count = sum(1 for aid in unaffected if latest_state(db, aid, trigger.event_time).get(key) == expected)
+        table.append({"context": label, "affected": f"{affected_count}/{len(affected)}", "unaffected": f"{unaffected_count}/{len(unaffected)}"})
+    return {
+        "question": "Where else is this happening?",
+        "same_change": len(exposed),
+        "same_signal": len(affected),
+        "no_signal": len(unaffected),
+        "affected_assets": affected,
+        "unaffected_assets": unaffected,
+        "table": table,
+        "interpretation": [
+            "Autonomy release 2.7 ran on all twelve machines, so the release alone does not explain the split.",
+            "Affected configuration records include localization L4 and Zone B; actual comparable operating exposure remains unverified.",
+            "EX11 has no known signal, but actual operating exposure is not verified; it is not a valid control yet.",
+            "LiDAR firmware 5.3 and map M19 also appear in healthy machines, so they are not sufficient on their own.",
+            "This narrows the investigation; it does not establish cause.",
+        ],
+        "potentially_exposed": [
+            {"asset_id": "EX11", "reason": "Exposure not verified: configuration alone does not establish matching operating conditions."}
+        ],
+    }
+
+
+def summarize_values(values: list[Any]) -> str:
+    if not values:
+        return "0/0"
+    counts: dict[str, int] = {}
+    for value in values:
+        counts[str(value)] = counts.get(str(value), 0) + 1
+    value, count = sorted(counts.items(), key=lambda item: item[1], reverse=True)[0]
+    return f"{value} · {count}/{len(values)}"
+
+
+def evaluated_hypotheses(db: Session, investigation_id: str) -> list[dict[str, Any]]:
+    from app.investigation_engine import evaluate
+    seed_field_case_reasoning(db, investigation_id)
+    return [{**item, "hypothesis": item["label"]} for item in evaluate(db, investigation_id)["hypotheses"]]
+
+
+def build_package(db: Session, investigation_id: str) -> DecisionPackage:
+    seed_decision_primitives(db, investigation_id)
+    rec = reconstruct(db, investigation_id)
+    comp = compare(db, investigation_id)
+    unknowns = rec["evidence_gaps"]
+    options = list(db.scalars(select(DecisionOption).where(DecisionOption.investigation_id == investigation_id).order_by(DecisionOption.option_type)))
+    observability = db.scalar(select(ObservabilityState).where(ObservabilityState.investigation_id == investigation_id).order_by(ObservabilityState.assessed_at.desc()).limit(1))
+    substantiation_checks = [
+        {"name": "affected population scoped", "status": "supported", "evidence": f"{len(comp['affected_assets'])} affected, {len(comp['unaffected_assets'])} healthy comparison machines"},
+        {"name": "exposed-but-stable systems identified", "status": "supported", "evidence": ", ".join(item["asset_id"] for item in comp["potentially_exposed"]) or "none"},
+        {"name": "decision owner assigned", "status": "missing", "evidence": "no named human owner until decision is recorded"},
+        {"name": "unknowns explicitly preserved", "status": "supported", "evidence": "; ".join(unknowns[:2])},
+        {"name": "inference boundary checked", "status": "warning", "evidence": "localization/zone exposure is plausible, not established cause"},
+        {"name": "outcome follow-up required", "status": "missing", "evidence": "no outcome record yet"},
+    ]
+    package = {
+        "trigger": rec["trigger"],
+        "last_known_healthy": rec["last_known_healthy"],
+        "recent_changes": rec["changes_since_healthy"],
+        "first_abnormal_evidence": rec["first_abnormal_evidence"],
+        "machine_state": rec["current_state"],
+        "peer_comparison": comp,
+        "supporting_evidence": ["release manifest", "robot configuration record", "mission runtime telemetry", "operator review"],
+        "missing_evidence": rec["evidence_gaps"],
+        "what_was_unknown": [
+            "Whether EX11 would later show the same safe-stop behavior",
+            "Whether loading zone B map or perception context contributed",
+            "Whether remote recovery would restore service",
+            "Whether localization profile L4 was causal or only correlated",
+        ],
+        "hypotheses": evaluated_hypotheses(db, investigation_id),
+        "primary_hypothesis": evaluated_hypotheses(db, investigation_id)[0],
+        "current_interpretation": comp["interpretation"],
+        "human_decision": None,
+        "planned_action": None,
+        "actual_action": None,
+        "options_considered": [serialize_option(option) for option in options],
+        "observability_state": serialize_observability(observability),
+        "approval_policy": {
+            "name": "Remote equipment rollout review",
+            "version": "v0.3",
+            "required": ["decision owner", "evidence package", "action scope", "outcome follow-up"],
+        },
+        "action_scope": {
+            "affected": comp["affected_assets"],
+            "watch": [item["asset_id"] for item in comp["potentially_exposed"]],
+            "stable_comparison": comp["unaffected_assets"],
+        },
+        "decision_substantiation": {
+            "question": "Are we allowed and justified to take the operational action yet?",
+            "status": "incomplete",
+            "summary": "Decision package incomplete. Action cannot yet be fully substantiated until owner, unknowns and outcome follow-up are recorded.",
+            "checks": substantiation_checks,
+        },
+        "outcome": None,
+        "outcome_validation": {
+            "status": "pending",
+            "method": "Track return-to-service, recurrence and field dispatch outcome after action",
+            "causal_attribution": "not_established",
+        },
+    }
+    dp = DecisionPackage(id=f"pkg-{uuid.uuid4().hex[:10]}", investigation_id=investigation_id, version=1, package=package)
+    db.add(dp)
+    db.add(
+        EvidenceSnapshot(
+            id=f"snap-{uuid.uuid4().hex[:10]}",
+            investigation_id=investigation_id,
+            snapshot_time=DEMO_DECISION_TIME,
+            evidence_ids=[item["id"] for item in rec["timeline"] if item["known_at"] <= iso(DEMO_DECISION_TIME)],
+            known_state={
+                "affected": comp["affected_assets"],
+                "unaffected": comp["unaffected_assets"],
+                "potentially_exposed": comp["potentially_exposed"],
+            },
+            unknowns=unknowns,
+            observability_state=serialize_observability(observability),
+        )
+    )
+    db.commit()
+    db.refresh(dp)
+    return dp
+
+
+def attach_human_decision(db: Session, decision: Decision) -> None:
+    """Legacy decision endpoint: record intent, never invent execution."""
+    options = [serialize_option(o) for o in db.scalars(select(DecisionOption).where(DecisionOption.investigation_id == decision.investigation_id))]
+    observability = db.scalar(select(ObservabilityState).where(ObservabilityState.investigation_id == decision.investigation_id).order_by(ObservabilityState.assessed_at.desc()).limit(1))
+    snapshot = db.scalar(select(EvidenceSnapshot).where(EvidenceSnapshot.investigation_id == decision.investigation_id).order_by(EvidenceSnapshot.snapshot_time.desc()).limit(1))
+    hypotheses = evaluated_hypotheses(db, decision.investigation_id)
+    evidence_snapshot = {"id": snapshot.id if snapshot else None, "known_state": snapshot.known_state if snapshot else {}, "what_was_unknown": snapshot.unknowns if snapshot else [], "hypotheses": hypotheses, "primary_hypothesis": hypotheses[0] if hypotheses else {}}
+    chosen = {"option_type": "human_reported_intent", "label": decision.decision}
+    body = {"decision_id": decision.id, "chosen_option": chosen, "options_considered": options, "evidence_snapshot": evidence_snapshot, "decision_time": iso(decision.decided_at)}
+    digest = hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    db.add(DecisionRecord(id=f"drec-{uuid.uuid4().hex}", investigation_id=decision.investigation_id, decision_id=decision.id, package_id=decision.package_id, decision_time=decision.decided_at, owner=decision.owner, chosen_option=chosen, options_considered=options, evidence_snapshot=evidence_snapshot, observability_state=serialize_observability(observability) or {}, immutable=True, digest=digest))
+    if decision.package_id:
+        dp = db.get(DecisionPackage, decision.package_id)
+        if dp and not dp.sealed:
+            package = dict(dp.package or {})
+            package["human_decision"] = {"decision": decision.decision, "owner": decision.owner, "rationale": decision.rationale, "decided_at": iso(decision.decided_at), "signature_intent": "human-reported decision; no execution attested"}
+            package["planned_action"] = {"action_type": "human_reported_intent", "label": decision.decision, "owner": decision.owner}
+            package["actual_action"] = {"status": "not_reported"}
+            if package.get("decision_substantiation"):
+                package["decision_substantiation"] = {**package["decision_substantiation"], "status": "decision_recorded_execution_unconfirmed", "summary": "Human intent recorded; execution and outcome require separate evidence."}
+            dp.package = package
+            db.add(dp)
+
+
+def serialize_option(option: DecisionOption) -> dict[str, Any]:
+    return {
+        "id": option.id,
+        "option_type": option.option_type,
+        "label": option.label,
+        "expected_cost": option.expected_cost,
+        "expected_risk": option.expected_risk,
+        "historical_support": option.historical_support,
+        "selected": option.selected,
+    }
+
+
+def serialize_observability(row: Optional[ObservabilityState]) -> Optional[dict[str, Any]]:
+    if not row:
+        return None
+    return {
+        "id": row.id,
+        "assessed_at": iso(row.assessed_at),
+        "status": row.status,
+        "connected_sources": row.connected_sources,
+        "freshness": row.freshness,
+        "completeness": row.completeness,
+        "delayed_sources": row.delayed_sources,
+        "missing_windows": row.missing_windows,
+    }
+
+
+def decision_context(db: Session, investigation_id: str) -> dict[str, Any]:
+    seed_decision_primitives(db, investigation_id)
+    decisions = list(db.scalars(select(Decision).where(Decision.investigation_id == investigation_id).order_by(Decision.decided_at.desc())))
+    options = list(db.scalars(select(DecisionOption).where(DecisionOption.investigation_id == investigation_id).order_by(DecisionOption.option_type)))
+    observability = db.scalar(select(ObservabilityState).where(ObservabilityState.investigation_id == investigation_id).order_by(ObservabilityState.assessed_at.desc()).limit(1))
+    actions = list(db.scalars(select(ExecutedAction).where(ExecutedAction.investigation_id == investigation_id).order_by(ExecutedAction.executed_at.desc())))
+    snapshots = list(db.scalars(select(EvidenceSnapshot).where(EvidenceSnapshot.investigation_id == investigation_id).order_by(EvidenceSnapshot.snapshot_time.desc())))
+    flags = list(db.scalars(select(ReviewFlag).where(ReviewFlag.investigation_id == investigation_id).order_by(ReviewFlag.created_at.desc())))
+    records = list(db.scalars(select(DecisionRecord).where(DecisionRecord.investigation_id == investigation_id).order_by(DecisionRecord.decision_time.desc())))
+    return {
+        "investigation_id": investigation_id,
+        "decision_time": iso(DEMO_DECISION_TIME),
+        "decisions": [
+            {
+                "id": item.id,
+                "decision": item.decision,
+                "owner": item.owner,
+                "rationale": item.rationale,
+                "decided_at": iso(item.decided_at),
+                "package_id": item.package_id,
+            }
+            for item in decisions
+        ],
+        "options_considered": [serialize_option(option) for option in options],
+        "observability_state": serialize_observability(observability),
+        "executed_actions": [
+            {
+                "id": item.id,
+                "action_type": item.action_type,
+                "owner": item.owner,
+                "executed_at": iso(item.executed_at),
+                "scope": item.scope,
+                "payload": item.payload,
+            }
+            for item in actions
+        ],
+        "evidence_snapshots": [
+            {
+                "id": item.id,
+                "snapshot_time": iso(item.snapshot_time),
+                "evidence_ids": item.evidence_ids,
+                "known_state": item.known_state,
+                "unknowns": item.unknowns,
+                "observability_state": item.observability_state,
+                "sealed_digest": item.sealed_digest,
+            }
+            for item in snapshots
+        ],
+        "review_flags": [
+            {"id": item.id, "flag_type": item.flag_type, "severity": item.severity, "reason": item.reason, "status": item.status}
+            for item in flags
+        ],
+        "decision_records": [
+            {
+                "id": item.id,
+                "decision_id": item.decision_id,
+                "package_id": item.package_id,
+                "decision_time": iso(item.decision_time),
+                "owner": item.owner,
+                "chosen_option": item.chosen_option,
+                "options_considered": item.options_considered,
+                "evidence_snapshot": item.evidence_snapshot,
+                "observability_state": item.observability_state,
+                "hypotheses": item.evidence_snapshot.get("hypotheses", []) if isinstance(item.evidence_snapshot, dict) else [],
+                "planned_action": {
+                    "action_type": "remote_fix_and_hold_rollout",
+                    "label": "Remote recovery on affected machines, hold field dispatch and monitor EX11",
+                    "scope": {"remote_recovery": ["EX03", "EX05", "EX08"], "watch": ["EX11"], "held_rollout": ["localization-L4", "loading-zone-B"]},
+                },
+                "immutable": item.immutable,
+                "digest": item.digest,
+            }
+            for item in records
+        ],
+    }
+
+
+def seal_body(dp: DecisionPackage) -> dict[str, Any]:
+    package = dict(dp.package or {})
+    package.pop("_seal", None)
+    return {
+        "version": dp.version,
+        "trusted_timestamp": iso(DEMO_SEAL_TIME),
+        "timestamp_authority": TIMESTAMP_AUTHORITY,
+        "package": package,
+    }
+
+
+def seal_package(db: Session, package_id: str) -> DecisionPackage:
+    dp = db.get(DecisionPackage, package_id)
+    if not dp:
+        raise ValueError("package not found")
+    if dp.sealed:
+        return dp
+    sealed_at = DEMO_SEAL_TIME
+    body = seal_body(dp)
+    canonical = json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+    digest = hashlib.sha256(canonical).hexdigest()
+    private_key = Ed25519PrivateKey.generate()
+    signature = private_key.sign(canonical)
+    public_key = private_key.public_key().public_bytes(encoding=serialization.Encoding.Raw, format=serialization.PublicFormat.Raw)
+    dp.sealed = True
+    dp.sealed_at = sealed_at
+    dp.digest = digest
+    dp.signature = base64.b64encode(signature).decode()
+    dp.public_key = base64.b64encode(public_key).decode()
+    package = dict(dp.package or {})
+    package["_seal"] = {
+        "canonicalization": "json.sort_keys.compact",
+        "digest_algorithm": "SHA-256",
+        "signature_algorithm": "Ed25519",
+        "trusted_timestamp": iso(DEMO_SEAL_TIME),
+        "timestamp_authority": TIMESTAMP_AUTHORITY,
+        "standalone_verification": "Use the public key, canonical body and signature to verify this package outside Veyra.",
+    }
+    dp.package = package
+    db.commit()
+    db.refresh(dp)
+    return dp
+
+
+def verify_package(db: Session, package_id: str) -> dict[str, Any]:
+    dp = db.get(DecisionPackage, package_id)
+    if not dp:
+        raise ValueError("package not found")
+    if not dp.sealed or not dp.digest or not dp.signature or not dp.public_key:
+        return {"package_id": package_id, "sealed": bool(dp.sealed), "valid": False, "reason": "package is not sealed"}
+    canonical = json.dumps(seal_body(dp), sort_keys=True, separators=(",", ":")).encode()
+    digest = hashlib.sha256(canonical).hexdigest()
+    digest_matches = digest == dp.digest
+    signature_valid = False
+    try:
+        public_key = Ed25519PublicKey.from_public_bytes(base64.b64decode(dp.public_key.encode()))
+        public_key.verify(base64.b64decode(dp.signature.encode()), canonical)
+        signature_valid = True
+    except (InvalidSignature, ValueError):
+        signature_valid = False
+    return {
+        "package_id": package_id,
+        "sealed": True,
+        "valid": digest_matches and signature_valid,
+        "digest_matches": digest_matches,
+        "signature_valid": signature_valid,
+        "digest": dp.digest,
+        "public_key": dp.public_key,
+        "trusted_timestamp": iso(DEMO_SEAL_TIME),
+        "timestamp_authority": TIMESTAMP_AUTHORITY,
+        "canonicalization": "json.sort_keys.compact",
+        "verification_mode": "standalone",
+    }
+
+
+def serialize_evidence(ev: Optional[Evidence]) -> Optional[dict[str, Any]]:
+    if not ev:
+        return None
+    return {
+        "id": ev.id,
+        "asset_id": ev.asset_id,
+        "event_type": ev.event_type,
+        "event_time": iso(ev.event_time),
+        "known_at": iso(ev.known_at),
+        "ingested_at": iso(ev.ingested_at),
+        "source": ev.source,
+        "source_id": ev.source_id,
+        "source_type": ev.source_type,
+        "original_reference": ev.original_reference,
+        "linkage_method": ev.linkage_method,
+        "verification_state": ev.verification_state,
+        "evidence_class": ev.evidence_class,
+        "payload": ev.payload,
+        "confidence": ev.confidence,
+        "provenance": ev.provenance,
+        "supporting_references": ev.supporting_references,
+        "unresolved_assumptions": ev.unresolved_assumptions,
+    }
+
+
+def inject_late_evidence(db: Session) -> dict[str, Any]:
+    ev = evidence(
+        "EX11",
+        "telemetry_anomaly",
+        9,
+        22,
+        "delayed_edge_buffer",
+        "OBSERVED",
+        {
+            "signal": "safe_stop_near_loading_zone",
+            "process_health": "safe_stop",
+            "severity": "review",
+            "safe_stop_count": 1,
+            "zone": "loading-zone-B",
+            "source_detail": "delayed edge buffer upload",
+            "note": "EX11 runtime buffer was uploaded at 14:31; safe-stop behavior was present at 14:09:11.",
+        },
+        "EX11-delayed-safe-stop",
+        ingested_delay_seconds=4,
+    )
+    if not db.get(Evidence, ev.id):
+        db.add(ev)
+        db.commit()
+    investigation_id = "inv-120-robots-bad-rollout"
+    latest_decision = db.scalar(select(Decision).where(Decision.investigation_id == investigation_id).order_by(Decision.decided_at.desc()).limit(1))
+    latest_record = db.scalar(select(DecisionRecord).where(DecisionRecord.investigation_id == investigation_id).order_by(DecisionRecord.decision_time.desc()).limit(1))
+    if not db.get(LateEvidence, "late-EX11-delayed-safe-stop"):
+        db.add(
+            LateEvidence(
+                id="late-EX11-delayed-safe-stop",
+                investigation_id=investigation_id,
+                evidence_id=ev.id,
+                decision_id=latest_decision.id if latest_decision else None,
+                materiality="decision_relevant",
+                review_status="open",
+                created_at=ev.ingested_at,
+            )
+        )
+        db.add(
+            ReviewFlag(
+                id=f"flag-{uuid.uuid4().hex[:10]}",
+                investigation_id=investigation_id,
+                decision_id=latest_decision.id if latest_decision else None,
+                flag_type="late_decision_relevant_evidence",
+                severity="review",
+                reason="EX11 evidence had event_time before the sealed decision but known_at after the decision.",
+                status="open",
+                created_at=ev.ingested_at,
+            )
+        )
+        db.commit()
+    return {
+        "late_evidence": serialize_evidence(ev),
+        "comparison": compare(db, investigation_id),
+        "review_required": True,
+        "decision_record_unchanged": latest_record.digest if latest_record else None,
+    }
+
+
+def record_cost_impact(db: Session, outcome: Outcome) -> CostImpact:
+    payload = outcome.payload or {}
+    impact = CostImpact(
+        id=f"cost-{uuid.uuid4().hex[:10]}",
+        investigation_id=outcome.investigation_id,
+        outcome_id=outcome.id,
+        recovery_time_minutes=payload.get("recovery_minutes", 41),
+        downtime_minutes=payload.get("downtime_minutes", 41),
+        field_visit=bool(payload.get("field_visit", False)),
+        engineering_hours=float(payload.get("engineering_hours", 1.5)),
+        rollout_delay_minutes=payload.get("rollout_delay_minutes", 60),
+        customer_escalation=bool(payload.get("customer_escalation", False)),
+        estimated_cost={
+            "field_visit_avoided_usd": payload.get("field_visit_avoided_usd", 1200),
+            "engineering_hours_saved": payload.get("engineering_hours_saved", 2),
+            "rollout_risk_reduced": True,
+        },
+    )
+    db.add(impact)
+    attribution = OutcomeAttribution(
+        id=f"attr-{uuid.uuid4().hex[:10]}",
+        investigation_id=outcome.investigation_id,
+        outcome_id=outcome.id,
+        action_type="remote_fix_and_hold_rollout",
+        attribution_level=payload.get("attribution_level", "observed"),
+        rationale=payload.get("attribution_rationale", "Return-to-service was observed after remote recovery. Remote recovery is not treated as proven causal."),
+        evidence={
+            "recovery_observed_after_action": True,
+            "causal_proof": False,
+            "validation_status": payload.get("validation_status", "observed_recovery_not_causal_proof"),
+            "validated_signals": payload.get("validated_signals", ["safe-stop cleared", "machines returned to service", "no field visit required"]),
+            "hypothesis_result": payload.get("hypothesis_result", {
+                "h-localization-zone": "partially_supported",
+                "h-perception-map": "still_unresolved",
+                "h-release-wide": "weakened",
+            }),
+            "recurrence_window": payload.get("recurrence_window", "EX03 and EX08 stable; EX05 entered safe-stop again six hours later; EX11 later showed same pattern"),
+        },
+    )
+    db.add(attribution)
+    return impact
+
+
+def precedent_comparison(db: Session, investigation_id: str) -> dict[str, Any]:
+    comp = compare(db, investigation_id)
+    outcomes = list(db.scalars(select(Outcome).order_by(Outcome.recorded_at.desc())))
+    cost_rows = list(db.scalars(select(CostImpact).where(CostImpact.investigation_id == investigation_id)))
+    attributions = list(db.scalars(select(OutcomeAttribution).where(OutcomeAttribution.investigation_id == investigation_id)))
+    response_history = {
+        "remote_fix": {
+            "cases": len([o for o in outcomes if "remote" in (o.outcome or "").lower() or "restart" in json.dumps(o.payload or {}).lower()]),
+            "observed_outcome": "returned to service without a field visit" if outcomes else "outcome pending",
+            "attribution": attributions[0].attribution_level if attributions else "not_observed",
+        },
+        "monitor": {"cases": 0, "observed_outcome": "not yet observed"},
+        "dispatch": {"cases": 0, "observed_outcome": "not supported by current evidence"},
+        "pause_rollout": {"cases": len(outcomes), "observed_outcome": "rollout contained while review continued" if outcomes else "outcome pending"},
+    }
+    result = {
+        "investigation_id": investigation_id,
+        "query": {
+            "question": "In similar conditions, what responses were tried and what happened?",
+            "state": {
+                "application": "autonomy-2.7",
+                "configuration": "localization-L4",
+                "firmware": "lidar-fw-5.3",
+                "map": "map-M19",
+                "zone": "loading-zone-B",
+                "signal": "safe_stop_near_loading_zone",
+            },
+        },
+        "similar_state": {
+            "affected": comp["affected_assets"],
+            "unaffected": comp["unaffected_assets"],
+            "potentially_exposed": comp["potentially_exposed"],
+        },
+        "response_history": response_history,
+        "outcome_comparison": [
+            {"action": "remote_fix", "cases": response_history["remote_fix"]["cases"], "outcome": response_history["remote_fix"]["observed_outcome"], "attribution": response_history["remote_fix"]["attribution"]},
+            {"action": "monitor", "cases": response_history["monitor"]["cases"], "outcome": response_history["monitor"]["observed_outcome"], "attribution": "not_observed"},
+            {"action": "dispatch", "cases": response_history["dispatch"]["cases"], "outcome": response_history["dispatch"]["observed_outcome"], "attribution": "not_supported"},
+            {"action": "pause_rollout", "cases": response_history["pause_rollout"]["cases"], "outcome": response_history["pause_rollout"]["observed_outcome"], "attribution": "observed"},
+        ],
+        "cost_comparison": [
+            {
+                "field_visit": row.field_visit,
+                "recovery_time_minutes": row.recovery_time_minutes,
+                "downtime_minutes": row.downtime_minutes,
+                "estimated_cost": row.estimated_cost,
+            }
+            for row in cost_rows
+        ],
+        "evidence_strength": "precedent, not causal proof",
+        "applicability": {
+            "status": "partially_applicable" if outcomes else "insufficient_evidence",
+            "why": "The failure signature matches L4 plus loading zone B, but unresolved confounders remain and the prior outcome is observed recovery, not causal proof.",
+            "applicable_conditions": ["safe-stop after autonomy 2.7", "localization L4", "loading zone B exposure"],
+            "excluded_conditions": ["hardware fault not confirmed", "LiDAR 5.3 alone not sufficient"],
+            "unresolved_confounders": ["EX11 delayed evidence", "site-specific map/perception context"],
+            "reuse_warning": "Use as a starting precedent, not an automatic fix.",
+        },
+        "outcome_validation": {
+            "status": attributions[0].evidence.get("validation_status") if attributions else "pending",
+            "validated_signals": attributions[0].evidence.get("validated_signals") if attributions else [],
+            "hypothesis_result": attributions[0].evidence.get("hypothesis_result") if attributions else {},
+            "causal_attribution": "not_established",
+        },
+    }
+    db.add(
+        PrecedentComparison(
+            id=f"prec-{uuid.uuid4().hex[:10]}",
+            investigation_id=investigation_id,
+            query=result["query"],
+            similar_state=result["similar_state"],
+            response_history=result["response_history"],
+            outcome_comparison={"rows": result["outcome_comparison"]},
+            cost_comparison={"rows": result["cost_comparison"]},
+        )
+    )
+    db.commit()
+    return result
+
+
+def similar_memory(db: Session, investigation_id: str) -> dict[str, Any]:
+    outcomes = list(db.scalars(select(Outcome).order_by(Outcome.recorded_at.desc())))
+    precedent = precedent_comparison(db, investigation_id) if outcomes else None
+    return {
+        "query_investigation_id": investigation_id,
+        "similar_cases": [
+            {
+                "investigation_id": o.investigation_id,
+                "match_reason": "same post-deployment safe-stop pattern, localization profile and loading-zone exposure",
+                "outcome": o.outcome,
+                "recorded_at": iso(o.recorded_at),
+            }
+            for o in outcomes[:5]
+        ],
+        "precedent_comparison": precedent,
+    }
+
+
+def record_check_observation(db: Session, investigation_id: str, check_id: str, observation: dict[str, Any]) -> dict[str, Any]:
+    from app.investigation_engine import observe
+    seed_field_case_reasoning(db, investigation_id)
+    return observe(db, investigation_id, check_id, observation)
+
+
+def replay_case(db: Session, investigation_id: str) -> dict[str, Any]:
+    seed_field_case_reasoning(db, investigation_id)
+    checkpoints = [
+        ("14:11", BASE + timedelta(minutes=11), "First safe-stop is knowable."),
+        ("14:23", BASE + timedelta(minutes=23), "Localization L4 becomes part of the case."),
+        ("14:24", BASE + timedelta(minutes=24), "EX11 is identified as a candidate control; it is not yet a counterexample."),
+        ("14:27", DEMO_DECISION_TIME, "Decision snapshot. Future evidence is hidden."),
+        ("14:31", DEMO_SEAL_TIME, "Late evidence may update current view after the decision."),
+    ]
+    frames = []
+    for label, timestamp, note in checkpoints:
+        lineage = evidence_lineage(db, investigation_id)
+        known_evidence = [ev for ev in lineage["evidence"] if ev["known_at"] <= iso(timestamp)]
+        frames.append({
+            "time": label,
+            "known_at": iso(timestamp),
+            "note": note,
+            "known_evidence_ids": [ev["id"] for ev in known_evidence],
+            "belief_state": hypotheses_state(db, investigation_id, timestamp)["hypotheses"],
+            "future_evidence_hidden": label == "14:27",
+        })
+    unsupported_claims = []
+    for hyp in hypotheses_state(db, investigation_id)["hypotheses"]:
+        if not hyp["supporting_evidence"] and not hyp["context_evidence"]:
+            unsupported_claims.append(hyp["id"])
+    return {
+        "investigation_id": investigation_id,
+        "frames": frames,
+        "evaluation": {
+            "evidence_linkage_correctness": "prototype_checked",
+            "unsupported_ai_claims": unsupported_claims,
+            "hypothesis_coverage": "3 competing possible causes maintained",
+            "possible_cause_coverage": "3 competing possible causes maintained",
+            "suggested_checks_usefulness": "EX11 exposure verification can challenge a simple hypothesis; it cannot identify an interaction on its own",
+            "precedent_applicability": precedent_comparison(db, investigation_id)["applicability"]["status"],
+            "decision_traceability": "decision snapshot and digest preserve what was knowable at 14:27",
+        },
+    }
