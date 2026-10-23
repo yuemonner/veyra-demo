@@ -31,6 +31,21 @@ Script: `scripts/research/uavsead_select.js`, run in a browser tab on huggingfac
   independent references, same day when possible.
 - 12 calibration normal flights, disjoint from the test set, same configurations: used only to set thresholds.
 
+### Selection result (run 2026-10-23; `backend/research/uavsead/selection_v1.json`)
+
+`mapping.json` SHA-256 `afb1e2ab…800a`. Of 78 altitude-labelled flights, 63 are eligible; 15 excluded: 5 with several
+labels, 1 label not on the height estimate, 1 file missing, 3 without the estimator height topic, 4 with no independent
+reference (vision is the fused height source and the distance sensor is also fused), 1 over 30 MB.
+
+| Set | Flights | Size | Independent references |
+|---|---|---|---|
+| Test, altitude anomaly | 16 (14 flying days; 27 labelled ranges, 171 s) | 120.7 MB | vision+baro 4, vision+range 4, vision 3, range+baro 3, range 2 |
+| Test, matched normal | 16 (all matched) | 195.0 MB | same as their anomaly flights |
+| Calibration, normal | 12 | 139.9 MB | all five configurations |
+| **Total to download** | **44** | **455.6 MB** | |
+
+11 of 16 anomaly flights come from one board; the result will be reported per board.
+
 ## The check (frozen before any flight data is read)
 
 Per flight, airborne time only (`vehicle_land_detected.landed` false), excluding 5 s after takeoff and 2 s before landing.
