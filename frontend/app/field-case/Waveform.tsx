@@ -28,12 +28,14 @@ export function plotFor(run: Any, rule: string, text: string): PlotSpec | null {
     const end = epoch(f.end), held = end - f.t_start;
     return { key: `out-${f.channel}`, title: `${f.channel} output`, zero: f.t_start, from: f.t_start - 20, to: end + 10,
       traces: [{ signal: "actuator.output", scope: f.channel, label: `${f.channel} output`, role: "measured" }],
-      region: { from: f.t_start, to: end, label: `held ${f.held_value} for ${held.toFixed(1)} s` },
+      region: { from: f.t_start, to: end, label: `held at ${f.held_value}${f.unit === "us" ? " µs" : f.unit ? ` ${f.unit}` : ""} for ${held.toFixed(1)} s` },
       band: f.reference_range ? { lo: f.reference_range[0], hi: f.reference_range[1], label: "normal range" } : undefined };
   }
   if (rule === "R-TRACKING") {
     const f = (run.findings?.tracking?.findings || []).find((x: Any) => text.startsWith(`${x.axis} stopped following`));
-    const pair = f && PAIRS[f.pair];
+    // Runs recorded before the pair id was stored: roll/pitch/yaw are attitude; otherwise match the measured signal.
+    const pairId = f && (f.pair || (["roll", "pitch", "yaw"].includes(f.axis) ? "attitude" : Object.keys(PAIRS).find((k) => PAIRS[k][1] === f.measured)));
+    const pair = pairId && PAIRS[pairId];
     if (!f || !pair) return null;
     const scope = pair[2] ? f.axis : null;
     return { key: `trk-${f.axis}`, title: `${f.axis}: command vs measured`, zero: f.t_start, from: f.t_start - 20, to: f.t_start + 25,
@@ -77,7 +79,8 @@ export function Waveform({ caseId, spec, load, compact = false }: { caseId: stri
     return { lo, hi, x, y };
   }, [series, spec]);
 
-  const unit = series?.find((x: Any) => x.unit)?.unit || "";
+  const rawUnit = series?.find((x: Any) => x.unit)?.unit || "";
+  const unit = rawUnit === "us" ? "µs" : rawUnit === "deg" ? "degrees" : rawUnit;
   const total = series?.reduce((n: number, x: Any) => n + x.samples, 0) ?? 0;
   const thinned = series?.some((x: Any) => x.thinned);
   const relTicks = [-20, -10, 0, 10, 20].filter((d) => spec.zero + d >= spec.from && spec.zero + d <= spec.to);
