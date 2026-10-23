@@ -38,7 +38,11 @@ V3 (exploratory, written after v2's result on the same seen flights; post-hoc by
 only the mission-side inputs (commanded pitch, commanded roll), which a fault does not move directly, not the
 controller's errors or the measured state. Everything else as v2.
 
-Usage: python3 scripts/research/alfa_internal_model.py <processed folder> <out.json> [--cache-only] [--v2 | --v3]   (numpy)
+THREE-STATE (reviewer's design, 2026-10-23): detection exactly as v1 (nothing suppressed); each alarm is labelled
+"supported" when the inputs at the alarm lie inside the normal flights' envelope (v2's rule), otherwise
+"insufficient_model_coverage". On ALFA this is a design check only (flights already seen), not a performance claim.
+
+Usage: python3 scripts/research/alfa_internal_model.py <processed folder> <out.json> [--cache-only] [--v2 | --v3 | --three-state]   (numpy)
 """
 import csv
 import glob
@@ -53,6 +57,7 @@ STEP = 0.25
 REF_S = 20.0
 WINDOW = (-1.0, 10.0)
 ROLL_S, HOLD_S, MARGIN = 2.0, 1.0, 1.1
+THREE = "--three-state" in sys.argv   # reviewer's design: detect as v1, label coverage, never suppress
 V3 = "--v3" in sys.argv
 V2 = "--v2" in sys.argv or V3
 COMMANDS = {"pitch_cmd", "roll_cmd"}
@@ -138,9 +143,9 @@ def fit(flights, ch, lam=1.0):
     return {"w": w, "mu": mu, "sd": sd, "lo": lo - pad, "hi": hi + pad}
 
 
-def familiar(model, f, ch):
+def familiar(model, f, ch, force=False):
     """True where every input lies inside the training envelope (v2); always True in v1."""
-    if not V2:
+    if not (V2 or force):
         return np.ones(len(f["t"]), dtype=bool)
     X = design(f, ch)
     inside = (X >= model["lo"]) & (X <= model["hi"])
@@ -237,12 +242,18 @@ def main(processed, out_path, cache=None, only_cache=False):
         else:
             cal = cal_all
         alarm = first_alarm(cal, f)                      # blind: truth not consulted above this line
+        coverage = None
+        if THREE and alarm:  # was the alarm raised where the model has seen such inputs? (label only; nothing suppressed)
+            ch = alarm[1]
+            i = int(np.searchsorted(f["t"], alarm[0]))
+            j = min(len(f["t"]), i + max(1, int(HOLD_S / STEP)))
+            coverage = "supported" if familiar(cal[ch]["model"], f, ch, force=True)[i:j].all() else "insufficient_model_coverage"
         after = f["t"] > REF_S
         unfamiliar = {ch: round(float((~familiar(c["model"], f, ch) & after).sum() * STEP), 1) for ch, c in cal.items()}
         kinds, onset = f["truth"]["kinds"], f["truth"]["onset_s"]
         entry = {"flight": f["name"], "split": "development" if f["name"] in DEVELOPMENT else "held_out", "truth": f["truth"],
                  "alarm": {"t_s": round(alarm[0], 2), "channel": alarm[1], "part": PART[alarm[1]]} if alarm else None,
-                 "unfamiliar_s": unfamiliar, "flight_s": round(float(f["t"][-1]), 1)}
+                 "unfamiliar_s": unfamiliar, "flight_s": round(float(f["t"][-1]), 1), "coverage_at_alarm": coverage}
         if not kinds:
             entry["outcome"] = "false_alarm" if alarm else "correct_quiet"
         elif not alarm:
@@ -265,7 +276,7 @@ def main(processed, out_path, cache=None, only_cache=False):
                 "median_delay_s": round(statistics.median([r["delay_s"] for r in det]), 2) if det else None,
                 "by_fault": {k: {"flights": sum(k in r["truth"]["kinds"] for r in faults), "detected": sum(k in r["truth"]["kinds"] for r in det),
                                  "isolated": sum(k in r["truth"]["kinds"] and r["isolated"] for r in det)} for k in ("engines", "aileron", "elevator", "rudder")}}
-    summary = {"version": "v3" if V3 else "v2" if V2 else "v1", "method": "internal-model residual (autopilot output law, linear, learned from normal flights only)", "design": __doc__.split("PRE-REGISTERED")[1][:1800],
+    summary = {"version": "three-state" if THREE else "v3" if V3 else "v2" if V2 else "v1", "method": "internal-model residual (autopilot output law, linear, learned from normal flights only)", "design": __doc__.split("PRE-REGISTERED")[1][:1800],
                "normal_flights_used": [f["name"] for f in normal], "thresholds_all_normal": {ch: round(c["k"], 2) for ch, c in cal_all.items()},
                "held_out": score("held_out"), "all": score("all"), "results": results}
     with open(out_path, "w") as h:
