@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
-from app.ingest import bags, catalog
+from app.ingest import bags, catalog, ulog
 from app.ingest.profile import parse_profile
 
 
@@ -28,8 +28,12 @@ def debrief_recording(store, path: Path, mapping: Dict[str, Any], *, machine_id:
     progress("Fingerprinting the recording")
     sha = bags.sha256_file(path)
     progress("Reading the recording")
-    clean = bags.validate_mapping(mapping, [s["id"] for s in catalog.describe()["signals"]])
-    extraction = bags.extract(path, clean, asset=machine_id, progress=lambda n: progress(f"Reading the recording ({n:,} messages)"))
+    if ulog.is_ulog(path):  # PX4 flight log: a fixed, documented topic mapping (app/ingest/ulog.py)
+        extraction, meta = ulog.extract(path, asset=machine_id)
+        clean = ulog.mapping(clock_domain="px4_clock" if meta["clock"] == "gps_utc" else "px4_boot_clock")
+    else:
+        clean = bags.validate_mapping(mapping, [s["id"] for s in catalog.describe()["signals"]])
+        extraction = bags.extract(path, clean, asset=machine_id, progress=lambda n: progress(f"Reading the recording ({n:,} messages)"))
     if not extraction.rows:
         raise ValueError("The mapping produced no readings from this recording")
     start, end = extraction.start_ns, extraction.end_ns

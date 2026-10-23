@@ -1,0 +1,31 @@
+{
+  "version": "voi-assumptions-v1",
+  "status": "Written engineering assumptions for a research experiment. Not measured, not validated, not customer costs.",
+  "units": "Money-equivalent units (think EUR). Loss = what the choice costs if this hypothesis is true, including downtime.",
+  "prior_weight": {
+    "supported": [1.5, 3.0],
+    "open": [0.5, 1.5],
+    "less_likely": [0.1, 0.5],
+    "ruled_out": [0.0, 0.0],
+    "no_fault_when_problem_reported": [0.05, 0.3],
+    "no_fault_when_nothing_reported": [0.5, 2.0]
+  },
+  "remote_parts": ["network", "control_suite"],
+  "actions": {
+    "monitor, no action":            {"remote": [2000, 10000], "hands_on": [2000, 10000], "none": [0, 50]},
+    "approved remote intervention":  {"remote": [100, 400],    "hands_on": [1500, 5000],  "none": [100, 400]},
+    "dispatch for diagnosis":        {"remote": [1500, 4500],  "hands_on": [900, 3000],   "none": [1000, 3000]},
+    "safety escalation now":         {"remote": [2500, 7000],  "hands_on": [2500, 7000],  "none": [2500, 7000]}
+  },
+  "check_cost": [30, 200],
+  "check_delay": {"ready_remote": [50, 400], "needs_context": [50, 400], "needs_authorization": [200, 1500], "needs_data": [300, 2000]},
+  "likelihood": {
+    "outcome_supports_h": [0.6, 0.95],
+    "outcome_weakens_h": [0.02, 0.15],
+    "outcome_neutral_to_h": [0.15, 0.5],
+    "no_fault_and_outcome_supports_something": [0.02, 0.2],
+    "no_fault_and_outcome_finds_nothing": [0.6, 0.95]
+  },
+  "safety_rule": "A case is safety-relevant when its evidence records a kill switch, flight termination, crash, emergency stop or a safety intervention. Then 'monitor, no action' is not allowed (the machine must not simply keep operating), and 'safety escalation now' becomes feasible. Otherwise 'safety escalation now' is excluded as disproportionate.",
+  "tolerance": 150
+}
