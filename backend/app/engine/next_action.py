@@ -11,6 +11,8 @@ decision; it never approves a dispatch or names a failed part that nobody has co
 """
 from __future__ import annotations
 
+from app.engine import checks as check_policy
+
 from typing import Any, Dict, List, Optional, Tuple
 
 POLICY = "next-action-v2"  # v2: neutral outcome wording (no presumed events), drive logs, localized-departure rule, explicit check comparison
@@ -177,7 +179,7 @@ def compare(run: Dict[str, Any], assessment: Dict[str, Any], results: Optional[D
     rows = []
     for check in run.get("checks") or []:
         cid = check["check_id"]
-        if cid not in SPLITS or check.get("previously_performed") or check["availability"]["state"] in ("answered_in_run", "not_applicable"):
+        if cid not in SPLITS or not check_policy.eligible(check):
             continue
         outcomes, changes, settles, travel = [], [], [], []
         for key, o in SPLITS[cid].items():

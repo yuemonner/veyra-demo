@@ -1,6 +1,8 @@
 """Self-contained HTML investigation report (English). Every value from imported data is escaped."""
 from __future__ import annotations
 
+from app.engine import checks as check_policy
+
 from datetime import datetime, timezone
 from html import escape
 from typing import Any, Dict, List, Optional
@@ -86,7 +88,7 @@ def _debrief(case, run, ledger, imports, label) -> str:
     quiet = [label(d) for d, a in run["domains"].items() if a["status"] == "no_delay_observed_in_measured_part"]
     if quiet:
         out.append(f"<p><b>Nothing found in the measured part of:</b> {_e(', '.join(quiet))}</p>")
-    checks = [c for c in run["checks"] if c["availability"]["state"] not in ("answered_in_run", "not_applicable")][:3]
+    checks = [c for c in run["checks"] if check_policy.eligible(c)][:3]
     if checks:
         out.append("<p><b>Next checks:</b></p><ol>" + "".join(f"<li>{_e(c['question'])} <span class='sub'>({_e(c['who'])}; {_e(c['availability']['state'].replace('_', ' '))})</span></li>" for c in checks) + "</ol>")
     for m in (run.get("precedents") or {}).get("matches", [])[:2]:

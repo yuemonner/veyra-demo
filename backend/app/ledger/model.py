@@ -12,6 +12,8 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
 
+from app.engine import states as case_states
+
 LEDGER_SCHEMA_VERSION = "intervention-ledger-v1"  # v1 entry format; kinds added additively in engine v2.1
 EPISODE_SCHEMA_VERSION = "veyra-episode-v3"  # v2 adds trigger, hypothesis statuses, intervention reviews, reproduction attempts; v3 case closures (hindsight)
 GENESIS = "GENESIS"
@@ -125,6 +127,13 @@ def _require_current_run(entries, run_id, state) -> Dict[str, Any]:
 REQUEST_CHANNELS = ("email", "phone", "chat", "ticket", "in_person", "other")
 
 
+def _transition(kind: str, entries: Sequence[Dict[str, Any]], run_id: str, check_id: str) -> None:
+    try:
+        case_states.require_check_transition(kind, entries, run_id, check_id)
+    except case_states.StateError as exc:
+        raise LedgerError(str(exc)) from None
+
+
 def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[Dict[str, Any]], state: Dict[str, Any], now: datetime, *, trusted_automatic: bool = False) -> Dict[str, Any]:
     """Validate a new entry against case history. Returns the normalized payload and links."""
     if not isinstance(payload, dict):
@@ -144,6 +153,7 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
     if kind == "check_review":
         run = _require_current_run(entries, payload.get("run_id"), state)
         check_id = _text(payload, "check_id")
+        _transition(kind, entries, run["payload"]["run_id"], check_id)
         candidates = {c["check_id"]: c for c in run["payload"]["candidates"]}
         if check_id not in candidates:
             raise LedgerError(f"'{check_id}' is not a check proposed by this run")
@@ -158,6 +168,8 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
     elif kind == "check_execution":
         run = _require_current_run(entries, payload.get("run_id"), state)
         check_id = _text(payload, "check_id")
+        if any(e["kind"] == "check_review" and e["payload"]["run_id"] == run["payload"]["run_id"] and e["payload"]["check_id"] == check_id for e in entries):
+            _transition(kind, entries, run["payload"]["run_id"], check_id)
         reviews = [e for e in entries if e["kind"] == "check_review" and e["payload"]["run_id"] == run["payload"]["run_id"] and e["payload"]["check_id"] == check_id]
         if not reviews or reviews[-1]["payload"]["verdict"] == "rejected":
             raise LedgerError("Accept or edit this check (with a reason) before recording its execution")
@@ -234,6 +246,7 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
             found = [e for e in entries if e["kind"] == "check_review" and e["payload"]["run_id"] == run["payload"]["run_id"] and e["payload"]["check_id"] == check_id]
             if not found or found[-1]["payload"]["verdict"] == "rejected":
                 raise LedgerError(f"Approve {check_id} before recording that the request was sent")
+            _transition(kind, entries, run["payload"]["run_id"], check_id)
             reviews.append(found[-1]["id"])
         out = {"run_id": run["payload"]["run_id"], "check_ids": ids, "channel": _choice(payload, "channel", REQUEST_CHANNELS),
                "sent_to": _text(payload, "sent_to", limit=200), "sent_at": _time(payload, "sent_at", now),
@@ -456,6 +469,12 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
         if status == "cause_confirmed" and method not in CONFIRMING_METHODS:
             raise LedgerError("'Confirmed' needs inspection, reproduction or a fix that resolved it; "
                               "evidence in the case or an engineer's judgement supports 'probable'")
+        if status == "cause_confirmed":
+            try:
+                case_states.require_confirming_record(method, payload.get("cause_domain"), evidence_entries, entries, evidence_note,
+                                                     synthetic=bool(state.get("synthetic")))
+            except case_states.StateError as exc:
+                raise LedgerError(str(exc)) from None
         resolution = _choice(payload, "resolution_status", RESOLUTION_STATUSES)
         fix = _text(payload, "fix", required=False, limit=1000)
         out = {"run_id": run["payload"]["run_id"] if run else None, "investigation_status": status,

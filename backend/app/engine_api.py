@@ -91,6 +91,7 @@ class RunIn(Strict):
     goal: Literal["reduce_uncertainty", "restore_operations"] = "reduce_uncertainty"
     baseline_start: Optional[str] = None
     baseline_end: Optional[str] = None
+    as_of: Optional[str] = Field(default=None, max_length=40)  # replay with only what was known then (ISO 8601 with timezone)
 
 
 class LedgerIn(Strict):
@@ -205,8 +206,9 @@ def run(case_id: str, body: RunIn, request: Request, store: CaseStore = Depends(
     baseline = (body.baseline_start, body.baseline_end) if body.baseline_start or body.baseline_end else None
     if baseline and not all(baseline):
         raise HTTPException(422, "Give both baseline_start and baseline_end")
-    result = _guard(store.investigate, case_id, actor=actor_for(request, body.actor), goal=body.goal, baseline_window=baseline)
-    _autopilot(store, case_id)
+    result = _guard(store.investigate, case_id, actor=actor_for(request, body.actor), goal=body.goal, baseline_window=baseline, as_of=body.as_of)
+    if body.as_of is None:  # a replay is a record of what was known then; Veyra does not act on it
+        _autopilot(store, case_id)
     return result
 
 
@@ -300,6 +302,23 @@ def autopilot_advance(case_id: str, store: CaseStore = Depends(get_store)):
     out = _guard(autopilot.advance, store, case_id)
     _auto_agent(store, case_id)
     return {**out, "enabled": autopilot_enabled(), "agent": _agent_status(store, case_id)}
+
+
+@router.get("/cases/{case_id}/series")
+def case_series(case_id: str, signal: str, start: float, end: float, scope: Optional[str] = None, max_points: int = 400,
+                store: CaseStore = Depends(get_store)):
+    """One signal's recorded samples in a window, for the evidence plots. Read-only; at most 2,000 points."""
+    if not 50 <= max_points <= 2000 or end - start > 6 * 3600:
+        raise HTTPException(422, "max_points must be 50 to 2000 and the window at most 6 hours")
+    return _guard(store.series, case_id, signal, scope, start, end, max_points)
+
+
+@router.get("/cases/{case_id}/states")
+def case_states_view(case_id: str, store: CaseStore = Depends(get_store)):
+    """Each part's evidence stage, each check's state and each decision's state, derived from the ledger."""
+    from app.engine import states as case_states
+    _guard(store.case, case_id)
+    return case_states.lifecycle(store.latest_run(case_id), store.ledger(case_id))
 
 
 @router.get("/cases/{case_id}/ledger")

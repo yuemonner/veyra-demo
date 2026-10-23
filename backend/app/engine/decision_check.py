@@ -15,6 +15,8 @@ Advisory only: it never blocks, never says an action is optimal, never names a f
 """
 from __future__ import annotations
 
+from app.engine import checks as check_policy
+
 from typing import Any, Dict, List, Optional
 
 from app.engine import next_action as na
@@ -156,7 +158,7 @@ def gaps(run: Dict[str, Any], proposal: Dict[str, Any], results: Dict[str, Dict[
     for check in run.get("checks") or []:
         cid = check["check_id"]
         splits = na.SPLITS.get(cid)
-        if not splits or check["availability"]["state"] in ("answered_in_run", "not_applicable", "onsite_required"):
+        if not splits or not check_policy.eligible(check) or check["availability"]["state"] == "onsite_required":
             continue
         could_change = []
         done = results.get(cid, {}).get("status") == "performed"

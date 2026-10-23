@@ -69,6 +69,23 @@ def _id(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex[:12]}"
 
 
+def _ts(value: Any) -> Optional[float]:
+    """Epoch seconds from a stored time (ISO text, datetime or epoch number); None when absent."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, datetime):
+        return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).timestamp()
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    return (parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)).timestamp()
+
+
+def _known(value: Any, as_of: Optional[float]) -> bool:
+    """True when a record stored at `value` was already known at `as_of` (no limit when as_of is None)."""
+    return as_of is None or (_ts(value) or 0.0) <= as_of
+
+
 class CaseStore:
     def __init__(self, path: Path, *, clock=_now):
         self.path = Path(path)
@@ -206,6 +223,33 @@ class CaseStore:
         columns = "*" if include_rows else self._IMPORT_META
         return [self._import(r, include_rows) for r in self.db.execute(f"SELECT {columns} FROM imports WHERE case_id = ? ORDER BY created_at, id", (case_id,)).fetchall()]
 
+    def series(self, case_id: str, signal: str, scope: Optional[str], start: float, end: float, max_points: int = 400) -> Dict[str, Any]:
+        """Samples of one signal (and scope) of this case between start and end (epoch s), for plotting. Read-only.
+        Above max_points the window is cut into buckets and each keeps its first, lowest and highest sample, so a
+        spike or a held value is never smoothed away. Says when it thinned the data."""
+        if end <= start:
+            raise StoreError("end must be after start")
+        self.case(case_id)
+        points, unit, total = [], None, 0
+        for (raw,) in self.db.execute("SELECT rows_json FROM imports WHERE case_id = ? ORDER BY created_at, id", (case_id,)):
+            for r in json.loads(raw):
+                if r.get("signal") != signal or (scope is not None and (r.get("scope") or None) != scope) or not isinstance(r.get("value"), (int, float)):
+                    continue
+                if start <= r["t"] <= end:
+                    points.append((r["t"], r["value"]))
+                    unit = unit or r.get("unit")
+        points.sort()
+        total = len(points)
+        if total > max_points:
+            buckets = max(1, max_points // 3)
+            width = (end - start) / buckets
+            kept: Dict[int, List[Tuple[float, float]]] = {}
+            for t, v in points:
+                kept.setdefault(min(buckets - 1, int((t - start) / width)), []).append((t, v))
+            points = sorted({p for group in kept.values() for p in (group[0], min(group, key=lambda x: x[1]), max(group, key=lambda x: x[1]))})
+        return {"signal": signal, "scope": scope, "unit": unit, "start": start, "end": end, "samples": total, "shown": len(points),
+                "thinned": total > len(points), "points": [[round(t, 3), v] for t, v in points]}
+
     def original_bytes(self, import_id: str) -> bytes:
         row = self.db.execute("SELECT content FROM imports WHERE id = ?", (import_id,)).fetchone()
         if not row:
@@ -262,6 +306,7 @@ class CaseStore:
         context_now = self.context(case["machine_id"])
         window = (case["symptom_start"], case["symptom_end"]) if case.get("symptom_start") is not None else None
         return {"input_hashes": {i["id"]: i["sha256"] for i in imports}, "context_hash_current": context_now["hash"], "symptom_window": window,
+                "synthetic": bool(case.get("synthetic")),
                 "import_ids": [i["id"] for i in imports], "import_spans": {i["id"]: i["span"] for i in imports},
                 "import_sample_times": sample_times}
 
@@ -296,15 +341,25 @@ class CaseStore:
 
     # ---------- runs ----------
     def investigate(self, case_id: str, *, actor: str, goal: str = "reduce_uncertainty",
-                    baseline_window: Optional[Tuple[str, str]] = None) -> Dict[str, Any]:
+                    baseline_window: Optional[Tuple[str, str]] = None, as_of: Optional[str] = None) -> Dict[str, Any]:
+        """as_of: investigate with only what was known at that time (ISO 8601 with timezone; default now). Files,
+        ledger entries, machine context, baselines, approved normals, machine history and precedents recorded later
+        are left out, so a replayed investigation cannot be contaminated by hindsight."""
         with self._write_transaction():
-            return self._investigate_locked(case_id, actor=actor, goal=goal, baseline_window=baseline_window)
+            return self._investigate_locked(case_id, actor=actor, goal=goal, baseline_window=baseline_window, as_of=as_of)
 
-    def _investigate_locked(self, case_id, *, actor, goal, baseline_window):
+    def _investigate_locked(self, case_id, *, actor, goal, baseline_window, as_of=None):
         case = self.case(case_id)
-        imports = self.imports(case_id)
+        now = self.clock()
+        cutoff = None
+        if as_of is not None:
+            cutoff = context_model.parse_time(as_of, "as_of").timestamp()
+            if cutoff > now.timestamp():
+                raise StoreError("as_of cannot be in the future")
+        imports = [i for i in self.imports(case_id) if _known(i["created_at"], cutoff)]
         if not imports:
-            raise StoreError("Import at least one authorized file before investigating")
+            raise StoreError("Import at least one authorized file before investigating" if cutoff is None
+                             else "No file of this case had been imported by as_of")
         broken = [i["id"] for i in imports if not i["integrity_ok"]]
         if broken:
             raise StoreError("Stored import integrity check failed; investigation refused: " + ", ".join(broken))
@@ -314,26 +369,29 @@ class CaseStore:
             if window[1] <= window[0]:
                 raise StoreError("Baseline window end must be after its start")
         run_id = _id("run")
-        run = engine.investigate(case=case, imports=imports, assertions=self.assertions(case["machine_id"]), ledger=self.ledger(case_id),
-                                 goal=goal, actor=actor, now=self.clock(), run_id=run_id, baseline_window=window,
-                                 history=self.machine_history(case["machine_id"], exclude_case=case_id, synthetic=bool(case["synthetic"])),
-                                 baseline_runs=self.known_good_runs(case), normals=self.approved_normals(),
-                                 precedents=self.precedent_candidates(case))
+        run = engine.investigate(case=case, imports=imports, assertions=self.assertions(case["machine_id"]),
+                                 ledger=[e for e in self.ledger(case_id) if _known(e["recorded_at"], cutoff)],
+                                 goal=goal, actor=actor, now=now, run_id=run_id, baseline_window=window, as_of=cutoff,
+                                 history=self.machine_history(case["machine_id"], exclude_case=case_id, synthetic=bool(case["synthetic"]),
+                                                              as_of=cutoff, before_incident=case.get("symptom_start")),
+                                 baseline_runs=self.known_good_runs(case, as_of=cutoff), normals=self.approved_normals(as_of=cutoff),
+                                 precedents=self.precedent_candidates(case, as_of=cutoff))
         del imports  # the parsed rows are not needed any more; the ledger append below re-verifies the imports one at a time
         gc.collect()
         self.db.execute("INSERT INTO runs VALUES (?,?,?,?,?)", (run_id, case_id, run["created_at"], run["run_hash"], json.dumps(run, default=str)))
         self._append_locked(case_id, "investigation_run", {"run_id": run_id, "run_hash": run["run_hash"], "input_hashes": run["input_hashes"],
                                                    "context_hash_current": run["context"]["current_hash"], "context_hash_incident": run["context"]["incident"]["hash"],
                                                    "belief": engine.belief_summary(run), "candidates": engine.candidate_summary(run), "goal": goal,
-                                                   "policy_versions": run["versions"], "dispatch_status": run["dispatch"]["status"]},
+                                                   "policy_versions": run["versions"], "dispatch_status": run["dispatch"]["status"],
+                                                   "as_of": run["as_of"]},
                     actor=actor, source="veyra://investigation-engine")
         return run
 
     def runs(self, case_id: str) -> List[Dict[str, Any]]:
         return [json.loads(r["body_json"]) for r in self.db.execute("SELECT body_json FROM runs WHERE case_id = ? ORDER BY rowid", (case_id,))]
 
-    def latest_run(self, case_id: str) -> Optional[Dict[str, Any]]:
-        runs = self.runs(case_id)
+    def latest_run(self, case_id: str, as_of: Optional[float] = None) -> Optional[Dict[str, Any]]:
+        runs = [r for r in self.runs(case_id) if _known(r["created_at"], as_of)]
         return runs[-1] if runs else None
 
     def execute_automatic(self, case_id: str, check_id: str, *, actor: str) -> Dict[str, Any]:
@@ -380,8 +438,11 @@ class CaseStore:
     BASELINE_SIGNALS = ("actuator.output", "control.attitude_setpoint", "vehicle.attitude", "joint.position_command", "joint.position",
                         "control.velocity_setpoint", "vehicle.velocity", "control.yaw_rate_setpoint", "vehicle.yaw_rate")
 
-    def known_good_runs(self, case: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def known_good_runs(self, case: Dict[str, Any], as_of: Optional[float] = None) -> List[Dict[str, Any]]:
         """Rows inside windows that people declared known-good, in OTHER cases of the same machine.
+
+        as_of (epoch s): only declarations and files that were already recorded at that time count, so replaying
+        an old investigation never uses a baseline someone declared later.
 
         Synthetic and real cases never mix. A case that shares any imported file (same fingerprint)
         with this case is excluded, and so are rows from the time span this case's own data covers
@@ -399,11 +460,15 @@ class CaseStore:
         for other in self.cases():
             if other["id"] == case["id"] or other["machine_id"] != case["machine_id"] or bool(other["synthetic"]) != bool(case["synthetic"]):
                 continue
+            if not _known(other["created_at"], as_of):
+                continue
             windows = [(engine._to_epoch(e["payload"]["window_from"]), engine._to_epoch(e["payload"]["window_to"]))
-                       for e in self.ledger(other["id"]) if e["kind"] == "reference_declared"]
+                       for e in self.ledger(other["id"]) if e["kind"] == "reference_declared" and _known(e["recorded_at"], as_of)]
             if not windows:
                 continue
-            metas = self.imports(other["id"], include_rows=False)
+            metas = [m for m in self.imports(other["id"], include_rows=False) if _known(m["created_at"], as_of)]
+            if not metas:
+                continue
             shas = {m["sha256"] for m in metas}
             if own & shas or not all(m["integrity_ok"] for m in metas) or shas <= seen:
                 continue  # never compare a recording with itself; never use a file that fails its integrity check; count each recording once
@@ -420,20 +485,28 @@ class CaseStore:
                 out.append({"case_id": other["id"], "windows": windows, "rows": rows})
         return out
 
-    def machine_history(self, machine_id: str, *, exclude_case: Optional[str] = None, synthetic: Optional[bool] = None) -> List[Dict[str, Any]]:
+    def machine_history(self, machine_id: str, *, exclude_case: Optional[str] = None, synthetic: Optional[bool] = None,
+                        as_of: Optional[float] = None, before_incident: Optional[float] = None) -> List[Dict[str, Any]]:
         """Earlier cases on the same machine, summarised from their own records. Synthetic and real cases never mix.
-        Known-good runs are not incidents, and a case built on the same recording as this one is not "earlier"."""
+        Known-good runs are not incidents, and a case built on the same recording as this one is not "earlier".
+
+        as_of (epoch s): only cases, records and runs that existed at that time. before_incident (epoch s): only
+        incidents that happened before this one (a later incident on the same machine is not "this machine before")."""
         out = []
         own = {i["sha256"] for i in self.imports(exclude_case, include_rows=False)} if exclude_case else set()
         for case in self.cases():
             if case["machine_id"] != machine_id or case["id"] == exclude_case or case.get("fault_type") == "known_good_run":
                 continue
+            if not _known(case["created_at"], as_of):
+                continue
+            if before_incident is not None and case["symptom_start"] is not None and case["symptom_start"] >= before_incident:
+                continue
             if own and own & {i["sha256"] for i in self.imports(case["id"], include_rows=False)}:
                 continue
             if synthetic is not None and bool(case["synthetic"]) != synthetic:
                 continue
-            entries = self.ledger(case["id"])
-            run = self.latest_run(case["id"])
+            entries = [e for e in self.ledger(case["id"]) if _known(e["recorded_at"], as_of)]
+            run = self.latest_run(case["id"], as_of=as_of)
             decisions = [e for e in entries if e["kind"] == "decision"]
             out.append({
                 "case_id": case["id"], "title": case["title"], "created_at": case["created_at"], "synthetic": bool(case["synthetic"]),
@@ -451,13 +524,17 @@ class CaseStore:
             })
         return out
 
-    def precedent_candidates(self, case: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def precedent_candidates(self, case: Dict[str, Any], as_of: Optional[float] = None) -> List[Dict[str, Any]]:
         """Closed earlier cases (any machine) with the signature of their latest run, for the precedent matcher.
-        Known-good runs and cases built on the same recording as this one are never precedents."""
+        Known-good runs and cases built on the same recording as this one are never precedents.
+        as_of (epoch s): only closures recorded by then, with the run that existed then (no hindsight in a replay).
+        Each candidate carries its incident context (firmware, configuration, workload) for the matcher to compare."""
         rows = self.db.execute("SELECT case_id, body_json FROM ledger WHERE kind = 'case_closure' ORDER BY seq").fetchall()
         latest: Dict[str, Dict[str, Any]] = {}
         for case_id, body in rows:
-            latest[case_id] = json.loads(body)
+            entry = json.loads(body)
+            if _known(entry["recorded_at"], as_of):
+                latest[case_id] = entry
         latest.pop(case["id"], None)
         if not latest:
             return []
@@ -467,7 +544,7 @@ class CaseStore:
             other = self.case(case_id)
             if other.get("fault_type") == "known_good_run" or (own & {i["sha256"] for i in self.imports(case_id, include_rows=False)}):
                 continue
-            run = self.latest_run(case_id)
+            run = self.latest_run(case_id, as_of=as_of)
             if run is None:
                 continue
             sig = run.get("signature")
@@ -477,16 +554,19 @@ class CaseStore:
             from app.engine import precedents as precedent_rules
             out.append({"case_id": case_id, "title": other["title"], "machine_id": other["machine_id"], "synthetic": bool(other["synthetic"]),
                         "profile_id": (run.get("machine_profile") or {}).get("id"), "signature": sig,
-                        "reported": precedent_rules.reported(self.ledger(case_id)),
+                        "reported": precedent_rules.reported([e for e in self.ledger(case_id) if _known(e["recorded_at"], as_of)]),
+                        "context": ((run.get("context") or {}).get("incident") or {}),
                         "closure": {**entry["payload"], "closed_by": entry["actor"], "closed_at": entry["recorded_at"]}})
         return out
 
-    def approved_normals(self) -> List[Dict[str, Any]]:
-        """'Normal for this machine' proposals whose latest review approves them, from every case."""
+    def approved_normals(self, as_of: Optional[float] = None) -> List[Dict[str, Any]]:
+        """'Normal for this machine' proposals whose latest review approves them, from every case (as known at as_of)."""
         rows = self.db.execute("SELECT case_id, kind, body_json FROM ledger WHERE kind IN ('normal_proposal', 'normal_review') ORDER BY seq").fetchall()
         proposals, verdicts = {}, {}
         for case_id, kind, body in rows:
             entry = json.loads(body)
+            if not _known(entry["recorded_at"], as_of):
+                continue
             if kind == "normal_proposal":
                 proposals[entry["id"]] = (case_id, entry)
             else:

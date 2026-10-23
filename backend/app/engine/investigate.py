@@ -14,6 +14,8 @@ domains stay open unless measured evidence speaks to them, and even then only fo
 """
 from __future__ import annotations
 
+import re
+
 import hashlib
 import json
 import time
@@ -260,7 +262,7 @@ def _dispatch(context_now: Dict[str, Any], domains: Dict[str, Dict[str, Any]], r
     for reason, keys in context_gaps.items():
         if keys:
             blockers.append({"item": "Machine context for dispatch: " + ", ".join(keys), "status": reason})
-    remote_open = [c for c in ranked if c["availability"]["state"] in ("ready_automatic", "ready_remote") and not c["previously_performed"]
+    remote_open = [c for c in ranked if check_policy.eligible(c) and c["availability"]["state"] in ("ready_automatic", "ready_remote")
                    and c["objective"] == "reduce_uncertainty"]
     for check in remote_open:
         blockers.append({"item": f"Remote check not yet done: {check['check_id']} — {check['question']}", "status": "remote_check_outstanding"})
@@ -282,7 +284,10 @@ def _dispatch(context_now: Dict[str, Any], domains: Dict[str, Dict[str, Any]], r
 def investigate(*, case: Dict[str, Any], imports: List[Dict[str, Any]], assertions: List[Any], ledger: List[Dict[str, Any]],
                 goal: str, actor: str, now: datetime, run_id: str, baseline_window: Optional[Tuple[float, float]] = None,
                 history: Optional[List[Dict[str, Any]]] = None, baseline_runs: Optional[List[Dict[str, Any]]] = None,
-                normals: Optional[List[Dict[str, Any]]] = None, precedents: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+                normals: Optional[List[Dict[str, Any]]] = None, precedents: Optional[List[Dict[str, Any]]] = None,
+                as_of: Optional[float] = None) -> Dict[str, Any]:
+    """as_of (epoch s): what Veyra may know. The caller passes only inputs recorded by then; machine context is
+    resolved as known at that time. Default: now."""
     if goal not in ("reduce_uncertainty", "restore_operations"):
         raise ValueError("goal must be reduce_uncertainty or restore_operations")
     trace = Trace()
@@ -296,7 +301,7 @@ def investigate(*, case: Dict[str, Any], imports: List[Dict[str, Any]], assertio
         raise ValueError("Stored import integrity check failed; investigation refused: " + ", ".join(i["id"] for i in imports if i not in usable))
     rows = [r for i in usable for r in i["rows"]]
     machine = case["machine_id"]
-    known_at = now.timestamp()
+    known_at = as_of if as_of is not None else now.timestamp()
     evidence_end = max((r["t"] for r in rows), default=known_at)
     incident_time = window[0] if window else evidence_end
 
@@ -373,7 +378,7 @@ def investigate(*, case: Dict[str, Any], imports: List[Dict[str, Any]], assertio
                          lambda: precedent_rules.match(signature, precedents or [], machine_id=case["machine_id"], profile_id=profile["id"],
                                                        synthetic=bool(case.get("synthetic")), names=names,
                                                        reported_now=precedent_rules.reported(ledger),
-                                                       status_now={d: a["status"] for d, a in domains.items()}),
+                                                       status_now={d: a["status"] for d, a in domains.items()}, context_now=context_incident),
                          [c["case_id"] for c in precedents or []])
     triage = trace.call("propose_triage", {"rules": triage_rules.TRIAGE_RULES_VERSION}, lambda: triage_rules.propose(domains, board, interventions, ledger, owners, names), [])
 
@@ -395,7 +400,12 @@ def investigate(*, case: Dict[str, Any], imports: List[Dict[str, Any]], assertio
     if profile.get("context_keys"):  # the machine type decides which context must be confirmed before comparing
         comparability_keys = set(profile["context_keys"])
     gap_lists = context_model.gaps(context_incident, sorted(comparability_keys))
+    # What kinds of source are already in the case, so no check asks the site for them again.
+    fc_logs = sorted({(i.get("review_reason") or "").split("Extracted from ", 1)[-1].split(" (sha256")[0] if "Extracted from " in (i.get("review_reason") or "") else i.get("filename")
+                      for i in usable if str(i.get("clock_domain") or "").startswith("px4")
+                      or re.search(r"\.(ulg|ulog|bin|tlog)\b", (i.get("review_reason") or "") + " " + (i.get("filename") or ""), re.IGNORECASE)})
     facts = {
+        "sources_in_case": {"flight_controller_log": fc_logs},
         "signals_present": signals_present, "answered_in_run": answered, "io_needs_context": io_needs_context,
         "remote_access": context_model.confirmed(context_current, "remote_access"), "previously_performed": performed,
         "transport_cross_clock": (chain.get("segments") or {}).get("command.sent->command.received", {}).get("status", "").endswith(("assuming_stable_offset", "cross_clock"))
@@ -447,7 +457,7 @@ def investigate(*, case: Dict[str, Any], imports: List[Dict[str, Any]], assertio
     inputs = {i["id"]: {"filename": i["filename"], "sha256": i["sha256"], "normalized_sha256": i["normalized_sha256"], "clock_domain": i["clock_domain"],
                         "rows": len(i["rows"]), "synthetic": i.get("synthetic", False)} for i in usable}
     run = {
-        "id": run_id, "case_id": case["id"], "machine_id": machine, "fault_type": case.get("fault_type", FAULT_TYPE), "created_at": now.isoformat(), "actor": actor,
+        "id": run_id, "case_id": case["id"], "machine_id": machine, "fault_type": case.get("fault_type", FAULT_TYPE), "created_at": now.isoformat(), "as_of": _iso(known_at), "actor": actor,
         "goal": goal, "symptom_window": [_iso(w) for w in window] if window else None, "synthetic": bool(case.get("synthetic")),
         "inputs": inputs, "input_hashes": {k: v["sha256"] for k, v in inputs.items()},
         "context": {"incident": context_incident, "current_hash": context_current["hash"],

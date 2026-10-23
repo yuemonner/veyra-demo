@@ -8,13 +8,24 @@ Ranking is a documented lexicographic rule, not a probability or a calibrated in
   5. more open fault domains it can inform
   6. lower operational disruption
 Each ranked check carries the rule values that placed it, so an engineer can disagree precisely.
+
+Eligibility (next-check-policy-v5) is decided in ONE place, `eligibility()`, and every consumer (the brief, next action,
+the decision check, the report, the dispatch blockers) uses it. A check is not eligible when it was already answered in
+this run, already performed, not applicable to this machine, cannot run (automatic check missing data or comparable
+context), or when the evidence it would fetch is ALREADY IN THE CASE (e.g. asking the site for the flight-controller log
+while that log is the case's evidence). Eligible checks list their unmet prerequisites (authorization, travel).
 """
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-POLICY_VERSION = "next-check-policy-v4"  # v2 adds reference, brief-event, intervention-review and reproduction checks; v3 words checks per machine profile and evidence; v4 puts the check that settled a similar closed case first
-AVAILABILITY_ORDER = {"ready_automatic": 0, "ready_remote": 1, "needs_context": 2, "needs_data": 3, "needs_authorization": 3, "onsite_required": 4, "not_applicable": 6}
+POLICY_VERSION = "next-check-policy-v5"  # v2 adds reference, brief-event, intervention-review and reproduction checks; v3 words checks per machine profile and evidence; v4 puts the check that settled a similar closed case first
+AVAILABILITY_ORDER = {"ready_automatic": 0, "ready_remote": 1, "needs_context": 2, "needs_data": 3, "needs_authorization": 3, "onsite_required": 4,
+                      "already_in_case": 6, "not_applicable": 6}
+NOT_ELIGIBLE_STATES = ("answered_in_run", "already_in_case", "not_applicable", "needs_data", "needs_context")
+PREREQUISITE = {"needs_authorization": "Read-only remote access must be authorized first", "onsite_required": "Travel and site approval"}
+# Catalog checks whose whole purpose is to fetch one kind of source. If that source is already imported, the check is a re-read.
+FETCHES_SOURCE = {"CHK-CONTROLLER-LOGS": "flight_controller_log"}
 DISRUPTION_ORDER = {"none": 0, "low": 1, "high": 2}
 OPEN_STATUSES = ("not_observed", "anomaly_observed", "delay_observed")
 
@@ -101,6 +112,10 @@ def _availability(check: Dict[str, Any], facts: Dict[str, Any]) -> Dict[str, Any
     missing_signals = [s for s in check.get("requires_signals", []) if s not in signals]
     if check["id"] in facts["answered_in_run"]:
         return {"state": "answered_in_run", "detail": facts["answered_in_run"][check["id"]]}
+    source = FETCHES_SOURCE.get(check["id"])
+    if source and (facts.get("sources_in_case") or {}).get(source):
+        files = facts["sources_in_case"][source]
+        return {"state": "already_in_case", "detail": f"Already in this case ({', '.join(files[:2])}{'…' if len(files) > 2 else ''}); read it instead of asking the site"}
     if check["id"] == "CHK-INTERVENTION-REVIEW" and not facts.get("interventions_total"):
         return {"state": "not_applicable", "detail": "No operator intervention recorded for this case"}
     if check["mode"] == "automatic_read_only":
@@ -116,6 +131,24 @@ def _availability(check: Dict[str, Any], facts: Dict[str, Any]) -> Dict[str, Any
     if check.get("requires_authorization") and facts["remote_access"] != "read_only_authorized":
         return {"state": "needs_authorization", "detail": f"Remote access is '{facts['remote_access'] or 'not recorded'}'; read-only authorization must be confirmed"}
     return {"state": "ready_remote", "detail": "Can be done remotely by a person"}
+
+
+def eligibility(check: Dict[str, Any]) -> Dict[str, Any]:
+    """Whether Veyra may recommend this check now, and what must happen first. Works on ranked checks of any run
+    (runs recorded before v5 have no 'eligibility' field; it is derived from the same fields)."""
+    if isinstance(check.get("eligibility"), dict):
+        return check["eligibility"]
+    state = (check.get("availability") or {}).get("state")
+    if check.get("previously_performed"):
+        return {"eligible": False, "reason": "Already performed", "prerequisites": []}
+    if state in NOT_ELIGIBLE_STATES:
+        return {"eligible": False, "reason": (check.get("availability") or {}).get("detail") or state, "prerequisites": []}
+    return {"eligible": True, "reason": None, "prerequisites": [PREREQUISITE[state]] if state in PREREQUISITE else []}
+
+
+def eligible(check: Dict[str, Any], done: Any = ()) -> bool:
+    """The single test used everywhere: eligible, and not already done in this run (check ids in `done`)."""
+    return eligibility(check)["eligible"] and check.get("check_id") not in done
 
 
 def _triggered(check_id: str, facts: Dict[str, Any], names: Optional[Dict[str, str]] = None) -> str:
@@ -185,7 +218,7 @@ def rank(domains: Dict[str, Dict[str, Any]], facts: Dict[str, Any], goal: str, p
         open_domains = [d for d in check["domains"] if domains.get(d, {}).get("status") in OPEN_STATUSES]
         key = (
             0 if check["objective"] == goal else 1,
-            1 if availability["state"] in ("answered_in_run", "not_applicable") or performed else 0,
+            1 if availability["state"] in ("answered_in_run", "already_in_case", "not_applicable") or performed else 0,
             0 if precedent else 1,
             0 if trigger else 1,
             AVAILABILITY_ORDER.get(availability["state"], 5),
@@ -194,6 +227,7 @@ def rank(domains: Dict[str, Dict[str, Any]], facts: Dict[str, Any], goal: str, p
         )
         ranked.append({**{k: v for k, v in check.items() if k not in ("requires_signals", "applicable_to_machine")},
                        "check_id": check["id"], "availability": availability, "trigger": trigger or None,
+                       "eligibility": eligibility({"availability": availability, "previously_performed": performed}),
                        "informs_open_domains": open_domains, "previously_performed": performed,
                        "precedent": precedent,
                        "rank_key": {"objective_match": key[0] == 0, "already_answered": key[1] == 1, "settled_similar_case": key[2] == 0, "triggered": key[3] == 0,

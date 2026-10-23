@@ -8,6 +8,8 @@ Every step is a ledger record:
 """
 from __future__ import annotations
 
+from app.engine import checks as check_policy
+
 from typing import Any, Dict, List, Optional
 
 from app.engine import next_action as rules
@@ -49,8 +51,8 @@ def nothing_to_ask(run: Dict[str, Any], assessment: Dict[str, Any], checks: List
     """Why no site check is proposed, or None when there is one (or earlier site results to build on)."""
     if checks or any(not r["this_run"] for r in earlier.values()):
         return None
-    info = [c["question"] for c in run.get("checks") or [] if c["availability"]["state"] in ("ready_remote", "needs_authorization", "needs_context")
-            and c["objective"] == "reduce_uncertainty" and not c.get("previously_performed")][:3]
+    info = [c["question"] for c in run.get("checks") or [] if check_policy.eligible(c) and c.get("mode") != "automatic_read_only"
+            and c["availability"]["state"] != "onsite_required" and c["objective"] == "reduce_uncertainty"][:3]
     return ("No remote check's result would change which of " + (" and ".join(x["label"] for x in assessment["cannot_tell_apart"]) or "the open explanations")
             + " is more likely. " + (f"Checks like '{info[0]}' add context but don't move that balance. " if info else "")
             + "The next step is on site, or a decision.")

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import s from "./field-case.module.css";
+import { plotFor, Waveform } from "./Waveform";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "/local-api";
 const STORY_TITLE = "EX1 boom kept moving after joystick release (SYNTHETIC)";
@@ -35,7 +36,7 @@ const isInternal = (e: Any) => (e.kind === "next_action" && e.payload.stage === 
   || (e.kind === "decision_proposal" && e.payload.proposed_by === "veyra");
 const AVAILABILITY: Record<string, string> = {
   ready_automatic: "Can run now", ready_remote: "Remote, by a person", needs_context: "Needs context", needs_data: "Needs data",
-  needs_authorization: "Needs authorization", onsite_required: "On site", answered_in_run: "Answered", not_applicable: "Not applicable",
+  needs_authorization: "Needs authorization", onsite_required: "On site", answered_in_run: "Answered", already_in_case: "Already in this case", not_applicable: "Not applicable",
 };
 
 const time = (iso?: string | null, withDate = false) => {
@@ -59,6 +60,9 @@ function storeCode(code: string) {
   try { if (code) window.sessionStorage.setItem(ACCESS_KEY, code); else window.sessionStorage.removeItem(ACCESS_KEY); } catch { /* private mode: memory only */ }
 }
 
+// The engine decides eligibility once per check (next-check-policy-v5); older runs fall back to the same rule.
+const NOT_ELIGIBLE = ["answered_in_run", "already_in_case", "not_applicable", "needs_data", "needs_context"];
+const isEligible = (c: Any) => (c.eligibility ? c.eligibility.eligible : !NOT_ELIGIBLE.includes(c.availability?.state) && !c.previously_performed);
 const CHECK_NAME: Record<string, string> = { "CHK-NETWORK-LOGS": "the router logs", "CHK-CONTROLLER-LOGS": "the controller logs", "CHK-PROBE-PATH": "the probe path", "CHK-IO-BASELINE": "the machine's response" };
 const plainEngine = (t: string) => t
   .replace(/Delay in command\.sent->command\.received rose by (\d+(?:\.\d+)?) ms for (\d+) commands? (?:inside the window|during the problem)/, "Commands took $1 ms longer to reach the machine ($2 commands during the problem)")
@@ -336,7 +340,7 @@ export default function FieldCasePage() {
                 {count && <span className={s.viewCount}>{count}</span>}
               </button>))}
           </nav>
-          {tab === "next" && <NextAction caseId={caseId!} data={data} onChanged={() => load(caseId!)} me={me?.user?.name} />}
+          {tab === "next" && <NextAction caseId={caseId!} data={data} onChanged={() => load(caseId!)} me={me?.user?.name} onEvidence={() => go("findings")} />}
           {tab === "brief" && <Brief data={data} run={run} verification={verification} go={go} onAccept={acceptCheck} acceptBusy={acceptBusy} error={agentError} />}
           {tab === "evidence" && <>
             <AgentPanel ledger={data.ledger} run={run} info={agentInfo} busy={agentBusy} error={agentError} onRun={runAgent} />
@@ -562,7 +566,7 @@ function Hypotheses({ run, ledger }: { run: Any; ledger: Any[] }) {
 function Checks({ run, ledger }: { run: Any; ledger: Any[] }) {
   const all: Any[] = run.checks || [];
   const ran: Record<string, Any> = Object.fromEntries(ledger.filter((e) => e.kind === "check_execution" && e.payload.run_id === run.id).map((e) => [e.payload.check_id, e]));
-  const open = all.filter((c) => !["answered_in_run", "not_applicable"].includes(c.availability.state) && !c.previously_performed && !ran[c.check_id]);
+  const open = all.filter((c) => isEligible(c) && !ran[c.check_id]);
   const done = all.filter((c) => !open.includes(c));
   return (
     <section id="checks" className={s.panel}>
@@ -965,6 +969,7 @@ function Findings({ run, ledger, caseId, onSaved }: { run: Any; ledger: Any[]; c
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <b>{dl(o.domain)}</b>
                   <div title={o.text}>{plain(o.text)}</div>
+                  {(() => { const spec = plotFor(run, o.rule, o.text); return spec ? <Waveform caseId={caseId} spec={spec} load={call} /> : null; })()}
                 </div>
                 {!o.key ? null : last ? (
                   <span className={`${s.pill} ${review?.payload.verdict === "approved" ? s.verified : ""}`}>
@@ -1472,7 +1477,7 @@ function Assistant({ caseId, me, onChanged, onDecideOther, stamp }: { caseId: st
   );
 }
 
-function NextAction({ caseId, data, onChanged, me }: { caseId: string; data: Any; onChanged: () => Promise<void>; me?: string }) {
+function NextAction({ caseId, data, onChanged, me, onEvidence }: { caseId: string; data: Any; onChanged: () => Promise<void>; me?: string; onEvidence: () => void }) {
   const [st, setSt] = useState<Any>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -1503,7 +1508,8 @@ function NextAction({ caseId, data, onChanged, me }: { caseId: string; data: Any
         <div>
           <p className={s.kicker}>Supported</p>
           {a.supported.length === 0 ? <p className={s.empty}>Nothing points at a part yet.</p> : a.supported.map((x: Any) => (
-            <p key={x.part} style={{ margin: "0 0 6px" }}><b>{x.label}</b><br /><span className={s.dim}>{plain(x.evidence[0])}</span></p>))}
+            <p key={x.part} style={{ margin: "0 0 6px" }}><b>{x.label}</b><br /><span className={s.dim}>{x.evidence.length} finding{x.evidence.length === 1 ? "" : "s"}</span>{" "}
+              <button className={s.link} onClick={onEvidence}>See the evidence</button></p>))}
         </div>
         <div>
           <p className={s.kicker}>Can't tell apart</p>
@@ -1617,7 +1623,7 @@ function buildBrief(data: Any, run: Any) {
       .map((b) => ({ domain: b.domain, why: "No delay in the measured part", scope: "measured part only", by: null })),
   ].slice(0, 2);
   const doneHere = new Set(data.ledger.filter((e: Any) => e.kind === "check_execution" && e.payload.run_id === run.id).map((e: Any) => e.payload.check_id));
-  const next = (run.checks || []).find((c: Any) => !["answered_in_run", "not_applicable"].includes(c.availability.state) && !c.previously_performed && !doneHere.has(c.check_id));
+  const next = (run.checks || []).find((c: Any) => isEligible(c) && !doneHere.has(c.check_id));
   const ref = run.reference;
   // One unknown, and never the same sentence the next check already shows.
   const unknowns: string[] = [
@@ -1668,6 +1674,10 @@ function Precedent({ m }: { m: Any }) {
         <span className={s.dim}> · machine {label(RESOLUTION, c.resolution_status).toLowerCase()}</span>
       </p>
       {c.decisive_check && <p className={s.answerSmall} style={{ margin: "4px 0 0" }}>Settled by: <b>{c.decisive_check}</b></p>}
+      {m.context?.status === "differs" && <p className={s.answerSmall} style={{ margin: "4px 0 0" }}><b>Different setup:</b> {m.context.differs.map((d: Any) => `${human(d.key)} ${d.then} then, ${d.now} now`).join("; ")}</p>}
+      {m.context?.status === "unverified" && <p className={s.answerSmall} style={{ margin: "4px 0 0" }}>Setup can&apos;t be compared: {m.context.recorded_for_one_case_only.map(human).join(", ")} recorded for one case only</p>}
+      {m.context?.status === "not_recorded" && <p className={s.note} style={{ margin: "4px 0 0" }}>Firmware, software and workload not recorded for either case.</p>}
+      {m.check_not_moved_up && <p className={s.note} style={{ margin: "4px 0 0" }}>{m.check_not_moved_up}</p>}
       <p className={s.answerSmall} style={{ margin: "4px 0 0" }}>
         Same: {(m.same || []).length} finding{(m.same || []).length === 1 ? "" : "s"} · Different: <b>{different}</b>{" "}
         <button className={s.link} onClick={() => setOpen(!open)}>{open ? "Hide" : "What differs"}</button>
@@ -1769,6 +1779,8 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
                     <button key={i} className={s.evidenceChip} onClick={() => go(SECTION_OF_RULE[o.rule] || "hypotheses")}>{plain(o.text).length > 70 ? plain(o.text).slice(0, 68) + "…" : plain(o.text)}</button>))}
                   {supporting.length > 2 && <button className={s.link} onClick={() => go("hypotheses")}>+{supporting.length - 2} more</button>}
                 </div>
+                {(() => { const lead = b.observations.map((o: Any) => plotFor(run, o.rule, o.text)).find(Boolean);
+                  return lead ? <Waveform caseId={data.case.id} spec={lead} load={call} compact /> : null; })()}
                 {agentElsewhere && <p className={s.answerSmall} style={{ marginTop: 10 }}>The AI agent points to <b>{dl(agentElsewhere.domain)}</b> — {agentElsewhere.statement.split(/(?<=\.)\s/)[0]} <button className={s.link} onClick={() => go("agent")}>Why</button></p>}
               </>;
             })()}
@@ -1809,7 +1821,8 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
             <div>
               <p className={s.answer} style={{ margin: 0 }}><b>{plain(b.next.question)}</b></p>
               <p className={s.answerSmall}>{plain(b.next.trigger || b.next.why)}</p>
-              <p className={s.dim} style={{ margin: "2px 0 0", fontSize: 13 }}>{b.next.who} · {AVAILABILITY[b.next.availability.state] ?? human(b.next.availability.state)}</p>
+              <p className={s.dim} style={{ margin: "2px 0 0", fontSize: 13 }}>{b.next.who} · {AVAILABILITY[b.next.availability.state] ?? human(b.next.availability.state)}
+                {(b.next.eligibility?.prerequisites || []).length > 0 && <> · first: {b.next.eligibility.prerequisites.join("; ").toLowerCase()}</>}</p>
             </div>
             {accepted(b.next.check_id) ? <span className={`${s.pill} ${s.verified}`}>Accepted</span>
               : <button className={s.button} disabled={acceptBusy} onClick={() => onAccept(b.next)}>{acceptBusy ? "Recording…" : b.next.availability.state === "ready_automatic" ? "Accept and run" : "Accept"}</button>}
@@ -1843,7 +1856,7 @@ function Outputs({ run }: { run: Any }) {
     <section id="outputs" className={s.panel}>
       <h2>Actuator outputs</h2>
       <p className={s.lede}>Outputs that froze, or stopped matching their twin.</p>
-      <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>{o.findings.map((f: Any, i: number) => <li key={i}><span className={s.mono}>{time(f.start)}</span> {plain(f.text)}</li>)}</ul>
+      {o.findings.length > 0 && <p className={s.findingRef}>{o.findings.length} output{o.findings.length === 1 ? "" : "s"} flagged ({o.findings.map((f: Any) => f.channel).join(", ")}): shown with the recorded samples under All findings.</p>}
       {normal.length > 0 && <p className={s.note}>Skipped, normal on this machine: {normal.map((n: Any) => plain(n.text)).join("; ")}.</p>}
       <How>{runs ? `Checked against ${runs} normal runs of this machine. ` : "Compared with the normal period. "}Rules {o.rules_version}: {o.rules.STUCK}; {o.rules.MIRROR}. {o.boundary}</How>
     </section>
@@ -1856,7 +1869,7 @@ function Tracking({ run }: { run: Any }) {
     <section id="tracking" className={s.panel}>
       <h2>Did the machine follow its commands?</h2>
       <p className={s.lede}>Commanded vs measured.</p>
-      {t.findings.length > 0 && <ul style={{ margin: "0 0 10px", paddingLeft: 18, display: "grid", gap: 6 }}>{t.findings.map((f: Any, i: number) => <li key={i}>{plain(f.text)}</li>)}</ul>}
+      {t.findings.length > 0 && <p className={s.findingRef} style={{ margin: "0 0 10px" }}>Stopped following: {t.findings.map((f: Any) => f.axis).join(", ")}. Command and measured are plotted under All findings.</p>}
       <div className={s.tableWrap}>
         <table className={s.table}>
           <thead><tr><th>Joint / axis</th><th>Command size</th><th style={{ textAlign: "right" }}>Normal error</th><th style={{ textAlign: "right" }}>During problem</th><th></th></tr></thead>
