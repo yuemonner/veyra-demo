@@ -83,3 +83,50 @@ Per flight, airborne time only (`vehicle_land_detected.landed` false), excluding
 - 16 + 16 flights from a few boards and days: a small sample; one dominant board.
 - Labels are *probable* expert judgements, not injected faults.
 - Indoor distance-sensor heights assume a flat floor; obstacles under the vehicle will look like disagreements.
+
+## Result (run once, 2026-10-23) — the check fails; stopped, no tuning
+
+Download: 44 of 44 files, every size equal to the size recorded at selection; SHA-256 of each in
+`datasets/uav-sead/download.txt` (local). Source: Hugging Face `aykutkabaoglu/uav-flight-anomaly-dataset`, single
+upload commit `9bd0363`, licence CC BY 4.0 on the dataset card. Results: `datasets/uav-sead/results_v1.json`,
+`results_v1_1.json` (local, not in the repository).
+
+**Bug found after the first run.** v1 read the attitude quaternion under the wrong field name, so every distance-sensor
+sample was discarded (coverage 0 on all flights). v1.1 fixes only that line (commit 8221828). Rule, thresholds procedure
+and selection are unchanged. Both runs are reported; v1.1 is the result.
+
+Thresholds from the 12 calibration flights: vision 3.55 m, distance sensor 0.54 m, barometer 1.0 m (the floor).
+
+| Test (16 anomaly, 16 matched normal) | v1 (as first run) | **v1.1** |
+|---|---|---|
+| Anomaly flights detected | 3 / 16 | **5 / 16** |
+| Labelled ranges hit | 4 / 27 | 8 / 27 |
+| Normal flights with a false alarm | 2 / 16 | **3 / 16** |
+| False alarms per airborne hour (0.71 h of normal flight) | 2.8 | 5.6 |
+| Delay from range start (detected) | −1.0, 3.8, 3.8 s | −1.0, 1.9, 1.9, 3.8, 19.4 s |
+
+By board (anomaly detected / normal false alarm): 3832: 3/11 and 2/11; 3833: 1/2 and 1/2; 0028: 1/3 and 0/3.
+By reference: vision only 0/3; vision+range 1/4; vision+baro 2/4 with 2 false alarms on 4 normals; range 1/2;
+range+baro 1/3.
+
+**An alarm is nearly as likely on a normal flight (3/16) as on an anomaly flight (5/16).** This is not an evidence check
+that can go into the product.
+
+Why (diagnosis after the result; nothing below was used to change the run):
+
+- **The "independent" vision reference is not independent.** On the two 2019-03-04 anomaly flights the estimator and
+  motion capture agree within 3–6 cm through the labelled anomalies, although the height source is set to the barometer.
+  The vision position is evidently fused for height too. The reviewer's warning ("check whether other references are
+  correlated through the fusion chain") was right; reading `EKF2_HGT_MODE` alone was not enough.
+- **The labels may describe what the vehicle did, not an estimation error.** If the drone really dipped and every sensor
+  agrees, a consistency check is silent by design. "Altitude anomaly" in UAV-SEAD and "estimate disagrees with an
+  independent sensor" are different questions.
+- **One calibration flight set the vision threshold** (3.2 m on 2018-10-01/07_36_14), so vision could not alarm.
+- **Indoor barometers are noisy** (propeller wash, doors): all baro false alarms are on vision+baro flights.
+
+What holds: the check found the 2021-10-06 anomaly through both the distance sensor and the barometer, 1.9 s after the
+labelled start, and the PX4 #26910 lead (estimator vs barometer) is not contradicted. But that is a few cases, not a
+validated rule.
+
+**Decision: stop here.** No re-tuning on these flights. The height cross-check stays a research note. Not integrated.
+The ALFA internal-model results are separate and unaffected.
