@@ -32,6 +32,22 @@ def test_reads_are_open_and_writes_need_the_code(client):
     assert ok.status_code == 200 and ok.json()["synthetic"] is True
 
 
+def test_public_demo_without_a_code_is_read_only_not_open(tmp_path, monkeypatch):
+    """Release blocker found 2026-10-23: the hosted code was never set, so the gate stayed open. It now fails closed."""
+    monkeypatch.setenv("VEYRA_ENABLE_RUNTIME", "true")
+    monkeypatch.setenv("VEYRA_ENGINE_DB", str(tmp_path / "engine.db"))
+    monkeypatch.setenv("VEYRA_PUBLIC_DEMO", "true")
+    monkeypatch.delenv("VEYRA_ACCESS_CODE", raising=False)
+    monkeypatch.delenv("VEYRA_ENGINE_SEED", raising=False)
+    main = importlib.import_module("app.main")
+    with TestClient(main.app) as c:
+        assert c.get("/engine/cases").status_code == 200
+        for path in ("/engine/cases", "/engine/demo/field-case"):
+            denied = c.post(path, json={})
+            assert denied.status_code == 403 and denied.json()["code"] == "read_only_demo"
+        assert c.get("/engine/cases").json() == []                     # nothing was created
+
+
 def test_cors_origins_setting():
     from app.main import cors_origins
     assert cors_origins("https://a.vercel.app/, https://b.vercel.app") == ["https://a.vercel.app", "https://b.vercel.app"]

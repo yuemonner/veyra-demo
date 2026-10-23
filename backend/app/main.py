@@ -40,10 +40,15 @@ _READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 @app.middleware("http")
 async def access_code_gate(request: Request, call_next):
-    """Hosted demo: when VEYRA_ACCESS_CODE is set, every write needs header x-veyra-access with that code.
+    """Hosted demo: when VEYRA_ACCESS_CODE is set, every write needs header x-veyra-access with that code. With
+    VEYRA_PUBLIC_DEMO=true and no code set, every write is refused (the demo is read-only rather than open).
     Reads stay open so visitors can view the demo cases. Signed webhooks keep their own HMAC check."""
     code = os.getenv("VEYRA_ACCESS_CODE", "")
-    if code and request.method not in _READ_METHODS and not request.url.path.startswith("/engine/webhooks/"):
+    writing = request.method not in _READ_METHODS and not request.url.path.startswith("/engine/webhooks/")
+    if writing and not code and os.getenv("VEYRA_PUBLIC_DEMO", "").lower() == "true":
+        # Fail closed: a public demo whose access code was never set is read-only, not open to anyone.
+        return JSONResponse({"detail": "This public demo is read-only. Uploading and recording are switched off.", "code": "read_only_demo"}, status_code=403)
+    if code and writing:
         given = request.headers.get("x-veyra-access", "")
         if not _hmac.compare_digest(given.encode(), code.encode()):
             return JSONResponse({"detail": "An access code is needed to upload or record anything here.", "code": "access_required"}, status_code=401)

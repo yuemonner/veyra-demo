@@ -73,11 +73,18 @@ const plainEngine = (t: string) => t
   .replace(/Site result for (CHK-[A-Z-]+):/, (_m: string, c: string) => `Site result (${CHECK_NAME[c] ?? c}):`);
 // Engine text, made easier to scan: clock times instead of full ISO stamps, rule details left to the "How" toggles.
 const plain = (t?: string | null) => plainEngine(t || "").replace(/\d{4}-\d{2}-\d{2}T(\d{2}:\d{2}:\d{2})(?:\.\d+)?Z/g, "$1")
+  .replace(/\s*\(baseline: [^;)]*(?:\([^)]*\)[^;)]*)*; (peak [^)]*)\)/g, " ($1)")
   .replace(/\s*\((?:baseline|path|rule|basis|the cause)[^)]*\)/gi, "").replace(/95th-percentile/g, "normal")
   .replace(/(inside|within|in) the symptom window/gi, "during the problem").replace(/symptom window/gi, "problem window")
-  .replace(/known-good/gi, "normal").replace(/ than reference/g, " than normal").replace(/screening rule/g, "usual limit")
+  .replace(/known-good/gi, (m: string) => (m[0] === "K" ? "Normal" : "normal")).replace(/ than reference/g, " than normal").replace(/screening rule/g, "usual limit")
   .replace(/^Unconfirmed context blocks comparisons: /, "Not confirmed yet: ").replace(/^Records exist during the problem$/, "The raw data covers the problem")
-  .replace(/control_version/g, "control software version").replace(/(?<!robot )\bmodel\b(?=,|$)/g, "robot model");
+  .replace(/control_version/g, "control software version").replace(/\b(firmware_version|kit_version|harness_revision|vehicle_interface|operating_conditions|measurement_endpoints|network_path|clock_sync_method)\b/g, (k: string) => k.replace(/_/g, " ")).replace(/(?<!robot )\bmodel\b(?=,|$)/g, "robot model");
+// Case titles in the picker: the "Synthetic / Real data" prefix already says what the title repeats; cut at a word.
+const caseLabel = (title: string, max = 72) => {
+  const t = title.replace(/\s*\(SYNTHETIC[^)]*\)\s*$/, "").replace(/\s*[—-]\s*SYNTHETIC\b[^—]*$/i, "").replace(/\s*\(real data[^)]*\)/i, "")
+    .replace(/\s*[—-]\s*real [A-Z0-9]+ flight$/i, "").trim();
+  return t.length <= max ? t : t.slice(0, t.lastIndexOf(" ", max - 1) > max * 0.6 ? t.lastIndexOf(" ", max - 1) : max - 1).replace(/[\s—,:-]+$/, "") + "…";
+};
 const firstSentence = (t: string) => t.split(/(?<=[.!?])\s+(?=[A-Z])/)[0];
 function How({ children }: { children: ReactNode }) {
   return <details className={s.how}><summary>How this was measured</summary><div>{children}</div></details>;
@@ -286,7 +293,7 @@ export default function FieldCasePage() {
             <span className={s.visuallyHidden}>Case</span>
             <select value={caseId ?? ""} onChange={(e) => { setTab("brief"); load(e.target.value); }}>
               {[...cases].reverse().map((c) => (
-                <option key={c.id} value={c.id}>{c.synthetic ? "Synthetic · " : "Real data · "}{c.title.replace(/\s*\(SYNTHETIC[^)]*\)\s*$/, "").slice(0, 70)}</option>))}
+                <option key={c.id} value={c.id}>{c.synthetic ? "Synthetic · " : "Real data · "}{caseLabel(c.title)}</option>))}
             </select>
           </label>
         ) : <span className={s.crumb}>Field case</span>}
