@@ -293,7 +293,8 @@ def _agent_status(store, case_id: str) -> Optional[Dict[str, Any]]:
 @router.get("/cases/{case_id}/autopilot")
 def autopilot_view(case_id: str, store: CaseStore = Depends(get_store)):
     from app.workflows import autopilot
-    return {**_guard(autopilot.view, store, case_id), "enabled": autopilot_enabled(), "agent": _agent_status(store, case_id)}
+    view = _guard(store.cached_view, "autopilot", case_id, lambda: autopilot.view(store, case_id))  # read-only; reused until the case changes
+    return {**view, "enabled": autopilot_enabled(), "agent": _agent_status(store, case_id)}
 
 
 @router.post("/cases/{case_id}/autopilot")

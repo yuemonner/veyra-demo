@@ -235,7 +235,8 @@ class CaseStore:
         """Changes whenever anything a read-side answer depends on changes (this case's run and record, any case's records or files)."""
         q = lambda sql, *a: self.db.execute(sql, a).fetchone()[0]
         return (q("SELECT COUNT(*) FROM runs WHERE case_id = ?", case_id), q("SELECT COUNT(*) FROM ledger WHERE case_id = ?", case_id),
-                q("SELECT COUNT(*) FROM ledger"), q("SELECT COUNT(*) FROM imports"), q("SELECT COUNT(*) FROM cases"))
+                q("SELECT COUNT(*) FROM ledger"), q("SELECT COUNT(*) FROM imports"), q("SELECT COUNT(*) FROM cases"),
+                q("SELECT COUNT(*) FROM context_assertions"))
 
     def _series_index(self, import_id: str, sha: str) -> Dict[tuple, tuple]:
         """Numeric samples of one import as sorted float arrays per (signal, scope): about 16 bytes a sample, parsed once per process."""
@@ -261,6 +262,18 @@ class CaseStore:
             _SERIES_INDEX.popitem(last=False)
         return index
 
+    def cached_view(self, name: str, case_id: str, compute) -> Any:
+        """A read-only view of a case, reused while the database state is unchanged (shared across requests)."""
+        key = (str(self.path), name, case_id, self._state_signature(case_id))
+        if key in _QUESTIONS_CACHE:
+            _QUESTIONS_CACHE.move_to_end(key)
+            return _QUESTIONS_CACHE[key]
+        out = compute()
+        _QUESTIONS_CACHE[key] = out
+        while len(_QUESTIONS_CACHE) > _CACHE_MAX:
+            _QUESTIONS_CACHE.popitem(last=False)
+        return out
+
     def warm_read_caches(self) -> Dict[str, Any]:
         """Compute what a first visitor would otherwise wait for: each case's answers and its plot index."""
         done = []
@@ -270,6 +283,11 @@ class CaseStore:
             for import_id, sha in self.db.execute("SELECT id, sha256 FROM imports WHERE case_id = ?", (c["id"],)).fetchall():
                 self._series_index(import_id, sha)
             self.questions(c["id"])
+            try:
+                from app.workflows import autopilot
+                self.cached_view("autopilot", c["id"], lambda: autopilot.view(self, c["id"]))
+            except Exception:
+                pass
             done.append(c["id"])
         return {"warmed": len(done)}
 
