@@ -339,3 +339,38 @@
 .factList { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15px; line-height: 1.45; max-width: 75ch; }
 .brief, .briefTitle { scroll-margin-top: 88px; }
 .answered { margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--sr-edge); border-radius: 12px; background: rgba(255, 255, 255, 0.7); }
+
+/* Signal chain: where an anomaly was measured, from operator input to machine motion. */
+.chainWrap { margin-top: 2px; }
+.chain { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; position: relative; }
+.chainPoint { position: relative; padding: 18px 8px 0 0; font-size: 12px; line-height: 1.3; color: var(--sr-ink-3); }
+.chainPoint::before { content: ""; position: absolute; top: 5px; left: 0; right: 0; height: 2px; background: var(--sr-edge-strong); }
+.chainPoint:first-child::before { left: 5px; }
+.chainPoint:last-child::before { right: auto; width: 6px; }
+.chainNode { position: absolute; top: 0; left: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--sr-paper, #fff); border: 2px dashed var(--sr-edge-strong); }
+.chainSeen { border-style: solid; border-color: var(--sr-ink-3); }
+.chainLabel { display: block; color: var(--sr-ink-2); }
+.chainState { display: block; margin-top: 2px; font-size: 11px; }
+.chainLead .chainNode { background: var(--sr-anomaly); border: 2px solid var(--sr-anomaly); box-shadow: 0 0 0 4px var(--sr-anomaly-soft); }
+.chainLead .chainLabel { color: var(--sr-ink); font-weight: 600; }
+.chainLead .chainState { color: var(--sr-anomaly); font-weight: 600; }
+.chainAfter .chainNode { border: 2px solid var(--sr-anomaly); background: var(--sr-anomaly-soft); }
+.chainAfter .chainState { color: var(--sr-ink-2); }
+.mechList { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.mechList li { display: grid; grid-template-columns: 170px 1fr; gap: 10px; align-items: baseline; font-size: 14px; }
+.mechStatus { font-size: 12px; font-weight: 600; border-radius: 6px; padding: 2px 8px; justify-self: start; }
+.mSupported { background: var(--sr-thread-soft); color: var(--sr-thread-deep); }
+.mPossible { background: rgba(35, 37, 92, 0.05); color: var(--sr-ink-2); }
+.mUnknown { border: 1px dashed var(--sr-edge-strong); color: var(--sr-ink-3); }
+.mUnlikely { color: var(--sr-ink-3); text-decoration: line-through; text-decoration-color: var(--sr-edge-strong); }
+.recordingRead { margin-top: 12px; font-size: 14px; }
+.recordingRead summary { cursor: pointer; color: var(--sr-ink-2); }
+@media (max-width: 720px) {
+  .chain { grid-template-columns: 1fr; }
+  .chainPoint { padding: 0 0 12px 22px; }
+  .chainPoint::before { top: 0; bottom: 0; left: 5px; right: auto; width: 2px; height: auto; }
+  .chainPoint:first-child::before { top: 6px; left: 5px; }
+  .chainPoint:last-child::before { bottom: auto; height: 6px; width: 2px; }
+  .mechList li { grid-template-columns: 1fr; gap: 2px; }
+}
+.routingNote { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--sr-anomaly-soft); color: var(--sr-ink); font-size: 14px; }

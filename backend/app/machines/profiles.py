@@ -8,7 +8,9 @@ machine:
   vehicle_body       the physical machine that should move
 A profile (one JSON file per machine type) gives each role its name and owner team on that kind of
 machine, can route signals to roles, can reword or switch off checks, and lists which machine-context
-attributes must be confirmed before two runs are compared (context_keys). Adding a machine type is a
+attributes must be confirmed before two runs are compared (context_keys), and describes the machine's SIGNAL CHAIN
+(signal_chain): ordered measurement points from operator input to machine motion and the mechanisms that can act
+between them, used to weigh where an anomaly can come from (app/engine/mechanisms.py). Adding a machine type is a
 new JSON file in this folder (or in VEYRA_MACHINE_PROFILES_DIR); no engine code changes.
 
 The profile is chosen by the machine context attribute `machine_class` (reported or confirmed), as of
@@ -59,12 +61,27 @@ def _validate(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
             re.compile(rule["pattern"])
         except re.error as exc:
             raise ProfileError(f"{source}: routine_events[{i}].pattern is not a valid pattern ({exc})") from None
+    chain = raw.get("signal_chain")
+    if chain is not None:
+        points = chain.get("points") if isinstance(chain, dict) else None
+        if not (isinstance(points, list) and points and all(isinstance(x, dict) and x.get("id") and x.get("label") for x in points)):
+            raise ProfileError(f"{source}: signal_chain.points must be a non-empty list of points with an id and a label")
+        ids = [x["id"] for x in points]
+        if len(set(ids)) != len(ids):
+            raise ProfileError(f"{source}: signal_chain point ids must be unique")
+        if not isinstance(chain.get("redundant_signals", []), list):
+            raise ProfileError(f"{source}: signal_chain.redundant_signals must be a list of signals whose scopes are independent measurements of one quantity")
+        for m in chain.get("mechanisms") or []:
+            if not (isinstance(m, dict) and m.get("id") and m.get("label") and m.get("acts_on") in ids):
+                raise ProfileError(f"{source}: signal_chain mechanism {m.get('id') if isinstance(m, dict) else m} needs an id, a label and acts_on one of {', '.join(ids)}")
+            if m.get("domain") is not None and m["domain"] not in ROLES:
+                raise ProfileError(f"{source}: signal_chain mechanism {m['id']} domain must be one of {', '.join(ROLES)}")
     keys = raw.get("context_keys")
     if keys is not None and not (isinstance(keys, list) and all(isinstance(k, str) for k in keys)):
         raise ProfileError(f"{source}: context_keys must be a list of machine-context attribute names")
     return {"id": pid, "name": raw.get("name") or pid, "description": raw.get("description", ""), "domains": domains,
             "signal_roles": raw.get("signal_roles") or {}, "checks": raw.get("checks") or {}, "context_keys": keys,
-            "routine_events": raw.get("routine_events") or [], "source": source}
+            "routine_events": raw.get("routine_events") or [], "signal_chain": chain, "source": source}
 
 
 def load_all() -> Dict[str, Dict[str, Any]]:
@@ -91,6 +108,8 @@ def resolve(context_incident: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         chosen = profiles[DEFAULT_ID]
         basis = (f"machine_class '{value}' has no profile; generic profile used" if value
                  else "No machine_class in the machine context; generic profile used")
+    if not chosen.get("signal_chain"):
+        chosen = {**chosen, "signal_chain": profiles[DEFAULT_ID].get("signal_chain")}
     return {**chosen, "basis": basis}
 
 

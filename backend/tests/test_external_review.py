@@ -141,24 +141,18 @@ def test_6_questions_answer_from_records_and_name_no_cause():
     assert not any(w in text for w in ("servo path", "controller output", "most likely", "cause"))
 
 
-def test_7_source_coverage_answers_before_asking_and_names_the_missing_record():
+def test_7_without_the_original_recording_nothing_claims_it_was_read():
+    """With the recording read (evidence discovery), see tests/test_discovery_causal.py. Without it, the controller
+    question stays open and names the record; nothing says the recording was read."""
     from app.engine import questions
     t0 = 1536693598.701565
     run = {"findings": {"actuator_outputs": {"findings": [{"rule": "STUCK", "channel": "rudder_rc4", "held_value": 1900.0, "t_start": t0,
                                                             "end": "2018-09-11T19:20:15.697Z", "unit": "us", "reference_range": [1479.0, 1516.0]}]},
                         "tracking": {"findings": []}}}
-    cov = {"source_flight": "2018-09-11-15-06-34_2", "onset_epoch_s": t0, "recorded_span_s": [-52.1, 16.9], "mode_sample_interval_s": 1.0,
-           "mode_changes": [{"t_s": -52.09, "mode": "GUIDED", "armed": True}], "pilot_rudder_input_us": {"min": 1509, "max": 1509},
-           "rudder_output_us": {"min": 1900, "max": 1900}, "switch_changes": [], "diagnostic_warnings": {}, "statustext_messages": 0,
-           "files": {}, "not_in_recording": ["x"], "excluded": "failure_status-*"}
-    out = questions.answer(run, [], [], source_coverage=cov)
-    by = {q["id"].split(":")[0]: q for q in out["questions"]}
-    assert by["commanded"]["status"] == "answered" and "not a stick input" in by["commanded"]["answer"] and "no mode change" in by["commanded"]["answer"]
-    assert by["autopilot"]["status"] == "not_answerable" and "SERVO4_MAX" in by["autopilot"]["needs"]
-    assert out["next"]["question"].startswith("Did the autopilot itself log") and "SD card" in out["next"]["why_a_person"]
-    # without coverage the old question stands, and nothing claims the recording was read
     plain_out = questions.answer(run, [], [])
-    assert {q["id"].split(":")[0] for q in plain_out["questions"]} >= {"commanded"} and "SD card" not in plain_out["next"]["why_a_person"]
+    by = {q["id"].split(":")[0]: q for q in plain_out["questions"]}
+    assert by["commanded"]["status"] == "not_answerable" and by["commanded"]["check_id"] == "CHK-CONTROLLER-LOGS"
+    assert "original recording" not in plain_out["next"]["why_a_person"] and plain_out["discovery"] is None
 
 
 def test_8_read_caches_are_shared_across_connections_and_invalidated_by_new_records(tmp_path):

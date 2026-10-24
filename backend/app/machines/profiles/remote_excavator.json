@@ -35,5 +35,167 @@
     "CHK-DRIVE-LOGS": {
       "applicable": false
     }
+  },
+  "signal_chain": {
+    "lag_s": 3.0,
+    "redundant_signals": [
+      "vehicle.altitude"
+    ],
+    "points": [
+      {
+        "id": "operator",
+        "label": "Operator console input",
+        "roles": [
+          "operator_input"
+        ],
+        "signals": [
+          "vehicle.command_input",
+          "command.sent"
+        ],
+        "if_missing": "The operator's own inputs are not recorded: whether a person commanded the change cannot be read."
+      },
+      {
+        "id": "link",
+        "label": "Console-to-machine link",
+        "roles": [],
+        "signals": [
+          "network.rtt",
+          "network.one_way_delay",
+          "network.jitter",
+          "network.packet_loss",
+          "network.throughput",
+          "network.signal_strength",
+          "network.link_event",
+          "command.received"
+        ],
+        "if_missing": "The link between operator and machine is not measured: delays or losses on it cannot be read."
+      },
+      {
+        "id": "controller",
+        "label": "Remote-control software (mode, interlocks)",
+        "roles": [
+          "controller_mode",
+          "controller_setpoint",
+          "controller_parameters",
+          "controller_text",
+          "controller_status",
+          "command_link"
+        ],
+        "signals": [
+          "controller.event",
+          "controller.reset",
+          "controller.cycle_time",
+          "app.heartbeat",
+          "app.heartbeat_interval",
+          "fault.code",
+          "control.attitude_setpoint",
+          "control.velocity_setpoint",
+          "control.yaw_rate_setpoint"
+        ],
+        "if_missing": "The controller's own mode, configuration and messages are not recorded."
+      },
+      {
+        "id": "output_command",
+        "label": "Valve and actuator commands sent to the machine",
+        "roles": [
+          "actuator_command"
+        ],
+        "signals": [
+          "command.output",
+          "actuator.output",
+          "propulsion.throttle",
+          "joint.position_command"
+        ],
+        "if_missing": "The controller's output commands are not recorded."
+      },
+      {
+        "id": "actuator",
+        "label": "Hydraulic actuator response",
+        "roles": [
+          "actuator_feedback",
+          "power"
+        ],
+        "signals": [
+          "vehicle.feedback",
+          "vehicle.actuator_response",
+          "actuator.status",
+          "joint.position",
+          "joint.torque",
+          "vehicle.hydraulic_pressure"
+        ],
+        "if_missing": "No actuator feedback is recorded: whether an actuator did what it was commanded cannot be read."
+      },
+      {
+        "id": "motion",
+        "label": "Machine motion",
+        "roles": [
+          "body_motion"
+        ],
+        "signals": [
+          "vehicle.attitude",
+          "vehicle.yaw_rate",
+          "vehicle.velocity",
+          "vehicle.ground_speed",
+          "vehicle.airspeed",
+          "vehicle.altitude"
+        ],
+        "if_missing": "The machine's motion is not measured."
+      }
+    ],
+    "mechanisms": [
+      {
+        "id": "operator_command",
+        "label": "Operator command",
+        "acts_on": "operator",
+        "domain": "network",
+        "needs": "The operator's inputs and the console log at the onset",
+        "short": "operator input"
+      },
+      {
+        "id": "link_fault",
+        "label": "Command link delay or loss",
+        "acts_on": "link",
+        "domain": "network",
+        "needs": "Link quality and command timing records for the window",
+        "check_id": "CHK-NETWORK-LOGS",
+        "short": "the link"
+      },
+      {
+        "id": "controller_behaviour",
+        "label": "Controller behaviour (mode change, configuration, failsafe or control logic)",
+        "acts_on": "controller",
+        "domain": "control_suite",
+        "needs": "The controller's own mode, event and configuration log at the onset",
+        "check_id": "CHK-CONTROLLER-LOGS",
+        "short": "the controller"
+      },
+      {
+        "id": "output_path",
+        "label": "Output path (driver, wiring or actuator electronics): command not carried out",
+        "acts_on": "actuator",
+        "domain": "vehicle_interface",
+        "needs": "Actuator feedback, or an inspection of the actuator and its wiring",
+        "check_id": "CHK-ONSITE-ACTUATOR",
+        "short": "the output path"
+      },
+      {
+        "id": "physical_response",
+        "label": "Mechanics, load or environment: actuator moves but the machine does not respond as expected",
+        "acts_on": "motion",
+        "domain": "vehicle_body",
+        "needs": "Actuator feedback alongside the motion, or an inspection of the mechanism",
+        "check_id": "CHK-ONSITE-ACTUATOR",
+        "short": "mechanics or environment"
+      },
+      {
+        "id": "sensor_error",
+        "label": "Measurement error: the machine moved normally but a sensor reported otherwise",
+        "acts_on": "motion",
+        "domain": "vehicle_body",
+        "needs": "A second, independent measurement of the same motion",
+        "measurement_only": true,
+        "short": "a sensor error"
+      }
+    ]
   }
 }

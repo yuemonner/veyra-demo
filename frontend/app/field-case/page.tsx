@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import s from "./field-case.module.css";
+import { RecordingRead, SignalChain } from "./SignalChain";
 import { plotFor, Waveform } from "./Waveform";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "/local-api";
@@ -1517,8 +1518,14 @@ function NextAction({ caseId, data, onChanged, me, onEvidence }: { caseId: strin
         <p className={s.kicker}>Checked in the records already (before asking anyone)</p>
         <ul className={s.factList}>
           {qa.questions.map((q: Any) => <li key={q.id}><b>{q.question}</b><br />
-            {q.status === "answered" ? <span>{q.answer}</span> : <span className={s.dim}>Not in these records. Needs: {q.needs}.</span>}</li>)}
+            {q.status === "answered" ? <span>{q.answer}</span> : <span className={s.dim}>Not in these records. Needs: {q.needs}.</span>}
+            {q.order_note ? <><br /><span className={s.dim}>Order of events: {q.order_note}</span></> : null}</li>)}
         </ul>
+        <RecordingRead d={qa.discovery} />
+      </div>}
+      {qa?.causal?.applicable && qa.causal.events?.length > 0 && <div className={s.answered}>
+        <p className={s.kicker}>Which mechanisms the records leave open</p>
+        <SignalChain causal={qa.causal} />
       </div>}
       <Assistant caseId={caseId} me={me} onChanged={after} stamp={(data.ledger || []).length} onDecideOther={() => document.getElementById("your-decision")?.scrollIntoView({ behavior: "smooth" })} />
       <details className={s.reasoning}>
@@ -1860,6 +1867,11 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
             })()}
           </> : <p className={s.answer}>Nothing stands out yet. <button className={s.link} onClick={() => go("hypotheses")}>See the data</button></p>}
         </div>
+      </div>}
+
+      {qa?.causal?.applicable && qa.causal.events?.length > 0 && <div className={s.row}>
+        <span className={s.rowLabel}>Where it started</span>
+        <div><SignalChain causal={qa.causal} compact domains={run.machine_profile?.domains} /></div>
       </div>}
 
       {b.ruledOut.length > 0 && (

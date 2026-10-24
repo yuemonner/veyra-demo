@@ -99,5 +99,167 @@
       "within_s": 1.0,
       "why": "all 12 joint drives changed status word together with that command-mode switch"
     }
-  ]
+  ],
+  "signal_chain": {
+    "lag_s": 2.0,
+    "redundant_signals": [
+      "vehicle.altitude"
+    ],
+    "points": [
+      {
+        "id": "operator",
+        "label": "Operator joystick or mission command",
+        "roles": [
+          "operator_input"
+        ],
+        "signals": [
+          "vehicle.command_input",
+          "command.sent"
+        ],
+        "if_missing": "The operator's own inputs are not recorded: whether a person commanded the change cannot be read."
+      },
+      {
+        "id": "link",
+        "label": "Operator and mission link",
+        "roles": [],
+        "signals": [
+          "network.rtt",
+          "network.one_way_delay",
+          "network.jitter",
+          "network.packet_loss",
+          "network.throughput",
+          "network.signal_strength",
+          "network.link_event",
+          "command.received"
+        ],
+        "if_missing": "The link between operator and machine is not measured: delays or losses on it cannot be read."
+      },
+      {
+        "id": "controller",
+        "label": "Locomotion controller (mode, gait, setpoints)",
+        "roles": [
+          "controller_mode",
+          "controller_setpoint",
+          "controller_parameters",
+          "controller_text",
+          "controller_status",
+          "command_link"
+        ],
+        "signals": [
+          "controller.event",
+          "controller.reset",
+          "controller.cycle_time",
+          "app.heartbeat",
+          "app.heartbeat_interval",
+          "fault.code",
+          "control.attitude_setpoint",
+          "control.velocity_setpoint",
+          "control.yaw_rate_setpoint"
+        ],
+        "if_missing": "The controller's own mode, configuration and messages are not recorded."
+      },
+      {
+        "id": "output_command",
+        "label": "Joint commands the controller sends",
+        "roles": [
+          "actuator_command"
+        ],
+        "signals": [
+          "command.output",
+          "actuator.output",
+          "propulsion.throttle",
+          "joint.position_command"
+        ],
+        "if_missing": "The controller's output commands are not recorded."
+      },
+      {
+        "id": "actuator",
+        "label": "Joint drives (measured position and torque)",
+        "roles": [
+          "actuator_feedback",
+          "power"
+        ],
+        "signals": [
+          "vehicle.feedback",
+          "vehicle.actuator_response",
+          "actuator.status",
+          "joint.position",
+          "joint.torque",
+          "vehicle.hydraulic_pressure"
+        ],
+        "if_missing": "No actuator feedback is recorded: whether an actuator did what it was commanded cannot be read."
+      },
+      {
+        "id": "motion",
+        "label": "Body motion (velocity, attitude)",
+        "roles": [
+          "body_motion"
+        ],
+        "signals": [
+          "vehicle.attitude",
+          "vehicle.yaw_rate",
+          "vehicle.velocity",
+          "vehicle.ground_speed",
+          "vehicle.airspeed",
+          "vehicle.altitude"
+        ],
+        "if_missing": "The machine's motion is not measured."
+      }
+    ],
+    "mechanisms": [
+      {
+        "id": "operator_command",
+        "label": "Operator command",
+        "acts_on": "operator",
+        "domain": "network",
+        "needs": "The operator's inputs and the console log at the onset",
+        "short": "operator input"
+      },
+      {
+        "id": "link_fault",
+        "label": "Command link delay or loss",
+        "acts_on": "link",
+        "domain": "network",
+        "needs": "Link quality and command timing records for the window",
+        "check_id": "CHK-NETWORK-LOGS",
+        "short": "the link"
+      },
+      {
+        "id": "controller_behaviour",
+        "label": "Controller behaviour (mode change, configuration, failsafe or control logic)",
+        "acts_on": "controller",
+        "domain": "control_suite",
+        "needs": "The controller's own mode, event and configuration log at the onset",
+        "check_id": "CHK-CONTROLLER-LOGS",
+        "short": "the locomotion controller"
+      },
+      {
+        "id": "output_path",
+        "label": "Joint drive (drive fault, encoder, temperature derating): joint not following its command",
+        "acts_on": "actuator",
+        "domain": "vehicle_interface",
+        "needs": "The drive's status and error log, or an inspection of the drive",
+        "check_id": "CHK-ONSITE-ACTUATOR",
+        "short": "the joint drive"
+      },
+      {
+        "id": "physical_response",
+        "label": "Leg, foot, terrain or load: joints follow commands but the body does not move as expected",
+        "acts_on": "motion",
+        "domain": "vehicle_body",
+        "needs": "Actuator feedback alongside the motion, or an inspection of the mechanism",
+        "check_id": "CHK-ONSITE-ACTUATOR",
+        "short": "leg, terrain or load"
+      },
+      {
+        "id": "sensor_error",
+        "label": "Measurement error: the machine moved normally but a sensor reported otherwise",
+        "acts_on": "motion",
+        "domain": "vehicle_body",
+        "needs": "A second, independent measurement of the same motion",
+        "measurement_only": true,
+        "short": "a sensor error"
+      }
+    ]
+  }
 }

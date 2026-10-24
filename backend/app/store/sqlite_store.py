@@ -304,21 +304,25 @@ class CaseStore:
             _QUESTIONS_CACHE.popitem(last=False)
         return out
 
+    def discovery(self, case_id: str) -> Optional[Dict[str, Any]]:
+        """The latest evidence-discovery record of the case (what the whole original recording holds), or None."""
+        return next((e["payload"] for e in reversed(self.ledger(case_id)) if e["kind"] == "evidence_discovery"), None)
+
     def _questions(self, case_id: str) -> Dict[str, Any]:
+        from app.engine import mechanisms
         from app.engine import questions as data_questions
+        from app.workflows.discovery import profile_for_run
         case = self.case(case_id)
         run = self.latest_run(case_id)
         if run is None:
             return {"version": data_questions.QUESTIONS_VERSION, "applicable": False, "questions": []}
-        keep = {"actuator.output", *data_questions.EVENT_SIGNALS, *data_questions.FEEDBACK_SIGNALS}
+        chain = profile_for_run(run).get("signal_chain")
+        keep = {"actuator.output", *data_questions.EVENT_SIGNALS, *data_questions.FEEDBACK_SIGNALS, *((chain or {}).get("redundant_signals") or [])}
         rows = [r for (raw,) in self.db.execute("SELECT rows_json FROM imports WHERE case_id = ?", (case_id,)) for r in json.loads(raw) if r.get("signal") in keep]
         closure = next((e["payload"] for e in reversed(self.ledger(case_id)) if e["kind"] == "case_closure"), None)
-        # Coverage of the ORIGINAL recording (topics not imported), shipped beside the demo seeds, matched by source flight.
-        from app.engine_seed import SEED_DIR
-        names = " ".join(i["filename"] for i in self.imports(case_id, include_rows=False))
-        coverage = next((c for c in (json.loads(p.read_text()) for p in sorted(SEED_DIR.glob("*_source_coverage.json")))
-                         if c.get("source_flight") and c["source_flight"] in names), None)
-        return data_questions.answer(run, rows, self.known_good_runs(case), closure, source_coverage=coverage)
+        found = self.discovery(case_id)
+        causal = mechanisms.assess(run, chain, found, rows)
+        return data_questions.answer(run, rows, self.known_good_runs(case), closure, discovery=found, causal=causal)
 
     def series(self, case_id: str, signal: str, scope: Optional[str], start: float, end: float, max_points: int = 400) -> Dict[str, Any]:
         """Samples of one signal (and scope) of this case between start and end (epoch s), for plotting. Read-only.
@@ -415,7 +419,7 @@ class CaseStore:
 
     def append_trusted(self, case_id: str, kind: str, payload: Dict[str, Any], *, actor: str, source: str) -> Dict[str, Any]:
         """Records produced by Veyra's own connectors and agent (never reachable from the human ledger API)."""
-        if kind not in ("acquisition", "agent_report", "trigger_event", "next_action", "decision_check", "decision_proposal"):
+        if kind not in ("acquisition", "agent_report", "trigger_event", "next_action", "decision_check", "decision_proposal", "evidence_discovery"):
             raise StoreError(f"'{kind}' is not a machine-generated record")
         with self._write_transaction():
             return self._append_locked(case_id, kind, payload, actor=actor, source=source, trusted_automatic=True)

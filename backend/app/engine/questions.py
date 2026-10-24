@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from statistics import median
 from typing import Any, Dict, List, Optional
 
-QUESTIONS_VERSION = "data-questions-v1"
+QUESTIONS_VERSION = "data-questions-v2"
 EVENT_SIGNALS = ("controller.event", "controller.reset", "fault.code")
 FEEDBACK_SIGNALS = ("vehicle.actuator_response", "actuator.status")
 CHANGE_MIN = 20.0       # output units (PWM µs): smaller median shifts around the onset are not reported
@@ -34,30 +34,48 @@ def _unit(u: Optional[str]) -> str:
     return " µs" if u == "us" else f" {u}" if u else ""
 
 
-def _from_source(cov: Dict[str, Any], ch: str) -> Dict[str, Any]:
-    """The 'commanded?' question, answered from topics of the original recording that were not imported."""
-    modes = cov["mode_changes"]
-    span = cov["recorded_span_s"]
-    mode_text = (f"flight mode {modes[0]['mode']} and {'armed' if modes[0]['armed'] else 'disarmed'} for the whole recorded segment "
-                 f"({span[0]:+.0f} s to {span[1]:+.0f} s around the onset; sampled about every {cov['mode_sample_interval_s']:g} s), no mode change"
-                 if len(modes) == 1 else "mode changes: " + ", ".join(f"{m['mode']} at {m['t_s']:+.1f} s" for m in modes))
-    pilot = cov["pilot_rudder_input_us"]
-    parts = [mode_text,
-             (f"the pilot's rudder input stayed at {pilot['min']} µs while the output was {cov['rudder_output_us']['min']} µs, so it was not a stick input"
-              if pilot["min"] == pilot["max"] else f"the pilot's rudder input ranged {pilot['min']}–{pilot['max']} µs during the hold")]
-    if cov.get("switch_changes"):
-        parts.append("; ".join(f"transmitter switch {x['rc_input']} changed {x['from']}→{x['to']} µs at {x['t_s']:+.1f} s" for x in cov["switch_changes"]))
-    for k, w in (cov.get("diagnostic_warnings") or {}).items():
-        parts.append(f"'{k.split(': ', 1)[-1]}' warning present from {w['first_t_s']:+.0f} s to {w['last_t_s']:+.0f} s (not new at the onset)")
-    parts.append("no autopilot status-text messages anywhere in the recording" if not cov.get("statustext_messages")
-                 else f"{cov['statustext_messages']} autopilot status-text messages")
-    return {"id": f"commanded:{ch}", "question": f"Was the hold on {ch} commanded by the pilot or a mode change?", "status": "answered",
-            "answer": "From topics of the original recording Veyra had not imported: " + "; ".join(parts) + ".",
-            "source": {"flight": cov["source_flight"], "files": cov["files"], "excluded": cov.get("excluded")}}
+def _discovered(disc: Optional[Dict[str, Any]], t0: float) -> Optional[Dict[str, Any]]:
+    """The evidence-discovery result for the incident at t0 (within 1 s), if the original recording was read."""
+    for inc in (disc or {}).get("incidents") or []:
+        it = (inc.get("incident") or {}).get("t")
+        if it is not None and abs(float(it) - t0) <= 1.0 and not inc.get("outside_recording"):
+            return inc
+    return None
+
+
+def _from_discovery(disc: Dict[str, Any], inc: Dict[str, Any], ch: str) -> Dict[str, Any]:
+    """The 'commanded?' question, answered from the whole original recording (evidence discovery), not only the imported signals."""
+    parts = []
+    shown = lambda v: str(v).lower() if isinstance(v, bool) else str(v)  # noqa: E731
+    modes = [m for m in inc.get("controller_mode") or [] if m["field"] not in ("connected", "guided", "system_status") and m.get("at_onset") is not None]
+    steady = [m for m in modes if not m["changes_in_window"]]
+    if steady:
+        every = max((m.get("sample_interval_s") or 0) for m in steady)
+        parts.append(" and ".join(f"{m['field']} {shown(m['at_onset'])}" for m in steady) + " at the onset, unchanged in the 60 s around it"
+                     + (f" (state sampled about every {every:.1f} s)" if every else ""))
+    for m in modes:
+        if m["changes_in_window"]:
+            parts.append(f"{m['field']} {shown(m['at_onset'])} at the onset, {m['changes_in_window']} change(s) in the 60 s around it")
+    facts = inc.get("facts") or []
+    cause_like = [f for f in facts if f["point"] == "controller" and f.get("near_onset") and f["t_rel_s"] is not None and f["t_rel_s"] <= 1.0
+                  and (f.get("chance_near_onset") or 0) < 0.2]
+    for f in cause_like[:4]:
+        parts.append(f"{f['text']} at {f['t_rel_s']:+.2f} s")
+    for f in facts:
+        if f["kind"] in ("operator_vs_output", "operator_steady"):
+            parts.append(f["text"])
+    if not inc.get("texts_in_recording"):
+        parts.append("no controller text messages anywhere in the recording")
+    src = disc.get("source") or {}
+    return {"id": f"commanded:{ch}", "question": f"Was the change on {ch} commanded by the operator, or by the controller itself?", "status": "answered",
+            "answer": f"From the whole original recording ({src.get('name')}), read by Veyra: " + "; ".join(parts) + ".",
+            "source": {"recording": src.get("name"), "sha256": src.get("sha256"), "streams_read": len((disc.get("inventory") or {}).get("read_by_probes") or []),
+                       "excluded": [e["stream"] for e in (disc.get("inventory") or {}).get("excluded") or []]},
+            "facts": {"controller_records_before_onset": [f["text"] for f in cause_like]}}
 
 
 def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[Dict[str, Any]], closure: Optional[Dict[str, Any]] = None,
-           source_coverage: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+           discovery: Optional[Dict[str, Any]] = None, causal: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     outputs = [f for f in ((run.get("findings") or {}).get("actuator_outputs") or {}).get("findings", []) if f.get("rule") == "STUCK"]
     tracking = ((run.get("findings") or {}).get("tracking") or {}).get("findings", [])
     signals = {r.get("signal") for r in rows}
@@ -116,16 +134,25 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
                                          f"{'later' if dt >= 0 else 'earlier'} and the hold lasted {t1 - t0:.1f} s."),
                               "facts": {"output_onset": t0, "departure_onset": first["t_start"], "seconds_between": round(dt, 3)}})
         # 4. Commanded? Mode changes, failsafes, controller events or fault codes around the onset.
-        cov = source_coverage if source_coverage and abs(source_coverage.get("onset_epoch_s", 0) - t0) < 0.5 else None
-        if cov:  # the original recording holds more than was imported: read it before asking anyone
-            questions.append(_from_source(cov, ch))
-            questions.append({"id": f"autopilot:{ch}", "question": f"Did the autopilot itself log a failsafe, an error, or a servo limit that explains {v:g}{_unit(unit)}?",
-                              "status": "not_answerable",
-                              "needs": ("The ArduPilot on-board (dataflash) log, with its ERR and EV event records, and the servo parameters "
-                                        "SERVO4_MIN, SERVO4_MAX, SERVO4_TRIM and SERVO4_REVERSED. Neither is in this recording or published with the dataset"),
-                              "check_id": "CHK-CONTROLLER-LOGS"})
-        ev = [] if cov else [r for r in rows if r.get("signal") in EVENT_SIGNALS and t0 - EVENT_MARGIN_S <= r["t"] <= t1 + EVENT_MARGIN_S]
-        if cov:
+        inc = _discovered(discovery, t0)
+        if inc:  # the original recording was read around this onset: answer from it before asking anyone
+            q = _from_discovery(discovery, inc, ch)
+            questions.append(q)
+            params = [f for f in inc.get("facts") or [] if f["kind"] == "parameter_reported" and f.get("near_onset") and f["t_rel_s"] <= 1.0]
+            if params:
+                names = ", ".join(sorted({f["parameter"] for f in params}))
+                questions.append({"id": f"config:{ch}", "question": f"What does {names} do in this firmware, and who or what set it {abs(params[0]['t_rel_s']):.2f} s before the onset?",
+                                  "status": "not_answerable",
+                                  "needs": (f"The firmware documentation for {names}, and the ground-station log or the flight-controller's own log for that moment. "
+                                            "The recording shows the controller reporting the value; it does not show who sent it"),
+                                  "check_id": "CHK-CONTROLLER-LOGS"})
+            elif not q["facts"]["controller_records_before_onset"]:
+                questions.append({"id": f"autopilot:{ch}", "question": f"Did the controller itself log a failsafe, an error or an output limit that explains {v:g}{_unit(unit)}?",
+                                  "status": "not_answerable",
+                                  "needs": "The controller's own on-board log (error, event and failsafe records) and its output configuration: neither is in this recording",
+                                  "check_id": "CHK-CONTROLLER-LOGS"})
+        ev = [] if inc else [r for r in rows if r.get("signal") in EVENT_SIGNALS and t0 - EVENT_MARGIN_S <= r["t"] <= t1 + EVENT_MARGIN_S]
+        if inc:
             pass
         elif ev:
             questions.append({"id": f"commanded:{ch}", "question": f"Did a mode change, failsafe or controller event come with the hold on {ch}?", "status": "answered",
@@ -140,11 +167,14 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
                               "check_id": None if present else "CHK-CONTROLLER-LOGS"})
         # 5. Did the actuator physically get there?
         fb = [r for r in rows if r.get("signal") in FEEDBACK_SIGNALS and (r.get("scope") or "") == ch]
-        questions.append({"id": f"physical:{ch}", "question": f"Did the {ch.split('_')[0]} servo physically move to that position?",
+        ev_c = next((e for e in (causal or {}).get("events") or [] if e["lead"]["scope"] == ch), None)
+        path = next((m for m in (ev_c or {}).get("mechanisms") or [] if m["id"] == "output_path"), None)
+        order_note = (path["evidence"][0]["text"] if path and path["status"] == "unlikely" and path.get("evidence") else None)
+        questions.append({"id": f"physical:{ch}", "question": f"Did the {ch.split('_')[0]} actuator physically move to that position?",
                           "status": "answered" if fb else "not_answerable",
                           "answer": f"{len(fb)} feedback records for {ch} exist in the window; see Evidence." if fb else None,
-                          "needs": None if fb else "Servo position feedback (not recorded on this aircraft) or a check of the servo and linkage",
-                          "check_id": None if fb else "CHK-ONSITE-ACTUATOR"})
+                          "needs": None if fb else "Actuator position feedback (not in this case) or a check of the actuator and its linkage",
+                          "check_id": None if fb else "CHK-ONSITE-ACTUATOR", "order_note": order_note})
 
     if tracking and not outputs:
         for d in tracking[:2]:
@@ -158,7 +188,7 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
                               "check_id": None if present else "CHK-CONTROLLER-LOGS"})
 
     if not questions:
-        return {"version": QUESTIONS_VERSION, "applicable": False, "questions": []}
+        return {"version": QUESTIONS_VERSION, "applicable": False, "questions": [], "causal": causal, "discovery": _discovery_summary(discovery)}
     established = [q["answer"] for q in questions if q["status"] == "answered" and q.get("answer")]
     open_q = [q for q in questions if q["status"] == "not_answerable"]
     # Remote retrieval before travel: a log someone can send comes before a physical check.
@@ -168,11 +198,26 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
               else "Further investigation needed · No cause confirmed")
     # The Brief leads with these facts only when the data answers enough (today: output-hold findings); otherwise the
     # questions are still shown in Next action, and the Brief keeps its finding-led summary.
-    return {"version": QUESTIONS_VERSION, "applicable": True, "brief": bool(outputs) and len(established) >= 2, "questions": questions, "established": established,
+    return {"version": QUESTIONS_VERSION, "applicable": True, "causal": causal, "discovery": _discovery_summary(discovery), "brief": bool(outputs) and len(established) >= 2, "questions": questions, "established": established,
             "cannot_establish": [{"question": q["question"], "needs": q["needs"], "check_id": q.get("check_id")} for q in open_q],
             "next": None if not nxt else {"question": nxt["question"], "needs": nxt["needs"], "check_id": nxt.get("check_id"),
-                                          "why_a_person": ("Veyra read the recording's flight-mode, pilot-input, diagnostics and MAVLink records; this log is not among them. "
-                                                           "Only someone with the aircraft or its SD card can provide it." if source_coverage else
+                                          "why_a_person": (f"Veyra read the whole original recording ({len((discovery.get('inventory') or {}).get('read_by_probes') or [])} streams: "
+                                                           "controller mode and status, controller messages and configuration, operator inputs, outputs, battery); "
+                                                           "this record is not in it. Only someone with the machine, its storage or the ground station can provide it." if discovery else
                                                            "That record is not in this case. Veyra cannot reach the machine; someone with access has to retrieve it, or inspect the part.")},
             "decision_status": status,
             "boundary": "Answered only from records in this case and known-good runs of the same machine. Facts, not a cause."}
+
+
+def _discovery_summary(disc: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not disc:
+        return None
+    inv = disc.get("inventory") or {}
+    roles: Dict[str, int] = {}
+    for st in inv.get("streams") or []:
+        roles[st["role"]] = roles.get(st["role"], 0) + 1
+    return {"recording": (disc.get("source") or {}).get("name"), "sha256": (disc.get("source") or {}).get("sha256"), "version": disc.get("version"),
+            "streams": len(inv.get("streams") or []), "roles": roles, "read_by_probes": len(inv.get("read_by_probes") or []),
+            "not_understood": [{"stream": x["stream"], "type": x["type"], "why": x["why"]} for x in inv.get("not_understood") or []][:20],
+            "excluded": [{"stream": x["stream"], "reason": x["reason"]} for x in inv.get("excluded") or []],
+            "gaps": disc.get("gaps") or [], "rules": disc.get("rules")}

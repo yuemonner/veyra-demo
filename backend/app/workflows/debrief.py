@@ -81,5 +81,15 @@ def debrief_recording(store, path: Path, mapping: Dict[str, Any], *, machine_id:
                                                  "reference_source": f"Upload of {source_name or path.name}"}, actor=actor, source="upload form")
     progress("Investigating")
     run = store.investigate(cid, actor=actor)
+    progress("Reading the rest of the recording")
+    discovered = None
+    try:  # evidence discovery never blocks an upload: a failure is reported, the case stands
+        from app.workflows.discovery import discover_and_record
+        entry = discover_and_record(store, cid, run, path, actor=actor, source_name=source_name or path.name, sha256=sha)
+        discovered = {"entry_id": entry["id"], "incidents": len(entry["payload"]["incidents"]),
+                      "streams": len(entry["payload"]["inventory"]["streams"]), "gaps": len(entry["payload"]["gaps"])}
+    except Exception as error:  # noqa: BLE001
+        discovered = {"error": f"{type(error).__name__}: {error}"[:300]}
     return {"case_id": cid, "run_id": run["id"], "imports": imports, "counts": extraction.counts, "skipped": extraction.skipped,
+            "discovery": discovered,
             "recording": {"sha256": sha, "start": _iso(start), "end": _iso(end), "duration_s": round(span, 3)}}

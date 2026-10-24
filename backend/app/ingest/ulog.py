@@ -93,7 +93,10 @@ def _parse_format(text: str) -> Tuple[str, List[Tuple[str, str, int]]]:
 
 
 def read(path: Path, topics: Optional[set] = None) -> Dict[str, Any]:
-    """{info, params, messages: [(t_us, level, text)], dropouts, data: {(topic, multi_id): [(t_us, bytes)]}, layouts}"""
+    """{info, params, messages: [(t_us, level, text)], dropouts, data: {(topic, multi_id): [(t_us, bytes)]}, layouts,
+    counts: {(topic, multi_id): messages} for EVERY topic (also those not in `topics`), first_us / last_us (data span),
+    param_changes: [(t_us, name, value)] for parameters changed after logging started (t_us = the last data timestamp
+    before the change: ULog parameter messages carry no time of their own)}"""
     data_bytes = Path(path).read_bytes()
     if data_bytes[:7] != MAGIC:
         raise ULogError("Not a ULog file")
@@ -107,6 +110,10 @@ def read(path: Path, topics: Optional[set] = None) -> Dict[str, Any]:
     dropouts: List[int] = []
     out: Dict[Tuple[str, int], List[Tuple[int, bytes]]] = {}
     layouts: Dict[str, _Layout] = {}
+    counts: Dict[Tuple[str, int], int] = {}
+    param_changes: List[Tuple[int, str, Any]] = []
+    first_us: Optional[int] = None
+    last_us: Optional[int] = None
 
     def value_of(key: str, raw: bytes) -> Any:
         ktype, _, kname = key.partition(" ")
@@ -128,8 +135,14 @@ def read(path: Path, topics: Optional[set] = None) -> Dict[str, Any]:
         if mtype == ord("D"):
             msg_id = struct.unpack_from("<H", body, 0)[0]
             sub = subs.get(msg_id)
-            if sub and (topics is None or sub[0] in topics):
-                out.setdefault(sub, []).append((struct.unpack_from("<Q", body, 2)[0], body[2:]))
+            if sub:
+                counts[sub] = counts.get(sub, 0) + 1
+                t_msg = struct.unpack_from("<Q", body, 2)[0]
+                if t_msg:
+                    first_us = t_msg if first_us is None else first_us
+                    last_us = t_msg if last_us is None or t_msg > last_us else last_us
+                if topics is None or sub[0] in topics:
+                    out.setdefault(sub, []).append((t_msg, body[2:]))
         elif mtype == ord("F"):
             name, fields = _parse_format(body.decode(errors="replace"))
             formats[name] = fields
@@ -139,6 +152,8 @@ def read(path: Path, topics: Optional[set] = None) -> Dict[str, Any]:
         elif mtype in (ord("I"), ord("P")):
             klen = body[0]
             k, v = value_of(body[1:1 + klen].decode(errors="replace"), body[1 + klen:])
+            if mtype == ord("P") and last_us is not None and params.get(k) != v:
+                param_changes.append((last_us, k, v))
             (info if mtype == ord("I") else params)[k] = v
         elif mtype == ord("L"):
             level, t = struct.unpack_from("<BQ", body, 0)
@@ -151,7 +166,8 @@ def read(path: Path, topics: Optional[set] = None) -> Dict[str, Any]:
     for (topic, _multi) in out:
         if topic in formats and topic not in layouts:
             layouts[topic] = _Layout(formats, topic)
-    return {"start_us": start_us, "info": info, "params": params, "messages": messages, "dropouts": dropouts, "data": out, "layouts": layouts}
+    return {"start_us": start_us, "info": info, "params": params, "messages": messages, "dropouts": dropouts, "data": out, "layouts": layouts,
+            "counts": counts, "first_us": first_us, "last_us": last_us, "param_changes": param_changes, "formats": formats}
 
 
 TOPICS = {"vehicle_attitude", "vehicle_attitude_setpoint", "vehicle_angular_velocity", "vehicle_rates_setpoint", "vehicle_local_position",
@@ -166,10 +182,9 @@ def mapping(max_hz: float = 10.0, clock_domain: str = "px4_clock") -> Dict[str, 
             "topics": [{"topic": "ulog", "entries": [{"signal": s} for s in SIGNALS]}]}
 
 
-def extract(path: Path, *, asset: str, max_hz: float = 10.0, progress: Optional[Callable[[int], None]] = None) -> Tuple[Extraction, Dict[str, Any]]:
-    log = read(path, TOPICS)
+def utc_offset(log: Dict[str, Any]) -> Tuple[int, str]:
+    """(offset to add to boot-clock microseconds, clock name). The log must have been read with the GPS topic."""
     data, lay = log["data"], log["layouts"]
-    period = 1e6 / max_hz
     # UTC offset from the first GPS fix
     offset_us, clock = None, "px4_boot"
     for topic in ("vehicle_gps_position", "sensor_gps"):
@@ -194,6 +209,14 @@ def extract(path: Path, *, asset: str, max_hz: float = 10.0, progress: Optional[
                 break
     if offset_us is None:
         offset_us = 0
+    return offset_us, clock
+
+
+def extract(path: Path, *, asset: str, max_hz: float = 10.0, progress: Optional[Callable[[int], None]] = None) -> Tuple[Extraction, Dict[str, Any]]:
+    log = read(path, TOPICS)
+    data, lay = log["data"], log["layouts"]
+    period = 1e6 / max_hz
+    offset_us, clock = utc_offset(log)
     rows: List[Dict[str, Any]] = []
     counts: Dict[str, int] = {}
     skipped: Dict[str, int] = {}
