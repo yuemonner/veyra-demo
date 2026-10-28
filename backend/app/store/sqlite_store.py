@@ -322,7 +322,14 @@ class CaseStore:
         closure = next((e["payload"] for e in reversed(self.ledger(case_id)) if e["kind"] == "case_closure"), None)
         found = self.discovery(case_id)
         causal = mechanisms.assess(run, chain, found, rows)
-        return data_questions.answer(run, rows, self.known_good_runs(case), closure, discovery=found, causal=causal)
+        from app.engine import lessons as lesson_engine
+        try:
+            learned = lesson_engine.match(self, case_id)
+        except Exception as error:  # noqa: BLE001 - lessons are a lead; never block the case's own answers
+            learned = {"version": lesson_engine.LESSONS_VERSION, "lessons": [], "error": f"{type(error).__name__}: {error}"[:200]}
+        reports = [e["payload"].get("stated_reason") for e in self.ledger(case_id) if e["kind"] == "intervention_report"]
+        return data_questions.answer(run, rows, self.known_good_runs(case), closure, discovery=found, causal=causal, lessons=learned,
+                                     reports=[r for r in reports if r])
 
     def series(self, case_id: str, signal: str, scope: Optional[str], start: float, end: float, max_points: int = 400) -> Dict[str, Any]:
         """Samples of one signal (and scope) of this case between start and end (epoch s), for plotting. Read-only.

@@ -10,8 +10,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
-from app.ingest import bags, catalog, ulog
+from app.ingest import bags, catalog, textlog, ulog
 from app.ingest.profile import parse_profile
+
+
+def is_text_log(path: Path) -> bool:
+    """A text log (console, syslog, rosout export) rather than a binary recording."""
+    name = Path(path).name.lower()
+    return name.endswith(textlog.TEXT_SUFFIXES) or (not name.endswith((".bag", ".mcap", ".zip", ".ulg")) and textlog.looks_like_text(path))
 
 
 def _iso(ns: int) -> str:
@@ -28,9 +34,19 @@ def debrief_recording(store, path: Path, mapping: Dict[str, Any], *, machine_id:
     progress("Fingerprinting the recording")
     sha = bags.sha256_file(path)
     progress("Reading the recording")
+    text_log = None
     if ulog.is_ulog(path):  # PX4 flight log: a fixed, documented topic mapping (app/ingest/ulog.py)
         extraction, meta = ulog.extract(path, asset=machine_id)
         clean = ulog.mapping(clock_domain="px4_clock" if meta["clock"] == "gps_utc" else "px4_boot_clock")
+    elif is_text_log(path):  # console / syslog / rosout text (app/ingest/textlog.py): no mapping needed
+        text_log = textlog.read(path)
+        found_rows = textlog.rows(text_log, machine_id)
+        counts: Dict[str, int] = {}
+        for r in found_rows:
+            counts[r["signal"]] = counts.get(r["signal"], 0) + 1
+        extraction = bags.Extraction(rows=found_rows, counts=counts, skipped={}, start_ns=found_rows[0]["t"] if found_rows else None,
+                                     end_ns=found_rows[-1]["t"] if found_rows else None)
+        clean = textlog.mapping(text_log.clock)
     else:
         clean = bags.validate_mapping(mapping, [s["id"] for s in catalog.describe()["signals"]])
         extraction = bags.extract(path, clean, asset=machine_id, progress=lambda n: progress(f"Reading the recording ({n:,} messages)"))
@@ -50,6 +66,8 @@ def debrief_recording(store, path: Path, mapping: Dict[str, Any], *, machine_id:
             store.assert_context({"machine_id": machine_id, "key": "machine_class", "value": machine_class, "status": "reported", "actor": actor,
                                   "source": f"Given when uploading {source_name or path.name}", "effective_from": _iso(start)})
     symptom = {}
+    if text_log is not None and problem_from_s is None:  # a log's whole span is the window unless the uploader narrows it
+        problem_from_s, problem_to_s = 0.0, max(span, 0.001)
     if problem_from_s is not None and problem_to_s is not None:
         if problem_to_s <= problem_from_s:
             raise ValueError("The problem must end after it starts")
@@ -85,7 +103,7 @@ def debrief_recording(store, path: Path, mapping: Dict[str, Any], *, machine_id:
     discovered = None
     try:  # evidence discovery never blocks an upload: a failure is reported, the case stands
         from app.workflows.discovery import discover_and_record
-        entry = discover_and_record(store, cid, run, path, actor=actor, source_name=source_name or path.name, sha256=sha)
+        entry = discover_and_record(store, cid, run, path, actor=actor, source_name=source_name or path.name, sha256=sha, text_log=text_log)
         discovered = {"entry_id": entry["id"], "incidents": len(entry["payload"]["incidents"]),
                       "streams": len(entry["payload"]["inventory"]["streams"]), "gaps": len(entry["payload"]["gaps"])}
     except Exception as error:  # noqa: BLE001

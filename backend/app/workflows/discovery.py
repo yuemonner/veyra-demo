@@ -42,8 +42,24 @@ def incidents_from_run(run: Dict[str, Any], chain: Dict[str, Any], limit: int = 
 
 
 def discover_and_record(store, case_id: str, run: Dict[str, Any], path: Path, *, actor: str, source_name: Optional[str] = None,
-                        sha256: Optional[str] = None) -> Dict[str, Any]:
+                        sha256: Optional[str] = None, text_log=None) -> Dict[str, Any]:
     chain = profile_for_run(run)["signal_chain"]
-    found = discovery.discover(Path(path), incidents_from_run(run, chain), chain, source_name=source_name, sha256=sha256)
+    if text_log is not None:
+        found = text_discovery(text_log, source_name=source_name or Path(path).name, sha256=sha256)
+    else:
+        found = discovery.discover(Path(path), incidents_from_run(run, chain), chain, source_name=source_name, sha256=sha256)
     return store.append_trusted(case_id, "evidence_discovery", {**found, "run_id": run["id"]}, actor=actor,
                                 source=f"veyra://discovery/{discovery.DISCOVERY_VERSION}")
+
+
+def text_discovery(text_log, *, source_name: str, sha256: Optional[str]) -> Dict[str, Any]:
+    """Evidence discovery for a text log: the log characterization (restarts, causes, faults, absences, checks)."""
+    from app.discovery import logs
+    found = logs.characterize(text_log, source_name=source_name)
+    return {"version": discovery.DISCOVERY_VERSION,
+            "source": {"name": source_name, "sha256": sha256, "format": "text_log", "clock": text_log.clock, "lines": len(text_log.lines)},
+            "inventory": {"streams": [{"stream": "(log lines)", "type": "text", "count": len(text_log.lines), "rate_hz": None, "role": "controller_text",
+                                       "why": "text log"}], "excluded": [], "not_understood": [], "read_by_probes": ["(log lines)"],
+                          "roles_present": ["controller_text"]},
+            "incidents": [], "gaps": [{"point": "controller", **g} for g in found["gaps"]], "log": found,
+            "boundary": found["boundary"]}

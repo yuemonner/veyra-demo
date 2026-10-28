@@ -77,6 +77,14 @@ TOOL_SPECS: List[Dict[str, Any]] = [
     {"name": "run_python", "description": "Run new Python analysis on named input series in an isolated process (no network, no file access, time and memory limits). In the code: series[name].t (UTC seconds), .v (values; numpy arrays when numeric), .unit, .clock, .sources; np (numpy), pd (pandas, if installed), math, statistics, params. Set `result` to a JSON-able value. Up to 8 series. State the assumptions (alignment, units, thresholds) in result.",
      "input_schema": {"type": "object", "required": ["code", "inputs"], "additionalProperties": False, "properties": {
          "code": {"type": "string"}, "inputs": {"type": "object", "additionalProperties": SERIES_SCHEMA}, "params": {"type": "object"}}}},
+    {"name": "recording_discovery", "description": "What the ORIGINAL recording holds beyond the imported signals: every stream with its role (or 'not understood'), label streams excluded, and per incident the controller's mode / failsafe / configuration / text records, operator inputs and output departures, each with its time relative to the onset and how likely it is to land there by chance. For a text log: restarts with the cause the log states, fault messages, the lines before each restart, absences and checks.",
+     "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}},
+    {"name": "log_lines", "description": "Lines of the case's text log (if it has one) matching a pattern (regular expression, case-insensitive), with line numbers; or the lines around a line number.",
+     "input_schema": {"type": "object", "properties": {"pattern": {"type": "string"}, "around_line": {"type": "integer"}, "context": {"type": "integer"}}, "additionalProperties": False}},
+    {"name": "signal_chain", "description": "Where each anomaly was measured in the machine's signal chain (operator, link, controller, output command, actuator, motion), which later anomalies are consequences, and each mechanism (operator, link, controller, output path, physical response, sensor error) as supported / possible / unlikely / cannot tell with the record behind it.",
+     "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}},
+    {"name": "lessons", "description": "Earlier CLOSED cases whose failure signature overlaps this one: their cause, fix, whether it held, the check that settled it, and whether the lesson applies here (applies / check_first / not_applicable) with what is shared and what is missing; counterexamples with a different cause.",
+     "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}},
     {"name": "submit_report", "description": "Finish. Every observation, hypothesis and proposed check must cite the ids of tool calls whose results support it.",
      "input_schema": {"type": "object", "additionalProperties": False, "required": ["summary", "observations", "hypotheses", "proposed_checks", "questions_for_engineers", "uncertainty"],
                       "properties": {
@@ -131,6 +139,42 @@ class Toolbox:
         return handler(**args)
 
     # ---- tools ----
+    def tool_recording_discovery(self) -> Dict[str, Any]:
+        found = self.store.discovery(self.case["id"])
+        if not found:
+            return {"available": False, "reason": "The original recording was not read for this case (no evidence-discovery record)"}
+        out = {k: found.get(k) for k in ("source", "gaps", "rules")}
+        inv = found.get("inventory") or {}
+        out["streams"] = [{k: s.get(k) for k in ("stream", "type", "role", "count")} for s in inv.get("streams", [])][:60]
+        out["excluded"], out["not_understood"] = inv.get("excluded"), inv.get("not_understood")
+        out["incidents"] = [{"incident": i.get("incident"), "facts": i.get("facts", [])[:40], "controller_mode": i.get("controller_mode"),
+                             "operator": i.get("operator"), "channel": i.get("channel")} for i in found.get("incidents", [])]
+        if found.get("log"):
+            out["log"] = {k: found["log"].get(k) for k in ("summary", "clock", "lines", "restarts", "signatures", "absences", "checks", "notes")}
+        return out
+
+    def tool_log_lines(self, pattern: Optional[str] = None, around_line: Optional[int] = None, context: int = 5) -> Dict[str, Any]:
+        import re as _re
+        rows = sorted((r for r in self.rows() if r.get("signal") in ("controller.event", "controller.reset", "fault.code")),
+                      key=lambda r: (r["t"], r.get("row") or 0))
+        lines = [{"row": f"{r.get('import_id')}#{r.get('row')}", "time": None if str(r.get("clock_domain", "")).endswith("line_order") else _iso(r["t"]),
+                  "scope": r.get("scope"),
+                  "text": r.get("event_value") or r.get("value") or r.get("code") or r.get("signal")} for r in rows]
+        if around_line is not None:
+            k = max(0, min(len(lines) - 1, around_line - 1))
+            return {"lines": [{"n": i + 1, **lines[i]} for i in range(max(0, k - context), min(len(lines), k + context + 1))]}
+        rx = _re.compile(pattern or ".", _re.I)
+        hits = [{"n": i + 1, **x} for i, x in enumerate(lines) if rx.search(str(x["text"]) + " " + str(x["scope"]))]
+        return {"matches": len(hits), "lines": hits[:80], "note": "Line numbers count the case's event rows in time order."}
+
+    def tool_signal_chain(self) -> Dict[str, Any]:
+        q = self.store.questions(self.case["id"])
+        return q.get("causal") or {"applicable": False}
+
+    def tool_lessons(self) -> Dict[str, Any]:
+        q = self.store.questions(self.case["id"])
+        return q.get("lessons") or {"lessons": []}
+
     def tool_case_overview(self) -> Dict[str, Any]:
         run = self.run
         profile = run.get("machine_profile") or {}

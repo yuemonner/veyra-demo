@@ -504,6 +504,7 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
                "fix_held": _choice(payload, "fix_held", FIX_HELD, required=False) or ("not_yet_known" if fix else None),
                "handed_over_to": _text(payload, "handed_over_to", required=resolution == "handed_over", limit=300),
                "decisive_check": _text(payload, "decisive_check", required=False, limit=200),
+               "applies_when": _text(payload, "applies_when", required=False, limit=1000),
                "hours_to_cause": hours, "would_have_saved_time": _text(payload, "would_have_saved_time", required=False, limit=2000),
                "engine_status_at_closure": {b["domain"]: b["status"] for b in run["payload"]["belief"]} if run else None,
                "supersedes": previous[-1]["id"] if previous else None,

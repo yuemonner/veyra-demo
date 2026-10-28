@@ -83,3 +83,38 @@ export function RecordingRead({ d }: { d: Any }) {
     </details>
   );
 }
+
+const VERDICT: Record<string, { label: string; cls: string }> = {
+  applies: { label: "Applies here", cls: "mSupported" },
+  check_first: { label: "Check before reusing", cls: "mPossible" },
+  not_applicable: { label: "Does not apply", cls: "mUnlikely" },
+};
+const LESSON_STATUS: Record<string, string> = { verified: "verified: cause confirmed, fix held", candidate: "candidate: not yet verified", no_cause: "closed without a cause" };
+
+/** Earlier closed cases that overlap this one, and whether their lesson applies (engine: lessons-v1). */
+export function Lessons({ lessons, compact = false }: { lessons: Any; compact?: boolean }) {
+  const items: Any[] = lessons?.lessons || [];
+  if (!items.length) return null;
+  return (
+    <ul className={s.lessonList}>
+      {items.slice(0, compact ? 2 : 5).map((l: Any) => {
+        const v = VERDICT[l.verdict] || VERDICT.check_first;
+        return (
+          <li key={l.case_id}>
+            <span className={`${s.mechStatus} ${s[v.cls]}`}>{v.label}</span>
+            <div>
+              <b>{l.title}</b>{l.synthetic ? <span className={s.dim}> · synthetic</span> : null}
+              <br /><span>{l.cause ? <>Cause there: {l.cause}.</> : "Closed without a cause."}{l.fix ? <> Fix: {l.fix} ({l.fix_held === "held" ? "held" : String(l.fix_held || "not yet known").replace(/_/g, " ")}).</> : null}</span>
+              <br /><span className={s.dim}>{LESSON_STATUS[l.status] || l.status}. Shared: {(l.explain?.shared || []).join(", ") || "nothing specific"}.
+                {(l.explain?.missing_here || []).length > 0 && <> Not seen here: {l.explain.missing_here.join(", ")}.</>}
+                {l.context?.status === "differs" && <> Context differs: {l.context.differs.map((d: Any) => `${d.key} ${d.then} → ${d.now}`).join(", ")}.</>}</span>
+              {l.reuse && <p className={s.answerSmall} style={{ margin: "4px 0 0" }}>{l.reuse}</p>}
+              {!compact && (l.counterexamples || []).length > 0 && <p className={s.dim} style={{ margin: "4px 0 0", fontSize: 13 }}>
+                Counterexamples (similar, different cause): {l.counterexamples.map((c: Any) => `${c.title} — ${c.cause}`).join("; ")}</p>}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

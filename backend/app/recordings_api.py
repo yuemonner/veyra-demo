@@ -1,4 +1,5 @@
-"""Upload a robot recording (ROS 1 bag, ROS 2 bag as .zip, MCAP) -> review the suggested mapping -> debrief.
+"""Upload a robot recording (ROS 1 bag, ROS 2 bag as .zip, MCAP, PX4 ULog) or a text log (console, syslog, rosout)
+-> review the suggested mapping (recordings only; a text log needs none) -> debrief.
 
 Recordings are large, so they are streamed to disk (not sent as base64 JSON) and the debrief runs as a background
 job the page polls. Available on a private instance, or locally with VEYRA_ALLOW_RECORDINGS=true; never on the
@@ -21,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.ingest import bags, catalog
+from app.ingest import bags, catalog, textlog, ulog
 from app.private import actor_for, private
 
 
@@ -34,7 +35,7 @@ def recordings_enabled(request: Request):
 
 router = APIRouter(prefix="/engine", tags=["Recordings"], dependencies=[Depends(recordings_enabled)])
 MAX_MB = int(os.getenv("VEYRA_MAX_RECORDING_MB", "4096"))
-SUFFIXES = (".bag", ".mcap", ".zip")
+SUFFIXES = (".bag", ".mcap", ".zip", ".ulg") + textlog.TEXT_SUFFIXES
 _jobs: Dict[str, Dict[str, Any]] = {}
 _lock = threading.Lock()
 
@@ -59,7 +60,7 @@ def _recording_dir(request: Request, rid: str) -> Path:
 async def upload(request: Request, filename: str = Query(min_length=1, max_length=160)):
     name = Path(filename).name
     if name.startswith(".") or not name.lower().endswith(SUFFIXES):
-        raise HTTPException(422, "Upload a ROS 1 bag (.bag), an MCAP file (.mcap) or a ROS 2 bag folder zipped (.zip)")
+        raise HTTPException(422, "Upload a ROS 1 bag (.bag), an MCAP file (.mcap), a ROS 2 bag folder zipped (.zip), a PX4 log (.ulg) or a text log (.log, .txt)")
     rid = "rec-" + secrets.token_hex(8)
     folder = _folder(request) / rid
     folder.mkdir()
@@ -74,17 +75,37 @@ async def upload(request: Request, filename: str = Query(min_length=1, max_lengt
                 handle.write(chunk)
         if size == 0:
             raise HTTPException(422, "The upload was empty")
-        inspection = await run_in_threadpool(bags.inspect, target)
-    except bags.RecordingError as error:
+        inspection = await run_in_threadpool(_inspect, target)
+    except (bags.RecordingError, ValueError) as error:
         shutil.rmtree(folder, ignore_errors=True)
         raise HTTPException(422, str(error)) from None
     except BaseException:
         shutil.rmtree(folder, ignore_errors=True)
         raise
     meta = {"id": rid, "filename": name, "stored_as": target.name, "bytes": size, "uploaded_at": time.time(),
-            "uploaded_by": actor_for(request, "Engineer (upload)"), "inspection": inspection, "suggested": bags.suggest(inspection)}
+            "uploaded_by": actor_for(request, "Engineer (upload)"), "inspection": inspection,
+            "suggested": bags.suggest(inspection) if inspection["format"] in bags.FORMATS else None}
     (folder / "recording.json").write_text(json.dumps(meta))
     return meta
+
+
+def _inspect(path: Path) -> Dict[str, Any]:
+    """What the file is, before anything is imported. Text logs and PX4 logs need no topic mapping."""
+    from app.workflows.debrief import is_text_log
+    if ulog.is_ulog(path):
+        log = ulog.read(path, set())
+        topics = sorted({k[0] for k in log["counts"]})
+        span = ((log["last_us"] or 0) - (log["first_us"] or 0)) / 1e6
+        return {"format": "px4_ulog", "duration_s": span, "topics": [{"topic": t, "type": "px4", "count": n, "rate_hz": None}
+                                                                    for (t, _m), n in sorted(log["counts"].items())], "message_count": sum(log["counts"].values()),
+                "start_ns": None}
+    if is_text_log(path):
+        from app.discovery import logs
+        parsed = textlog.read(path)
+        found = logs.characterize(parsed, source_name=path.name)
+        return {"format": "text_log", "lines": found["lines"], "clock": found["clock"], "notes": found["notes"], "summary": found["summary"],
+                "restarts": len(found["restarts"]), "kinds": found["kinds"], "duration_s": None, "topics": [], "message_count": found["lines"]}
+    return bags.inspect(path)
 
 
 @router.get("/recordings/{rid}")
@@ -123,10 +144,13 @@ def start_debrief(rid: str, body: DebriefIn, request: Request):
     from app.engine_api import store_path
     folder = _recording_dir(request, rid)
     meta = json.loads((folder / "recording.json").read_text())
-    try:
-        mapping = bags.validate_mapping(body.mapping, [s["id"] for s in catalog.describe()["signals"]], [t["topic"] for t in meta["inspection"]["topics"]])
-    except bags.RecordingError as error:
-        raise HTTPException(422, str(error)) from None
+    if meta["inspection"]["format"] in bags.FORMATS:
+        try:
+            mapping = bags.validate_mapping(body.mapping, [s["id"] for s in catalog.describe()["signals"]], [t["topic"] for t in meta["inspection"]["topics"]])
+        except bags.RecordingError as error:
+            raise HTTPException(422, str(error)) from None
+    else:
+        mapping = {}  # PX4 logs and text logs have a fixed, documented reading
     if body.machine_class:
         from app.machines import profiles
         if body.machine_class not in profiles.load_all():
@@ -162,6 +186,43 @@ def _run_job(job: Dict[str, Any], db: Path, args: Dict[str, Any]) -> None:
         store.close()
         from app.memory import release
         release()
+
+
+class SampleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=60)
+
+
+@router.post("/demo/sample-log")
+def sample_log(body: SampleIn, request: Request):
+    """Run a SYNTHETIC sample through the ordinary upload path (and the earlier, closed case it learns from)."""
+    from app.engine_api import store_path
+    from app.workflows import crazyflie_demo
+    if body.name not in crazyflie_demo.SAMPLES:
+        raise HTTPException(404, "Unknown sample")
+    job = {"id": "job-" + secrets.token_hex(8), "recording": None, "state": "running", "step": "Starting", "started_at": time.time(),
+           "owner": (getattr(request.state, "user", None) or {}).get("workspace_id")}
+    with _lock:
+        _jobs[job["id"]] = job
+    threading.Thread(target=_run_sample, args=(job, store_path(request), body.name), daemon=True).start()
+    return {"job_id": job["id"]}
+
+
+def _run_sample(job: Dict[str, Any], db: Path, name: str) -> None:
+    from app.store.sqlite_store import CaseStore
+    from app.workflows import crazyflie_demo
+    store = CaseStore(db)
+    try:
+        result = crazyflie_demo.run_sample(store, name, progress=lambda step: job.update(step=step))
+        from app.engine_api import _autopilot
+        job.update(step="Preparing the next step")
+        _autopilot(store, result["case_id"])
+        job.update(state="done", step="Done", result=result, finished_at=time.time())
+    except Exception as error:  # noqa: BLE001
+        traceback.print_exc()
+        job.update(state="failed", error=f"{type(error).__name__}: {error}", finished_at=time.time())
+    finally:
+        store.close()
 
 
 @router.get("/jobs/{job_id}")

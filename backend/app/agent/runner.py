@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 from app.agent import tools as toolset
 from app.agent.llm import ModelError
 
-AGENT_VERSION = "veyra-agent-v3.2"  # v3.2: observation vs attribution, "leading" needs comparative evidence, reads Veyra's plan. v3.1: short reports (length limits checked). v3: queries any signal and case, runs methods and sandboxed Python; answers follow-up questions with a premise check
+AGENT_VERSION = "veyra-agent-v3.3"  # v3.3: reads evidence discovery, text logs, the signal chain and lessons first  # v3.2: observation vs attribution, "leading" needs comparative evidence, reads Veyra's plan. v3.1: short reports (length limits checked). v3: queries any signal and case, runs methods and sandboxed Python; answers follow-up questions with a premise check
 # v2: numbers in claims must appear in the cited tool output; no interpretation inside observations
 MAX_TURNS = 20
 MAX_REPORT_ATTEMPTS = 3
@@ -27,7 +27,7 @@ _CONFIRMED = re.compile(r"\b(root cause (is|was) (confirmed|identified)|confirme
 
 SYSTEM_PROMPT = """You are Veyra's field investigation agent. A deployed machine behaved unexpectedly; engineers need to know what changed and what to check next before anyone travels.
 
-Work only from tool results. Call case_overview first, then the tools that matter for this case. case_overview names the machine type and what each domain key means on this machine (e.g. control_suite = the flight controller on an aircraft); write for that machine, in its terms, and never borrow terms from another machine type. Compare the symptom window with the reference. Look for brief events near any operator intervention. Treat clocks carefully: different clock domains may be offset.
+Work only from tool results. Call case_overview first, then recording_discovery (what the original recording or log holds beyond the imported signals), signal_chain (where each anomaly was measured and which mechanisms the records leave open) and lessons (earlier closed cases and whether they apply), then the tools that matter for this case. For a text log, read the lines around each restart with log_lines. case_overview names the machine type and what each domain key means on this machine (e.g. control_suite = the flight controller on an aircraft); write for that machine, in its terms, and never borrow terms from another machine type. Compare the symptom window with the reference. Look for brief events near any operator intervention. Treat clocks carefully: different clock domains may be offset.
 
 Rules:
 - Every observation, hypothesis and proposed check must cite the ids of the tool calls whose results support it (the tool_use ids you received).
@@ -35,6 +35,7 @@ Rules:
 - Observations state only what tool results show. Put any interpretation (may, likely, suggests, consistent with, an artifact of) in a hypothesis.
 - Check whether the machine followed its commands (command_tracking) and which outputs froze (actuator_outputs) before ranking hypotheses.
 - A finding the engine suppressed as normal for this machine is not evidence of a fault.
+- A lesson from an earlier case is a lead with conditions: use it only as far as its verdict allows (applies / check_first / not_applicable), and never copy its cause into this case's observations.
 - Never state a confirmed root cause. Rank hypotheses as leading, open or weakened, and say what would confirm or rule each out.
 - Keep what failed apart from why. "LF_KFE stopped following its commands" is an observation; "its encoder is faulty" is an attribution. Name a hypothesis at the level the data can separate (e.g. "a fault at the LF_KFE joint (drive, encoder, wiring or mechanics)"), never one component out of several the data doesn't distinguish.
 - "leading" needs comparative evidence: cite, in each other open hypothesis's `against`, a tool result that weighs against it. Without that, mark them all "open".

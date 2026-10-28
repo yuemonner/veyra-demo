@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import s from "./field-case.module.css";
-import { RecordingRead, SignalChain } from "./SignalChain";
+import { Lessons, RecordingRead, SignalChain } from "./SignalChain";
 import { plotFor, Waveform } from "./Waveform";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "/local-api";
@@ -831,7 +831,7 @@ function Closure({ ledger, run, caseId, onSaved }: { ledger: Any[]; run: Any; ca
   const [open, setOpen] = useState(!latest);
   const [f, setF] = useState<Any>({ investigation_status: "cause_confirmed", cause_domain: domains[0] || "vehicle_interface", cause: "", confirmed_by: "inspection",
     evidence_entries: [] as string[], evidence_note: "", resolution_status: "resolved", handed_over_to: "",
-    fix: "", fix_held: "not_yet_known", decisive_check: "", hours_to_cause: "", would_have_saved_time: "" });
+    fix: "", fix_held: "not_yet_known", decisive_check: "", hours_to_cause: "", would_have_saved_time: "", applies_when: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = (k: string) => (e: Any) => setF({ ...f, [k]: e.target.value });
@@ -852,7 +852,7 @@ function Closure({ ledger, run, caseId, onSaved }: { ledger: Any[]; run: Any; ca
       await call(`/engine/cases/${caseId}/ledger`, { method: "POST", body: JSON.stringify({ kind: "case_closure", actor: ENGINEER, source: "field case page",
         payload: { run_id: run.id, investigation_status: f.investigation_status, ...cause, evidence_entries: f.evidence_entries,
           evidence_note: f.evidence_note || null, resolution_status: f.resolution_status, handed_over_to: f.handed_over_to || null,
-          fix: f.fix || null, fix_held: f.fix ? f.fix_held : null, decisive_check: f.decisive_check || null,
+          fix: f.fix || null, fix_held: f.fix ? f.fix_held : null, decisive_check: f.decisive_check || null, applies_when: f.applies_when || null,
           hours_to_cause: hours, would_have_saved_time: f.would_have_saved_time || null } }) });
       setOpen(false);
       await onSaved();
@@ -922,6 +922,8 @@ function Closure({ ledger, run, caseId, onSaved }: { ledger: Any[]; run: Any; ca
           </div>
           <label className={s.field} style={{ marginTop: 12 }}><span>What would have saved time (optional)</span>
             <textarea rows={2} value={f.would_have_saved_time} onChange={set("would_have_saved_time")} placeholder="Reading the drive's error register first; it showed the encoder fault before anyone went on site" /></label>
+          <label className={s.field} style={{ marginTop: 12 }}><span>When does this lesson apply? (optional)</span>
+            <input value={f.applies_when} onChange={set("applies_when")} placeholder="Same firmware family, and the drive error register shows the encoder fault" /></label>
           {error && <p className={s.warning}>{error}</p>}
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
             <button className={s.button} disabled={busy || incomplete}>{busy ? "Recording…" : latest ? "Record revised conclusion" : "Close the case"}</button>
@@ -1518,10 +1520,14 @@ function NextAction({ caseId, data, onChanged, me, onEvidence }: { caseId: strin
         <p className={s.kicker}>Checked in the records already (before asking anyone)</p>
         <ul className={s.factList}>
           {qa.questions.map((q: Any) => <li key={q.id}><b>{q.question}</b><br />
-            {q.status === "answered" ? <span>{q.answer}</span> : <span className={s.dim}>Not in these records. Needs: {q.needs}.</span>}
+            {q.status === "answered" || q.status === "reported_done" ? <span>{q.answer}</span> : <span className={s.dim}>Not in these records. Needs: {q.needs}.</span>}
             {q.order_note ? <><br /><span className={s.dim}>Order of events: {q.order_note}</span></> : null}</li>)}
         </ul>
         <RecordingRead d={qa.discovery} />
+      </div>}
+      {(qa?.lessons?.lessons || []).length > 0 && <div className={s.answered}>
+        <p className={s.kicker}>Earlier cases with a similar signature</p>
+        <Lessons lessons={qa.lessons} />
       </div>}
       {qa?.causal?.applicable && qa.causal.events?.length > 0 && <div className={s.answered}>
         <p className={s.kicker}>Which mechanisms the records leave open</p>
@@ -1869,6 +1875,11 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
         </div>
       </div>}
 
+      {(qa?.lessons?.lessons || []).length > 0 && <div className={s.row}>
+        <span className={s.rowLabel}>Learned from earlier cases</span>
+        <div><Lessons lessons={qa.lessons} compact /></div>
+      </div>}
+
       {qa?.causal?.applicable && qa.causal.events?.length > 0 && <div className={s.row}>
         <span className={s.rowLabel}>Where it started</span>
         <div><SignalChain causal={qa.causal} compact domains={run.machine_profile?.domains} /></div>
@@ -2138,7 +2149,7 @@ function UploadDialog({ onClose, onDone, initialFiles = [] }: { onClose: () => v
 
 const SYMPTOM_OPTIONS: [string, string][] = [["", "Not given"], ["late_response", "Responds late"], ["no_response", "Does not respond"], ["unexpected_motion", "Moves unexpectedly"],
   ["erratic_motion", "Erratic or unsteady motion"], ["stopped_unexpectedly", "Stopped by itself"], ["other", "Something else"]];
-const FORMAT_LABEL: Record<string, string> = { ros1_bag: "ROS 1 bag", ros2_bag: "ROS 2 bag", mcap: "MCAP" };
+const FORMAT_LABEL: Record<string, string> = { ros1_bag: "ROS 1 bag", ros2_bag: "ROS 2 bag", mcap: "MCAP", px4_ulog: "PX4 log", text_log: "Text log" };
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
 function seconds(text: string): number | null {
   const t = text.trim();
@@ -2191,7 +2202,12 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
     try {
       const meta = await uploadWithProgress(file, (p) => { setPct(p); if (p >= 100) setBusy("Reading the recording"); });
       setRec(meta);
-      setJson(JSON.stringify(meta.suggested, null, 1));
+      setJson(JSON.stringify(meta.suggested || {}, null, 1));
+      if (!meta.suggested) {  // PX4 and text logs: fixed reading, no topic choice; a log's whole span is the window
+        setF((cur: Any) => ({ ...cur, title: cur.title || file.name.replace(/\.(log|txt|out|console|ulg)$/i, ""), normal_from: "", normal_to: "", normal_basis: "",
+          synthetic: cur.synthetic || /synthetic|simulat|\bsim\b|fake|test/i.test(file.name) }));
+        return;
+      }
       const dur = meta.inspection.duration_s || 0;
       setF((cur: Any) => ({ ...cur, title: cur.title || file.name.replace(/\.(bag|mcap|zip)$/i, ""), normal_from: "0:00", normal_to: clock(Math.min(60, dur / 3)),
         synthetic: cur.synthetic || /synthetic|simulat|\bsim\b|fake|test/i.test(file.name),
@@ -2204,7 +2220,9 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
   const suggested: Any[] = rec?.suggested?.topics || [];
   const mappedTopic = (topic: string) => suggested.find((t: Any) => t.topic === topic);
 
+  const fixedReading = !!rec && !rec.suggested;
   function mapping(): Any {
+    if (fixedReading) return {};
     let base: Any;
     try { base = JSON.parse(json); } catch { throw new Error("The mapping JSON is not valid"); }
     return { ...base, topics: (base.topics || []).filter((t: Any) => !off.has(t.topic)) };
@@ -2241,14 +2259,14 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 12 }}>
           <div>
             <h2 id="rec-title" style={{ margin: 0 }}>Upload data</h2>
-            <p className={s.lede} style={{ margin: "4px 0 0" }}>Robot recordings (.bag, .mcap, zipped ROS 2) or logs (.csv, .json). Stays in your workspace.</p>
+            <p className={s.lede} style={{ margin: "4px 0 0" }}>Robot recordings (.bag, .mcap, zipped ROS 2, PX4 .ulg), console or system logs (.log, .txt), or tables (.csv, .json). Stays in your workspace.</p>
           </div>
           <button className={s.quiet} onClick={onClose} aria-label="Close" disabled={!!busy && !rec}>Close</button>
         </div>
 
         {!rec && <>
           <label className={s.field} style={{ marginTop: 16 }}><span>File</span>
-            <input type="file" multiple accept=".bag,.mcap,.zip,.csv,.json,.jsonl,.ndjson" onChange={(e) => {
+            <input type="file" multiple accept=".bag,.mcap,.zip,.ulg,.log,.txt,.out,.console,.csv,.json,.jsonl,.ndjson" onChange={(e) => {
               const picked = Array.from(e.target.files || []); setError("");
               if (picked.length && picked.every((x) => TABULAR.test(x.name))) { onTabular(picked); return; }
               if (picked.length > 1) { setFile(null); setError("Upload one recording at a time, or several CSV / JSON files together"); return; }
@@ -2259,9 +2277,57 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
             {busy && <span className={s.note} style={{ margin: 0 }}>{busy}{pct != null && pct < 100 ? ` ${pct}%` : "…"}</span>}
             <button className={s.button} onClick={upload} disabled={!file || !!busy}>Upload and read</button>
           </div>
+          <div className={s.sampleRow}>
+            <span>No file at hand?</span>
+            <button className={s.quiet} disabled={!!busy} onClick={async () => {
+              setError(""); setBusy("Starting");
+              try {
+                const { job_id } = await call("/engine/demo/sample-log", { method: "POST", body: JSON.stringify({ name: "crazyflie-restart" }) });
+                for (;;) {
+                  await sleep(800);
+                  const job = await call(`/engine/jobs/${job_id}`);
+                  if (job.state === "done") { onDone(job.result.case_id); return; }
+                  if (job.state === "failed") throw new Error(job.error);
+                  setBusy(job.step);
+                }
+              } catch (e: Any) { setError(e.message); setBusy(""); }
+            }}>Try a sample: a drone that restarted in flight</button>
+            <span className={s.dim}>Synthetic console log, reconstructed from a public report</span>
+          </div>
         </>}
 
-        {rec && <>
+        {rec && fixedReading && <>
+          <p className={s.answerSmall} style={{ marginTop: 14 }}>
+            <b>{FORMAT_LABEL[rec.inspection.format] || rec.inspection.format}</b>
+            {rec.inspection.format === "text_log"
+              ? <> · {rec.inspection.lines.toLocaleString()} lines · {rec.inspection.clock === "line_order" ? "no timestamps (line order only)" : `${rec.inspection.clock} timestamps`}</>
+              : <> · {rec.inspection.topics.length} topics · {rec.inspection.message_count.toLocaleString()} messages</>}
+          </p>
+          {(rec.inspection.summary || []).length > 0 && <ul className={s.factList}>{rec.inspection.summary.map((t: string, i: number) => <li key={i}>{t}</li>)}</ul>}
+          <div className={s.formGrid}>
+            <label className={s.field}><span>Machine id</span><input value={f.machine_id} onChange={set("machine_id")} placeholder="e.g. CF-LAB-12" /></label>
+            <label className={s.field}><span>Machine type</span>
+              <select value={f.machine_class} onChange={set("machine_class")}>
+                <option value="">Not sure (generic)</option>
+                {types.map((t: Any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select></label>
+            <label className={s.field} style={{ gridColumn: "1 / -1" }}><span>Short title</span><input value={f.title} onChange={set("title")} /></label>
+            <label className={s.field} style={{ gridColumn: "1 / -1" }}><span>What happened, and what you already checked (optional)</span>
+              <input value={f.stated_reason} onChange={set("stated_reason")} placeholder="Restarted in flight. Stack overflow already ruled out." /></label>
+            <label className={s.field}><span>Symptom</span>
+              <select value={f.symptom} onChange={set("symptom")}>{SYMPTOM_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            <label className={s.field}><span>Which part (optional)</span><input value={f.affected} onChange={set("affected")} placeholder="flight" /></label>
+          </div>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, fontSize: 13 }}>
+            <input type="checkbox" checked={f.synthetic} onChange={(e) => setF({ ...f, synthetic: e.target.checked })} /> Test or simulated data</label>
+          {error && <p className={s.warning} role="alert">{error}</p>}
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
+            {busy && <span className={s.note} style={{ margin: 0 }} aria-live="polite">{busy}…</span>}
+            <button className={s.button} onClick={debrief} disabled={!!busy}>Investigate</button>
+          </div>
+        </>}
+
+        {rec && !fixedReading && <>
           <p className={s.answerSmall} style={{ marginTop: 14 }}>
             <b>{FORMAT_LABEL[rec.inspection.format] || rec.inspection.format}</b> · {clock(duration)} long · {rec.inspection.topics.length} topics · {rec.inspection.message_count.toLocaleString()} messages
             {startIso && <> · starts {startIso.slice(0, 19).replace("T", " ")} UTC</>}

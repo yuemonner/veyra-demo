@@ -74,8 +74,45 @@ def _from_discovery(disc: Dict[str, Any], inc: Dict[str, Any], ch: str) -> Dict[
             "facts": {"controller_records_before_onset": [f["text"] for f in cause_like]}}
 
 
+def _from_log(log: Dict[str, Any], reports: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    """Questions a text log answers (app/discovery/logs.py), and the checks it cannot answer."""
+    out: List[Dict[str, Any]] = []
+    restarts = log.get("restarts") or []
+    if not restarts:
+        out.append({"id": "log:restarts", "question": "Did the machine restart?", "status": "answered",
+                    "answer": f"No restart or reset appears in the {log['lines']} lines of the log."})
+    for r in restarts[-2:]:
+        where = f"line {r['line']}"
+        if r["causes"]:
+            ans = "; ".join(f"{c['label'].split(':')[0]} (line{'s' if len(c['lines']) > 1 else ''} {', '.join(map(str, c['lines'][:3]))}"
+                            + (f", at {', '.join(c['locations'])}" if c["locations"] else "") + ")" for c in r["causes"])
+            ans = f"The log states it: {ans}." + (f" {r['note']}" if r.get("note") else "")
+        else:
+            ans = "The log does not say why: no watchdog, assert, fault or low-voltage message near it."
+        out.append({"id": f"log:cause:{r['line']}", "question": f"Why did it restart at {where}?", "status": "answered", "answer": ans,
+                    "facts": {"primary_cause": r["primary_cause"], "lines": r["boot_lines"]}})
+        before = [b for b in r["before"] if not set(b["text"]) <= set("-= ")]
+        if before:
+            out.append({"id": f"log:before:{r['line']}", "question": f"What did the log show just before the restart at {where}?", "status": "answered",
+                        "answer": " / ".join(f"line {b['line']}: {b['text'][:90]}" for b in before[-3:]) + "."})
+    for a in log.get("absences") or []:
+        out.append({"id": f"log:absence:{a['what'][:30]}", "question": a["what"].replace("No ", "Was there any ", 1).rstrip(".") + "?",
+                    "status": "answered", "answer": f"{a['what']}. {a['caveat']}"})
+    from app.discovery.logs import already_done
+    for c in (log.get("checks") or [])[:4]:
+        done = already_done(c, reports or [])
+        if done:
+            out.append({"id": f"log:check:{c['cause']}:{c['check'][:20]}", "question": c["question"], "status": "reported_done",
+                        "answer": f"Reported as already examined: “{done.rstrip('.')}”.", "check": c["check"]})
+        else:
+            out.append({"id": f"log:check:{c['cause']}:{c['check'][:20]}", "question": c["question"], "status": "not_answerable",
+                        "needs": f"{c['check']}. {c['why']}", "check_id": None, "for": c["for"]})
+    return out
+
+
 def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[Dict[str, Any]], closure: Optional[Dict[str, Any]] = None,
-           discovery: Optional[Dict[str, Any]] = None, causal: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+           discovery: Optional[Dict[str, Any]] = None, causal: Optional[Dict[str, Any]] = None, lessons: Optional[Dict[str, Any]] = None,
+           reports: Optional[List[str]] = None) -> Dict[str, Any]:
     outputs = [f for f in ((run.get("findings") or {}).get("actuator_outputs") or {}).get("findings", []) if f.get("rule") == "STUCK"]
     tracking = ((run.get("findings") or {}).get("tracking") or {}).get("findings", [])
     signals = {r.get("signal") for r in rows}
@@ -187,9 +224,13 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
                               "needs": None if present else "The controller's own mode and event log: none are in this case",
                               "check_id": None if present else "CHK-CONTROLLER-LOGS"})
 
+    log = (discovery or {}).get("log")
+    if log:
+        questions += _from_log(log, reports)
     if not questions:
-        return {"version": QUESTIONS_VERSION, "applicable": False, "questions": [], "causal": causal, "discovery": _discovery_summary(discovery)}
-    established = [q["answer"] for q in questions if q["status"] == "answered" and q.get("answer")]
+        return {"version": QUESTIONS_VERSION, "applicable": False, "questions": [], "causal": causal, "discovery": _discovery_summary(discovery),
+                "lessons": lessons}
+    established = [q["answer"] for q in questions if q["status"] in ("answered", "reported_done") and q.get("answer")]
     open_q = [q for q in questions if q["status"] == "not_answerable"]
     # Remote retrieval before travel: a log someone can send comes before a physical check.
     order = {"CHK-CONTROLLER-LOGS": 0, None: 1, "CHK-ONSITE-ACTUATOR": 2}
@@ -198,10 +239,13 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
               else "Further investigation needed · No cause confirmed")
     # The Brief leads with these facts only when the data answers enough (today: output-hold findings); otherwise the
     # questions are still shown in Next action, and the Brief keeps its finding-led summary.
-    return {"version": QUESTIONS_VERSION, "applicable": True, "causal": causal, "discovery": _discovery_summary(discovery), "brief": bool(outputs) and len(established) >= 2, "questions": questions, "established": established,
+    return {"version": QUESTIONS_VERSION, "applicable": True, "causal": causal, "discovery": _discovery_summary(discovery), "lessons": lessons,
+            "log": log, "brief": (bool(outputs) or bool(log)) and len(established) >= 2, "questions": questions, "established": established,
             "cannot_establish": [{"question": q["question"], "needs": q["needs"], "check_id": q.get("check_id")} for q in open_q],
             "next": None if not nxt else {"question": nxt["question"], "needs": nxt["needs"], "check_id": nxt.get("check_id"),
-                                          "why_a_person": (f"Veyra read the whole original recording ({len((discovery.get('inventory') or {}).get('read_by_probes') or [])} streams: "
+                                          "why_a_person": (f"Veyra read all {log['lines']} lines of the log; the answer is not in them. It needs the machine itself "
+                                                           "(a debug build, added logging or a debugger on the board)." if log else
+                                                           f"Veyra read the whole original recording ({len((discovery.get('inventory') or {}).get('read_by_probes') or [])} streams: "
                                                            "controller mode and status, controller messages and configuration, operator inputs, outputs, battery); "
                                                            "this record is not in it. Only someone with the machine, its storage or the ground station can provide it." if discovery else
                                                            "That record is not in this case. Veyra cannot reach the machine; someone with access has to retrieve it, or inspect the part.")},
