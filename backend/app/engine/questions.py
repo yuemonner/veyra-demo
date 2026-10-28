@@ -10,6 +10,7 @@ Facts only: no cause is named. Read-only and deterministic; computed when asked,
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from statistics import median
 from typing import Any, Dict, List, Optional
@@ -91,7 +92,7 @@ def _from_log(log: Dict[str, Any], reports: Optional[List[str]] = None) -> List[
             ans = "The log does not say why: no watchdog, assert, fault or low-voltage message near it."
         out.append({"id": f"log:cause:{r['line']}", "question": f"Why did it restart at {where}?", "status": "answered", "answer": ans,
                     "facts": {"primary_cause": r["primary_cause"], "lines": r["boot_lines"]}})
-        before = [b for b in r["before"] if not set(b["text"]) <= set("-= ")]
+        before = [b for b in r["before"] if not re.fullmatch(r"\s*(\w{1,16}:)?\s*[-=_*#.~ ]*", b["text"])]  # skip separator lines
         if before:
             out.append({"id": f"log:before:{r['line']}", "question": f"What did the log show just before the restart at {where}?", "status": "answered",
                         "answer": " / ".join(f"line {b['line']}: {b['text'][:90]}" for b in before[-3:]) + "."})
@@ -106,7 +107,7 @@ def _from_log(log: Dict[str, Any], reports: Optional[List[str]] = None) -> List[
                         "answer": f"Reported as already examined: “{done.rstrip('.')}”.", "check": c["check"]})
         else:
             out.append({"id": f"log:check:{c['cause']}:{c['check'][:20]}", "question": c["question"], "status": "not_answerable",
-                        "needs": f"{c['check']}. {c['why']}", "check_id": None, "for": c["for"]})
+                        "needs": f"{c['check']}. {c['why']}".rstrip("."), "check_id": None, "for": c["for"]})
     return out
 
 
