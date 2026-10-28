@@ -198,8 +198,13 @@ def list_samples():
     return public_samples.listing()
 
 
+class SampleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    allow_model: bool = False
+
+
 @router.post("/samples/{name}/run")
-def sample_log(name: str, request: Request, body: Optional["SampleIn"] = None):
+def sample_log(name: str, request: Request, body: Optional[SampleIn] = None):
     """Run a REAL public failure log (fixtures/real/public) through the ordinary upload path and the investigator."""
     from app.engine_api import store_path
     from app.workflows import public_samples
@@ -209,11 +214,6 @@ def sample_log(name: str, request: Request, body: Optional["SampleIn"] = None):
     threading.Thread(target=_run_sample, args=(job, store_path(request), name, bool(body and body.allow_model), actor_for(request, "Engineer (sample)")),
                      daemon=True).start()
     return {"job_id": job["id"]}
-
-
-class SampleIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    allow_model: bool = False
 
 
 def _new_job(request: Request, **extra) -> Dict[str, Any]:
