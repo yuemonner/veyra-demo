@@ -30,14 +30,20 @@ data from a failure. Your job is to DO the investigation, not to hand the engine
 
 How to work:
 1. Call overview first: Veyra's reading of the data (incidents, restarts, which component warned first, repeated messages).
-2. Form 2-4 competing explanations. For each, decide which check in THIS data would separate them, and RUN it with the
-   tools: search for messages, read lines around events, measure counts, rates and the time between events, compare with
-   earlier cases (lessons). Prefer checks that can rule an explanation out. Typically 4-10 tool calls.
+2. Map the fault space: 3-6 competing hypotheses, each a place the fault can be (an area of the machine or software,
+   e.g. "Network path", "Board firmware", "Sensor hardware", "Host / agent side"). For each, decide which check in THIS
+   data would separate them, and RUN it with the tools: search for messages, read lines around events, measure counts,
+   rates and the time between events, compare with earlier cases (lessons). Prefer checks that can rule an area out.
+   Typically 4-10 tool calls. Report every hypothesis with its status: leading, open, weakened or ruled_out, and the
+   line(s) or result that decided it.
 3. Separate cause from consequence: a crash, a restart, a watchdog, an e-stop or a timeout is often the effect of
    something earlier. Say which lines are the earliest sign and which are effects.
-4. Only what the data cannot answer becomes the next action for a person. Make it one concrete action a field engineer
-   can do (a command to run, a value to read, a part to inspect, a config to check), with what each possible result
-   would mean. Never propose an action you could have done yourself with the tools.
+4. Only what the data cannot answer becomes the next action for a person: design it as an experiment that splits the
+   hypotheses still standing. One concrete action a field engineer can do (a command to run, a value to read, a part to
+   inspect, a config to check). For each possible result: which hypotheses it keeps, which it rules out, and what Veyra
+   would do next. Never propose an action you could have done yourself with the tools.
+5. Classify the log's notable events into groups (events): root_cause_candidate, anomaly, effect, or routine (start-up,
+   configuration, normal traffic). Group repeated messages together. Routine events need no attention from anyone.
 
 Rules:
 - Quote log lines exactly as the tools return them, with their line numbers. Every number you write must come from a
@@ -47,6 +53,9 @@ Rules:
 - An earlier case (lesson) is a lead with conditions; reuse its fix only if its verdict is 'applies'.
 - Write for a busy engineer: short, plain, specific to this machine. No filler.
 - If the engineer already reported results of earlier actions (case_context), build on them: do not repeat a check.
+  Keep the ids of earlier hypotheses (case_context.previous_hypotheses) and update their status; add new ones only
+  when the evidence opens a new area.
+- An event the engineer marked as normal for this machine (case_context.marked_normal) is routine here.
 - Fill reuse_when: the conditions under which your explanation, once confirmed, would apply to another machine.
 Finish by calling submit_report exactly once."""
 
@@ -77,13 +86,28 @@ SUBMIT_SPEC = {
                 "where": {"type": "string", "enum": ["remote", "on_site", "lab"]},
                 "outcomes": {"type": "array", "minItems": 2, "maxItems": 3, "items": {"type": "object", "properties": {
                     "label": {"type": "string", "description": "What the engineer would find, under 8 words"},
-                    "means": {"type": "string", "description": "What that would mean, under 20 words"}}, "required": ["label", "means"]}}},
+                    "means": {"type": "string", "description": "What that would mean, under 20 words"},
+                    "keeps": {"type": "array", "items": {"type": "string"}, "description": "Hypothesis ids still standing after this result"},
+                    "rules_out": {"type": "array", "items": {"type": "string"}, "description": "Hypothesis ids this result rules out"},
+                    "then": {"type": "string", "description": "What Veyra would do next after this result, under 12 words"}},
+                    "required": ["label", "means", "keeps", "rules_out"]}}},
                 "required": ["action", "why", "how", "where", "outcomes"]},
             "unknowns": {"type": "array", "maxItems": 3, "items": {"type": "string"}},
+            "hypotheses": {"type": "array", "minItems": 2, "maxItems": 6, "items": {"type": "object", "properties": {
+                "id": {"type": "string", "description": "h1, h2... keep ids from earlier rounds"},
+                "area": {"type": "string", "description": "Where the fault would be, 2-5 words"},
+                "claim": {"type": "string", "description": "The hypothesis, under 20 words"},
+                "status": {"type": "string", "enum": ["leading", "open", "weakened", "ruled_out"]},
+                "because": {"type": "string", "description": "What decided this status, under 25 words"},
+                "lines": {"type": "array", "items": {"type": "integer"}}}, "required": ["id", "area", "claim", "status", "because"]}},
+            "events": {"type": "array", "maxItems": 12, "description": "Notable log events grouped and classified", "items": {"type": "object", "properties": {
+                "lines": {"type": "array", "items": {"type": "integer"}}, "what": {"type": "string", "description": "under 12 words"},
+                "class": {"type": "string", "enum": ["root_cause_candidate", "anomaly", "effect", "routine"]},
+                "why": {"type": "string", "description": "under 20 words"}}, "required": ["lines", "what", "class"]}},
             "lesson": {"type": "string", "description": "How earlier cases apply, one sentence; empty if none"},
             "reuse_when": {"type": "string", "description": "If this explanation is later confirmed: the conditions under which it would apply to another machine (hardware, firmware/software version, configuration, log signature), under 40 words"},
         },
-        "required": ["headline", "status", "confidence", "evidence", "checked", "next_action", "unknowns"],
+        "required": ["headline", "status", "confidence", "evidence", "checked", "next_action", "unknowns", "hypotheses", "events"],
     },
 }
 
@@ -239,7 +263,23 @@ def _case_context(store, case_id: str) -> Dict[str, Any]:
     reports = [e["payload"].get("stated_reason") for e in led if e["kind"] == "intervention_report"]
     findings = [{"recorded_at": e["recorded_at"], "by": e["actor"], **{k: e["payload"].get(k) for k in ("action", "result", "observations")}}
                 for e in led if e["kind"] == "engineer_finding"]
-    return {"machine": case["machine_id"], "title": case["title"], "reported": reports, "engineer_results": findings}
+    prev = next((e["payload"]["result"].get("hypotheses") for e in reversed(led) if e["kind"] == "agent_report"
+                 and e["payload"].get("kind") == "autonomous_investigation" and e["payload"].get("mode") == "agent"), None)
+    notes = {}
+    for e in store.ledger(case_id) + _machine_notes(store, case["machine_id"], case_id):
+        if e["kind"] == "event_note":
+            notes[e["payload"]["pattern"]] = e["payload"]
+    return {"machine": case["machine_id"], "title": case["title"], "reported": reports, "engineer_results": findings,
+            "previous_hypotheses": prev, "marked_normal": [n for n in notes.values() if n["verdict"] == "normal"]}
+
+
+def _machine_notes(store, machine_id: str, exclude: str) -> List[Dict[str, Any]]:
+    """Event notes the engineer scoped to this machine in its other cases."""
+    out = []
+    for c in store.cases():
+        if c["machine_id"] == machine_id and c["id"] != exclude:
+            out += [e for e in store.ledger(c["id"]) if e["kind"] == "event_note" and e["payload"].get("scope") == "machine"]
+    return out
 
 
 def _summary(name: str, result: Any) -> str:
@@ -306,6 +346,21 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
             err = numbers_ok(item.get("result"), calls, [], f"checked[{i}]")
         (problems.append(err) or dropped.append({"checked": item})) if err else keep.append(item)
     cleaned["checked"] = keep
+    ids = {h.get("id") for h in cleaned.get("hypotheses") or []}
+    for h in cleaned.get("hypotheses") or []:
+        bad = [n for n in h.get("lines") or [] if not isinstance(n, int) or not 1 <= n <= len(raw)]
+        if bad:
+            problems.append(f"hypothesis {h.get('id')}: line(s) {bad} do not exist")
+    for i, o in enumerate(((cleaned.get("next_action") or {}).get("outcomes")) or []):
+        unknown = [x for x in (o.get("keeps") or []) + (o.get("rules_out") or []) if x not in ids]
+        if unknown:
+            problems.append(f"next_action.outcomes[{i}]: unknown hypothesis id(s) {unknown}")
+    ev = []
+    for g in cleaned.get("events") or []:
+        g["lines"] = [n for n in g.get("lines") or [] if isinstance(n, int) and 1 <= n <= len(raw)]
+        if g["lines"]:
+            ev.append(g)
+    cleaned["events"] = ev
     text = " ".join(str(cleaned.get(k) or "") for k in ("headline", "explanation"))
     if _CONFIRMED.search(text):
         problems.append("Do not state a confirmed root cause; use cause_probable and say what would confirm it")
@@ -347,7 +402,17 @@ def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str
         if x.get("status") == "answered" and x["id"].startswith("log:check"):
             checked.append({"check": x["question"], "result": x["answer"], "verdict": "supports", "calls": []})
     nxt = q.get("next") or {}
-    return {"headline": headline, "status": "cause_unknown" if (restarts or inc or not raw) else "no_failure_found", "explanation": "", "confidence": "low",
+    events = []
+    if raw:  # the rule-based grouping: warnings and errors by message, the rest is routine
+        groups: Dict[str, List[int]] = {}
+        for n, p in tools.parsed.items():
+            if p.level in ("WARNING", "ERROR", "FATAL") or p.kind:
+                groups.setdefault(p.template, []).append(n)
+        for tpl, ns in sorted(groups.items(), key=lambda kv: kv[1][0])[:12]:
+            p = tools.parsed[ns[0]]
+            events.append({"lines": ns[:50], "what": raw[ns[0] - 1][:90], "class": "anomaly" if p.level in ("ERROR", "FATAL") or p.kind else "routine",
+                           "why": f"{len(ns)} line{'s' if len(ns) > 1 else ''} with this message"})
+    return {"events": events, "hypotheses": [], "headline": headline, "status": "cause_unknown" if (restarts or inc or not raw) else "no_failure_found", "explanation": "", "confidence": "low",
             "evidence": evidence[:4], "checked": checked, "effects": effects,
             "next_action": {"action": nxt.get("question") or "Capture the full log up to the next failure", "why": nxt.get("needs") or "",
                             "how": [], "where": "remote", "outcomes": [{"label": "Found it", "means": "Record what you found"},
@@ -474,3 +539,95 @@ def draft_lesson(store, case_id: str) -> Dict[str, Any]:
             "applies_when": (res.get("reuse_when") or "")[:1000],
             "resolution_status": "not_yet_repaired",
             "basis": "Drafted by Veyra from this case's investigation and the engineer's results. Edit anything that is wrong, then confirm."}
+
+
+# ---------------------------------------------------------------- the record, written by Veyra as the work happens
+def _changes(before: Optional[List[Dict[str, Any]]], after: Optional[List[Dict[str, Any]]]) -> Dict[str, List[str]]:
+    """How the fault space moved between two investigation rounds (by hypothesis id)."""
+    b = {h["id"]: h for h in before or []}
+    out: Dict[str, List[str]] = {"ruled_out": [], "leading": [], "weakened": [], "new": []}
+    for h in after or []:
+        old = b.get(h["id"])
+        if old is None:
+            if before is not None:
+                out["new"].append(h["area"])
+        elif old.get("status") != h.get("status") and h.get("status") in ("ruled_out", "leading", "weakened"):
+            out[h["status"]].append(h["area"])
+    return out
+
+
+def record(store, case_id: str) -> Dict[str, Any]:
+    """The case record Veyra keeps itself: what was reported, every investigation round and how it changed the fault space,
+    every action the engineer took and its result, the conclusion and whether the machine recovered. Built from the
+    append-only ledger; nobody writes it by hand."""
+    case = store.case(case_id)
+    led = store.ledger(case_id)
+    chain, prev_h, rounds, checks, actions = [], None, 0, 0, 0
+    first_inv_at = None
+    for e in led:
+        p, k = e["payload"], e["kind"]
+        if k == "intervention_report":
+            chain.append({"at": e["recorded_at"], "type": "reported", "by": e["actor"], "title": "Problem reported", "detail": p.get("stated_reason")})
+        elif k == "agent_report" and p.get("kind") == "autonomous_investigation" and p.get("mode") == "agent":
+            rounds += 1
+            checks += len(p.get("steps") or [])
+            first_inv_at = first_inv_at or e["recorded_at"]
+            r = p.get("result") or {}
+            hyps = r.get("hypotheses")
+            lead = [h["area"] for h in hyps or [] if h.get("status") == "leading"]
+            chain.append({"at": e["recorded_at"], "type": "investigation", "by": "Veyra", "title": f"Investigation round {rounds}",
+                          "detail": r.get("headline"), "checks": len(p.get("steps") or []), "seconds": p.get("seconds"),
+                          "leading": lead, "standing": [h["area"] for h in hyps or [] if h.get("status") in ("leading", "open")],
+                          "changes": _changes(prev_h, hyps) if prev_h is not None else None,
+                          "next_action": (r.get("next_action") or {}).get("action"), "status": r.get("status")})
+            prev_h = hyps if hyps else prev_h
+        elif k == "engineer_finding":
+            actions += 1
+            label = {"found": "found", "not_found": "nothing found", "cannot_do": "could not do it", "other": "other result"}[p["result"]]
+            chain.append({"at": e["recorded_at"], "type": "action", "by": e["actor"], "title": p["action"], "detail": f"{label}{': ' + p['observations'] if p.get('observations') else ''}"})
+        elif k == "event_note":
+            chain.append({"at": e["recorded_at"], "type": "note", "by": e["actor"],
+                          "title": f"Marked {'normal' if p['verdict'] == 'normal' else 'relevant'}{' for this machine' if p['scope'] == 'machine' else ''}", "detail": p["pattern"]})
+        elif k == "case_closure":
+            chain.append({"at": e["recorded_at"], "type": "closure", "by": e["actor"], "title": "Conclusion confirmed",
+                          "detail": p.get("cause") or "Closed without a cause", "recovered": p.get("resolution_status"), "status": p.get("investigation_status")})
+    last = latest(store, case_id) or {}
+    res = last.get("result") or {}
+    created = case.get("created_at")
+    t_first = None
+    try:
+        from datetime import datetime
+        if created and first_inv_at:
+            t_first = round((datetime.fromisoformat(first_inv_at) - datetime.fromisoformat(created)).total_seconds(), 1)
+    except ValueError:
+        pass
+    closure = next((e for e in reversed(led) if e["kind"] == "case_closure"), None)
+    return {"case_id": case_id, "machine_id": case["machine_id"], "title": case["title"],
+            "summary": {"headline": res.get("headline"), "explanation": res.get("explanation"), "status": (closure or {}).get("payload", {}).get("investigation_status") or res.get("status"),
+                        "rounds": rounds, "checks_run": checks, "engineer_actions": actions, "seconds_to_first_answer": t_first,
+                        "closed": closure is not None, "recovered": (closure or {}).get("payload", {}).get("resolution_status")},
+            "chain": chain, "integrity": store.verify(case_id)["ledger_chain"]["valid"],
+            "boundary": "Written by Veyra from the case's append-only record as the investigation happened."}
+
+
+def review_to_closure(store, case_id: str, *, conclusion: str, recovered: str, correction: Optional[str] = None,
+                      fix: Optional[str] = None) -> Dict[str, Any]:
+    """Review & confirm: the engineer answers two questions; Veyra writes the closure from what the case already holds.
+    conclusion: correct | partly | wrong; recovered: yes | not_yet | unknown."""
+    d = draft_lesson(store, case_id)
+    run = store.latest_run(case_id) or {}
+    domains = run.get("domains") or {}
+    domain = next((k for k, v in domains.items() if v.get("status") == "anomaly_observed"), next(iter(domains), None))
+    cause = d["cause"] if conclusion == "correct" else (correction or "").strip()
+    status = "cause_unknown" if conclusion == "wrong" and not cause else "cause_probable"
+    fix_text = (fix or "").strip() or None
+    confirmed = conclusion == "correct" and recovered == "yes" and fix_text
+    payload = {"investigation_status": "cause_confirmed" if confirmed else status,
+               "evidence_note": (d["evidence_note"] + ("; engineer: the machine recovered after the fix" if recovered == "yes" else ""))[:1000] or None,
+               "resolution_status": {"yes": "resolved", "not_yet": "not_yet_repaired", "unknown": "not_yet_repaired"}[recovered],
+               "decisive_check": (d.get("decisive_check") or "")[:200] or None, "applies_when": d.get("applies_when") or None, "fix": fix_text}
+    if payload["investigation_status"] != "cause_unknown":
+        payload.update(cause=cause[:1000], cause_domain=domain, confirmed_by="fix_resolved_it" if confirmed else "engineer_judgement")
+    if fix_text:
+        payload["fix_held"] = "held" if recovered == "yes" else "not_yet_known"
+    return payload

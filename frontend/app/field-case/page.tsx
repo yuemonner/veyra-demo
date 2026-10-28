@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import s from "./field-case.module.css";
 import { Lessons, RecordingRead, SignalChain } from "./SignalChain";
-import Investigation from "./Investigation";
+import Investigation, { AutoRecord, LogEvidence } from "./Investigation";
 import { plotFor, Waveform } from "./Waveform";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "/local-api";
@@ -355,7 +355,7 @@ export default function FieldCasePage() {
               ...(logCase ? [["case", "Investigation", "What happened, what Veyra checked, what to do next", ""] as const] : [
                 ["brief", "Brief", "What happened, what to do", ""] as const,
                 ["next", "Next action", "Veyra's next step and your decision", `${nextStep(data.ledger, run.id)}/3`] as const]),
-              ["evidence", "Evidence", "Findings and their sources", String(Object.values(run.domains || {}).reduce((n: number, d: Any) => n + (d.observations || []).filter((o: Any) => o.kind === "anomaly" || o.kind === "delay").length, 0))],
+              logCase ? ["evidence", "Log", "The log as Veyra read it", ""] as const : ["evidence", "Evidence", "Findings and their sources", String(Object.values(run.domains || {}).reduce((n: number, d: Any) => n + (d.observations || []).filter((o: Any) => o.kind === "anomaly" || o.kind === "delay").length, 0))] as const,
               ["audit", "Record", "Owners, decisions and the case record", String((data.ledger || []).length)],
             ] as const).map(([id, label, hint, count]) => (
               <button key={id} className={tab === id ? s.viewOn : s.view} onClick={() => setTab(id)} aria-pressed={tab === id} title={hint}>
@@ -366,7 +366,8 @@ export default function FieldCasePage() {
           {tab === "next" && <NextAction caseId={caseId!} data={data} onChanged={() => load(caseId!)} me={me?.user?.name} onEvidence={() => go("findings")} />}
           {tab === "case" && <Investigation key={`${caseId}:${jobId || ""}`} caseId={caseId!} call={call} actor={me?.user?.name || ENGINEER} jobId={jobId} onChanged={() => load(caseId!)} />}
           {tab === "brief" && <Brief data={data} run={run} verification={verification} go={go} onAccept={acceptCheck} acceptBusy={acceptBusy} error={agentError} />}
-          {tab === "evidence" && <>
+          {tab === "evidence" && logCase && <LogEvidence key={caseId!} caseId={caseId!} call={call} />}
+          {tab === "evidence" && !logCase && <>
             <AgentPanel ledger={data.ledger} run={run} info={agentInfo} busy={agentBusy} error={agentError} onRun={runAgent} />
             <Hypotheses run={run} ledger={data.ledger} />
             <Findings run={run} ledger={data.ledger} caseId={caseId!} onSaved={() => load(caseId!)} />
@@ -378,7 +379,11 @@ export default function FieldCasePage() {
             {(run.machine_history?.prior_cases || []).length > 0 && <History run={run} />}
             <Checks run={run} ledger={data.ledger} />
           </>}
-          {tab === "audit" && <>
+          {tab === "audit" && logCase && <AutoRecord key={caseId!} caseId={caseId!} call={call}>
+            <Sources ledger={data.ledger} imports={data.imports} />
+            <Record ledger={data.ledger} verification={verification} caseId={caseId!} />
+          </AutoRecord>}
+          {tab === "audit" && !logCase && <>
             <Triage run={run} />
             <Sources ledger={data.ledger} imports={data.imports} />
             <Decisions ledger={data.ledger} run={run} caseId={caseId!} onSaved={() => load(caseId!)} />

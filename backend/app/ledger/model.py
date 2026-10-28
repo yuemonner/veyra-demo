@@ -466,6 +466,15 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
                "scope": _text(payload, "scope"), "authorized_by": _text(payload, "authorized_by", limit=300), "evidence": _text(payload, "evidence"),
                "boundary": "Covers only the provider and scope stated. Recorded by a person; not verified by Veyra."}
 
+    elif kind == "event_note":
+        # One click on an event Veyra classified: "normal for this machine" (or "relevant after all"). Applies at once,
+        # by the person who knows the machine; the latest note on a pattern wins. Read by the investigator next time.
+        lines = payload.get("lines") or []
+        if not isinstance(lines, list) or not all(isinstance(n, int) for n in lines):
+            raise LedgerError("lines must be a list of line numbers")
+        out = {"pattern": _text(payload, "pattern", limit=400), "verdict": _choice(payload, "verdict", ("normal", "relevant")),
+               "scope": _choice(payload, "scope", ("case", "machine")), "lines": lines[:50], "note": _text(payload, "note", required=False, limit=500)}
+
     elif kind == "engineer_finding":
         # What an engineer found when doing the next action Veyra proposed (or any check of their own). It feeds the
         # next investigation step; it is the engineer's report, not an independently verified measurement.

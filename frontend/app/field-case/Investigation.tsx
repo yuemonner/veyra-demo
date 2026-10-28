@@ -85,16 +85,17 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
           {agent.configured ? <button className={st.inline} onClick={() => start(true)}>Let Veyra investigate with AI</button>
             : <span>Connect the AI investigator (Claude Code sign-in on this computer) to have Veyra run the checks for you.</span>}
         </div>) : null}
-      next={<NextAction caseId={caseId} call={call} next={(inv.result || {}).next_action} entry={inv.entry_id} closed={data.closed} onRecorded={(j) => j ? follow(j) : load()} />}
+      prev={data.previous_hypotheses}
+      next={<NextAction caseId={caseId} call={call} next={(inv.result || {}).next_action} entry={inv.entry_id} closed={data.closed} onRecorded={(j) => j ? follow(j) : load()} hyps={(inv.result || {}).hypotheses} />}
       footer={<>
-        {!data.closed && <CloseCase caseId={caseId} call={call} actor={actor} onClosed={() => { load(); onChanged(); }} />}
+        {!data.closed && <ReviewConfirm inv={inv} submit={async (a) => { await call(`/engine/cases/${caseId}/review`, { method: "POST", body: JSON.stringify(a) }); load(); onChanged(); }} />}
         {data.closed && <p className={st.fine}>This case is closed. Its lesson is used when a similar failure comes in.</p>}
         {error && <p className={st.err}>{error}</p>}
       </>} />
   );
 }
 
-function ResultView({ inv, findings, banner, next, footer }: { inv: Any; findings: Any[]; banner?: React.ReactNode; next: React.ReactNode; footer?: React.ReactNode }) {
+function ResultView({ inv, findings, banner, next, footer, prev }: { inv: Any; findings: Any[]; banner?: React.ReactNode; next: React.ReactNode; footer?: React.ReactNode; prev?: Any[] | null }) {
   const r = inv.result || {};
   const status = STATUS[r.status] || STATUS.cause_unknown;
   return (
@@ -106,6 +107,8 @@ function ResultView({ inv, findings, banner, next, footer }: { inv: Any; finding
         {r.explanation && <p className={st.lead}>{r.explanation}</p>}
         {inv.mode === "agent" && <p className={st.fine}>Veyra ran {inv.steps.length} check{inv.steps.length === 1 ? "" : "s"} on the original data in {inv.seconds} s · every quoted line verified against the file{(inv.dropped || []).length ? ` · ${inv.dropped.length} unverifiable statement${inv.dropped.length === 1 ? "" : "s"} removed` : ""}</p>}
       </header>
+
+      {(r.hypotheses || []).length > 0 && <FaultSpace hyps={r.hypotheses} prev={prev} />}
 
       {next}
 
@@ -193,8 +196,9 @@ function Live({ job, subtitle }: { job: Any; subtitle?: string }) {
 }
 
 type Demo = { prefill: (o: Any) => string; submit: (choice: Any, notes: string) => void };
-function NextAction({ caseId, call, next, entry, closed, onRecorded, demo }:
-  { caseId: string; call: Call; next: Any; entry: string; closed: boolean; onRecorded: (jobId: string | null) => void; demo?: Demo }) {
+function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps = [] }:
+  { caseId: string; call: Call; next: Any; entry: string; closed: boolean; onRecorded: (jobId: string | null) => void; demo?: Demo; hyps?: Any[] }) {
+  const area = (id: string) => (hyps.find((h: Any) => h.id === id) || {}).area || id;
   const [choice, setChoice] = useState<Any>(null);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
@@ -225,11 +229,15 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo }:
         </div>
       )}
       {!closed && <>
-        <p className={st.ask}>What did you find?</p>
-        <div className={st.outcomes}>
+        <p className={st.ask}>Run it. What did you find?</p>
+        <div className={st.tree}>
           {outcomes.map((o, i) => (
             <button key={i} className={choice?.label === o.label ? st.outcomeOn : st.outcome} onClick={() => { setChoice(o); if (demo) setNotes(demo.prefill(o)); }} aria-pressed={choice?.label === o.label}>
-              <b>{o.label}</b><span>{o.means}</span></button>))}
+              <b>{o.label}</b><span>{o.means}</span>
+              {(o.rules_out || []).length > 0 && <span className={st.fx}><i>Rules out</i> {o.rules_out.map(area).join(", ")}</span>}
+              {(o.keeps || []).length > 0 && <span className={st.fx}><i>Leaves</i> {o.keeps.map(area).join(", ")}</span>}
+              {o.then && <span className={st.fx}><i>Then</i> {o.then}</span>}
+            </button>))}
         </div>
         {choice && (
           <div className={st.record}>
@@ -246,60 +254,6 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo }:
     </div>
   );
 }
-
-function CloseCase({ caseId, call, actor, onClosed }: { caseId: string; call: Call; actor: string; onClosed: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [d, setD] = useState<Any>(null);
-  const [domains, setDomains] = useState<Any[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  async function draft() {
-    setOpen(true); setErr(null);
-    try {
-      const out = await call(`/engine/cases/${caseId}/lesson-draft`);
-      const pick = (out.domains || []).find((x: Any) => x.status === "anomaly_observed") || (out.domains || [])[0];
-      setDomains(out.domains || []); setD({ ...out.draft, cause_domain: out.draft.cause_domain || pick?.id || "" });
-    } catch (e: Any) { setErr(e.message); }
-  }
-  async function confirm() {
-    setBusy(true); setErr(null);
-    try {
-      const withCause = d.investigation_status !== "cause_unknown";
-      const payload: Any = { investigation_status: d.investigation_status, resolution_status: d.resolution_status, evidence_note: d.evidence_note || null,
-        decisive_check: (d.decisive_check || "").slice(0, 200) || null, applies_when: d.applies_when || null, fix: d.fix || null };
-      if (withCause) Object.assign(payload, { cause: d.cause, cause_domain: d.cause_domain, confirmed_by: d.investigation_status === "cause_confirmed" && !["inspection", "reproduction", "fix_resolved_it"].includes(d.confirmed_by) ? "fix_resolved_it" : (d.investigation_status === "cause_confirmed" ? d.confirmed_by : "engineer_judgement") });
-      await call(`/engine/cases/${caseId}/ledger`, { method: "POST", body: JSON.stringify({ kind: "case_closure", actor, source: "lesson draft (confirmed)", payload }) });
-      onClosed();
-    } catch (e: Any) { setErr(e.message); } finally { setBusy(false); }
-  }
-  if (!open) return <div className={st.closeRow}><button className={st.ghost} onClick={draft}>Close the case</button><span className={st.fine}>Veyra drafts the lesson; you confirm it.</span></div>;
-  if (!d) return <div className={st.lesson}><p className={st.dim}>Drafting the lesson…</p>{err && <p className={st.err}>{err}</p>}</div>;
-  const set = (k: string) => (e: Any) => setD({ ...d, [k]: e.target.value });
-  return (
-    <div className={st.lesson}>
-      <h2 className={st.h2}>Lesson from this case</h2>
-      <p className={st.fine}>Drafted from the investigation and your results. Change what is wrong, then confirm.</p>
-      <div className={st.grid}>
-        <label>Cause<select value={d.investigation_status} onChange={set("investigation_status")}>
-          <option value="cause_probable">Probable</option><option value="cause_unknown">Not found</option><option value="cause_confirmed">Confirmed (inspection, reproduction or a fix that worked)</option></select></label>
-        {d.investigation_status !== "cause_unknown" && <label>Where<select value={d.cause_domain} onChange={set("cause_domain")}>
-          {domains.map((x: Any) => <option key={x.id} value={x.id}>{x.label}</option>)}</select></label>}
-        {d.investigation_status === "cause_confirmed" && <label>Confirmed by<select value={["inspection", "reproduction", "fix_resolved_it"].includes(d.confirmed_by) ? d.confirmed_by : "fix_resolved_it"} onChange={set("confirmed_by")}>
-          <option value="inspection">Inspection</option><option value="reproduction">Reproduction</option><option value="fix_resolved_it">A fix that resolved it</option></select></label>}
-        <label>Machine now<select value={d.resolution_status} onChange={set("resolution_status")}>
-          <option value="not_yet_repaired">Not repaired yet</option><option value="resolved">Resolved</option><option value="temporary_workaround">Workaround in place</option></select></label>
-      </div>
-      {d.investigation_status !== "cause_unknown" && <label className={st.wide}>What caused it<textarea className={st.text} rows={2} value={d.cause} onChange={set("cause")} /></label>}
-      <label className={st.wide}>Fix (if any)<input className={st.input} value={d.fix || ""} onChange={set("fix")} placeholder="what was changed" /></label>
-      <label className={st.wide}>Reuse only when<input className={st.input} value={d.applies_when || ""} onChange={set("applies_when")} placeholder="firmware, configuration or signature that must match" /></label>
-      <p className={st.fine}>Evidence kept with it: {d.evidence_note || "none"}</p>
-      <div className={st.row}><button className={st.primary} onClick={confirm} disabled={busy || (d.investigation_status !== "cause_unknown" && !d.cause?.trim())}>{busy ? "Saving…" : "Confirm and close"}</button>
-        <button className={st.ghost} onClick={() => setOpen(false)}>Not yet</button></div>
-      {err && <p className={st.err}>{err}</p>}
-    </div>
-  );
-}
-
 
 /** A recorded investigation walked through step by step: Veyra reads the log, hands over the next action, takes the
  *  engineer's result, continues, and closes with a lesson. Nothing is written. */
@@ -334,22 +288,189 @@ function Playback({ pb }: { pb: Any }) {
   };
   const close = (invs[invs.length - 1].recorded || {}).close || {};
   const footer = phase === "closing" ? (
-    <div className={st.lesson}>
-      <h2 className={st.h2}>Lesson from this case</h2>
-      <p className={st.fine}>Drafted by Veyra from the investigation and your results. Confirm, or change what is wrong.</p>
-      <label className={st.wide}>What caused it<textarea className={st.text} rows={2} defaultValue={close.cause || inv.result?.explanation} /></label>
-      <label className={st.wide}>Fix<input className={st.input} defaultValue={close.fix || ""} /></label>
-      <label className={st.wide}>Reuse only when<input className={st.input} defaultValue={close.applies_when || ""} /></label>
-      <div className={st.row}><button className={st.primary} onClick={() => { setPhase("closed"); }}>Confirm and close</button></div>
-    </div>
+    <ReviewConfirm inv={inv} submit={async () => { setPhase("closed"); }} />
   ) : phase === "closed" ? (
     <div className={st.lesson}>
       <h2 className={st.h2}>Case closed · lesson saved</h2>
-      <p className={st.lead} style={{ fontSize: 15 }}>The next time a failure matches it, Veyra checks this first, and only reuses the fix when the conditions match.</p>
+      {close.cause && <p className={st.lessonNote}><b>Cause:</b> {close.cause}</p>}
+      {close.fix && <p className={st.lessonNote}><b>Fix:</b> {close.fix}</p>}
+      {close.applies_when && <p className={st.lessonNote}><b>Reused only when:</b> {close.applies_when}</p>}
+      <p className={st.fine}>Written by Veyra from the investigation and your two answers.</p>
       <div className={st.row}><button className={st.ghost} onClick={() => { setStage(0); setShown(0); setMine([]); setPhase("running"); top(); }}>Replay from the start</button></div>
     </div>
   ) : null;
   return <ResultView inv={inv} findings={mine}
-    next={phase === "result" ? <NextAction caseId="" call={async () => null} next={inv.result?.next_action} entry="" closed={false} onRecorded={() => undefined} demo={demo} /> : null}
+    prev={stage > 0 ? (invs[stage - 1].result || {}).hypotheses : null}
+    next={phase === "result" ? <NextAction caseId="" call={async () => null} next={inv.result?.next_action} entry="" closed={false} onRecorded={() => undefined} demo={demo} hyps={inv.result?.hypotheses} /> : null}
     footer={footer} />;
+}
+
+
+const H_STATUS: Record<string, string> = { leading: "Leading", open: "Open", weakened: "Weakened", ruled_out: "Ruled out" };
+const H_ORDER: Record<string, number> = { leading: 0, open: 1, weakened: 2, ruled_out: 3 };
+
+/** Where the fault can be: the hypotheses Veyra is weighing, and what the latest evidence did to them. */
+function FaultSpace({ hyps, prev }: { hyps: Any[]; prev?: Any[] | null }) {
+  const before: Record<string, string> = Object.fromEntries((prev || []).map((h: Any) => [h.id, h.status]));
+  const moved = prev ? hyps.filter((h) => before[h.id] && before[h.id] !== h.status) : [];
+  const ruled = hyps.filter((h) => h.status === "ruled_out").length;
+  const sorted = [...hyps].sort((a, b) => (H_ORDER[a.status] ?? 9) - (H_ORDER[b.status] ?? 9));
+  return (
+    <div className={st.block}>
+      <div className={st.spaceHead}>
+        <h2 className={st.h2}>Where the fault can be</h2>
+        <span className={st.dim}>{hyps.length - ruled} of {hyps.length} still possible</span>
+      </div>
+      {moved.length > 0 && (
+        <p className={st.changed}>Your result changed the picture: {moved.map((h) => `${h.area} ${({ ruled_out: "ruled out", leading: "now leading", weakened: "weakened", open: "reopened" } as Any)[h.status]}`).join(" · ")}</p>
+      )}
+      <ul className={st.space}>
+        {sorted.map((h) => (
+          <li key={h.id} className={`${st.hyp} ${st["h_" + h.status] || ""} ${before[h.id] && before[h.id] !== h.status ? st.hMoved : ""}`}>
+            <span className={st.hStatus}>{H_STATUS[h.status] || h.status}</span>
+            <b className={st.hArea}>{h.area}</b>
+            <span className={st.hClaim}>{h.claim}</span>
+            <span className={st.hWhy}>{h.because}{(h.lines || []).length ? ` · line${h.lines.length > 1 ? "s" : ""} ${h.lines.slice(0, 4).join(", ")}` : ""}</span>
+          </li>))}
+      </ul>
+    </div>
+  );
+}
+
+/** Close by review: is the conclusion right, and did the machine recover? Veyra writes the rest. */
+function ReviewConfirm({ inv, submit }: { inv: Any; submit: (answers: Any) => Promise<void> }) {
+  const r = inv.result || {};
+  const [open, setOpen] = useState(false);
+  const [conclusion, setConclusion] = useState<string | null>(null);
+  const [recovered, setRecovered] = useState<string | null>(null);
+  const [correction, setCorrection] = useState("");
+  const [fix, setFix] = useState(r.next_action?.action || "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (!open) return <div className={st.closeRow}><button className={st.ghost} onClick={() => setOpen(true)}>Review &amp; close</button><span className={st.fine}>Two questions. Veyra writes the record and the lesson.</span></div>;
+  const pick = (v: string | null, set: (x: string) => void, opts: [string, string][]) => (
+    <div className={st.row}>{opts.map(([k, l]) => <button key={k} className={v === k ? st.choiceOn : st.choice} onClick={() => set(k)} aria-pressed={v === k}>{l}</button>)}</div>);
+  async function go() {
+    setBusy(true); setErr(null);
+    try { await submit({ conclusion, recovered, correction: correction.trim() || null, fix: recovered === "yes" ? fix.trim() || null : null }); }
+    catch (e: Any) { setErr(e.message); } finally { setBusy(false); }
+  }
+  return (
+    <div className={st.lesson}>
+      <h2 className={st.h2}>Review &amp; close</h2>
+      <p className={st.quote}>{r.explanation || r.headline}</p>
+      <p className={st.ask2}>Is this conclusion right?</p>
+      {pick(conclusion, setConclusion, [["correct", "Yes"], ["partly", "Partly"], ["wrong", "No"]])}
+      {conclusion && conclusion !== "correct" && <label className={st.wide}>What is right?<textarea className={st.text} rows={2} value={correction} onChange={(e) => setCorrection(e.target.value)} /></label>}
+      <p className={st.ask2}>Did the machine recover?</p>
+      {pick(recovered, setRecovered, [["yes", "Yes"], ["not_yet", "Not yet"], ["unknown", "Don't know"]])}
+      {recovered === "yes" && <label className={st.wide}>What fixed it?<input className={st.input} value={fix} onChange={(e) => setFix(e.target.value)} /></label>}
+      <div className={st.row}><button className={st.primary} disabled={!conclusion || !recovered || busy || (conclusion === "partly" && !correction.trim())} onClick={go}>{busy ? "Closing…" : "Confirm and close"}</button>
+        <button className={st.ghost} onClick={() => setOpen(false)}>Not yet</button></div>
+      {err && <p className={st.err}>{err}</p>}
+    </div>
+  );
+}
+
+const CLASS_LABEL: Record<string, string> = { root_cause_candidate: "Possible cause", anomaly: "Anomaly", effect: "Effect of the failure", routine: "Routine" };
+
+/** The log as Veyra read it: events grouped and classified, with the original lines. One click marks an event normal for this machine. */
+export function LogEvidence({ caseId, call }: { caseId: string; call: Call }) {
+  const [inv, setInv] = useState<Any>(null);
+  const [log, setLog] = useState<string[]>([]);
+  const [notes, setNotes] = useState<Record<string, Any>>({});
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    call(`/engine/cases/${caseId}/investigation`).then((d) => {
+      const pb = d.playback?.investigations; setInv(pb?.length ? pb[pb.length - 1] : d.investigation);
+      setNotes(Object.fromEntries((d.notes || []).map((n: Any) => [n.pattern, n])));
+    }).catch((e) => setErr(e.message));
+    call(`/engine/cases/${caseId}/log`).then((d) => setLog(d.lines || [])).catch(() => setLog([]));
+  }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!inv) return <section className={st.surface}><p className={st.dim}>{err || "Loading…"}</p></section>;
+  const events: Any[] = (inv.result || {}).events || [];
+  const cls = (e: Any) => (notes[e.what]?.verdict === "normal" ? "routine" : notes[e.what]?.verdict === "relevant" && e.class === "routine" ? "anomaly" : e.class);
+  async function mark(e: Any, verdict: string) {
+    const body = { pattern: e.what, verdict, scope: "machine", lines: (e.lines || []).slice(0, 50) };
+    setNotes({ ...notes, [e.what]: body });
+    try { await call(`/engine/cases/${caseId}/event-note`, { method: "POST", body: JSON.stringify(body) }); } catch (x: Any) { setErr(x.message); }
+  }
+  const groups = ["root_cause_candidate", "anomaly", "effect", "routine"].map((c) => [c, events.filter((e) => cls(e) === c)] as const).filter(([, l]) => l.length);
+  const raw = (n: number) => log[n - 1] ?? "";
+  return (
+    <section className={st.surface}>
+      <header className={st.head}>
+        <h1 className={st.headline} style={{ fontSize: 24 }}>The log, as Veyra read it</h1>
+        <p className={st.fine}>{log.length} lines · {events.length} groups of events · routine events need no attention</p>
+      </header>
+      {groups.map(([c, list]) => {
+        const body = (
+          <ul className={st.events}>
+            {list.map((e: Any, i: number) => (
+              <li key={i} className={st.event}>
+                <div className={st.eventHead}><b>{e.what}</b>
+                  {c !== "routine" ? <button className={st.mini} onClick={() => mark(e, "normal")}>Normal for this machine</button>
+                    : notes[e.what]?.verdict === "normal" ? <button className={st.mini} onClick={() => mark(e, "relevant")}>Undo</button>
+                    : <button className={st.mini} onClick={() => mark(e, "relevant")}>Not routine</button>}
+                </div>
+                {e.why && <span className={st.shows}>{e.why}</span>}
+                <ul className={st.lines}>{(e.lines || []).slice(0, 3).map((n: number) => <li key={n}><code className={st.ln}>{n}</code><div><code className={st.raw}>{raw(n)}</code></div></li>)}</ul>
+                {(e.lines || []).length > 3 && <span className={st.fine}>+{e.lines.length - 3} more lines like this</span>}
+              </li>))}
+          </ul>);
+        return c === "routine"
+          ? <details key={c} className={st.fold}><summary>{CLASS_LABEL[c]} ({list.length})</summary>{body}</details>
+          : <div key={c} className={st.block}><h2 className={st.h2}>{CLASS_LABEL[c]} ({list.length})</h2>{body}</div>;
+      })}
+      {log.length > 0 && <details className={st.fold}><summary>Full log ({log.length} lines)</summary>
+        <ol className={st.full}>{log.map((l, i) => <li key={i}><code className={st.ln}>{i + 1}</code><code className={st.rawPlain}>{l}</code></li>)}</ol></details>}
+      {err && <p className={st.err}>{err}</p>}
+    </section>
+  );
+}
+
+const STEP_ICON: Record<string, string> = { reported: "Reported", investigation: "Veyra", action: "Engineer", note: "Engineer", closure: "Closed" };
+
+/** The case record Veyra keeps itself: decision → action → evidence → outcome, nobody types it. */
+export function AutoRecord({ caseId, call, children }: { caseId: string; call: Call; children?: React.ReactNode }) {
+  const [rec, setRec] = useState<Any>(null);
+  const [inv, setInv] = useState<Any>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const load = useCallback(() => {
+    call(`/engine/cases/${caseId}/record`).then(setRec).catch((e) => setErr(e.message));
+    call(`/engine/cases/${caseId}/investigation`).then((d) => setInv(d.investigation)).catch(() => undefined);
+  }, [caseId, call]);
+  useEffect(() => { load(); }, [load]);
+  if (!rec) return <section className={st.surface}><p className={st.dim}>{err || "Loading…"}</p></section>;
+  const s = rec.summary || {};
+  return (
+    <section className={st.surface}>
+      <header className={st.head}>
+        <h1 className={st.headline} style={{ fontSize: 24 }}>Case record</h1>
+        <p className={st.fine}>Written by Veyra as the investigation happened{rec.integrity ? " · record intact" : " · INTEGRITY CHECK FAILED"}</p>
+      </header>
+      <div className={st.stats}>
+        <div><b>{s.rounds}</b><span>investigation rounds</span></div>
+        <div><b>{s.checks_run}</b><span>checks run by Veyra</span></div>
+        <div><b>{s.engineer_actions}</b><span>actions by engineers</span></div>
+        <div><b>{s.closed ? (s.recovered === "resolved" ? "Recovered" : "Closed") : "Open"}</b><span>{s.closed ? "conclusion confirmed" : "investigation"}</span></div>
+      </div>
+      <ol className={st.chain}>
+        {(rec.chain || []).map((c: Any, i: number) => (
+          <li key={i} className={st["c_" + c.type] || ""}>
+            <span className={st.cWho}>{STEP_ICON[c.type] || c.type}</span>
+            <div>
+              <b>{c.title}</b> <span className={st.when}>{new Date(c.at).toLocaleString()}{c.by && c.type !== "investigation" ? ` · ${c.by}` : ""}</span>
+              {c.detail && <span className={st.result}>{c.detail}</span>}
+              {c.type === "investigation" && <span className={st.about}>{c.checks} checks{c.seconds ? ` in ${c.seconds} s` : ""}{(c.standing || []).length ? ` · still possible: ${c.standing.join(", ")}` : ""}{c.next_action ? ` · next: ${c.next_action}` : ""}</span>}
+              {c.changes && (c.changes.ruled_out.length + c.changes.leading.length + c.changes.weakened.length) > 0 && (
+                <span className={st.changedSmall}>{[c.changes.ruled_out.length ? `ruled out ${c.changes.ruled_out.join(", ")}` : "", c.changes.leading.length ? `now leading ${c.changes.leading.join(", ")}` : "", c.changes.weakened.length ? `weakened ${c.changes.weakened.join(", ")}` : ""].filter(Boolean).join(" · ")}</span>)}
+            </div>
+          </li>))}
+      </ol>
+      {!s.closed && inv && <ReviewConfirm inv={inv} submit={async (a) => { await call(`/engine/cases/${caseId}/review`, { method: "POST", body: JSON.stringify(a) }); load(); }} />}
+      {children && <details className={st.fold}><summary>Full ledger and integrity details</summary>{children}</details>}
+      {err && <p className={st.err}>{err}</p>}
+    </section>
+  );
 }
