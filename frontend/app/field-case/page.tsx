@@ -226,7 +226,10 @@ export default function FieldCasePage() {
         setCases(all);
         // Showcase first: the earliest real case (the seeded demo case on a hosted engine), so a visitor's
         // upload never becomes what everyone else sees. Uploaders are taken to their own case directly.
-        const real = all.find((c) => !c.synthetic);
+        // A real public log with its investigation (the hosted demo's showcase) comes first when there is one.
+        const sampleTitles: string[] = await call("/engine/samples").then((l: Any[]) => l.map((x) => x.title)).catch(() => []);
+        const showcase = all.find((c) => !c.synthetic && sampleTitles.includes(c.title));
+        const real = showcase || all.find((c) => !c.synthetic);
         const story = (wanted && all.find((c) => c.id === wanted)) || real || all.filter((c) => c.title === STORY_TITLE).pop() || all[all.length - 1];
         if (story) await load(story.id);
         else setState("empty");

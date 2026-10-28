@@ -66,9 +66,12 @@ def seed_if_empty(store) -> Dict[str, object]:
         if not (check["ledger_chain"]["valid"] and check["imports_intact"] and check["runs_intact"]):
             raise RuntimeError(f"Seed case {case_id} failed verification: {check}")
     extra = _seed_review_cases(store)
+    from app.workflows.public_samples import seed_showcase
+    showcase = seed_showcase(store)  # a real public log with the investigation recorded with the live model
+    SEEDED_IDS.update(showcase)
     advanced = _advance_all(store)
     return {"seeded": True, "real_cases": real, "story": story.get("case_id") if isinstance(story, dict) else None, "case_memory": memory,
-            **extra, "autopilot": advanced}
+            **extra, "showcase": showcase, "autopilot": advanced}
 
 
 QD1_SEED = SEED_DIR / "synthetic" / "qd1_quadruped.sqlite.gz"

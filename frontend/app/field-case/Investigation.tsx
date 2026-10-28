@@ -91,6 +91,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
         <span className={`${st.status} ${st[status.cls]}`}>{status.label}{r.confidence && r.status === "cause_probable" ? ` · ${r.confidence} confidence` : ""}</span>
         <h1 className={st.headline}>{r.headline}</h1>
         {r.explanation && <p className={st.lead}>{r.explanation}</p>}
+        {inv.recorded && <p className={st.fine}>Recorded {new Date(inv.recorded.at).toLocaleString()} with {String(inv.model || "").replace("claude-code:", "Claude ")} on a local Veyra instance and shown here as recorded; this demo did not run it again.</p>}
         {inv.mode === "agent" && <p className={st.fine}>Veyra ran {inv.steps.length} check{inv.steps.length === 1 ? "" : "s"} on the original data in {inv.seconds} s · every quoted line verified against the file{(inv.dropped || []).length ? ` · ${inv.dropped.length} unverifiable statement${inv.dropped.length === 1 ? "" : "s"} removed` : ""}</p>}
       </header>
 

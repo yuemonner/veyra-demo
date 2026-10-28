@@ -137,3 +137,12 @@ def test_api_upload_to_investigation_to_finding(tmp_path, monkeypatch):
     assert after["findings"][0]["result"] == "cannot_do" and after["investigation"]["entry_id"] != got["investigation"]["entry_id"]
     draft = c.get(f"/engine/cases/{cid}/lesson-draft").json()
     assert draft["draft"]["investigation_status"] in ("cause_unknown", "cause_probable") and draft["domains"]
+
+
+def test_hosted_showcase_replays_the_recorded_investigation_labelled(store):
+    ids = public_samples.seed_showcase(store)
+    assert len(ids) == 1 and public_samples.seed_showcase(store) == []            # once
+    inv_ = inv.latest(store, ids[0])
+    assert inv_["mode"] == "agent" and inv_["recorded"]["note"].startswith("Recorded on a local Veyra instance")
+    assert [e["kind"] for e in store.ledger(ids[0]) if e["kind"] in ("agent_report", "engineer_finding")] == ["agent_report", "engineer_finding", "agent_report"]
+    assert store.verify(ids[0])["ledger_chain"]["valid"]
