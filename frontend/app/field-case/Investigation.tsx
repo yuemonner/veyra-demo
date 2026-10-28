@@ -235,9 +235,11 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
           {outcomes.map((o, i) => (
             <button key={i} className={choice?.label === o.label ? st.outcomeOn : st.outcome} onClick={() => { setChoice(o); if (demo) setNotes(demo.prefill(o)); }} aria-pressed={choice?.label === o.label}>
               <b>{o.label}</b><span>{named(o.means, hyps)}</span>
-              {(o.rules_out || []).length > 0 && <span className={st.fx}><i>Rules out</i> {o.rules_out.map(area).join(", ")}</span>}
-              {(o.keeps || []).length > 0 && <span className={st.fx}><i>Leaves</i> {o.keeps.map(area).join(", ")}</span>}
-              {o.then && <span className={st.fx}><i>Then</i> {named(o.then, hyps)}</span>}
+              <span className={st.fxCol}>
+                {(o.rules_out || []).length > 0 && <span className={st.fx}><i>Rules out</i> {o.rules_out.map(area).join(", ")}</span>}
+                {(o.keeps || []).length > 0 && <span className={st.fx}><i>Leaves</i> {o.keeps.map(area).join(", ")}</span>}
+                {o.then && <span className={st.fx}><i>Then</i> {named(o.then, hyps)}</span>}
+              </span>
             </button>))}
         </div>
         <button className={choice?.result === "cannot_do" ? st.cantOn : st.cant} onClick={() => setChoice(cant)}>I can't do this — find another way</button>
@@ -265,6 +267,7 @@ function Playback({ pb }: { pb: Any }) {
   const [shown, setShown] = useState(0);
   const [phase, setPhase] = useState<"running" | "result" | "closing" | "closed">("running");
   const [mine, setMine] = useState<Any[]>([]);
+  const [answers, setAnswers] = useState<Any>({});
   const inv = invs[stage];
   useEffect(() => {
     if (phase !== "running") return;
@@ -290,13 +293,13 @@ function Playback({ pb }: { pb: Any }) {
   };
   const close = (invs[invs.length - 1].recorded || {}).close || {};
   const footer = phase === "closing" ? (
-    <ReviewConfirm inv={inv} submit={async () => { setPhase("closed"); }} />
+    <ReviewConfirm inv={inv} startOpen submit={async (a) => { setAnswers(a); setPhase("closed"); top(); }} />
   ) : phase === "closed" ? (
     <div className={st.lesson}>
       <h2 className={st.h2}>Case closed · lesson saved</h2>
-      {close.cause && <p className={st.lessonNote}><b>Cause:</b> {close.cause}</p>}
-      {close.fix && <p className={st.lessonNote}><b>Fix:</b> {close.fix}</p>}
-      {close.applies_when && <p className={st.lessonNote}><b>Reused only when:</b> {close.applies_when}</p>}
+      <p className={st.lessonNote}><b>Cause:</b> {answers.correction || named(inv.result?.explanation, inv.result?.hypotheses) || close.cause}</p>
+      {(answers.fix || close.fix) && <p className={st.lessonNote}><b>Fix that worked:</b> {answers.fix || close.fix}</p>}
+      {(inv.result?.reuse_when || close.applies_when) && <p className={st.lessonNote}><b>Reused only when:</b> {inv.result?.reuse_when || close.applies_when}</p>}
       <p className={st.fine}>Written by Veyra from the investigation and your two answers.</p>
       <div className={st.row}><button className={st.ghost} onClick={() => { setStage(0); setShown(0); setMine([]); setPhase("running"); top(); }}>Replay from the start</button></div>
     </div>
@@ -345,9 +348,9 @@ function FaultSpace({ hyps, prev }: { hyps: Any[]; prev?: Any[] | null }) {
 }
 
 /** Close by review: is the conclusion right, and did the machine recover? Veyra writes the rest. */
-function ReviewConfirm({ inv, submit }: { inv: Any; submit: (answers: Any) => Promise<void> }) {
+function ReviewConfirm({ inv, submit, startOpen = false }: { inv: Any; submit: (answers: Any) => Promise<void>; startOpen?: boolean }) {
   const r = inv.result || {};
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   const [conclusion, setConclusion] = useState<string | null>(null);
   const [recovered, setRecovered] = useState<string | null>(null);
   const [correction, setCorrection] = useState("");
@@ -416,7 +419,7 @@ export function LogEvidence({ caseId, call }: { caseId: string; call: Call }) {
             {list.map((e: Any, i: number) => (
               <li key={i} className={st.event}>
                 <div className={st.eventHead}><b>{e.what}</b>
-                  {c !== "routine" ? <button className={st.mini} onClick={() => mark(e, "normal")}>Normal for this machine</button>
+                  {c !== "routine" ? <button className={st.mini} onClick={() => mark(e, "normal")}>{c === "root_cause_candidate" ? "Not the cause" : "Normal for this machine"}</button>
                     : notes[e.what]?.verdict === "normal" ? <button className={st.mini} onClick={() => mark(e, "relevant")}>Undo</button>
                     : <button className={st.mini} onClick={() => mark(e, "relevant")}>Not routine</button>}
                 </div>

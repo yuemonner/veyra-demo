@@ -59,6 +59,6 @@ def seed_showcase(store) -> List[str]:
                 store.append_trusted(cid, "agent_report", payload, actor=e["actor"], source="recorded investigation (replayed)")
             elif e["kind"] == "engineer_finding":
                 p = {k: v for k, v in e["payload"].items() if k in ("action", "result", "observations")}
-                store.append(cid, "engineer_finding", p, actor=f"{e['actor']} (recorded)", source="recorded investigation (replayed)")
+                store.append(cid, "engineer_finding", p, actor=e["actor"], source="recorded investigation (replayed)")
         ids.append(cid)
     return ids
