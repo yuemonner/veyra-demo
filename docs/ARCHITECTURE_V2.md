@@ -123,3 +123,19 @@ each task waits, which is the step that found the UART / DMA wait loop in the re
   `claude mcp add veyra --env VEYRA_ENGINE_DB=../.local-private/workspaces/veyra-test/engine.db -- python -m app.mcp_server`
   Then ask Claude Code to "list Veyra cases and investigate the Crazyflie restart". Synthetic cases are served; a real
   case needs a model authorisation recorded in Veyra first.
+
+## 8. Decision (2026-10-28): the stack
+
+Keep the stack in this repository. Reuse is already in it where reuse wins; nothing outside beats a module we have.
+
+| Layer | Choice | Why |
+|---|---|---|
+| Bag / MCAP reading | `rosbags` (Apache-2.0), `mcap` (MIT): reused | Standard, maintained, already integrated |
+| PX4 logs | Veyra's own reader (stdlib) | Works on the 4 real #26910 logs; `pyulog` adds a dependency without a measured gain |
+| Text logs | Veyra's reader + fixed vocabulary | Restart / fault semantics are what matter; Drain3-style template mining only if real customer logs fragment templates |
+| Evidence engine, signal chain, lessons, decision record | Veyra (own) | The product's differentiation; nothing comparable exists to reuse |
+| Agent | Claude tool loop (Veyra agent) + MCP server | Standard protocol; any agent framework can call Veyra; no framework to maintain |
+| Orchestration | Veyra case record (no LangGraph / AgentScope) | Durable state, approvals and resume already exist and are hash-chained |
+| Not used | RosHD code (live-ROS tools only), AURA code (no licence; method already covered) | |
+
+Revisit a row only when a test on real data shows the alternative is better.
