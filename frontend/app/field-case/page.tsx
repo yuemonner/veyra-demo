@@ -308,7 +308,7 @@ export default function FieldCasePage() {
           <label className={s.casePick}>
             <span className={s.visuallyHidden}>Case</span>
             <select value={caseId ?? ""} onChange={(e) => { setTab("case"); load(e.target.value); }}>
-              {[...cases].reverse().map((c) => (
+              {[...cases].reverse().filter((c) => !c.synthetic || c.id === caseId).map((c) => (
                 <option key={c.id} value={c.id}>{c.synthetic ? "Synthetic · " : "Real data · "}{caseLabel(c.title)}</option>))}
             </select>
           </label>
@@ -316,7 +316,6 @@ export default function FieldCasePage() {
         <span className={s.spacer} />
         <div className={s.actions}>
           <button className={s.button} onClick={() => (recordings ? setRecordingOpen(true) : setUploadOpen(true))}>{recordings ? "Upload data" : "Upload logs"}</button>
-          {!isPrivate && <button className={s.quiet} onClick={liveEvent} disabled={state === "busy"}>Simulate live takeover</button>}
           {caseId && <a className={s.quiet} href={`${API}/engine/cases/${caseId}/report`} target="_blank" rel="noreferrer">Open report</a>}
           {caseId && isPrivate && <button className={s.quiet} onClick={() => setShareOpen(true)}>Share</button>}
           {isPrivate && me?.user && <span className={s.who} title={me.user.email}>{me.user.name} · {me.user.workspace_name}
