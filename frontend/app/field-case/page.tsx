@@ -179,6 +179,7 @@ export default function FieldCasePage() {
   const [me, setMe] = useState<Any>(null);
   const [acceptBusy, setAcceptBusy] = useState(false);
   const isPrivate = !!me?.private;
+  const recordings = isPrivate || !!me?.recordings;  // the hosted demo can take logs and recordings too (VEYRA_ALLOW_RECORDINGS)
 
   const go = (section: string) => {
     if (section === "next") { setTab("next"); return; }
@@ -286,6 +287,15 @@ export default function FieldCasePage() {
   }
 
   const run = data?.latest_run;
+  // A text log (or a case Veyra's investigator has worked on) opens on the action-first Investigation view; a table or
+  // recording case keeps its Brief and Next action.
+  const logCase = !!data && ((data.imports || []).some((i: Any) => String(i.clock_domain || "").startsWith("text_log"))
+    || (data.ledger || []).some((e: Any) => e.kind === "agent_report" && e.payload?.kind === "autonomous_investigation"));
+  useEffect(() => {
+    if (!data) return;
+    if (logCase && (tab === "brief" || tab === "next")) setTab("case");
+    if (!logCase && tab === "case") setTab("brief");
+  }, [caseId, logCase]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className={s.page}>
       {accessAsk && <AccessDialog detail={accessAsk.detail} onDone={(code) => { accessAsk.resolve(code); setAccessAsk(null); }} />}
@@ -302,7 +312,7 @@ export default function FieldCasePage() {
         ) : <span className={s.crumb}>Field case</span>}
         <span className={s.spacer} />
         <div className={s.actions}>
-          <button className={s.button} onClick={() => (isPrivate ? setRecordingOpen(true) : setUploadOpen(true))}>{isPrivate ? "Upload data" : "Upload logs"}</button>
+          <button className={s.button} onClick={() => (recordings ? setRecordingOpen(true) : setUploadOpen(true))}>{recordings ? "Upload data" : "Upload logs"}</button>
           {!isPrivate && <button className={s.quiet} onClick={liveEvent} disabled={state === "busy"}>Simulate live takeover</button>}
           {caseId && <a className={s.quiet} href={`${API}/engine/cases/${caseId}/report`} target="_blank" rel="noreferrer">Open report</a>}
           {caseId && isPrivate && <button className={s.quiet} onClick={() => setShareOpen(true)}>Share</button>}
@@ -340,7 +350,9 @@ export default function FieldCasePage() {
         <main className={s.body}>
           <nav className={s.views} aria-label="Views of this case">
             {([
-              ["case", "Investigation", "What happened, what Veyra checked, what to do next", ""],
+              ...(logCase ? [["case", "Investigation", "What happened, what Veyra checked, what to do next", ""] as const] : [
+                ["brief", "Brief", "What happened, what to do", ""] as const,
+                ["next", "Next action", "Veyra's next step and your decision", `${nextStep(data.ledger, run.id)}/3`] as const]),
               ["evidence", "Evidence", "Findings and their sources", String(Object.values(run.domains || {}).reduce((n: number, d: Any) => n + (d.observations || []).filter((o: Any) => o.kind === "anomaly" || o.kind === "delay").length, 0))],
               ["audit", "Record", "Owners, decisions and the case record", String((data.ledger || []).length)],
             ] as const).map(([id, label, hint, count]) => (
@@ -2172,6 +2184,8 @@ function uploadWithProgress(file: File, onProgress: (pct: number) => void): Prom
     xhr.withCredentials = true;
     xhr.setRequestHeader("content-type", "application/octet-stream");
     xhr.setRequestHeader("x-veyra-request", "1");
+    const code = storedCode();
+    if (code) xhr.setRequestHeader("x-veyra-access", code);  // the hosted demo: uploads need its access code
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)); };
     xhr.onload = () => {
       let body: Any = null;
@@ -2206,6 +2220,7 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
     if (!file) return;
     setError(""); setBusy("Uploading"); setPct(0);
     try {
+      await call("/engine/access-check", { method: "POST", body: "{}" });  // asks for the access code first where one is needed
       const meta = await uploadWithProgress(file, (p) => { setPct(p); if (p >= 100) setBusy("Reading the recording"); });
       setRec(meta);
       setJson(JSON.stringify(meta.suggested || {}, null, 1));

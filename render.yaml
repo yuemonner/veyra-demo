@@ -27,9 +27,20 @@ services:
         value: sqlite:////tmp/veyra.db
       - key: VEYRA_AUTO_SEED
         value: "true"
-      # Veyra drafts the next step and checks it itself; people approve, send and decide. No AI agent here (no model key).
+      # Veyra drafts the next step and checks it itself; people approve, send and decide.
       - key: VEYRA_AUTOPILOT
         value: "true"
+      # Uploading logs and recordings (still behind the access code), and the real public sample logs.
+      - key: VEYRA_ALLOW_RECORDINGS
+        value: "true"
+      # The autonomous investigator. It uses the Anthropic API when ANTHROPIC_API_KEY is set (in the Render dashboard,
+      # never committed); without a key it falls back to the rule-based reading and the page says so.
+      - key: VEYRA_INVESTIGATOR
+        value: agent
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: VEYRA_MAX_RECORDING_MB
+        value: "200"
       # The synthetic live-takeover demo reads the mock fleet API served by this same process.
       - key: VEYRA_API_BASE
         value: http://127.0.0.1:10000

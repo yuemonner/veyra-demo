@@ -192,6 +192,12 @@ def _run_job(job: Dict[str, Any], db: Path, args: Dict[str, Any], allow_model: b
         release()
 
 
+@router.post("/access-check")
+def access_check():
+    """Nothing to do: reaching here means the access-code gate (hosted demo) let this browser write."""
+    return {"ok": True}
+
+
 @router.get("/samples")
 def list_samples():
     from app.workflows import public_samples
