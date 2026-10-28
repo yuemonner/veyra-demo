@@ -1757,7 +1757,10 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
   const t = run.triage;
   const closure = [...data.ledger].reverse().find((e: Any) => e.kind === "case_closure");
   const learned: Any[] = (run.machine_history?.prior_cases || []).filter((c: Any) => c.closure);
-  const similar: Any[] = run.precedents?.matches || [];
+  // Earlier cases that the lessons layer already weighed (with what differs) are not repeated as a coarser match.
+  const similar: Any[] = (run.precedents?.matches || []).filter((m: Any) => !(qa?.lessons?.lessons || []).some((l: Any) => l.case_id === m.case_id));
+  // A text log's own checks come before generic engine drafts, which are written for measured signals.
+  const logFirst = !!(qa?.log && qa?.brief && qa?.next);
   const accepted = (id: string) => data.ledger.some((e: Any) => e.kind === "check_review" && e.payload.run_id === run.id && e.payload.check_id === id && e.payload.verdict !== "rejected");
   const agentLead = b.agent?.report?.hypotheses?.find((h: Any) => h.status === "leading");
   // Use the agent's wording only when it points at the same part as the engine's evidence; otherwise show both.
@@ -1894,9 +1897,9 @@ function Brief({ data, run, verification, go, onAccept, acceptBusy, error }: { d
       )}
 
       {!qaPending && <div className={s.row}>
-        <span className={s.rowLabel}>{facts && !b.recommendation && !b.prepared && !b.oldRules ? "Investigate next" : "Do next"}</span>
+        <span className={s.rowLabel}>{facts && (logFirst || (!b.recommendation && !b.prepared && !b.oldRules)) ? "Investigate next" : "Do next"}</span>
         <div>
-          {facts?.next && !b.recommendation && !b.prepared && !b.oldRules ? <div className={s.nextBox}>
+          {facts?.next && (logFirst || (!b.recommendation && !b.prepared && !b.oldRules)) ? <div className={s.nextBox}>
             <div>
               <p className={s.answer} style={{ margin: 0 }}><b>{facts.next.question}</b></p>
               <p className={s.answerSmall}>Needs: {facts.next.needs}.</p>
