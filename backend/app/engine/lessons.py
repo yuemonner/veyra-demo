@@ -143,7 +143,8 @@ def match(store, case_id: str) -> Dict[str, Any]:
             verdict = "not_applicable"
         counter = [{"case_id": o["case_id"], "title": o["title"], "cause": o.get("cause"), "status": o["status"]}
                    for o in lessons if o["case_id"] != lesson["case_id"] and o.get("cause") and not _same_cause(o, lesson)
-                   and _weighted_overlap(set(o["signature"]), then) >= 0.3]
+                   and _weighted_overlap(set(o["signature"]), then) >= 0.2
+                   and any(t.startswith(SPECIFIC) for t in set(o["signature"]) & then)]
         done_here = already_done({"topic": _check_topic(lesson.get("decisive_check"))}, reports) if lesson.get("decisive_check") else None
         if done_here and verdict != "applies":
             reuse = (f"The check that settled it there ({lesson['decisive_check']}) is reported as already done here: “{done_here.rstrip('.')}”. "

@@ -120,3 +120,17 @@ def test_mcp_server_lists_and_calls_read_only_tools(demo, monkeypatch):
     refused = mcp_server.handle({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "case_overview", "arguments": {"case_id": real["id"]}}})
     assert refused["result"]["isError"] and "model_authorization" in refused["result"]["content"][0]["text"]
     assert mcp_server.handle({"jsonrpc": "2.0", "id": 5, "method": "nope"})["error"]["code"] == -32601
+
+
+def test_closing_the_new_case_makes_it_the_lesson_next_time_and_a_counterexample(tmp_path):
+    store = CaseStore(tmp_path / "loop.db")
+    b = cf.run_sample(store, "crazyflie-restart")["case_id"]
+    store.append(b, "case_closure", {"investigation_status": "cause_probable", "confirmed_by": "engineer_judgement", "cause_domain": "control_suite",
+                                     "cause": "Deck UART receive task blocked in a DMA wait loop that never completed",
+                                     "evidence_note": "Debugger halt during the hang (synthetic)", "resolution_status": "not_yet_repaired"}, actor="Engineer")
+    c = cf.run_sample(store, "crazyflie-restart")["case_id"]
+    lessons = {l["case_id"]: l for l in store.questions(c)["lessons"]["lessons"]}
+    assert lessons[b]["verdict"] == "applies" and lessons[b]["status"] == "candidate"
+    first = next(l for l in lessons.values() if l["case_id"] != b)
+    assert first["verdict"] == "check_first" and any(x["case_id"] == b for x in first["counterexamples"])
+    store.close()
