@@ -47,6 +47,7 @@ Rules:
 - An earlier case (lesson) is a lead with conditions; reuse its fix only if its verdict is 'applies'.
 - Write for a busy engineer: short, plain, specific to this machine. No filler.
 - If the engineer already reported results of earlier actions (case_context), build on them: do not repeat a check.
+- Fill reuse_when: the conditions under which your explanation, once confirmed, would apply to another machine.
 Finish by calling submit_report exactly once."""
 
 SUBMIT_SPEC = {
@@ -80,6 +81,7 @@ SUBMIT_SPEC = {
                 "required": ["action", "why", "how", "where", "outcomes"]},
             "unknowns": {"type": "array", "maxItems": 3, "items": {"type": "string"}},
             "lesson": {"type": "string", "description": "How earlier cases apply, one sentence; empty if none"},
+            "reuse_when": {"type": "string", "description": "If this explanation is later confirmed: the conditions under which it would apply to another machine (hardware, firmware/software version, configuration, log signature), under 40 words"},
         },
         "required": ["headline", "status", "confidence", "evidence", "checked", "next_action", "unknowns"],
     },
@@ -461,13 +463,14 @@ def draft_lesson(store, case_id: str) -> Dict[str, Any]:
     findings = [e for e in store.ledger(case_id) if e["kind"] == "engineer_finding"]
     last = findings[-1]["payload"] if findings else None
     confirmed = bool(last and last.get("result") == "found")
-    cause = (last.get("observations") if confirmed else None) or res.get("explanation") or ""
+    newer = bool(last and inv.get("recorded_at") and inv["recorded_at"] > findings[-1]["recorded_at"])
+    cause = (res.get("explanation") if (newer or not confirmed) else None) or (last.get("observations") if confirmed else None) or res.get("explanation") or ""
     return {"investigation_status": "cause_probable" if (confirmed or res.get("status") == "cause_probable") else "cause_unknown",
             "confirmed_by": "engineer_judgement",
             "cause": cause[:600],
             "evidence_note": "; ".join([f"line {e['line']}: {e['quote'][:100]}" for e in (res.get("evidence") or [])[:3]]
                                        + ([f"engineer: {last.get('action')} -> {last.get('result')}: {last.get('observations') or ''}"] if last else []))[:900],
             "decisive_check": (last or {}).get("action") or (res.get("next_action") or {}).get("action"),
-            "applies_when": "",
+            "applies_when": (res.get("reuse_when") or "")[:1000],
             "resolution_status": "not_yet_repaired",
             "basis": "Drafted by Veyra from this case's investigation and the engineer's results. Edit anything that is wrong, then confirm."}

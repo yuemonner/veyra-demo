@@ -108,7 +108,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
 
       {(r.checked || []).length > 0 && (
         <div className={st.block}>
-          <h2 className={st.h2}>Already checked by Veyra</h2>
+          <h2 className={st.h2}>Already checked</h2>
           <ul className={st.checks}>
             {r.checked.map((c: Any, i: number) => {
               const v = VERDICT[c.verdict] || VERDICT.inconclusive;
@@ -215,7 +215,7 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded }:
         <p className={st.ask}>What did you find?</p>
         <div className={st.outcomes}>
           {outcomes.map((o, i) => (
-            <button key={i} className={choice === o ? st.outcomeOn : st.outcome} onClick={() => setChoice(o)} aria-pressed={choice === o}>
+            <button key={i} className={choice?.label === o.label ? st.outcomeOn : st.outcome} onClick={() => setChoice(o)} aria-pressed={choice?.label === o.label}>
               <b>{o.label}</b><span>{o.means}</span></button>))}
         </div>
         {choice && (
