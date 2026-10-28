@@ -141,7 +141,8 @@ class ClaudeCodeModel:
         import tempfile
         env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}  # use the subscription sign-in
         command = [binary, "-p", "--output-format", "json", "--model", self.cli_model, "--system-prompt", system_prompt,
-                   "--max-turns", "1", "--disallowedTools", "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,NotebookEdit,Task,TodoWrite"]
+                   "--max-turns", "3", "--disallowedTools", "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,NotebookEdit,Task,Agent,TodoWrite,Skill,ToolSearch,"
+                   "AskUserQuestion,ExitPlanMode,EnterPlanMode,BashOutput,KillShell,SlashCommand,ListMcpResourcesTool,ReadMcpResourceTool,Monitor"]
         try:
             with tempfile.TemporaryDirectory(prefix="veyra-agent-") as cwd:
                 done = subprocess.run(command, input=prompt, capture_output=True, text=True, timeout=self.timeout_s, cwd=cwd, env=env)
@@ -154,8 +155,9 @@ class ClaudeCodeModel:
         except ValueError:
             detail = (done.stderr or done.stdout or "").strip()[:400]
             raise ModelError(f"Claude Code failed (exit {done.returncode}): {detail or 'no output'}. Is it signed in? Run `claude` once in Terminal.") from None
-        if envelope.get("is_error"):
-            raise ModelError(f"Claude Code returned an error: {str(envelope.get('result'))[:400]}")
+        if envelope.get("is_error") or envelope.get("subtype") not in (None, "success"):
+            detail = envelope.get("result") or envelope.get("error") or (done.stderr or "").strip()[:300] or "no detail"
+            raise ModelError(f"Claude Code returned an error ({envelope.get('subtype') or 'error'}): {str(detail)[:400]}")
         try:
             reply = self._extract_json(str(envelope.get("result") or ""))
         except ValueError as error:

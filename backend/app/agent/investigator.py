@@ -313,7 +313,7 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
 
 
 # ---------------------------------------------------------------- deterministic investigation (no model)
-def deterministic(store, case_id: str) -> Dict[str, Any]:
+def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
     """The engine's own reading in the same shape, for when no model is configured. Labelled; never presented as AI."""
     tools = LogTools(store, case_id)
     q = store.questions(case_id)
@@ -350,7 +350,7 @@ def deterministic(store, case_id: str) -> Dict[str, Any]:
             "next_action": {"action": nxt.get("question") or "Capture the full log up to the next failure", "why": nxt.get("needs") or "",
                             "how": [], "where": "remote", "outcomes": [{"label": "Found it", "means": "Record what you found"},
                                                                       {"label": "Nothing found", "means": "Record what you checked"}]},
-            "unknowns": ["No model configured: this is Veyra's rule-based reading only, without an investigation."], "lesson": ""}
+            "unknowns": [f"{reason or 'No model configured'}: this is Veyra's rule-based reading only, without an investigation."], "lesson": ""}
 
 
 def run_summary(store, case_id: str) -> Optional[str]:
@@ -384,7 +384,11 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
         attempts = 0
         try:
             for _ in range(max_turns):
-                reply = model.create(system=SYSTEM_PROMPT, messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
+                try:
+                    reply = model.create(system=SYSTEM_PROMPT, messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
+                except Exception:  # noqa: BLE001  one retry: a transient CLI / network failure is not a verdict
+                    time.sleep(2)
+                    reply = model.create(system=SYSTEM_PROMPT, messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
                 for k in usage:
                     usage[k] += int((reply.get("usage") or {}).get(k) or 0)
                 content = reply.get("content") or []
@@ -433,7 +437,7 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
         except Exception as exc:  # noqa: BLE001  a model failure falls back, and says so
             mode, why_deterministic = "deterministic", f"The model step failed: {exc}"[:300]
     if mode == "deterministic":
-        report = deterministic(store, case_id)
+        report = deterministic(store, case_id, why_deterministic)
     result = {"kind": "autonomous_investigation", "version": INVESTIGATOR_VERSION, "run_id": run["id"], "mode": mode,
               "model": getattr(model, "model", None) if mode == "agent" else None, "fallback_reason": why_deterministic,
               "steps": steps, "result": report, "dropped": dropped, "usage": usage, "seconds": round(time.time() - started, 1),
