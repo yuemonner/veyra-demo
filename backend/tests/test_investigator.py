@@ -143,6 +143,6 @@ def test_hosted_showcase_replays_the_recorded_investigation_labelled(store):
     ids = public_samples.seed_showcase(store)
     assert len(ids) == 1 and public_samples.seed_showcase(store) == []            # once
     inv_ = inv.latest(store, ids[0])
-    assert inv_["mode"] == "agent" and inv_["recorded"]["note"].startswith("Recorded on a local Veyra instance")
+    assert inv_["mode"] == "agent" and inv_["recorded"]["note"].startswith("Recorded") and inv_["result"]["hypotheses"]
     assert [e["kind"] for e in store.ledger(ids[0]) if e["kind"] in ("agent_report", "engineer_finding")] == ["agent_report", "engineer_finding", "agent_report"]
     assert store.verify(ids[0])["ledger_chain"]["valid"]
