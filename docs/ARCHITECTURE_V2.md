@@ -113,3 +113,13 @@ each task waits, which is the step that found the UART / DMA wait loop in the re
 3. Lessons at scale: today's retrieval is exact token overlap. Add embedding retrieval only when there are enough
    closed cases for exact overlap to miss real matches; applicability stays deterministic.
 4. PostgreSQL and object storage when a pilot customer needs multi-user workspaces.
+
+## 7. Run it locally
+
+- Preview: double-click `backups/veyra-v2-preview.command`, open http://127.0.0.1:3059/field-case, then Upload data ->
+  drop a `.log` / `.txt` / `.bag` / `.mcap` / `.ulg`, or "Try a sample". No model is called automatically
+  (`VEYRA_AUTOPILOT_AGENT=false`, matching the owner's "agent blocked" setting); the agent stays one click away.
+- MCP for Claude Code, from `backend/`:
+  `claude mcp add veyra --env VEYRA_ENGINE_DB=../.local-private/workspaces/veyra-test/engine.db -- python -m app.mcp_server`
+  Then ask Claude Code to "list Veyra cases and investigate the Crazyflie restart". Synthetic cases are served; a real
+  case needs a model authorisation recorded in Veyra first.
