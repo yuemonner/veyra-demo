@@ -78,6 +78,8 @@ def _from_discovery(disc: Dict[str, Any], inc: Dict[str, Any], ch: str) -> Dict[
 def _msg(text: str) -> str:
     """A log line without its time stamp and level prefix."""
     text = re.sub(r"^\s*(\[[^\]]*\]\s*){1,3}:?\s*", "", text)
+    text = re.sub(r"^\s*\w{3}\s+\d{1,2}\s+[\d:.]+\s+\S+\s+[\w./-]+(\[\d+\])?:\s*", "", text)  # syslog: 'Oct 27 14:05:42 host prog[pid]: '
+    text = re.sub(r"^(kernel:\s*)?(WARNING|WARN|ERROR|INFO|NOTICE|DEBUG|FATAL):\s*", "", text)
     return text.strip().rstrip(".")
 
 
@@ -93,7 +95,7 @@ def _from_log(log: Dict[str, Any], reports: Optional[List[str]] = None) -> List[
     if inc and inc.get("first_signs"):
         signs = inc["first_signs"]
         out.append({"id": "log:first_signs", "question": f"What warned before the failure at line {inc['line']}?", "status": "answered",
-                    "answer": "In order: " + "; ".join(f"{f['component']} from line {f['first_line']} ({_msg(f['text'])[:80]}"
+                    "answer": "Warnings before the failure, in order: " + "; ".join(f"{f['component']} from line {f['first_line']} ({_msg(f['text'])[:80]}"
                                                        + (f", {len(f['lines'])} lines" if len(f["lines"]) > 1 else "") + ")" for f in signs[:5])
                     + (f". The first sign came {inc['lead_s']:g} s before the failure" if inc.get("lead_s") is not None else "")
                     + ". Earlier is a lead, not a cause.",
@@ -101,8 +103,11 @@ def _from_log(log: Dict[str, Any], reports: Optional[List[str]] = None) -> List[
     for t in (inc or {}).get("threads") or []:
         later = "; ".join(f"line {x['line']}: {_msg(x['text'])[:90]}" for x in t["later"][:3])
         out.append({"id": f"log:thread:{t['component']}", "question": f"What happened to {t['component']}?", "status": "answered",
-                    "answer": f"It warned before the failure (line{'s' if len(t['before']) > 1 else ''} {', '.join(map(str, t['before'][:4]))}), then {later}. "
-                              "The same component warning first and failing later makes it the first place to look; the order alone does not prove it caused the failure."})
+                    "answer": f"{t['component']} warned before the failure (line{'s' if len(t['before']) > 1 else ''} {', '.join(map(str, t['before'][:4]))}), then {later}. "
+                              + ("The same component warning right before the failure and failing later makes it the first place to look; the order alone does not prove it caused the failure."
+                               if t.get("proximate", True) else
+                               f"It failed only after line {inc['line']}, and other components warned closer to the failure ({', '.join(x for x in inc.get('proximate', [])[:2])}): "
+                               "more likely a consequence or a separate fault than the trigger. Worth its own check, not the first one.")})
     for r in restarts[-2:]:
         where = f"line {r['line']}"
         if r["causes"]:
@@ -268,7 +273,7 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
             "cannot_establish": [{"question": q["question"], "needs": q["needs"], "check_id": q.get("check_id")} for q in open_q],
             "next": None if not nxt else {"question": nxt["question"], "needs": nxt["needs"], "check_id": nxt.get("check_id"),
                                           "why_a_person": (f"Veyra read all {log['lines']} lines of the log; the answer is not in them. It needs the machine itself " + ("(a debug build, added logging or a debugger on the board)." if log.get("restarts") else
-                                                              "(process and CPU / memory monitoring, a recording of the topics, or added logging).") if log else
+                                                              "(the data named under Needs: monitoring, diagnostics, a recording of the topics, or added logging).") if log else
                                                            f"Veyra read the whole original recording ({len((discovery.get('inventory') or {}).get('read_by_probes') or [])} streams: "
                                                            "controller mode and status, controller messages and configuration, operator inputs, outputs, battery); "
                                                            "this record is not in it. Only someone with the machine, its storage or the ground station can provide it." if discovery else

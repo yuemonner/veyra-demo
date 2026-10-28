@@ -87,6 +87,12 @@ def debrief_recording(store, path: Path, mapping: Dict[str, Any], *, machine_id:
         imports.append(record["id"])
     if report and report.get("stated_reason"):
         at_s = report.get("at_s")
+        if at_s is None and text_log is not None:  # a log: the report is about its failure, not its first line
+            from app.discovery.logs import characterize
+            found = characterize(text_log)
+            mark = (found.get("incident") or {}).get("t_ns") or ((found.get("restarts") or [{}])[-1]).get("t_ns")
+            if mark is not None and start <= mark <= end:
+                at_s = (mark - start) / 1e9
         payload = {"occurred_at": at(float(at_s if at_s is not None else (problem_from_s or 0.0))), "intervention_type": report.get("intervention_type") or "other",
                    "operator": report.get("operator") or actor, "stated_reason": report["stated_reason"], "reported_via": "Upload form"}
         if report.get("symptom"):

@@ -169,7 +169,7 @@ def test_the_incident_reaches_the_questions(tmp_path):
     q = store.questions(out["case_id"])
     ids = [x["id"] for x in q["questions"]]
     assert "log:first_signs" in ids and "log:thread:lidar_driver" in ids
-    assert q["next"]["question"].startswith("Did the killed process grow") and "memory monitoring" in q["next"]["why_a_person"]
+    assert q["next"]["question"].startswith("Did the killed process grow") and "Needs" in q["next"]["why_a_person"]
     store.close()
 
 
@@ -181,3 +181,16 @@ def test_a_crash_after_the_stop_is_not_promoted_over_what_came_right_before():
     by = {x["cause"]: x for x in c["checks"]}
     assert "following error" in by["failsafe"]["answered"] and "segmentation fault" in by["process_crash"]["answered"]
     assert any(s.startswith("Also: motion_planner") for s in c["summary"])
+
+
+def test_the_report_is_placed_at_the_failure_and_a_late_crash_is_not_the_first_lead(tmp_path):
+    from app.workflows.debrief import debrief_recording
+    store = CaseStore(tmp_path / "arm.db")
+    out = debrief_recording(store, AMR.parent / "cell3_arm_syslog.log", {}, machine_id="CELL3", title="Protective stop (SYNTHETIC)", actor="t",
+                            synthetic=True, report={"stated_reason": "Arm stopped mid-move"})
+    rep = next(e for e in store.ledger(out["case_id"]) if e["kind"] == "intervention_report")
+    assert rep["payload"]["occurred_at"].endswith("14:05:42Z") or "14:05:42" in rep["payload"]["occurred_at"]
+    q = {x["id"]: x for x in store.questions(out["case_id"])["questions"]}
+    assert "more likely a consequence" in q["log:thread:motion_planner"]["answer"] and not q["log:thread:motion_planner"]["answer"].startswith("Oct")
+    assert q["log:first_signs"]["answer"].startswith("Warnings before the failure") and "cell3-arm" not in q["log:first_signs"]["answer"]
+    store.close()
