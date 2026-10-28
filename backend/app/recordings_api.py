@@ -100,6 +100,8 @@ def _inspect(path: Path) -> Dict[str, Any]:
                                                                     for (t, _m), n in sorted(log["counts"].items())], "message_count": sum(log["counts"].values()),
                 "start_ns": None}
     if is_text_log(path):
+        if not textlog.looks_like_text(path):
+            raise ValueError("This file is not a readable text log (expected lines of text)")
         from app.discovery import logs
         parsed = textlog.read(path)
         found = logs.characterize(parsed, source_name=path.name)
