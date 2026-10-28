@@ -2282,7 +2282,7 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
             <button className={s.quiet} disabled={!!busy} onClick={async () => {
               setError(""); setBusy("Starting");
               try {
-                const { job_id } = await call("/engine/demo/sample-log", { method: "POST", body: JSON.stringify({ name: "crazyflie-restart" }) });
+                const { job_id } = await call("/engine/samples/crazyflie-restart/run", { method: "POST", body: "{}" });
                 for (;;) {
                   await sleep(800);
                   const job = await call(`/engine/jobs/${job_id}`);

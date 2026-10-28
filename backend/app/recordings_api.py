@@ -190,23 +190,18 @@ def _run_job(job: Dict[str, Any], db: Path, args: Dict[str, Any]) -> None:
         release()
 
 
-class SampleIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: str = Field(min_length=1, max_length=60)
-
-
-@router.post("/demo/sample-log")
-def sample_log(body: SampleIn, request: Request):
+@router.post("/samples/{name}/run")
+def sample_log(name: str, request: Request):
     """Run a SYNTHETIC sample through the ordinary upload path (and the earlier, closed case it learns from)."""
     from app.engine_api import store_path
     from app.workflows import crazyflie_demo
-    if body.name not in crazyflie_demo.SAMPLES:
+    if name not in crazyflie_demo.SAMPLES:
         raise HTTPException(404, "Unknown sample")
     job = {"id": "job-" + secrets.token_hex(8), "recording": None, "state": "running", "step": "Starting", "started_at": time.time(),
            "owner": (getattr(request.state, "user", None) or {}).get("workspace_id")}
     with _lock:
         _jobs[job["id"]] = job
-    threading.Thread(target=_run_sample, args=(job, store_path(request), body.name), daemon=True).start()
+    threading.Thread(target=_run_sample, args=(job, store_path(request), name), daemon=True).start()
     return {"job_id": job["id"]}
 
 
