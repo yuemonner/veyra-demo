@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import s from "./field-case.module.css";
 import { Lessons, RecordingRead, SignalChain } from "./SignalChain";
+import Investigation from "./Investigation";
 import { plotFor, Waveform } from "./Waveform";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "/local-api";
@@ -168,7 +169,8 @@ export default function FieldCasePage() {
   const [agentInfo, setAgentInfo] = useState<Any>(null);
   const [agentBusy, setAgentBusy] = useState(false);
   const [agentError, setAgentError] = useState("");
-  const [tab, setTab] = useState<"brief" | "next" | "evidence" | "audit">("brief");
+  const [tab, setTab] = useState<"case" | "brief" | "next" | "evidence" | "audit">("case");
+  const [jobId, setJobId] = useState<string | null>(null);
   const [cases, setCases] = useState<Any[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [tabularFiles, setTabularFiles] = useState<File[]>([]);
@@ -292,7 +294,7 @@ export default function FieldCasePage() {
         {cases.length > 1 ? (
           <label className={s.casePick}>
             <span className={s.visuallyHidden}>Case</span>
-            <select value={caseId ?? ""} onChange={(e) => { setTab("brief"); load(e.target.value); }}>
+            <select value={caseId ?? ""} onChange={(e) => { setTab("case"); load(e.target.value); }}>
               {[...cases].reverse().map((c) => (
                 <option key={c.id} value={c.id}>{c.synthetic ? "Synthetic · " : "Real data · "}{caseLabel(c.title)}</option>))}
             </select>
@@ -338,8 +340,7 @@ export default function FieldCasePage() {
         <main className={s.body}>
           <nav className={s.views} aria-label="Views of this case">
             {([
-              ["brief", "Brief", "What happened, what to do", ""],
-              ["next", "Next action", "Veyra's next step and your decision", `${nextStep(data.ledger, run.id)}/3`],
+              ["case", "Investigation", "What happened, what Veyra checked, what to do next", ""],
               ["evidence", "Evidence", "Findings and their sources", String(Object.values(run.domains || {}).reduce((n: number, d: Any) => n + (d.observations || []).filter((o: Any) => o.kind === "anomaly" || o.kind === "delay").length, 0))],
               ["audit", "Record", "Owners, decisions and the case record", String((data.ledger || []).length)],
             ] as const).map(([id, label, hint, count]) => (
@@ -349,6 +350,7 @@ export default function FieldCasePage() {
               </button>))}
           </nav>
           {tab === "next" && <NextAction caseId={caseId!} data={data} onChanged={() => load(caseId!)} me={me?.user?.name} onEvidence={() => go("findings")} />}
+          {tab === "case" && <Investigation key={caseId!} caseId={caseId!} call={call} actor={me?.user?.name || ENGINEER} jobId={jobId} onChanged={() => load(caseId!)} />}
           {tab === "brief" && <Brief data={data} run={run} verification={verification} go={go} onAccept={acceptCheck} acceptBusy={acceptBusy} error={agentError} />}
           {tab === "evidence" && <>
             <AgentPanel ledger={data.ledger} run={run} info={agentInfo} busy={agentBusy} error={agentError} onRun={runAgent} />
@@ -373,9 +375,9 @@ export default function FieldCasePage() {
         </main>
       )}
       {uploadOpen && <UploadDialog initialFiles={tabularFiles} onClose={() => { setUploadOpen(false); setTabularFiles([]); }} onDone={async (id: string) => {
-        setUploadOpen(false); setCases((await call("/engine/cases")).filter((c: Any) => c.fault_type !== "known_good_run")); setTab("brief"); await load(id); }} />}
-      {recordingOpen && <RecordingDialog onTabular={(files: File[]) => { setRecordingOpen(false); setTabularFiles(files); setUploadOpen(true); }} onClose={() => setRecordingOpen(false)} onDone={async (id: string) => {
-        setRecordingOpen(false); setCases((await call("/engine/cases")).filter((c: Any) => c.fault_type !== "known_good_run")); setTab("brief"); await load(id); }} />}
+        setUploadOpen(false); setCases((await call("/engine/cases")).filter((c: Any) => c.fault_type !== "known_good_run")); setTab("case"); await load(id); }} />}
+      {recordingOpen && <RecordingDialog onTabular={(files: File[]) => { setRecordingOpen(false); setTabularFiles(files); setUploadOpen(true); }} onClose={() => setRecordingOpen(false)} onDone={async (id: string, job?: string) => {
+        setRecordingOpen(false); setJobId(job || null); setCases((await call("/engine/cases")).filter((c: Any) => c.fault_type !== "known_good_run")); setTab("case"); await load(id); }} />}
       {shareOpen && caseId && <ShareDialog caseId={caseId} title={data?.case?.title || ""} onClose={() => setShareOpen(false)} />}
       {!isPrivate && <p className={s.legacy}>Looking for the earlier workspace? <a href="/product-demo?legacy=1">Open it</a> (manual analysis, older engine).</p>}
     </div>
@@ -2185,7 +2187,7 @@ function uploadWithProgress(file: File, onProgress: (pct: number) => void): Prom
 
 const TABULAR = /\.(csv|json|jsonl|ndjson)$/i;
 
-function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; onDone: (caseId: string) => void; onTabular: (files: File[]) => void }) {
+function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; onDone: (caseId: string, jobId?: string) => void; onTabular: (files: File[]) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [pct, setPct] = useState<number | null>(null);
   const [rec, setRec] = useState<Any>(null);
@@ -2193,7 +2195,7 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
   const [json, setJson] = useState("");
   const [types, setTypes] = useState<Any[]>([]);
   const [f, setF] = useState<Any>({ machine_id: "", machine_class: "", title: "", stated_reason: "", symptom: "", affected: "",
-    problem_from: "", problem_to: "", normal_from: "", normal_to: "", normal_basis: "", synthetic: false });
+    problem_from: "", problem_to: "", normal_from: "", normal_to: "", normal_basis: "", synthetic: false, allow_model: true });
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const set = (k: string) => (e: Any) => setF({ ...f, [k]: e.target.value });
@@ -2243,15 +2245,15 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
       if ((pf == null) !== (pt == null)) throw new Error("Give both ends of the problem, or neither");
       if ((nf == null) !== (nt == null)) throw new Error("Give both ends of the normal period, or neither");
       const body: Any = { mapping: mapping(), machine_id: f.machine_id.trim(), title: f.title.trim(), machine_class: f.machine_class || null,
-        problem_from_s: pf, problem_to_s: pt, normal_from_s: nf, normal_to_s: nt, normal_basis: f.normal_basis || null, synthetic: f.synthetic };
+        problem_from_s: pf, problem_to_s: pt, normal_from_s: nf, normal_to_s: nt, normal_basis: f.normal_basis || null, synthetic: f.synthetic, allow_model: !!f.allow_model };
       if (f.stated_reason.trim()) body.report = { stated_reason: f.stated_reason.trim(), symptom: f.symptom || null, affected_function: f.affected.trim() || null, at_s: pf };
       setBusy("Starting");
       const { job_id } = await call(`/engine/recordings/${rec.id}/debrief`, { method: "POST", body: JSON.stringify(body) });
       for (;;) {
         await sleep(1000);
         const job = await call(`/engine/jobs/${job_id}`);
-        if (job.state === "done") { onDone(job.result.case_id); return; }
         if (job.state === "failed") throw new Error(job.error);
+        if (job.case_id || job.state === "done") { onDone(job.case_id || job.result.case_id, job.state === "running" ? job_id : undefined); return; }  // the investigation continues on the case page
         setBusy(job.step);
       }
     } catch (e: Any) { setError(e.message); setBusy(""); }
@@ -2281,23 +2283,7 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
             {busy && <span className={s.note} style={{ margin: 0 }}>{busy}{pct != null && pct < 100 ? ` ${pct}%` : "…"}</span>}
             <button className={s.button} onClick={upload} disabled={!file || !!busy}>Upload and read</button>
           </div>
-          <div className={s.sampleRow}>
-            <span>No file at hand?</span>
-            <button className={s.quiet} disabled={!!busy} onClick={async () => {
-              setError(""); setBusy("Starting");
-              try {
-                const { job_id } = await call("/engine/samples/crazyflie-restart/run", { method: "POST", body: "{}" });
-                for (;;) {
-                  await sleep(800);
-                  const job = await call(`/engine/jobs/${job_id}`);
-                  if (job.state === "done") { onDone(job.result.case_id); return; }
-                  if (job.state === "failed") throw new Error(job.error);
-                  setBusy(job.step);
-                }
-              } catch (e: Any) { setError(e.message); setBusy(""); }
-            }}>Try a sample: a drone that restarted in flight</button>
-            <span className={s.dim}>Synthetic console log, reconstructed from a public report</span>
-          </div>
+          <RealSamples busy={!!busy} setBusy={setBusy} setError={setError} onDone={onDone} />
         </>}
 
         {rec && fixedReading && <>
@@ -2324,6 +2310,8 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
           </div>
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, fontSize: 13 }}>
             <input type="checkbox" checked={f.synthetic} onChange={(e) => setF({ ...f, synthetic: e.target.checked })} /> Test or simulated data</label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, fontSize: 13 }}>
+            <input type="checkbox" checked={!!f.allow_model} onChange={(e) => setF({ ...f, allow_model: e.target.checked })} /> Let Veyra's AI investigator read this data (sent to the AI model configured on this instance)</label>
           {error && <p className={s.warning} role="alert">{error}</p>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
             {busy && <span className={s.note} style={{ margin: 0 }} aria-live="polite">{busy}…</span>}
@@ -2384,6 +2372,8 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, fontSize: 13 }}>
             <input type="checkbox" checked={f.synthetic} onChange={(e) => setF({ ...f, synthetic: e.target.checked })} />
             Test or simulated data{/synthetic|simulat|\bsim\b|fake|test/i.test(file?.name || "") ? <span className={s.dim}> (ticked because of the file name)</span> : null}</label>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, fontSize: 13 }}>
+            <input type="checkbox" checked={!!f.allow_model} onChange={(e) => setF({ ...f, allow_model: e.target.checked })} /> Let Veyra's AI investigator read this data (sent to the AI model configured on this instance)</label>
           <p className={s.note}>Times from the start of the recording, 0:00 to {clock(duration)}.</p>
           {error && <p className={s.warning} role="alert">{error}</p>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
@@ -2447,6 +2437,33 @@ function ShareDialog({ caseId, title, onClose }: { caseId: string; title: string
         </>}
         {error && <p className={s.warning} role="alert">{error}</p>}
       </div>
+    </div>
+  );
+}
+
+
+/** One click: a real failure log from a public issue thread, through the same upload path and the investigator. */
+function RealSamples({ busy, setBusy, setError, onDone }: { busy: boolean; setBusy: (s: string) => void; setError: (s: string) => void; onDone: (caseId: string, jobId?: string) => void }) {
+  const [list, setList] = useState<Any[]>([]);
+  useEffect(() => { call("/engine/samples").then(setList).catch(() => setList([])); }, []);
+  if (!list.length) return null;
+  async function run(name: string) {
+    setError(""); setBusy("Starting");
+    try {
+      const { job_id } = await call(`/engine/samples/${name}/run`, { method: "POST", body: JSON.stringify({ allow_model: true }) });
+      for (;;) {
+        await sleep(700);
+        const job = await call(`/engine/jobs/${job_id}`);
+        if (job.state === "failed") throw new Error(job.error);
+        if (job.case_id || job.state === "done") { onDone(job.case_id || job.result.case_id, job.state === "running" ? job_id : undefined); return; }
+        setBusy(job.step);
+      }
+    } catch (e: Any) { setError(e.message); setBusy(""); }
+  }
+  return (
+    <div className={s.sampleRow}>
+      <span>No file at hand? Open a real failure log from a public issue:</span>
+      {list.map((x) => <button key={x.name} className={s.quiet} disabled={busy} onClick={() => run(x.name)} title={`${x.platform}. Source: ${x.source_url}`}>{x.title}</button>)}
     </div>
   );
 }

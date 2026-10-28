@@ -44,8 +44,11 @@ def debrief_recording(store, path: Path, mapping: Dict[str, Any], *, machine_id:
         counts: Dict[str, int] = {}
         for r in found_rows:
             counts[r["signal"]] = counts.get(r["signal"], 0) + 1
-        extraction = bags.Extraction(rows=found_rows, counts=counts, skipped={}, start_ns=found_rows[0]["t"] if found_rows else None,
-                                     end_ns=found_rows[-1]["t"] if found_rows else None)
+        times = [r["t"] for r in found_rows]  # a log's clock can step backwards (re-sync, several runs pasted together)
+        extraction = bags.Extraction(rows=found_rows, counts=counts, skipped={}, start_ns=min(times) if times else None,
+                                     end_ns=max(times) if times else None)
+        from app.ingest import rawstore
+        rawstore.save(store.path, path)  # the original lines, values and line numbers, for the engineer and the investigator
         clean = textlog.mapping(text_log.clock)
     else:
         clean = bags.validate_mapping(mapping, [s["id"] for s in catalog.describe()["signals"]])

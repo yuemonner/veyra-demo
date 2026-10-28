@@ -139,6 +139,7 @@ class DebriefIn(BaseModel):
     normal_basis: Optional[str] = Field(default=None, max_length=1000)
     report: Optional[ReportIn] = None
     synthetic: bool = False
+    allow_model: bool = False   # the uploader allows Veyra's AI investigator to read this data (sent to the configured model provider)
 
 
 @router.post("/recordings/{rid}/debrief")
@@ -165,18 +166,19 @@ def start_debrief(rid: str, body: DebriefIn, request: Request):
                 actor=actor_for(request, body.actor), machine_class=body.machine_class, problem_from_s=body.problem_from_s, problem_to_s=body.problem_to_s,
                 normal_from_s=body.normal_from_s, normal_to_s=body.normal_to_s, normal_basis=body.normal_basis,
                 report=body.report.model_dump() if body.report else None, source_name=meta["filename"], synthetic=body.synthetic)
-    threading.Thread(target=_run_job, args=(job, store_path(request), args), daemon=True).start()
+    threading.Thread(target=_run_job, args=(job, store_path(request), args, body.allow_model, actor_for(request, body.actor)), daemon=True).start()
     return {"job_id": job["id"]}
 
 
-def _run_job(job: Dict[str, Any], db: Path, args: Dict[str, Any]) -> None:
+def _run_job(job: Dict[str, Any], db: Path, args: Dict[str, Any], allow_model: bool = False, actor: str = "Engineer (upload)") -> None:
     from app.workflows.debrief import debrief_recording
     from app.store.sqlite_store import CaseStore
     store = CaseStore(db)
     try:
         result = debrief_recording(store, progress=lambda step: job.update(step=step), **args)
+        job.update(case_id=result["case_id"])
+        _investigate_into(job, store, result["case_id"], allow_model=allow_model, actor=actor)
         from app.engine_api import _autopilot
-        job.update(step="Preparing the next step")
         _autopilot(store, result["case_id"])
         job.update(state="done", step="Done", result=result, finished_at=time.time())
     except (ValueError, bags.RecordingError) as error:
@@ -190,34 +192,164 @@ def _run_job(job: Dict[str, Any], db: Path, args: Dict[str, Any]) -> None:
         release()
 
 
+@router.get("/samples")
+def list_samples():
+    from app.workflows import public_samples
+    return public_samples.listing()
+
+
 @router.post("/samples/{name}/run")
-def sample_log(name: str, request: Request):
-    """Run a SYNTHETIC sample through the ordinary upload path (and the earlier, closed case it learns from)."""
+def sample_log(name: str, request: Request, body: Optional["SampleIn"] = None):
+    """Run a REAL public failure log (fixtures/real/public) through the ordinary upload path and the investigator."""
     from app.engine_api import store_path
-    from app.workflows import crazyflie_demo
-    if name not in crazyflie_demo.SAMPLES:
+    from app.workflows import public_samples
+    if name not in public_samples.SAMPLES:
         raise HTTPException(404, "Unknown sample")
-    job = {"id": "job-" + secrets.token_hex(8), "recording": None, "state": "running", "step": "Starting", "started_at": time.time(),
-           "owner": (getattr(request.state, "user", None) or {}).get("workspace_id")}
-    with _lock:
-        _jobs[job["id"]] = job
-    threading.Thread(target=_run_sample, args=(job, store_path(request), name), daemon=True).start()
+    job = _new_job(request)
+    threading.Thread(target=_run_sample, args=(job, store_path(request), name, bool(body and body.allow_model), actor_for(request, "Engineer (sample)")),
+                     daemon=True).start()
     return {"job_id": job["id"]}
 
 
-def _run_sample(job: Dict[str, Any], db: Path, name: str) -> None:
+class SampleIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    allow_model: bool = False
+
+
+def _new_job(request: Request, **extra) -> Dict[str, Any]:
+    job = {"id": "job-" + secrets.token_hex(8), "recording": None, "state": "running", "step": "Starting", "started_at": time.time(), "steps": [],
+           "owner": (getattr(request.state, "user", None) or {}).get("workspace_id"), **extra}
+    with _lock:
+        _jobs[job["id"]] = job
+    return job
+
+
+def _run_sample(job: Dict[str, Any], db: Path, name: str, allow_model: bool, actor: str) -> None:
     from app.store.sqlite_store import CaseStore
-    from app.workflows import crazyflie_demo
+    from app.workflows import public_samples
     store = CaseStore(db)
     try:
-        result = crazyflie_demo.run_sample(store, name, progress=lambda step: job.update(step=step))
-        from app.engine_api import _autopilot
-        job.update(step="Preparing the next step")
-        _autopilot(store, result["case_id"])
+        result = public_samples.run_sample(store, name, progress=lambda step: job.update(step=step))
+        job.update(case_id=result["case_id"])
+        _investigate_into(job, store, result["case_id"], allow_model=allow_model, actor=actor)
         job.update(state="done", step="Done", result=result, finished_at=time.time())
     except Exception as error:  # noqa: BLE001
         traceback.print_exc()
         job.update(state="failed", error=f"{type(error).__name__}: {error}", finished_at=time.time())
+    finally:
+        store.close()
+
+
+# ---------------------------------------------------------------- autonomous investigation
+def _investigator_model():
+    if os.getenv("VEYRA_INVESTIGATOR", "agent").strip().lower() in ("rules", "off", "false"):
+        return None
+    from app.agent.llm import from_environment
+    return from_environment()
+
+
+def _investigate_into(job: Dict[str, Any], store, case_id: str, *, allow_model: bool, actor: str) -> Dict[str, Any]:
+    """Run the investigator for a case, streaming each check it runs into the job (the page shows them live)."""
+    from app.agent import investigator
+    from app.agent.runner import egress_allowed
+    model = _investigator_model()
+    if model is not None and allow_model and model.available() and not egress_allowed(store, case_id, model.provider):
+        store.append(case_id, "model_authorization", {"provider": model.provider, "model": getattr(model, "model", None),
+                                                      "scope": "Veyra's investigator may read this case's data to investigate it",
+                                                      "authorized_by": actor, "evidence": "Allowed by the uploader in the upload form"},
+                     actor=actor, source="upload form")
+    job.update(step="Veyra is investigating" if model is not None and model.available() else "Reading the log")
+    out = investigator.investigate(store, case_id, model=model, on_step=lambda st: job["steps"].append(st))
+    job.update(investigation={"mode": out["mode"], "fallback_reason": out["fallback_reason"], "seconds": out["seconds"]})
+    return out
+
+
+class InvestigateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    allow_model: bool = False
+
+
+@router.post("/cases/{case_id}/investigate")
+def start_investigation(case_id: str, request: Request, body: Optional[InvestigateIn] = None):
+    from app.engine_api import store_path
+    job = _new_job(request, case_id=case_id)
+    threading.Thread(target=_run_investigation, args=(job, store_path(request), case_id, bool(body and body.allow_model), actor_for(request, "Engineer")),
+                     daemon=True).start()
+    return {"job_id": job["id"]}
+
+
+def _run_investigation(job, db, case_id, allow_model, actor):
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(db)
+    try:
+        _investigate_into(job, store, case_id, allow_model=allow_model, actor=actor)
+        job.update(state="done", step="Done", result={"case_id": case_id}, finished_at=time.time())
+    except Exception as error:  # noqa: BLE001
+        traceback.print_exc()
+        job.update(state="failed", error=f"{type(error).__name__}: {error}", finished_at=time.time())
+    finally:
+        store.close()
+
+
+@router.get("/cases/{case_id}/investigation")
+def get_investigation(case_id: str, request: Request):
+    from app.agent import investigator
+    from app.agent.runner import egress_allowed
+    from app.engine_api import store_path
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(store_path(request))
+    try:
+        model = _investigator_model()
+        findings = [{"id": e["id"], "recorded_at": e["recorded_at"], "by": e["actor"], **e["payload"]} for e in store.ledger(case_id) if e["kind"] == "engineer_finding"]
+        return {"investigation": investigator.latest(store, case_id), "findings": findings,
+                "agent": {"configured": bool(model and model.available()), "model": getattr(model, "model", None) if model else None,
+                          "allowed": bool(model and egress_allowed(store, case_id, model.provider))},
+                "closed": any(e["kind"] == "case_closure" for e in store.ledger(case_id))}
+    finally:
+        store.close()
+
+
+class FindingIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    action: str = Field(min_length=1, max_length=500)
+    result: str = Field(pattern="^(found|not_found|cannot_do|other)$")
+    observations: Optional[str] = Field(default=None, max_length=2000)
+    investigation_entry: Optional[str] = Field(default=None, max_length=80)
+    reinvestigate: bool = True
+
+
+@router.post("/cases/{case_id}/finding")
+def record_finding(case_id: str, body: FindingIn, request: Request):
+    """The engineer's result for the next action. Veyra re-investigates with it (unless asked not to)."""
+    from app.engine_api import store_path
+    from app.ledger.model import LedgerError
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(store_path(request))
+    try:
+        entry = store.append(case_id, "engineer_finding", body.model_dump(exclude={"reinvestigate"}, exclude_none=True),
+                             actor=actor_for(request, "Engineer"), source="case page")
+    except LedgerError as error:
+        raise HTTPException(422, str(error)) from None
+    finally:
+        store.close()
+    if not body.reinvestigate:
+        return {"entry_id": entry["id"]}
+    job = _new_job(request, case_id=case_id)
+    threading.Thread(target=_run_investigation, args=(job, store_path(request), case_id, False, actor_for(request, "Engineer")), daemon=True).start()
+    return {"entry_id": entry["id"], "job_id": job["id"]}
+
+
+@router.get("/cases/{case_id}/lesson-draft")
+def lesson_draft(case_id: str, request: Request):
+    from app.agent import investigator
+    from app.engine_api import store_path
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(store_path(request))
+    try:
+        run = store.latest_run(case_id) or {}
+        labels = (run.get("machine_profile") or {}).get("domains") or {}
+        domains = [{"id": k, "label": (labels.get(k) or {}).get("label", k), "status": v.get("status")} for k, v in (run.get("domains") or {}).items()]
+        return {"draft": investigator.draft_lesson(store, case_id), "domains": domains}
     finally:
         store.close()
 

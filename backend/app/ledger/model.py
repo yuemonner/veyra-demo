@@ -466,6 +466,14 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
                "scope": _text(payload, "scope"), "authorized_by": _text(payload, "authorized_by", limit=300), "evidence": _text(payload, "evidence"),
                "boundary": "Covers only the provider and scope stated. Recorded by a person; not verified by Veyra."}
 
+    elif kind == "engineer_finding":
+        # What an engineer found when doing the next action Veyra proposed (or any check of their own). It feeds the
+        # next investigation step; it is the engineer's report, not an independently verified measurement.
+        out = {"action": _text(payload, "action", limit=500), "result": _choice(payload, "result", ("found", "not_found", "cannot_do", "other")),
+               "observations": _text(payload, "observations", required=payload.get("result") in ("found", "other"), limit=2000),
+               "investigation_entry": _text(payload, "investigation_entry", required=False, limit=80),
+               "verification_grade": "engineer_reported_not_independently_reviewed"}
+
     elif kind == "case_closure":
         # The engineer's conclusion: the unit of engineering experience later cases reuse. What is known about the
         # CAUSE (investigation status, with the strength of the evidence) is kept apart from what happened to the
