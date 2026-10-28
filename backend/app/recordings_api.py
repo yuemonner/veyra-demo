@@ -307,7 +307,10 @@ def get_investigation(case_id: str, request: Request):
     try:
         model = _investigator_model()
         findings = [{"id": e["id"], "recorded_at": e["recorded_at"], "by": e["actor"], **e["payload"]} for e in store.ledger(case_id) if e["kind"] == "engineer_finding"]
-        return {"investigation": investigator.latest(store, case_id), "findings": findings,
+        recorded = [{**e["payload"], "entry_id": e["id"]} for e in store.ledger(case_id)
+                    if e["kind"] == "agent_report" and e["payload"].get("kind") == "autonomous_investigation" and e["payload"].get("recorded")]
+        playback = {"investigations": recorded, "findings": findings} if recorded else None  # a recorded walkthrough, played step by step
+        return {"investigation": investigator.latest(store, case_id), "findings": findings, "playback": playback,
                 "agent": {"configured": bool(model and model.available()), "model": getattr(model, "model", None) if model else None,
                           "allowed": bool(model and egress_allowed(store, case_id, model.provider))},
                 "closed": any(e["kind"] == "case_closure" for e in store.ledger(case_id))}

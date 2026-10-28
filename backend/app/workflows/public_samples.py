@@ -28,7 +28,8 @@ SAMPLES = _load()
 
 
 def listing() -> List[Dict[str, Any]]:
-    return [{"name": k, **{f: v[f] for f in ("title", "platform", "symptom", "source_url", "project")}} for k, v in SAMPLES.items()]
+    return [{"name": k, "walkthrough": (v["dir"] / "recorded_investigation.json").exists(), **{f: v[f] for f in ("title", "platform", "symptom", "source_url", "project")}}
+            for k, v in SAMPLES.items()]
 
 
 def run_sample(store, name: str, progress=lambda step: None) -> Dict[str, Any]:
@@ -50,9 +51,11 @@ def seed_showcase(store) -> List[str]:
         recorded = json.loads(rec.read_text())
         cid = run_sample(store, name)["case_id"]
         run_id = store.latest_run(cid)["id"]
-        for e in recorded["entries"]:
+        last = max(i for i, e in enumerate(recorded["entries"]) if e["kind"] == "agent_report")
+        for i, e in enumerate(recorded["entries"]):
             if e["kind"] == "agent_report":
-                payload = {**e["payload"], "run_id": run_id, "recorded": {"at": e["recorded_at"], "note": recorded["note"]}}
+                payload = {**e["payload"], "run_id": run_id, "recorded": {"at": e["recorded_at"], "note": recorded["note"],
+                                                                          **({"close": recorded["close"]} if i == last and recorded.get("close") else {})}}
                 store.append_trusted(cid, "agent_report", payload, actor=e["actor"], source="recorded investigation (replayed)")
             elif e["kind"] == "engineer_finding":
                 p = {k: v for k, v in e["payload"].items() if k in ("action", "result", "observations")}

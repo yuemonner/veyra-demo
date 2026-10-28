@@ -1,7 +1,7 @@
 "use client";
 /* The case, action first: Veyra investigates; the engineer only does what Veyra cannot do from the data.
    What happened -> what Veyra already checked -> the one next action -> what you found (feeds the next step). */
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import st from "./investigation.module.css";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -50,7 +50,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
     }
   }, [call, load, onChanged]);
 
-  useEffect(() => { setData(null); setJob(null); setError(null); load(); if (jobId) follow(jobId); return () => { polling.current = null; }; }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setData(null); setJob(null); setError(null); load(); if (jobId && !jobId.startsWith("walkthrough")) follow(jobId); return () => { polling.current = null; }; }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function start(allowModel: boolean) {
     setError(null);
@@ -60,6 +60,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
 
   if (job) return <Live job={job} />;
   if (!data) return <section className={st.surface}><p className={st.dim}>Loading…</p></section>;
+  if (data.playback) return <Playback pb={data.playback} />;
   const inv = data.investigation;
   const agent = data.agent || {};
   if (!inv) {
@@ -76,26 +77,37 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
       </section>
     );
   }
-  const r = inv.result || {};
-  const status = STATUS[r.status] || STATUS.cause_unknown;
   return (
-    <section className={st.surface}>
-      {inv.mode !== "agent" && (
+    <ResultView inv={inv} findings={data.findings || []}
+      banner={inv.mode !== "agent" ? (
         <div className={st.banner}>
           <b>Rule-based reading only.</b> {inv.fallback_reason}.{" "}
           {agent.configured ? <button className={st.inline} onClick={() => start(true)}>Let Veyra investigate with AI</button>
             : <span>Connect the AI investigator (Claude Code sign-in on this computer) to have Veyra run the checks for you.</span>}
-        </div>
-      )}
+        </div>) : null}
+      next={<NextAction caseId={caseId} call={call} next={(inv.result || {}).next_action} entry={inv.entry_id} closed={data.closed} onRecorded={(j) => j ? follow(j) : load()} />}
+      footer={<>
+        {!data.closed && <CloseCase caseId={caseId} call={call} actor={actor} onClosed={() => { load(); onChanged(); }} />}
+        {data.closed && <p className={st.fine}>This case is closed. Its lesson is used when a similar failure comes in.</p>}
+        {error && <p className={st.err}>{error}</p>}
+      </>} />
+  );
+}
+
+function ResultView({ inv, findings, banner, next, footer }: { inv: Any; findings: Any[]; banner?: React.ReactNode; next: React.ReactNode; footer?: React.ReactNode }) {
+  const r = inv.result || {};
+  const status = STATUS[r.status] || STATUS.cause_unknown;
+  return (
+    <section className={st.surface}>
+      {banner}
       <header className={st.head}>
         <span className={`${st.status} ${st[status.cls]}`}>{status.label}{r.confidence && r.status === "cause_probable" ? ` · ${r.confidence} confidence` : ""}</span>
         <h1 className={st.headline}>{r.headline}</h1>
         {r.explanation && <p className={st.lead}>{r.explanation}</p>}
-        {inv.recorded && <p className={st.fine}>Recorded {new Date(inv.recorded.at).toLocaleString()} with {String(inv.model || "").replace("claude-code:", "Claude ")} on a local Veyra instance and shown here as recorded; this demo did not run it again.</p>}
         {inv.mode === "agent" && <p className={st.fine}>Veyra ran {inv.steps.length} check{inv.steps.length === 1 ? "" : "s"} on the original data in {inv.seconds} s · every quoted line verified against the file{(inv.dropped || []).length ? ` · ${inv.dropped.length} unverifiable statement${inv.dropped.length === 1 ? "" : "s"} removed` : ""}</p>}
       </header>
 
-      <NextAction caseId={caseId} call={call} next={r.next_action} entry={inv.entry_id} closed={data.closed} onRecorded={(j) => j ? follow(j) : load()} />
+      {next}
 
       {(r.evidence || []).length > 0 && (
         <div className={st.block}>
@@ -133,11 +145,11 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
         </details>
       )}
 
-      {(data.findings || []).length > 0 && (
+      {findings.length > 0 && (
         <div className={st.block}>
           <h2 className={st.h2}>What you found</h2>
           <ul className={st.findings}>
-            {data.findings.map((f: Any) => (
+            {findings.map((f: Any) => (
               <li key={f.id}><span className={st.when}>{new Date(f.recorded_at).toLocaleString()}</span>
                 <b>{f.action}</b> — {({ found: "found it", not_found: "nothing found", cannot_do: "could not do it", other: "other result" } as Any)[f.result]}
                 {f.observations ? `: ${f.observations}` : ""}</li>))}
@@ -160,20 +172,18 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
         </details>
       )}
 
-      {!data.closed && <CloseCase caseId={caseId} call={call} actor={actor} onClosed={() => { load(); onChanged(); }} />}
-      {data.closed && <p className={st.fine}>This case is closed. Its lesson is used when a similar failure comes in.</p>}
-      {error && <p className={st.err}>{error}</p>}
+      {footer}
     </section>
   );
 }
 
-function Live({ job }: { job: Any }) {
+function Live({ job, subtitle }: { job: Any; subtitle?: string }) {
   const steps: Any[] = job.steps || [];
   return (
     <section className={st.surface} aria-live="polite">
       <span className={`${st.status} ${st.working}`}>Investigating</span>
       <h1 className={st.headline}>{job.step === "Veyra is investigating" ? "Veyra is investigating the data" : job.step || "Starting"}</h1>
-      <p className={st.lead}>You don't need to stay on this page. Each check below runs on the original data.</p>
+      <p className={st.lead}>{subtitle || "You don't need to stay on this page. Each check below runs on the original data."}</p>
       <ol className={st.liveSteps}>
         {steps.map((s: Any) => <li key={s.id} className={st.done}><span>{s.label}</span><span className={st.dim}>{s.summary}</span></li>)}
         <li className={st.now}><span className={st.pulse} aria-hidden /> <span>{steps.length ? "Deciding the next check" : job.step}</span></li>
@@ -182,8 +192,9 @@ function Live({ job }: { job: Any }) {
   );
 }
 
-function NextAction({ caseId, call, next, entry, closed, onRecorded }:
-  { caseId: string; call: Call; next: Any; entry: string; closed: boolean; onRecorded: (jobId: string | null) => void }) {
+type Demo = { prefill: (o: Any) => string; submit: (choice: Any, notes: string) => void };
+function NextAction({ caseId, call, next, entry, closed, onRecorded, demo }:
+  { caseId: string; call: Call; next: Any; entry: string; closed: boolean; onRecorded: (jobId: string | null) => void; demo?: Demo }) {
   const [choice, setChoice] = useState<Any>(null);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
@@ -192,6 +203,7 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded }:
   if (!next) return null;
   const outcomes: Any[] = [...(next.outcomes || []).map((o: Any) => ({ ...o, result: "found" })), { label: "I can't do this", means: "Veyra looks for another way", result: "cannot_do" }];
   async function save() {
+    if (demo) { demo.submit(choice, notes); setChoice(null); setNotes(""); return; }
     setBusy(true); setErr(null);
     try {
       const result = choice.result === "cannot_do" ? "cannot_do" : (/nothing|no |not |normal|flat|clean/i.test(choice.label) ? "not_found" : "found");
@@ -216,7 +228,7 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded }:
         <p className={st.ask}>What did you find?</p>
         <div className={st.outcomes}>
           {outcomes.map((o, i) => (
-            <button key={i} className={choice?.label === o.label ? st.outcomeOn : st.outcome} onClick={() => setChoice(o)} aria-pressed={choice?.label === o.label}>
+            <button key={i} className={choice?.label === o.label ? st.outcomeOn : st.outcome} onClick={() => { setChoice(o); if (demo) setNotes(demo.prefill(o)); }} aria-pressed={choice?.label === o.label}>
               <b>{o.label}</b><span>{o.means}</span></button>))}
         </div>
         {choice && (
@@ -286,4 +298,58 @@ function CloseCase({ caseId, call, actor, onClosed }: { caseId: string; call: Ca
       {err && <p className={st.err}>{err}</p>}
     </div>
   );
+}
+
+
+/** A recorded investigation walked through step by step: Veyra reads the log, hands over the next action, takes the
+ *  engineer's result, continues, and closes with a lesson. Nothing is written. */
+function Playback({ pb }: { pb: Any }) {
+  const invs: Any[] = pb.investigations;
+  const [stage, setStage] = useState(0);
+  const [shown, setShown] = useState(0);
+  const [phase, setPhase] = useState<"running" | "result" | "closing" | "closed">("running");
+  const [mine, setMine] = useState<Any[]>([]);
+  const inv = invs[stage];
+  useEffect(() => {
+    if (phase !== "running") return;
+    const steps = inv.steps || [];
+    const t = setTimeout(() => (shown < steps.length ? setShown(shown + 1) : setPhase("result")), shown < steps.length ? 850 : 700);
+    return () => clearTimeout(t);
+  }, [phase, shown, stage]); // eslint-disable-line react-hooks/exhaustive-deps
+  const top = () => { try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* ignore */ } };
+  if (phase === "running") {
+    return <Live job={{ step: "Veyra is investigating", steps: (inv.steps || []).slice(0, shown) }}
+      subtitle={stage === 0 ? "Reading the log and running the checks it can do itself." : "Continuing with what you found."} />;
+  }
+  const recordedFinding = (o: Any) => (pb.findings || []).find((f: Any) => String(f.observations || "").startsWith(o.label));
+  const demo: Demo = {
+    prefill: (o) => { const f = recordedFinding(o); return f ? String(f.observations).replace(/^.*?\)\.\s*/, "") : ""; },
+    submit: (choice, notes) => {
+      const r = inv.result || {};
+      setMine([...mine, { id: `demo-${mine.length}`, recorded_at: new Date().toISOString(), action: r.next_action?.action,
+        result: choice.result === "cannot_do" ? "cannot_do" : "found", observations: [choice.result === "cannot_do" ? null : choice.label, notes || null].filter(Boolean).join(". ") }]);
+      if (choice.result !== "cannot_do" && stage + 1 < invs.length) { setStage(stage + 1); setShown(0); setPhase("running"); top(); }
+      else setPhase("closing");
+    },
+  };
+  const close = (invs[invs.length - 1].recorded || {}).close || {};
+  const footer = phase === "closing" ? (
+    <div className={st.lesson}>
+      <h2 className={st.h2}>Lesson from this case</h2>
+      <p className={st.fine}>Drafted by Veyra from the investigation and your results. Confirm, or change what is wrong.</p>
+      <label className={st.wide}>What caused it<textarea className={st.text} rows={2} defaultValue={close.cause || inv.result?.explanation} /></label>
+      <label className={st.wide}>Fix<input className={st.input} defaultValue={close.fix || ""} /></label>
+      <label className={st.wide}>Reuse only when<input className={st.input} defaultValue={close.applies_when || ""} /></label>
+      <div className={st.row}><button className={st.primary} onClick={() => { setPhase("closed"); }}>Confirm and close</button></div>
+    </div>
+  ) : phase === "closed" ? (
+    <div className={st.lesson}>
+      <h2 className={st.h2}>Case closed · lesson saved</h2>
+      <p className={st.lead} style={{ fontSize: 15 }}>The next time a failure matches it, Veyra checks this first, and only reuses the fix when the conditions match.</p>
+      <div className={st.row}><button className={st.ghost} onClick={() => { setStage(0); setShown(0); setMine([]); setPhase("running"); top(); }}>Replay from the start</button></div>
+    </div>
+  ) : null;
+  return <ResultView inv={inv} findings={mine}
+    next={phase === "result" ? <NextAction caseId="" call={async () => null} next={inv.result?.next_action} entry="" closed={false} onRecorded={() => undefined} demo={demo} /> : null}
+    footer={footer} />;
 }

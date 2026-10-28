@@ -128,7 +128,10 @@ def logout(request: Request, response: Response):
 @auth.get("/me")
 def me(request: Request):
     if not private():
-        return {"private": False, "user": None, "recordings": os.getenv("VEYRA_ENABLE_RUNTIME") == "true" and os.getenv("VEYRA_ALLOW_RECORDINGS") == "true"}
+        flag = os.getenv("VEYRA_PUBLIC_DEMO", "").strip().lower()
+        public_demo = flag == "true" or (flag != "false" and bool(os.getenv("RENDER")))
+        return {"private": False, "user": None, "recordings": os.getenv("VEYRA_ENABLE_RUNTIME") == "true" and os.getenv("VEYRA_ALLOW_RECORDINGS") == "true",
+                "read_only": public_demo and not os.getenv("VEYRA_ACCESS_CODE")}
     user = current_user(request)
     if not user:
         return JSONResponse({"private": True, "user": None, "code": "login_required"}, status_code=401)

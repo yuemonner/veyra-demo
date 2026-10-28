@@ -365,7 +365,7 @@ export default function FieldCasePage() {
               </button>))}
           </nav>
           {tab === "next" && <NextAction caseId={caseId!} data={data} onChanged={() => load(caseId!)} me={me?.user?.name} onEvidence={() => go("findings")} />}
-          {tab === "case" && <Investigation key={caseId!} caseId={caseId!} call={call} actor={me?.user?.name || ENGINEER} jobId={jobId} onChanged={() => load(caseId!)} />}
+          {tab === "case" && <Investigation key={`${caseId}:${jobId || ""}`} caseId={caseId!} call={call} actor={me?.user?.name || ENGINEER} jobId={jobId} onChanged={() => load(caseId!)} />}
           {tab === "brief" && <Brief data={data} run={run} verification={verification} go={go} onAccept={acceptCheck} acceptBusy={acceptBusy} error={agentError} />}
           {tab === "evidence" && <>
             <AgentPanel ledger={data.ledger} run={run} info={agentInfo} busy={agentBusy} error={agentError} onRun={runAgent} />
@@ -2463,10 +2463,21 @@ function ShareDialog({ caseId, title, onClose }: { caseId: string; title: string
 /** One click: a real failure log from a public issue thread, through the same upload path and the investigator. */
 function RealSamples({ busy, setBusy, setError, onDone }: { busy: boolean; setBusy: (s: string) => void; setError: (s: string) => void; onDone: (caseId: string, jobId?: string) => void }) {
   const [list, setList] = useState<Any[]>([]);
-  useEffect(() => { call("/engine/samples").then(setList).catch(() => setList([])); }, []);
-  if (!list.length) return null;
+  const [readOnly, setReadOnly] = useState(false);
+  useEffect(() => {
+    call("/engine/samples").then(setList).catch(() => setList([]));
+    fetch(`${API}/auth/me`, { credentials: "include" }).then((r) => r.json()).then((m) => setReadOnly(!!m?.read_only)).catch(() => undefined);
+  }, []);
+  const shown = readOnly ? list.filter((x) => x.walkthrough) : list;
+  if (!shown.length) return null;
   async function run(name: string) {
     setError(""); setBusy("Starting");
+    if (readOnly) {  // the public demo: open the sample's case and walk through its investigation, nothing is written
+      const title = list.find((x) => x.name === name)?.title;
+      const c = (await call("/engine/cases")).find((x: Any) => x.title === title);
+      if (c) { onDone(c.id, `walkthrough-${Date.now()}`); return; }
+      setBusy(""); setError("This sample is not loaded on this demo yet."); return;
+    }
     try {
       const { job_id } = await call(`/engine/samples/${name}/run`, { method: "POST", body: JSON.stringify({ allow_model: true }) });
       for (;;) {
@@ -2481,7 +2492,7 @@ function RealSamples({ busy, setBusy, setError, onDone }: { busy: boolean; setBu
   return (
     <div className={s.sampleRow}>
       <span>No file at hand? Open a real failure log from a public issue:</span>
-      {list.map((x) => <button key={x.name} className={s.quiet} disabled={busy} onClick={() => run(x.name)} title={`${x.platform}. Source: ${x.source_url}`}>{x.title}</button>)}
+      {shown.map((x) => <button key={x.name} className={s.quiet} disabled={busy} onClick={() => run(x.name)} title={`${x.platform}. Source: ${x.source_url}`}>{x.title}</button>)}
     </div>
   );
 }

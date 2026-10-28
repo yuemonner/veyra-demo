@@ -374,5 +374,10 @@
     "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it."
    }
   }
- ]
+ ],
+ "close": {
+  "cause": "D-cache not cleaned before the Ethernet DMA sent the Tx buffer: the DMA read stale memory and sent zeros, so the agent dropped the session.",
+  "fix": "Clean the D-cache over the Tx buffer (cache-line aligned) before each send, or put the Ethernet buffers in a non-cacheable MPU region.",
+  "applies_when": "STM32H7/F7 with D-cache enabled and Ethernet DMA; packets correct in the CPU's buffer but zero on the wire."
+ }
 }
