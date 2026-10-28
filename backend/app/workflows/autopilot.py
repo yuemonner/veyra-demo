@@ -158,6 +158,19 @@ def only_brief_events(run: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+def text_log_only(store, case_id: str) -> Optional[str]:
+    """A case whose evidence is a text log only: the generic site checks (drive logs, link logs, measured windows) do not
+    fit it; its next check comes from the log itself (app/discovery/logs.py, shown in the case's questions)."""
+    found = store.discovery(case_id)
+    if not found or (found.get("source") or {}).get("format") != "text_log":
+        return None
+    q = store.questions(case_id)
+    nxt = (q or {}).get("next") or {}
+    return ("This case is a text log, so I won't draft a generic site request. "
+            + (f"Its next check comes from the log: {nxt['question']} {nxt.get('needs', '')}".strip() if nxt.get("question") else
+               "Its open checks are under What we can't establish."))
+
+
 def _old_rules(ledger: List[Dict[str, Any]], run_id: str) -> Optional[Dict[str, Any]]:
     """A plan made under earlier rules stays in the record but is not acted on: its wording may presume events."""
     plan = _latest(ledger, "next_action", run_id, stage="plan")
@@ -181,6 +194,9 @@ def _advance(store, case_id: str) -> Dict[str, Any]:
     weak = only_brief_events(run)
     if weak:
         return {"stage": "weak_evidence", "run_id": run["id"], "say": weak}
+    log_only = text_log_only(store, case_id)
+    if log_only:
+        return {"stage": "weak_evidence", "run_id": run["id"], "say": log_only}
     old = _old_rules(store.ledger(case_id), run["id"])
     if old:
         return old
@@ -262,6 +278,9 @@ def view(store, case_id: str) -> Dict[str, Any]:
     weak = only_brief_events(run)
     if weak:
         return {"stage": "weak_evidence", "run_id": run["id"], "say": weak}
+    log_only = text_log_only(store, case_id)
+    if log_only:
+        return {"stage": "weak_evidence", "run_id": run["id"], "say": log_only}
     if state["step"] == 1 and not _latest(ledger, "next_action", run["id"], stage="plan"):
         # Say where the case stands without writing anything (a visitor may only be reading).
         if not flow_run_current(store, case_id):
