@@ -94,25 +94,30 @@
   .lines li { grid-template-columns: 34px 1fr; }
 }
 
-/* experiment: results branch from the action */
-.tree { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; padding-top: 14px; }
-.tree::before { content: ""; position: absolute; top: 0; left: 18px; right: 18px; height: 1px; background: rgba(255, 255, 255, 0.35); }
-.tree > button { position: relative; }
-.tree > button::before { content: ""; position: absolute; top: -14px; left: 50%; width: 1px; height: 14px; background: rgba(255, 255, 255, 0.35); }
-.fx { display: block; font-size: 12px; margin-top: 4px; opacity: 0.92; }
-.fx i { font-style: normal; font-weight: 600; margin-right: 4px; }
+/* experiment: each possible result branches from the action */
+.tree { position: relative; display: grid; gap: 8px; padding-left: 22px; }
+.tree::before { content: ""; position: absolute; top: 0; bottom: 22px; left: 7px; width: 2px; border-radius: 2px; background: rgba(255, 255, 255, 0.35); }
+.tree > button { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); column-gap: 16px; align-items: start; }
+.tree > button::before { content: ""; position: absolute; left: -15px; top: 20px; width: 14px; height: 2px; background: rgba(255, 255, 255, 0.35); }
+.tree > button > b, .tree > button > span:not(.fx) { grid-column: 1; }
+.fx { grid-column: 2; display: block; font-size: 12.5px; opacity: 0.95; }
+.fx i { font-style: normal; font-weight: 650; margin-right: 5px; opacity: 0.8; }
+.cant { font: inherit; font-size: 13px; background: none; border: 0; color: rgba(255, 255, 255, 0.8); text-decoration: underline; cursor: pointer; justify-self: start; padding: 0; }
+.cantOn { composes: cant; color: #fff; font-weight: 650; }
+@media (max-width: 640px) { .tree > button { grid-template-columns: 1fr; } .fx { grid-column: 1; } }
 
 /* where the fault can be */
 .spaceHead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .changed { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--sr-thread-deep); background: var(--sr-thread-soft); border: 1px solid var(--sr-thread-line);
   border-radius: 10px; padding: 8px 12px; }
 .space { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.hyp { display: grid; grid-template-columns: 92px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; align-items: baseline; padding: 9px 12px;
-  border-radius: 12px; border: 1px solid var(--sr-edge-strong); background: var(--sr-glass-strong); transition: background 0.5s, opacity 0.5s; }
-.hStatus { grid-row: span 3; font-size: 12px; font-weight: 650; }
-.hArea { font-size: 14.5px; }
+.hyp { display: grid; grid-template-columns: 84px minmax(0, 1fr); column-gap: 12px; align-items: baseline; padding: 7px 12px;
+  border-radius: 10px; border: 1px solid var(--sr-edge-strong); background: var(--sr-glass-strong); transition: background 0.5s, opacity 0.5s; }
+.hStatus { font-size: 12px; font-weight: 650; }
+.hBody { min-width: 0; }
+.hArea { font-size: 14.5px; margin-right: 8px; }
 .hClaim { font-size: 13.5px; color: var(--sr-ink-2); }
-.hWhy { font-size: 12.5px; color: var(--sr-ink-3); }
+.hWhy { display: block; font-size: 12.5px; color: var(--sr-ink-3); margin-top: 2px; }
 .h_leading { border-color: var(--sr-thread); background: var(--sr-thread-soft); }
 .h_leading .hStatus { color: var(--sr-thread); }
 .h_open .hStatus { color: var(--sr-ink-2); }
@@ -155,4 +160,4 @@
 .c_action .cWho { color: var(--sr-anomaly); }
 .c_closure .cWho { color: var(--sr-verified); }
 .changedSmall { display: block; margin-top: 3px; font-size: 12.5px; font-weight: 600; color: var(--sr-thread-deep); }
-@media (max-width: 640px) { .hyp { grid-template-columns: 1fr; } .hStatus { grid-row: auto; } .chain > li { grid-template-columns: 1fr; gap: 2px; } }
+@media (max-width: 640px) { .hyp { grid-template-columns: 1fr; } .chain > li { grid-template-columns: 1fr; gap: 2px; } }

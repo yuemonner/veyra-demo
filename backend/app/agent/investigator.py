@@ -56,6 +56,7 @@ Rules:
   Keep the ids of earlier hypotheses (case_context.previous_hypotheses) and update their status; add new ones only
   when the evidence opens a new area.
 - An event the engineer marked as normal for this machine (case_context.marked_normal) is routine here.
+- In all text a person reads, name hypotheses by their area ("Network path"), never by id; ids go only in keeps / rules_out.
 - Fill reuse_when: the conditions under which your explanation, once confirmed, would apply to another machine.
 Finish by calling submit_report exactly once."""
 

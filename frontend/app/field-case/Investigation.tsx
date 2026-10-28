@@ -104,7 +104,7 @@ function ResultView({ inv, findings, banner, next, footer, prev }: { inv: Any; f
       <header className={st.head}>
         <span className={`${st.status} ${st[status.cls]}`}>{status.label}{r.confidence && r.status === "cause_probable" ? ` · ${r.confidence} confidence` : ""}</span>
         <h1 className={st.headline}>{r.headline}</h1>
-        {r.explanation && <p className={st.lead}>{r.explanation}</p>}
+        {r.explanation && <p className={st.lead}>{named(r.explanation, r.hypotheses)}</p>}
         {inv.mode === "agent" && <p className={st.fine}>Veyra ran {inv.steps.length} check{inv.steps.length === 1 ? "" : "s"} on the original data in {inv.seconds} s · every quoted line verified against the file{(inv.dropped || []).length ? ` · ${inv.dropped.length} unverifiable statement${inv.dropped.length === 1 ? "" : "s"} removed` : ""}</p>}
       </header>
 
@@ -117,7 +117,7 @@ function ResultView({ inv, findings, banner, next, footer, prev }: { inv: Any; f
           <h2 className={st.h2}>Why Veyra thinks so</h2>
           <ul className={st.lines}>
             {r.evidence.map((e: Any, i: number) => (
-              <li key={i}><code className={st.ln}>{e.line}</code><div><code className={st.raw}>{e.quote}</code><span className={st.shows}>{e.shows}</span></div></li>))}
+              <li key={i}><code className={st.ln}>{e.line}</code><div><code className={st.raw}>{e.quote}</code><span className={st.shows}>{named(e.shows, r.hypotheses)}</span></div></li>))}
           </ul>
         </div>
       )}
@@ -131,8 +131,8 @@ function ResultView({ inv, findings, banner, next, footer, prev }: { inv: Any; f
               return (
                 <li key={i}>
                   <span className={`${st.verdict} ${st[v.cls]}`} title={v.label}>{v.mark}</span>
-                  <div><b>{c.check}</b><span className={st.result}>{c.result}</span>
-                    {c.about && <span className={st.about}>{v.label}: {c.about}</span>}</div>
+                  <div><b>{named(c.check, r.hypotheses)}</b><span className={st.result}>{named(c.result, r.hypotheses)}</span>
+                    {c.about && <span className={st.about}>{v.label}: {named(c.about, r.hypotheses)}</span>}</div>
                 </li>);
             })}
           </ul>
@@ -205,7 +205,8 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   if (!next) return null;
-  const outcomes: Any[] = [...(next.outcomes || []).map((o: Any) => ({ ...o, result: "found" })), { label: "I can't do this", means: "Veyra looks for another way", result: "cannot_do" }];
+  const outcomes: Any[] = (next.outcomes || []).map((o: Any) => ({ ...o, result: "found" }));
+  const cant = { label: "I can't do this", means: "", result: "cannot_do" };
   async function save() {
     if (demo) { demo.submit(choice, notes); setChoice(null); setNotes(""); return; }
     setBusy(true); setErr(null);
@@ -220,7 +221,7 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
     <div className={st.next}>
       <span className={st.nextLabel}>Your next action{next.where ? ` · ${({ remote: "remote", on_site: "on site", lab: "in the lab" } as Any)[next.where] || next.where}` : ""}</span>
       <h2 className={st.action}>{next.action}</h2>
-      {next.why && <p className={st.why}>{next.why}</p>}
+      {next.why && <p className={st.why}>{named(next.why, hyps)}</p>}
       {(next.how || []).length > 0 && (
         <div className={st.howWrap}>
           <ol className={st.how}>{next.how.map((h: string, i: number) => <li key={i}>{h}</li>)}</ol>
@@ -233,12 +234,13 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
         <div className={st.tree}>
           {outcomes.map((o, i) => (
             <button key={i} className={choice?.label === o.label ? st.outcomeOn : st.outcome} onClick={() => { setChoice(o); if (demo) setNotes(demo.prefill(o)); }} aria-pressed={choice?.label === o.label}>
-              <b>{o.label}</b><span>{o.means}</span>
+              <b>{o.label}</b><span>{named(o.means, hyps)}</span>
               {(o.rules_out || []).length > 0 && <span className={st.fx}><i>Rules out</i> {o.rules_out.map(area).join(", ")}</span>}
               {(o.keeps || []).length > 0 && <span className={st.fx}><i>Leaves</i> {o.keeps.map(area).join(", ")}</span>}
-              {o.then && <span className={st.fx}><i>Then</i> {o.then}</span>}
+              {o.then && <span className={st.fx}><i>Then</i> {named(o.then, hyps)}</span>}
             </button>))}
         </div>
+        <button className={choice?.result === "cannot_do" ? st.cantOn : st.cant} onClick={() => setChoice(cant)}>I can't do this — find another way</button>
         {choice && (
           <div className={st.record}>
             <label className={st.fieldLabel} htmlFor="finding-notes">{choice.result === "cannot_do" ? "Why not? (optional)" : "What exactly did you see? (optional, helps the next step)"}</label>
@@ -306,6 +308,12 @@ function Playback({ pb }: { pb: Any }) {
 }
 
 
+/** The model refers to hypotheses by id (h1, h2); people read their names. */
+function named(text: string | undefined, hyps: Any[] | undefined): string {
+  if (!text || !hyps?.length) return text || "";
+  return text.replace(/\bh(\d{1,2})\b/g, (m) => (hyps.find((h: Any) => h.id === m) || {}).area || m);
+}
+
 const H_STATUS: Record<string, string> = { leading: "Leading", open: "Open", weakened: "Weakened", ruled_out: "Ruled out" };
 const H_ORDER: Record<string, number> = { leading: 0, open: 1, weakened: 2, ruled_out: 3 };
 
@@ -328,9 +336,8 @@ function FaultSpace({ hyps, prev }: { hyps: Any[]; prev?: Any[] | null }) {
         {sorted.map((h) => (
           <li key={h.id} className={`${st.hyp} ${st["h_" + h.status] || ""} ${before[h.id] && before[h.id] !== h.status ? st.hMoved : ""}`}>
             <span className={st.hStatus}>{H_STATUS[h.status] || h.status}</span>
-            <b className={st.hArea}>{h.area}</b>
-            <span className={st.hClaim}>{h.claim}</span>
-            <span className={st.hWhy}>{h.because}{(h.lines || []).length ? ` · line${h.lines.length > 1 ? "s" : ""} ${h.lines.slice(0, 4).join(", ")}` : ""}</span>
+            <span className={st.hBody}><b className={st.hArea}>{h.area}</b><span className={st.hClaim}>{named(h.claim, hyps)}</span>
+              {(h.status === "leading" || (before[h.id] && before[h.id] !== h.status)) && <span className={st.hWhy}>{named(h.because, hyps)}{(h.lines || []).length ? ` · line${h.lines.length > 1 ? "s" : ""} ${h.lines.slice(0, 4).join(", ")}` : ""}</span>}</span>
           </li>))}
       </ul>
     </div>
