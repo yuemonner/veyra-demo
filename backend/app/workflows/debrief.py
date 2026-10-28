@@ -86,7 +86,8 @@ def debrief_recording(store, path: Path, mapping: Dict[str, Any], *, machine_id:
                                         review_reason=f"Extracted from {source_name or path.name} (sha256 {sha}) with mapping {clean['mapping_id']}")
         imports.append(record["id"])
     if report and report.get("stated_reason"):
-        payload = {"occurred_at": at(float(report.get("at_s", problem_from_s or 0.0))), "intervention_type": report.get("intervention_type") or "other",
+        at_s = report.get("at_s")
+        payload = {"occurred_at": at(float(at_s if at_s is not None else (problem_from_s or 0.0))), "intervention_type": report.get("intervention_type") or "other",
                    "operator": report.get("operator") or actor, "stated_reason": report["stated_reason"], "reported_via": "Upload form"}
         if report.get("symptom"):
             payload["symptom"] = report["symptom"]

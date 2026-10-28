@@ -75,13 +75,34 @@ def _from_discovery(disc: Dict[str, Any], inc: Dict[str, Any], ch: str) -> Dict[
             "facts": {"controller_records_before_onset": [f["text"] for f in cause_like]}}
 
 
+def _msg(text: str) -> str:
+    """A log line without its time stamp and level prefix."""
+    text = re.sub(r"^\s*(\[[^\]]*\]\s*){1,3}:?\s*", "", text)
+    return text.strip().rstrip(".")
+
+
 def _from_log(log: Dict[str, Any], reports: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """Questions a text log answers (app/discovery/logs.py), and the checks it cannot answer."""
     out: List[Dict[str, Any]] = []
     restarts = log.get("restarts") or []
+    inc = log.get("incident")
     if not restarts:
         out.append({"id": "log:restarts", "question": "Did the machine restart?", "status": "answered",
-                    "answer": f"No restart or reset appears in the {log['lines']} lines of the log."})
+                    "answer": f"No restart or reset appears in the {log['lines']} lines of the log."
+                    + (f" The first failure is at line {inc['line']}: {_msg(inc['text'])}." if inc else "")})
+    if inc and inc.get("first_signs"):
+        signs = inc["first_signs"]
+        out.append({"id": "log:first_signs", "question": f"What warned before the failure at line {inc['line']}?", "status": "answered",
+                    "answer": "In order: " + "; ".join(f"{f['component']} from line {f['first_line']} ({_msg(f['text'])[:80]}"
+                                                       + (f", {len(f['lines'])} lines" if len(f["lines"]) > 1 else "") + ")" for f in signs[:5])
+                    + (f". The first sign came {inc['lead_s']:g} s before the failure" if inc.get("lead_s") is not None else "")
+                    + ". Earlier is a lead, not a cause.",
+                    "facts": {"first_signs": [{k: f[k] for k in ("component", "first_line", "kinds", "lines")} for f in signs]}})
+    for t in (inc or {}).get("threads") or []:
+        later = "; ".join(f"line {x['line']}: {_msg(x['text'])[:90]}" for x in t["later"][:3])
+        out.append({"id": f"log:thread:{t['component']}", "question": f"What happened to {t['component']}?", "status": "answered",
+                    "answer": f"It warned before the failure (line{'s' if len(t['before']) > 1 else ''} {', '.join(map(str, t['before'][:4]))}), then {later}. "
+                              "The same component warning first and failing later makes it the first place to look; the order alone does not prove it caused the failure."})
     for r in restarts[-2:]:
         where = f"line {r['line']}"
         if r["causes"]:
@@ -100,9 +121,11 @@ def _from_log(log: Dict[str, Any], reports: Optional[List[str]] = None) -> List[
         out.append({"id": f"log:absence:{a['what'][:30]}", "question": a["what"].replace("No ", "Was there any ", 1).rstrip(".") + "?",
                     "status": "answered", "answer": f"{a['what']}. {a['caveat']}"})
     from app.discovery.logs import already_done
-    for c in (log.get("checks") or [])[:4]:
+    for c in (log.get("checks") or [])[:5]:
         done = already_done(c, reports or [])
-        if done:
+        if c.get("answered"):
+            out.append({"id": f"log:check:{c['cause']}:{c['check'][:20]}", "question": c["question"], "status": "answered", "answer": c["answered"]})
+        elif done:
             out.append({"id": f"log:check:{c['cause']}:{c['check'][:20]}", "question": c["question"], "status": "reported_done",
                         "answer": f"Reported as already examined: “{done.rstrip('.')}”.", "check": c["check"]})
         else:
@@ -244,8 +267,8 @@ def answer(run: Dict[str, Any], rows: List[Dict[str, Any]], baseline_runs: List[
             "log": log, "brief": (bool(outputs) or bool(log)) and len(established) >= 2, "questions": questions, "established": established,
             "cannot_establish": [{"question": q["question"], "needs": q["needs"], "check_id": q.get("check_id")} for q in open_q],
             "next": None if not nxt else {"question": nxt["question"], "needs": nxt["needs"], "check_id": nxt.get("check_id"),
-                                          "why_a_person": (f"Veyra read all {log['lines']} lines of the log; the answer is not in them. It needs the machine itself "
-                                                           "(a debug build, added logging or a debugger on the board)." if log else
+                                          "why_a_person": (f"Veyra read all {log['lines']} lines of the log; the answer is not in them. It needs the machine itself " + ("(a debug build, added logging or a debugger on the board)." if log.get("restarts") else
+                                                              "(process and CPU / memory monitoring, a recording of the topics, or added logging).") if log else
                                                            f"Veyra read the whole original recording ({len((discovery.get('inventory') or {}).get('read_by_probes') or [])} streams: "
                                                            "controller mode and status, controller messages and configuration, operator inputs, outputs, battery); "
                                                            "this record is not in it. Only someone with the machine, its storage or the ground station can provide it." if discovery else

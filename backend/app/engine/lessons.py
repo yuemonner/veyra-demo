@@ -169,6 +169,9 @@ def match(store, case_id: str) -> Dict[str, Any]:
 
 def describe(token: str) -> str:
     kind, _, rest = token.partition(":")
-    return {"at": f"fault at {rest}", "fault": f"{rest.replace('_', ' ')}{' reset' if rest == 'watchdog' else ''} reported", "reset": f"restart cause: {rest.replace('_', ' ')}",
+    if kind in ("at", "sign") and ":" in rest and not rest.split(":")[-1].isdigit():
+        comp, _, what = rest.rpartition(":")
+        return f"{comp}: {what.replace('_', ' ')}" + (" before the failure" if kind == "sign" else "")
+    return {"incident": f"first failure: {rest.replace('_', ' ')}", "at": f"fault at {rest}", "fault": f"{rest.replace('_', ' ')}{' reset' if rest == 'watchdog' else ''} reported", "reset": f"restart cause: {rest.replace('_', ' ')}",
             "anomaly": f"{rest.split(':', 1)[0].lower()} on {rest.split(':', 1)[-1]}", "mechanism": f"evidence pointed to {rest.replace('_', ' ')}",
             "symptom": f"reported symptom: {rest.replace('_', ' ')}", "function": f"affected: {rest}", "msg": f"message “{rest[:70]}”"}.get(kind, token)

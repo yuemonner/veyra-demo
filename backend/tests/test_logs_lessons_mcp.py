@@ -134,3 +134,50 @@ def test_closing_the_new_case_makes_it_the_lesson_next_time_and_a_counterexample
     first = next(l for l in lessons.values() if l["case_id"] != b)
     assert first["verdict"] == "check_first" and any(x["case_id"] == b for x in first["counterexamples"])
     store.close()
+
+
+# ---------- a log with no restart: a stop, an aborted task, a process killed
+AMR = Path(__file__).resolve().parents[2] / "fixtures" / "synthetic" / "robot" / "amr07_nav_failure.log"
+
+
+def test_levels_come_from_the_line_not_the_words_in_it():
+    log = textlog.read(AMR)
+    estop = next(p for p in log.lines if "Emergency stop" in p.text)
+    assert estop.level == "INFO" and estop.kind == "failsafe"
+    oom = next(p for p in log.lines if p.kind == "out_of_memory")
+    assert oom.target == "lidar_driver" and next(p for p in log.lines if p.kind == "process_crash").target == "lidar_driver"
+
+
+def test_an_incident_without_a_restart_has_first_signs_and_specific_checks():
+    c = logs.characterize(textlog.read(AMR))
+    assert not c["restarts"] and not c["absences"]                     # no stack / brown-out talk when nothing restarted
+    inc = c["incident"]
+    assert inc["line"] == 9 and inc["kind"] == "task_failed"
+    assert [f["component"] for f in inc["first_signs"]] == ["controller_server", "lidar_driver"] and inc["lead_s"] == pytest.approx(8.028)
+    assert inc["threads"][0]["component"] == "lidar_driver"
+    assert {"at:lidar_driver:out_of_memory", "incident:task_failed", "sign:lidar_driver:dropped_data"} <= set(c["signature_tokens"])
+    assert c["checks"][0]["cause"] == "out_of_memory"
+    crash = next(x for x in c["checks"] if x["cause"] == "process_crash")
+    assert "out-of-memory killer" in crash["answered"]                 # the log already answers this one
+
+
+def test_the_incident_reaches_the_questions(tmp_path):
+    from app.workflows.debrief import debrief_recording
+    store = CaseStore(tmp_path / "amr.db")
+    out = debrief_recording(store, AMR, {}, machine_id="AMR-07", title="Stopped mid-aisle (SYNTHETIC)", actor="t", synthetic=True,
+                            report={"stated_reason": "Stopped in aisle 4 and went into e-stop"})  # no at_s: must not crash
+    q = store.questions(out["case_id"])
+    ids = [x["id"] for x in q["questions"]]
+    assert "log:first_signs" in ids and "log:thread:lidar_driver" in ids
+    assert q["next"]["question"].startswith("Did the killed process grow") and "memory monitoring" in q["next"]["why_a_person"]
+    store.close()
+
+
+def test_a_crash_after_the_stop_is_not_promoted_over_what_came_right_before():
+    c = logs.characterize(textlog.read(AMR.parent / "cell3_arm_syslog.log"))
+    inc = c["incident"]
+    assert inc["kind"] == "failsafe" and inc["proximate"][:2] == ["robot_ctrl", "ethercat"]
+    assert [x["cause"] for x in c["checks"]][:2] == ["tracking_error", "fieldbus"]
+    by = {x["cause"]: x for x in c["checks"]}
+    assert "following error" in by["failsafe"]["answered"] and "segmentation fault" in by["process_crash"]["answered"]
+    assert any(s.startswith("Also: motion_planner") for s in c["summary"])

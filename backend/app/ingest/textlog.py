@@ -44,7 +44,7 @@ _LEVEL = [
 ]
 _LOCATION = re.compile(r"((?:[\w.-]+/)*[\w.-]+\.(?:c|cc|cpp|cxx|h|hpp|py|rs|go|java|ts|js)):(\d+)")
 _SUBSYSTEM = re.compile(r"^\s*(?:\[[^\]]*\]\s*)*(?:\[\s*([A-Za-z_][\w./-]{1,40})\s*\]|([A-Z][A-Z0-9_]{1,15}):\s)")
-_TEMPLATE_NUM = re.compile(r"0x[0-9a-fA-F]+|\b\d+(?:\.\d+)?\b")
+_TEMPLATE_NUM = re.compile(r"0x[0-9a-fA-F]+|(?<![A-Za-z])-?\d+(?:\.\d+)?(?=[a-zA-Z%]{0,3}\b)|\b\d+(?:\.\d+)?\b")
 
 # What a line reports. Order matters: the first match wins.
 KINDS: List[Tuple[str, re.Pattern]] = [
@@ -52,16 +52,30 @@ KINDS: List[Tuple[str, re.Pattern]] = [
     ("stack_overflow", re.compile(r"stack\s*(over\s*flow|smash|exhaust)|stackoverflow", re.I)),
     ("hard_fault", re.compile(r"hard\s*fault|bus\s*fault|usage\s*fault|mem\s*manage|segmentation fault|SIGSEGV|SIGABRT|kernel panic|core dumped", re.I)),
     ("assert", re.compile(r"assert(ion)?\s*(failed|failure)|\bASSERT\b", re.I)),
-    ("out_of_memory", re.compile(r"out of memory|\bOOM\b|malloc fail|allocation fail|heap (exhausted|full)", re.I)),
+    ("out_of_memory", re.compile(r"out of memory|\bOOM\b|malloc fail|allocation fail|heap (exhausted|full)|bad_alloc", re.I)),
+    ("process_crash", re.compile(r"process has died|exited with (code|signal)|exit code -?\d+|terminate called|\bcrash(ed)?\b|died unexpectedly|segfault|segmentation fault|core dumped|code=(dumped|killed)|status=\d+/(SEGV|ABRT|KILL)|SIGSEGV|SIGABRT", re.I)),
     ("brownout", re.compile(r"brown-?\s*out|under-?voltage|low (battery|voltage)|voltage (drop|low)|battery (critical|low)", re.I)),
     ("boot", re.compile(r"is up and running|\bbooting\b|\bboot(ed|ing)? (complete|up|done)\b|starting up|system start|firmware (version|build)|\bbuild\s*\d|bootloader|reset reason|reboot(ing|ed)?\b|power[- ]on", re.I)),
     ("link_loss", re.compile(r"(connection|link|radio|gcs|ground station|heartbeat|telemetry)[^.]{0,30}\b(lost|loss|timeout|timed out|dropped|disconnect)", re.I)),
-    ("failsafe", re.compile(r"fail-?safe|emergency stop|\bkill(ed)?\b|e-?stop", re.I)),
+    ("failsafe", re.compile(r"fail-?safe|emergency stop|\bkill engaged\b|e-?stop|protective stop|safety stop|safe-?stop", re.I)),
+    ("overrun", re.compile(r"missed (its|the) (desired )?(rate|deadline)|deadline miss|loop overrun|cycle overrun|took too long|exceeded (its )?(period|deadline)", re.I)),
+    ("tracking_error", re.compile(r"following error|tracking error|position error (exceeded|too large)|deviation (exceeded|too large)|contouring error", re.I)),
+    ("fieldbus", re.compile(r"working counter|ethercat.*(error|lost|timeout)|\bCAN\b.*(error|bus-?off|overrun)|bus-?off|lost (frames|packets) on|sync manager", re.I)),
+    ("task_failed", re.compile(r"goal (failed|aborted)|mission (failed|aborted)|failed to make progress|(navigation|planning|plan) failed|aborting (goal|mission)", re.I)),
+    ("recovered", re.compile(r"respawn|restart job|reconnected|recovered|resum(ed|ing) (normal|operation|mission)|connected\b", re.I)),
     ("timeout", re.compile(r"time(d)?\s*out|deadline (missed|exceeded)", re.I)),
     ("dropped_data", re.compile(r"\bdropped\b|overrun|checksum|crc (error|fail)|queue (full|overflow)|buffer (full|overflow)|overflow", re.I)),
 ]
 RESET_KINDS = {"watchdog_reset", "boot"}
-FAULT_KINDS = {"assert", "hard_fault", "stack_overflow", "out_of_memory"}
+FAULT_KINDS = {"assert", "hard_fault", "stack_overflow", "out_of_memory", "process_crash"}
+_TARGET = re.compile(r"killed process \d+ \(([A-Za-z_][\w.-]{1,60})|process\[([A-Za-z_][\w.-]{1,60})|([A-Za-z_][\w.-]{1,60})\[\d+\]:\s*segfault"
+                     r"|([A-Za-z_][\w.-]{1,60})\.service:", re.I)
+_SYSLOG_PROG = re.compile(r"^\s*\w{3}\s+\d{1,2}\s+[\d:.]+\s+\S+\s+([A-Za-z_][\w./-]{0,40}?)(?:\[\d+\])?:\s")
+
+
+def _target(line: str) -> Optional[str]:
+    m = _TARGET.search(line)
+    return re.sub(r"-\d+$", "", next(g for g in m.groups() if g)) if m else None
 
 
 @dataclass
@@ -74,6 +88,7 @@ class Line:
     subsystem: Optional[str]
     location: Optional[str]
     template: str
+    target: Optional[str] = None   # the process a crash / kill line names ('Killed process 4121 (lidar_driver)')
 
 
 @dataclass
@@ -132,7 +147,15 @@ def _time(text: str, year: int) -> Tuple[Optional[int], Optional[str]]:
     return None, None
 
 
+_EXPLICIT_LEVEL = re.compile(r"\[\s*(FATAL|ERROR|ERR|WARN|WARNING|INFO|NOTICE|DEBUG)\s*\]|^\s*(FATAL|ERROR|ERR|WARN|WARNING|INFO|NOTICE|DEBUG)\b|^\s*([FEWID])/")
+_LEVEL_NAME = {"FATAL": "FATAL", "ERROR": "ERROR", "ERR": "ERROR", "WARN": "WARNING", "WARNING": "WARNING", "INFO": "INFO", "NOTICE": "INFO",
+               "DEBUG": "DEBUG", "F": "FATAL", "E": "ERROR", "W": "WARNING", "I": "INFO", "D": "DEBUG"}
+
+
 def _level(text: str) -> Optional[str]:
+    m = _EXPLICIT_LEVEL.search(text)  # a level the line states ('[INFO]', 'ERROR  [commander]', 'W/') wins over words in the message
+    if m:
+        return _LEVEL_NAME[next(g for g in m.groups() if g).upper()]
     for name, rx in _LEVEL:
         if rx.search(text):
             return name
@@ -176,10 +199,14 @@ def read(path: Path, *, anchor_ns: Optional[int] = None, year: Optional[int] = N
         loc = _LOCATION.search(line)
         sub = _SUBSYSTEM.match(line)
         subsystem = (sub.group(1) or sub.group(2)) if sub else None
+        if subsystem is None:
+            prog = _SYSLOG_PROG.match(line)  # 'Oct 27 14:05:41 host ethercat[880]: ...'
+            subsystem = prog.group(1) if prog else None
         if subsystem and re.fullmatch(r"\s*[\d.]+\s*|INFO|WARN|WARNING|ERROR|DEBUG|FATAL|ERR", subsystem, re.I):
             subsystem = None
         parsed.append(Line(n=i, text=line.rstrip()[:500], t_ns=t, level=_level(line), kind=_kind(line), subsystem=subsystem,
-                           location=f"{loc.group(1).split('/')[-1]}:{loc.group(2)}" if loc else None, template=template(line)))
+                           location=f"{loc.group(1).split('/')[-1]}:{loc.group(2)}" if loc else None, template=template(line),
+                           target=_target(line)))
     stamped = sum(1 for p in parsed if p.t_ns is not None)
     share = stamped / len(parsed) if parsed else 0.0
     if anchor_ns is None:
