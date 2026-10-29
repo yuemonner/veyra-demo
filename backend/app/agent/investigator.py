@@ -39,6 +39,8 @@ How to work:
    area itself and shows it is not the fault. A measurement at one point of a path excludes only what lies beyond that
    point toward the observer, never the parts it did not observe (a capture at the receiving host does not clear the
    cable, switch or sender-side driver): use weakened (basis "indirect") and say where the evidence was observed.
+   An engineer's reported result is evidence but not verified by Veyra: on its own it can weaken an area or make one
+   leading, never rule one out. ruled_out also needs excluded_by "data": the exclusion is visible in the data you read.
 3. Separate cause from consequence: a crash, a restart, a watchdog, an e-stop or a timeout is often the effect of
    something earlier. Say which lines are the earliest sign and which are effects.
 4. Only what the data cannot answer becomes the next action for a person: design it as an experiment that splits the
@@ -110,6 +112,7 @@ SUBMIT_SPEC = {
                 "because": {"type": "string", "description": "What decided this status, under 25 words"},
                 "basis": {"type": "string", "enum": ["direct", "indirect"], "description": "direct: the evidence observes this area itself; required for ruled_out"},
                 "observed_at": {"type": "string", "description": "Where the deciding evidence was observed (e.g. 'agent host NIC', 'board Tx buffer')"},
+                "excluded_by": {"type": "string", "enum": ["data", "engineer_report"], "description": "For ruled_out: is the exclusion visible in the data Veyra read, or only in an engineer's report? ruled_out needs 'data'"},
                 "lines": {"type": "array", "items": {"type": "integer"}}}, "required": ["id", "area", "claim", "status", "because"]}},
             "events": {"type": "array", "maxItems": 12, "description": "Notable log events grouped and classified", "items": {"type": "object", "properties": {
                 "lines": {"type": "array", "items": {"type": "integer"}}, "what": {"type": "string", "description": "under 12 words"},
@@ -367,6 +370,9 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
         if h.get("status") == "ruled_out" and h.get("basis") != "direct":
             problems.append(f"hypothesis '{h.get('area')}' is ruled_out without direct exclusion: mark it weakened (basis indirect) "
                             "or name the evidence that observes that area itself (basis direct, observed_at)")
+        elif h.get("status") == "ruled_out" and h.get("excluded_by") != "data":
+            problems.append(f"hypothesis '{h.get('area')}' is ruled_out on an engineer's report (or without saying): an unverified "
+                            "report can weaken an area, not exclude it. Mark it weakened, or show the exclusion in the data (excluded_by data)")
     ids = {h.get("id") for h in cleaned.get("hypotheses") or []}
     for h in cleaned.get("hypotheses") or []:
         bad = [n for n in h.get("lines") or [] if not isinstance(n, int) or not 1 <= n <= len(raw)]
@@ -392,9 +398,11 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
 
 
 # ---------------------------------------------------------------- evidence integrity (also applied to stored outputs on read)
-INTEGRITY_VERSION = "evidence-integrity-v1"
+INTEGRITY_VERSION = "evidence-integrity-v2"
 _NOT_DIRECT = ("Kept open: no direct exclusion was recorded for this area (the deciding evidence was observed elsewhere), "
                "so it is weakened, not ruled out.")
+_REPORT_ONLY = ("Kept open: the exclusion rests on an engineer's report that Veyra has not verified in the data, so it is "
+                "weakened, not ruled out.")
 
 
 def reviewed_hypotheses(hyps: Optional[List[Dict[str, Any]]]) -> Tuple[List[Dict[str, Any]], List[str]]:
@@ -406,6 +414,9 @@ def reviewed_hypotheses(hyps: Optional[List[Dict[str, Any]]]) -> Tuple[List[Dict
         if h.get("status") == "ruled_out" and h.get("basis") != "direct":
             h["status"], h["integrity"] = "weakened", _NOT_DIRECT
             notes.append(f"{h.get('area')}: ruled out without direct exclusion, shown as weakened")
+        elif h.get("status") == "ruled_out" and h.get("excluded_by") != "data":
+            h["status"], h["integrity"] = "weakened", _REPORT_ONLY
+            notes.append(f"{h.get('area')}: ruled out without exclusion visible in the data, shown as weakened")
         out.append(h)
     return out, notes
 

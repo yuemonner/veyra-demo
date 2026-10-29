@@ -95,11 +95,26 @@ def test_a_new_run_must_name_direct_exclusion_or_the_area_stays_weakened(store):
     assert r["result"]["next_action"]["outcomes"][1]["rules_out"] == ["h1"]      # a declared direct branch exclusion is kept
     direct = _report("ruled_out", "direct", raw[0])
     direct["hypotheses"][1]["observed_at"] = "a clean rebuild on a second host"
+    direct["hypotheses"][1]["excluded_by"] = "data"
     model2 = _scripted([{"content": [{"type": "tool_use", "id": "b1", "name": "overview", "input": {}}]},
                         {"content": [{"type": "tool_use", "id": "b2", "name": "submit_report", "input": {**direct, "evidence": [{**direct["evidence"][0], "calls": ["b1"]}],
                                                                                                          "checked": [{**direct["checked"][0], "calls": ["b1"]}]}}]}])
     r2 = inv.investigate(store, cid, model=model2)
     assert next(h for h in r2["result"]["hypotheses"] if h["id"] == "h2")["status"] == "ruled_out"
+
+
+def test_an_engineer_report_alone_never_rules_an_area_out(store):
+    cid = _ardupilot(store)
+    _authorise(store, cid)
+    raw = inv.LogTools(store, cid).raw
+    rep = _report("ruled_out", "direct", raw[0])
+    rep["hypotheses"][1].update(observed_at="engineer's rebuild", excluded_by="engineer_report")
+    model = _scripted([{"content": [{"type": "tool_use", "id": "a1", "name": "overview", "input": {}}]}] +
+                      [{"content": [{"type": "tool_use", "id": f"a{i}", "name": "submit_report", "input": rep}]} for i in range(2, 5)])
+    r = inv.investigate(store, cid, model=model)
+    assert "engineer's report" in model.calls[2]["messages"][-1]["content"][0]["content"]
+    h2 = next(h for h in r["result"]["hypotheses"] if h["id"] == "h2")
+    assert h2["status"] == "weakened" and "not verified" in h2["integrity"]
 
 
 # ---------------------------------------------------------------- 2. machine-specific normal labels
