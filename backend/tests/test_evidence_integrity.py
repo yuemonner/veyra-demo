@@ -230,8 +230,14 @@ def test_api_review_and_note_defaults(tmp_path, monkeypatch):
     c = TestClient(app)
     c.headers.update({"x-veyra-request": "1"})
     got = c.get(f"/engine/cases/{cid}/investigation").json()
-    assert all(h["status"] != "ruled_out" for i in got["playback"]["investigations"] for h in i["result"]["hypotheses"])
-    assert got["playback"]["findings"][0]["provenance"][1]["kind"] == "veyra_description"
+    shown = [h for i in got["playback"]["investigations"] for h in i["result"]["hypotheses"]]
+    assert all(h["basis"] == "direct" and h.get("excluded_by") == "data" for h in shown if h["status"] == "ruled_out")
+    assert {h["status"] for h in shown if h["area"] in ("Network path", "Host / agent side")} == {"weakened"}
+    assert [p["kind"] for p in got["playback"]["findings"][0]["provenance"]] == ["selected", "observed", "observed", "observed"]
+    versions = c.get("/engine/samples/microros-stm32-session-drops/recordings").json()
+    assert [v["version"] for v in versions] == ["v1", "v2", "v3"]
+    v1 = c.get("/engine/samples/microros-stm32-session-drops/recordings", params={"version": "v1"}).json()
+    assert v1["entries"][0]["kind"] == "agent_report"                          # the first recording, unchanged, for comparison
     n = c.post(f"/engine/cases/{cid}/event-note", json={"pattern": "x", "verdict": "normal"}).json()
     assert n["payload"]["scope"] == "case"
     assert c.post(f"/engine/cases/{cid}/event-note", json={"pattern": "x", "verdict": "normal", "scope": "machine"}).status_code == 422
