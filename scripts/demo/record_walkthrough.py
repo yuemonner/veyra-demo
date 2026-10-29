@@ -1,11 +1,12 @@
 """Record the public demo's walkthrough with the live investigator (local only; needs the Claude Code sign-in).
 
-  python scripts/demo/record_walkthrough.py <sample-name> "<what the engineer found>" [keyword ...]
+  python scripts/demo/record_walkthrough.py <sample-name> <version> "<observation>; <observation>; ..." [keyword ...]
 
 1. A fresh database; the sample's real log through the upload path; the investigator runs (round 1).
-2. The engineer's result is recorded against round 1's next action, on the outcome that best matches the keywords.
+2. The engineer's result is recorded against round 1's next action: the outcome that best matches the keywords is the
+   result selected, and the observations are only what the engineer observed (kept apart, as the product does).
 3. The investigator runs again (round 2).
-4. fixtures/real/public/<sample>/recorded_investigation.json is rewritten with these entries (its "close" block is kept).
+4. Written to fixtures/real/public/<sample>/recorded_investigation.<version>.json. Earlier versions are never touched.
 Everything recorded is the investigator's real output; nothing is edited.
 """
 import json
@@ -24,7 +25,7 @@ from app.workflows import public_samples  # noqa: E402
 
 
 def main():
-    name, observed, keywords = sys.argv[1], sys.argv[2], [k.lower() for k in sys.argv[3:]]
+    name, version, observed, keywords = sys.argv[1], sys.argv[2], sys.argv[3], [k.lower() for k in sys.argv[4:]]
     model = from_environment()
     assert model.available(), "No model: run with VEYRA_AGENT_BACKEND=claude-code and a Claude Code sign-in"
     store = CaseStore(Path(tempfile.mkdtemp()) / "walkthrough.db")
@@ -39,18 +40,20 @@ def main():
     score = lambda o: sum(k in (o["label"] + " " + o["means"]).lower() for k in keywords)  # noqa: E731
     pick = max(na["outcomes"], key=score)
     print("engineer picks:", pick["label"], flush=True)
-    store.append(cid, "engineer_finding", {"action": na["action"][:500], "result": "found",
-                                           "observations": f"{pick['label']} ({pick['means']}). {observed}"}, actor="Engineer")
+    store.append(cid, "engineer_finding", {"action": na["action"][:500], "outcome_selected": pick["label"][:200], "result": "found",
+                                           "observations": observed}, actor="Engineer")
     time.sleep(1)
     r2 = investigator.investigate(store, cid, model=model, on_step=say)
     print("round 2:", r2["mode"], r2["seconds"], "s", r2["result"]["headline"], flush=True)
     assert r2["mode"] == "agent", r2["fallback_reason"]
     entries = [{"kind": e["kind"], "recorded_at": e["recorded_at"], "actor": e["actor"], "payload": e["payload"]} for e in store.ledger(cid)
                if (e["kind"] == "agent_report" and e["payload"].get("mode") == "agent") or e["kind"] == "engineer_finding"]
-    target = public_samples.SAMPLES[name]["dir"] / "recorded_investigation.json"
-    old = json.loads(target.read_text()) if target.exists() else {}
-    target.write_text(json.dumps({"note": f"Recorded {time.strftime('%Y-%m-%d')} with the live investigator ({model.model}) on a local instance.",
-                                  "entries": entries, **({"close": old["close"]} if old.get("close") else {})}, indent=1))
+    target = public_samples.SAMPLES[name]["dir"] / f"recorded_investigation.{version}.json"
+    if target.exists():
+        raise SystemExit(f"{target} exists: recordings are versioned, pick a new version")
+    from app.agent.investigator import INTEGRITY_VERSION, INVESTIGATOR_VERSION
+    target.write_text(json.dumps({"version": version, "note": f"Recorded {time.strftime('%Y-%m-%d %H:%M')} with the live investigator ({model.model}) on a local instance.",
+                                  "investigator": INVESTIGATOR_VERSION, "integrity_rules": INTEGRITY_VERSION, "entries": entries}, indent=1))
     print("WROTE", target, flush=True)
     store.close()
 

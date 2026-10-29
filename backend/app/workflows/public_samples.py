@@ -7,8 +7,9 @@ evaluation batch.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app.workflows.debrief import debrief_recording
 
@@ -27,8 +28,18 @@ def _load() -> Dict[str, Dict[str, Any]]:
 SAMPLES = _load()
 
 
+def recording(sample_dir: Path) -> Optional[Path]:
+    """The walkthrough a sample shows: the newest versioned recording (recorded_investigation.v2.json, v3...), else the
+    original recorded_investigation.json. Older recordings stay in the folder, unchanged, for comparison."""
+    versions = sorted(sample_dir.glob("recorded_investigation.v*.json"), key=lambda p: int(re.sub(r"\D", "", p.stem.split(".")[-1]) or 0))
+    if versions:
+        return versions[-1]
+    first = sample_dir / "recorded_investigation.json"
+    return first if first.exists() else None
+
+
 def listing() -> List[Dict[str, Any]]:
-    return [{"name": k, "walkthrough": (v["dir"] / "recorded_investigation.json").exists(), **{f: v[f] for f in ("title", "platform", "symptom", "source_url", "project")}}
+    return [{"name": k, "walkthrough": recording(v["dir"]) is not None, **{f: v[f] for f in ("title", "platform", "symptom", "source_url", "project")}}
             for k, v in SAMPLES.items()]
 
 
@@ -45,8 +56,8 @@ def seed_showcase(store) -> List[str]:
     the real result without the demo running a model. Returns the case ids."""
     ids = []
     for name, s in SAMPLES.items():
-        rec = s["dir"] / "recorded_investigation.json"
-        if not rec.exists() or any(c["title"] == s["title"] for c in store.cases()):
+        rec = recording(s["dir"])
+        if rec is None or any(c["title"] == s["title"] for c in store.cases()):
             continue
         recorded = json.loads(rec.read_text())
         cid = run_sample(store, name)["case_id"]
@@ -54,11 +65,11 @@ def seed_showcase(store) -> List[str]:
         last = max(i for i, e in enumerate(recorded["entries"]) if e["kind"] == "agent_report")
         for i, e in enumerate(recorded["entries"]):
             if e["kind"] == "agent_report":
-                payload = {**e["payload"], "run_id": run_id, "recorded": {"at": e["recorded_at"], "note": recorded["note"],
+                payload = {**e["payload"], "run_id": run_id, "recorded": {"at": e["recorded_at"], "note": recorded["note"], "file": rec.name,
                                                                           **({"close": recorded["close"]} if i == last and recorded.get("close") else {})}}
                 store.append_trusted(cid, "agent_report", payload, actor=e["actor"], source="recorded investigation (replayed)")
             elif e["kind"] == "engineer_finding":
-                p = {k: v for k, v in e["payload"].items() if k in ("action", "result", "observations")}
+                p = {k: v for k, v in e["payload"].items() if k in ("action", "outcome_selected", "result", "observations")}
                 store.append(cid, "engineer_finding", p, actor=e["actor"], source="recorded investigation (replayed)")
         ids.append(cid)
     return ids
