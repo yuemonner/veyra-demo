@@ -27,7 +27,13 @@ def store(tmp_path):
 
 
 def _microros(store):
+    """The walkthrough the demo shows (the newest recording)."""
     return public_samples.seed_showcase(store)[0]
+
+
+def _microros_v1(store):
+    """The first recording, made before the evidence-integrity rules; kept unchanged for comparison."""
+    return public_samples.seed_showcase(store, version="v1")[0]
 
 
 def _ardupilot(store, machine=None):
@@ -50,7 +56,7 @@ def _scripted(responses):
 
 # ---------------------------------------------------------------- 1. fault-space elimination
 def test_recorded_walkthrough_does_not_rule_out_the_network_path_from_a_host_capture(store):
-    cid = _microros(store)
+    cid = _microros_v1(store)
     stored = [e for e in store.ledger(cid) if e["kind"] == "agent_report"][-1]["payload"]["result"]
     assert {h["area"]: h["status"] for h in stored["hypotheses"]}["Network path"] == "ruled_out"     # the record itself is unchanged
     shown = inv.latest(store, cid)["result"]
@@ -176,8 +182,8 @@ def test_rejected_conclusion_without_a_correction_closes_without_a_cause(store):
 
 
 # ---------------------------------------------------------------- 4. observation provenance
-def test_the_walkthrough_shows_every_item_passed_to_round_two(store):
-    cid = _microros(store)
+def test_the_v1_walkthrough_shows_every_item_passed_to_round_two(store):
+    cid = _microros_v1(store)
     finding = next(e["payload"] for e in store.ledger(cid) if e["kind"] == "engineer_finding")
     items = inv.finding_provenance(finding)
     kinds = [i["kind"] for i in items]
@@ -232,3 +238,66 @@ def test_api_review_and_note_defaults(tmp_path, monkeypatch):
     r = c.post(f"/engine/cases/{cid}/review", json={"conclusion": "correct", "symptom_after_fix": "gone", "machine_restored": "yes", "fix": "clean D-cache"})
     assert r.status_code == 200, r.text
     assert r.json()["payload"]["investigation_status"] == "cause_probable" and r.json()["payload"]["root_cause_verified"] is False
+
+
+
+# ---------------------------------------------------------------- the walkthrough the demo shows (recording v3)
+def _rounds(store, cid):
+    return [e["payload"] for e in store.ledger(cid) if e["kind"] == "agent_report" and e["payload"].get("mode") == "agent"]
+
+
+def test_v3_conclusions_and_statuses_agree_without_any_correction(store):
+    cid = _microros(store)
+    rounds = _rounds(store, cid)
+    assert len(rounds) == 2
+    for p in rounds:
+        shown = inv.reviewed_payload(p)["result"]
+        assert "integrity" not in shown                                         # nothing had to be demoted: text and status agree
+        assert [h["status"] for h in shown["hypotheses"]] == [h["status"] for h in p["result"]["hypotheses"]]
+    final = {h["area"]: h for h in rounds[-1]["result"]["hypotheses"]}
+    assert final["Network path"]["status"] == "weakened" and final["Host / agent side"]["status"] == "weakened"
+    assert all(h["basis"] == "direct" and h.get("excluded_by") == "data" for h in final.values() if h["status"] == "ruled_out")
+    assert "unobserved" in final["Network path"]["because"] or "only at" in final["Network path"]["because"]
+
+
+def test_v3_engineer_observations_are_shown_apart_from_veyras_interpretation(store):
+    cid = _microros(store)
+    finding = next(e["payload"] for e in store.ledger(cid) if e["kind"] == "engineer_finding")
+    items = inv.finding_provenance(finding)
+    assert [i["kind"] for i in items] == ["selected", "observed", "observed", "observed"]       # no Veyra wording passed as observed
+    assert items[0]["text"] == "Buffer is valid at write, zeros on wire"
+    assert items[1]["text"].startswith("Board Tx buffer inspected in the debugger at the sendto call")
+    assert any("tcpdump on the agent host" in i["text"] for i in items) and any("D-cache is enabled" in i["text"] for i in items)
+
+
+def test_v3_next_steps_and_branches_are_consistent_with_the_evidence(store):
+    cid = _microros(store)
+    r1, r2 = [p["result"] for p in _rounds(store, cid)]
+    finding = next(e["payload"] for e in store.ledger(cid) if e["kind"] == "engineer_finding")
+    assert finding["action"] == r1["next_action"]["action"]
+    assert finding["outcome_selected"] in [o["label"] for o in r1["next_action"]["outcomes"]]
+    for r in (r1, r2):
+        ids = {h["id"] for h in r["hypotheses"]}
+        for o in r["next_action"]["outcomes"]:
+            refs = o.get("keeps", []) + o.get("rules_out", []) + o.get("weakens", [])
+            assert set(refs) <= ids and not (set(o.get("keeps", [])) & set(o.get("rules_out", [])))
+    assert {h["id"] for h in r1["hypotheses"]} == {h["id"] for h in r2["hypotheses"]}           # round 2 updated round 1's areas
+    chosen = next(o for o in r1["next_action"]["outcomes"] if o["label"] == finding["outcome_selected"])
+    leading = [h["id"] for h in r2["hypotheses"] if h["status"] == "leading"]
+    assert set(leading) <= set(chosen["keeps"])                                 # round 2 leads with what the chosen branch kept
+    assert r2["status"] != "cause_confirmed" and "D-cache" in r2["next_action"]["action"]
+
+
+def test_v3_closing_creates_a_candidate_lesson(store):
+    cid = _microros(store)
+    p = inv.review_to_closure(store, cid, conclusion="correct", symptom_after_fix="gone", machine_restored="yes",
+                              fix="Ethernet buffers and descriptors in a non-cacheable MPU region")
+    e = store.append(cid, "case_closure", p, actor="Ana")["payload"]
+    assert e["investigation_status"] == "cause_probable" and e["root_cause_verified"] is False
+    assert lessons.lesson_for(store, store.case(cid))["status"] == "candidate"
+
+
+def test_every_recording_is_kept_for_comparison():
+    versions = public_samples.recording_versions("microros-stm32-session-drops")
+    assert [v["version"] for v in versions] == ["v1", "v2", "v3"] and [v["shown"] for v in versions] == [False, False, True]
+    assert versions[2]["integrity_rules"] == inv.INTEGRITY_VERSION

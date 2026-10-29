@@ -28,7 +28,20 @@ def _load() -> Dict[str, Dict[str, Any]]:
 SAMPLES = _load()
 
 
-def recording(sample_dir: Path) -> Optional[Path]:
+def recordings(sample_dir: Path) -> List[Dict[str, Any]]:
+    """Every walkthrough recording of a sample, oldest first: v1 is the original recorded_investigation.json."""
+    out = []
+    first = sample_dir / "recorded_investigation.json"
+    if first.exists():
+        out.append({"version": "v1", "path": first})
+    for p in sorted(sample_dir.glob("recorded_investigation.v*.json"), key=lambda p: int(re.sub(r"\D", "", p.stem.split(".")[-1]) or 0)):
+        out.append({"version": p.stem.split(".")[-1], "path": p})
+    return out
+
+
+def recording(sample_dir: Path, version: Optional[str] = None) -> Optional[Path]:
+    if version:
+        return next((r["path"] for r in recordings(sample_dir) if r["version"] == version), None)
     """The walkthrough a sample shows: the newest versioned recording (recorded_investigation.v2.json, v3...), else the
     original recorded_investigation.json. Older recordings stay in the folder, unchanged, for comparison."""
     versions = sorted(sample_dir.glob("recorded_investigation.v*.json"), key=lambda p: int(re.sub(r"\D", "", p.stem.split(".")[-1]) or 0))
@@ -50,13 +63,13 @@ def run_sample(store, name: str, progress=lambda step: None) -> Dict[str, Any]:
                              progress=progress)
 
 
-def seed_showcase(store) -> List[str]:
+def seed_showcase(store, version: Optional[str] = None) -> List[str]:
     """Hosted demo: each sample with a recorded investigation (recorded_investigation.json) becomes a case showing that
     investigation as it was recorded on a local instance (with the live model), labelled as recorded, so a visitor sees
     the real result without the demo running a model. Returns the case ids."""
     ids = []
     for name, s in SAMPLES.items():
-        rec = recording(s["dir"])
+        rec = recording(s["dir"], version)
         if rec is None or any(c["title"] == s["title"] for c in store.cases()):
             continue
         recorded = json.loads(rec.read_text())
@@ -73,3 +86,13 @@ def seed_showcase(store) -> List[str]:
                 store.append(cid, "engineer_finding", p, actor=e["actor"], source="recorded investigation (replayed)")
         ids.append(cid)
     return ids
+
+
+def recording_versions(name: str) -> List[Dict[str, Any]]:
+    """For comparison: each recording's version, when and with which rules it was made (the files are never edited)."""
+    out = []
+    for r in recordings(SAMPLES[name]["dir"]):
+        d = json.loads(r["path"].read_text())
+        out.append({"version": r["version"], "file": r["path"].name, "note": d.get("note"), "integrity_rules": d.get("integrity_rules"),
+                    "investigator": d.get("investigator"), "shown": r["path"] == recording(SAMPLES[name]["dir"])})
+    return out

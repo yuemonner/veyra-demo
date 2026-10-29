@@ -209,6 +209,20 @@ class SampleIn(BaseModel):
     allow_model: bool = False
 
 
+@router.get("/samples/{name}/recordings")
+def sample_recordings(name: str, version: Optional[str] = None):
+    """Every recorded walkthrough of a sample, for comparison; with ?version= the recording itself, unchanged."""
+    from app.workflows import public_samples
+    if name not in public_samples.SAMPLES:
+        raise HTTPException(404, "Unknown sample")
+    if version:
+        path = public_samples.recording(public_samples.SAMPLES[name]["dir"], version)
+        if path is None:
+            raise HTTPException(404, "Unknown recording version")
+        return json.loads(path.read_text())
+    return public_samples.recording_versions(name)
+
+
 @router.post("/samples/{name}/run")
 def sample_log(name: str, request: Request, body: Optional[SampleIn] = None):
     """Run a REAL public failure log (fixtures/real/public) through the ordinary upload path and the investigator."""
