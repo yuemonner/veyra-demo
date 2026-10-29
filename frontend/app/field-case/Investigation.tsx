@@ -330,7 +330,7 @@ function Playback({ pb }: { pb: Any }) {
         <li><i>Machine</i> {({ yes: "Back in service", no: "Not restored yet", unknown: "Not known" } as Any)[answers.machine_restored] || "—"}</li>
       </ul>
       <p className={st.lessonNote}><b>Cause:</b> {answers.correction || named(inv.result?.explanation, inv.result?.hypotheses) || close.cause}</p>
-      {(answers.fix || close.fix) && <p className={st.lessonNote}><b>Fix that worked:</b> {answers.fix || close.fix}</p>}
+      {(answers.fix || close.fix) && <p className={st.lessonNote}><b>Fix applied:</b> {answers.fix || close.fix}</p>}
       {(inv.result?.reuse_when || close.applies_when) && <p className={st.lessonNote}><b>Reused only when:</b> {inv.result?.reuse_when || close.applies_when}</p>}
       <p className={st.fine}>Written by Veyra from the investigation and your answers. Reused as a lead with its conditions, not as a verified fix.</p>
       <div className={st.row}><button className={st.ghost} onClick={() => { setStage(0); setShown(0); setMine([]); setPhase("running"); top(); }}>Replay from the start</button></div>
