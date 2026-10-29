@@ -472,13 +472,22 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
         lines = payload.get("lines") or []
         if not isinstance(lines, list) or not all(isinstance(n, int) for n in lines):
             raise LedgerError("lines must be a list of line numbers")
+        scope = _choice(payload, "scope", ("case", "machine"), required=False) or "case"
         out = {"pattern": _text(payload, "pattern", limit=400), "verdict": _choice(payload, "verdict", ("normal", "relevant")),
-               "scope": _choice(payload, "scope", ("case", "machine")), "lines": lines[:50], "note": _text(payload, "note", required=False, limit=500)}
+               "scope": scope, "lines": lines[:50], "note": _text(payload, "note", required=False, limit=500)}
+        if scope == "machine":
+            # A baseline that later investigations of this machine see: only on evidence, for stated conditions, confirmed.
+            if payload.get("confirmed") is not True:
+                raise LedgerError("A machine baseline needs an explicit confirmation (confirmed: true)")
+            out["evidence"] = _text(payload, "evidence", limit=1000)
+            out["applies_when"] = _text(payload, "applies_when", limit=500)
+            out["confirmed"] = True
 
     elif kind == "engineer_finding":
         # What an engineer found when doing the next action Veyra proposed (or any check of their own). It feeds the
         # next investigation step; it is the engineer's report, not an independently verified measurement.
-        out = {"action": _text(payload, "action", limit=500), "result": _choice(payload, "result", ("found", "not_found", "cannot_do", "other")),
+        out = {"action": _text(payload, "action", limit=500), "outcome_selected": _text(payload, "outcome_selected", required=False, limit=200),
+               "result": _choice(payload, "result", ("found", "not_found", "cannot_do", "other")),
                "observations": _text(payload, "observations", required=payload.get("result") in ("found", "other"), limit=2000),
                "investigation_entry": _text(payload, "investigation_entry", required=False, limit=80),
                "verification_grade": "engineer_reported_not_independently_reviewed"}
@@ -523,6 +532,10 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
                "decisive_check": _text(payload, "decisive_check", required=False, limit=200),
                "applies_when": _text(payload, "applies_when", required=False, limit=1000),
                "hours_to_cause": hours, "would_have_saved_time": _text(payload, "would_have_saved_time", required=False, limit=2000),
+               # Kept apart from the cause status: what the engineer accepted and observed is not a verified root cause.
+               "engineer_acceptance": _choice(payload, "engineer_acceptance", ("accepted", "partly", "rejected"), required=False),
+               "symptom_after_fix": _choice(payload, "symptom_after_fix", ("gone", "still_present", "unknown", "no_fix"), required=False),
+               "root_cause_verified": status == "cause_confirmed",
                "engine_status_at_closure": {b["domain"]: b["status"] for b in run["payload"]["belief"]} if run else None,
                "supersedes": previous[-1]["id"] if previous else None,
                "boundary": "The engineer's conclusion, with the stated method and evidence strength. 'Probable' is not proof. "

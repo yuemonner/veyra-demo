@@ -306,17 +306,19 @@ def get_investigation(case_id: str, request: Request):
     store = CaseStore(store_path(request))
     try:
         model = _investigator_model()
-        findings = [{"id": e["id"], "recorded_at": e["recorded_at"], "by": e["actor"], **e["payload"]} for e in store.ledger(case_id) if e["kind"] == "engineer_finding"]
-        recorded = [{**e["payload"], "entry_id": e["id"]} for e in store.ledger(case_id)
+        findings = [{"id": e["id"], "recorded_at": e["recorded_at"], "by": e["actor"], **e["payload"], "provenance": investigator.finding_provenance(e["payload"])}
+                    for e in store.ledger(case_id) if e["kind"] == "engineer_finding"]
+        recorded = [{**investigator.reviewed_payload(e["payload"]), "entry_id": e["id"]} for e in store.ledger(case_id)
                     if e["kind"] == "agent_report" and e["payload"].get("kind") == "autonomous_investigation" and e["payload"].get("recorded")]
-        playback = {"investigations": recorded, "findings": findings} if recorded else None  # a recorded walkthrough, played step by step
+        playback = ({"investigations": recorded, "findings": [{**f, "provenance": investigator.finding_provenance(f)} for f in findings]}
+                    if recorded else None)  # a recorded walkthrough, played step by step
         notes = {}
         for e in store.ledger(case_id):
             if e["kind"] == "event_note":
                 notes[e["payload"]["pattern"]] = {**e["payload"], "by": e["actor"], "at": e["recorded_at"]}
         rounds = [e["payload"] for e in store.ledger(case_id) if e["kind"] == "agent_report"
                   and e["payload"].get("kind") == "autonomous_investigation" and e["payload"].get("mode") == "agent"]
-        previous = (rounds[-2].get("result") or {}).get("hypotheses") if len(rounds) > 1 else None
+        previous = investigator.reviewed_hypotheses((rounds[-2].get("result") or {}).get("hypotheses"))[0] if len(rounds) > 1 else None
         return {"investigation": investigator.latest(store, case_id), "findings": findings, "playback": playback, "notes": list(notes.values()),
                 "previous_hypotheses": previous,
                 "agent": {"configured": bool(model and model.available()), "model": getattr(model, "model", None) if model else None,
@@ -329,6 +331,7 @@ def get_investigation(case_id: str, request: Request):
 class FindingIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     action: str = Field(min_length=1, max_length=500)
+    outcome_selected: Optional[str] = Field(default=None, max_length=200)
     result: str = Field(pattern="^(found|not_found|cannot_do|other)$")
     observations: Optional[str] = Field(default=None, max_length=2000)
     investigation_entry: Optional[str] = Field(default=None, max_length=80)
@@ -383,14 +386,18 @@ class EventNoteIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     pattern: str = Field(min_length=1, max_length=400)
     verdict: str = Field(pattern="^(normal|relevant)$")
-    scope: str = Field(default="machine", pattern="^(case|machine)$")
+    scope: str = Field(default="case", pattern="^(case|machine)$")
     lines: list = Field(default_factory=list, max_length=50)
     note: Optional[str] = Field(default=None, max_length=500)
+    evidence: Optional[str] = Field(default=None, max_length=1000)       # machine baselines only: why it is normal
+    applies_when: Optional[str] = Field(default=None, max_length=500)    # machine baselines only: for which configuration
+    confirmed: Optional[bool] = None
 
 
 @router.post("/cases/{case_id}/event-note")
 def event_note(case_id: str, body: EventNoteIn, request: Request):
-    """One click: an event Veyra classified is normal for this machine (or relevant after all). No form, no second approver."""
+    """One click dismisses an event in THIS case. A baseline for the machine (seen by later investigations) needs evidence,
+    the configuration it applies to and an explicit confirmation; the ledger refuses it otherwise."""
     from app.engine_api import store_path
     from app.ledger.model import LedgerError
     from app.store.sqlite_store import CaseStore
@@ -418,7 +425,8 @@ def case_record(case_id: str, request: Request):
 class ReviewIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     conclusion: str = Field(pattern="^(correct|partly|wrong)$")
-    recovered: str = Field(pattern="^(yes|not_yet|unknown)$")
+    symptom_after_fix: str = Field(pattern="^(gone|still_present|unknown|no_fix)$")
+    machine_restored: str = Field(pattern="^(yes|no|unknown)$")
     correction: Optional[str] = Field(default=None, max_length=1000)
     fix: Optional[str] = Field(default=None, max_length=1000)
 
@@ -434,8 +442,8 @@ def review_and_confirm(case_id: str, body: ReviewIn, request: Request):
         raise HTTPException(422, "Say what is wrong in the conclusion")
     store = CaseStore(store_path(request))
     try:
-        payload = investigator.review_to_closure(store, case_id, conclusion=body.conclusion, recovered=body.recovered,
-                                                 correction=body.correction, fix=body.fix)
+        payload = investigator.review_to_closure(store, case_id, conclusion=body.conclusion, symptom_after_fix=body.symptom_after_fix,
+                                                 machine_restored=body.machine_restored, correction=body.correction, fix=body.fix)
         return store.append(case_id, "case_closure", payload, actor=actor_for(request, "Engineer"), source="review and confirm")
     except LedgerError as error:
         raise HTTPException(422, str(error)) from None

@@ -19,7 +19,7 @@ import json
 import re
 import statistics
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 INVESTIGATOR_VERSION = "veyra-investigator-v1"
 MAX_TURNS = 14
@@ -35,13 +35,16 @@ How to work:
    data would separate them, and RUN it with the tools: search for messages, read lines around events, measure counts,
    rates and the time between events, compare with earlier cases (lessons). Prefer checks that can rule an area out.
    Typically 4-10 tool calls. Report every hypothesis with its status: leading, open, weakened or ruled_out, and the
-   line(s) or result that decided it.
+   line(s) or result that decided it. ruled_out needs DIRECT exclusion (basis "direct"): evidence that observes that
+   area itself and shows it is not the fault. A measurement at one point of a path excludes only what lies beyond that
+   point toward the observer, never the parts it did not observe (a capture at the receiving host does not clear the
+   cable, switch or sender-side driver): use weakened (basis "indirect") and say where the evidence was observed.
 3. Separate cause from consequence: a crash, a restart, a watchdog, an e-stop or a timeout is often the effect of
    something earlier. Say which lines are the earliest sign and which are effects.
 4. Only what the data cannot answer becomes the next action for a person: design it as an experiment that splits the
    hypotheses still standing. One concrete action a field engineer can do (a command to run, a value to read, a part to
-   inspect, a config to check). For each possible result: which hypotheses it keeps, which it rules out, and what Veyra
-   would do next. Never propose an action you could have done yourself with the tools.
+   inspect, a config to check). For each possible result: which hypotheses it keeps, which it directly rules out, which
+   it only weakens, and what Veyra would do next. Never propose an action you could have done yourself with the tools.
 5. Classify the log's notable events into groups (events): root_cause_candidate, anomaly, effect, or routine (start-up,
    configuration, normal traffic). Group repeated messages together. Routine events need no attention from anyone.
 
@@ -55,7 +58,11 @@ Rules:
 - If the engineer already reported results of earlier actions (case_context), build on them: do not repeat a check.
   Keep the ids of earlier hypotheses (case_context.previous_hypotheses) and update their status; add new ones only
   when the evidence opens a new area.
-- An event the engineer marked as normal for this machine (case_context.marked_normal) is routine here.
+- An event the engineer dismissed in this case (case_context.dismissed_in_this_case) is routine in this case only.
+  A machine baseline (case_context.machine_baselines) is context with conditions, never a reason to hide an event:
+  check whether its conditions match this case, and still list the event.
+- An engineer's result has two parts: the outcome they selected (a label you proposed) and what they observed. Only the
+  observations are evidence; never treat your own description of an outcome as observed.
 - In all text a person reads, name hypotheses by their area ("Network path"), never by id; ids go only in keeps / rules_out.
 - Fill reuse_when: the conditions under which your explanation, once confirmed, would apply to another machine.
 Finish by calling submit_report exactly once."""
@@ -89,7 +96,8 @@ SUBMIT_SPEC = {
                     "label": {"type": "string", "description": "What the engineer would find, under 8 words"},
                     "means": {"type": "string", "description": "What that would mean, under 20 words"},
                     "keeps": {"type": "array", "items": {"type": "string"}, "description": "Hypothesis ids still standing after this result"},
-                    "rules_out": {"type": "array", "items": {"type": "string"}, "description": "Hypothesis ids this result rules out"},
+                    "rules_out": {"type": "array", "items": {"type": "string"}, "description": "Hypothesis ids this result DIRECTLY excludes"},
+                    "weakens": {"type": "array", "items": {"type": "string"}, "description": "Hypothesis ids this result makes less likely without excluding them"},
                     "then": {"type": "string", "description": "What Veyra would do next after this result, under 12 words"}},
                     "required": ["label", "means", "keeps", "rules_out"]}}},
                 "required": ["action", "why", "how", "where", "outcomes"]},
@@ -100,6 +108,8 @@ SUBMIT_SPEC = {
                 "claim": {"type": "string", "description": "The hypothesis, under 20 words"},
                 "status": {"type": "string", "enum": ["leading", "open", "weakened", "ruled_out"]},
                 "because": {"type": "string", "description": "What decided this status, under 25 words"},
+                "basis": {"type": "string", "enum": ["direct", "indirect"], "description": "direct: the evidence observes this area itself; required for ruled_out"},
+                "observed_at": {"type": "string", "description": "Where the deciding evidence was observed (e.g. 'agent host NIC', 'board Tx buffer')"},
                 "lines": {"type": "array", "items": {"type": "integer"}}}, "required": ["id", "area", "claim", "status", "because"]}},
             "events": {"type": "array", "maxItems": 12, "description": "Notable log events grouped and classified", "items": {"type": "object", "properties": {
                 "lines": {"type": "array", "items": {"type": "integer"}}, "what": {"type": "string", "description": "under 12 words"},
@@ -262,16 +272,22 @@ def _case_context(store, case_id: str) -> Dict[str, Any]:
     case = store.case(case_id)
     led = store.ledger(case_id)
     reports = [e["payload"].get("stated_reason") for e in led if e["kind"] == "intervention_report"]
-    findings = [{"recorded_at": e["recorded_at"], "by": e["actor"], **{k: e["payload"].get(k) for k in ("action", "result", "observations")}}
+    findings = [{"recorded_at": e["recorded_at"], "by": e["actor"], **{k: e["payload"].get(k) for k in ("action", "outcome_selected", "result", "observations")}}
                 for e in led if e["kind"] == "engineer_finding"]
     prev = next((e["payload"]["result"].get("hypotheses") for e in reversed(led) if e["kind"] == "agent_report"
                  and e["payload"].get("kind") == "autonomous_investigation" and e["payload"].get("mode") == "agent"), None)
-    notes = {}
-    for e in store.ledger(case_id) + _machine_notes(store, case["machine_id"], case_id):
-        if e["kind"] == "event_note":
-            notes[e["payload"]["pattern"]] = e["payload"]
+    here: Dict[str, Dict[str, Any]] = {}
+    for e in led:
+        if e["kind"] == "event_note" and e["payload"].get("scope", "case") == "case":
+            here[e["payload"]["pattern"]] = e["payload"]
+    baselines: Dict[str, Dict[str, Any]] = {}
+    for e in [x for x in led if x["kind"] == "event_note"] + _machine_notes(store, case["machine_id"], case_id):
+        if e["payload"].get("scope") == "machine":
+            baselines[e["payload"]["pattern"]] = e["payload"]
     return {"machine": case["machine_id"], "title": case["title"], "reported": reports, "engineer_results": findings,
-            "previous_hypotheses": prev, "marked_normal": [n for n in notes.values() if n["verdict"] == "normal"]}
+            "previous_hypotheses": reviewed_hypotheses(prev)[0] if prev else prev,
+            "dismissed_in_this_case": [n["pattern"] for n in here.values() if n["verdict"] == "normal"],
+            "machine_baselines": [{k: n.get(k) for k in ("pattern", "evidence", "applies_when")} for n in baselines.values() if n["verdict"] == "normal"]}
 
 
 def _machine_notes(store, machine_id: str, exclude: str) -> List[Dict[str, Any]]:
@@ -347,13 +363,17 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
             err = numbers_ok(item.get("result"), calls, [], f"checked[{i}]")
         (problems.append(err) or dropped.append({"checked": item})) if err else keep.append(item)
     cleaned["checked"] = keep
+    for h in cleaned.get("hypotheses") or []:
+        if h.get("status") == "ruled_out" and h.get("basis") != "direct":
+            problems.append(f"hypothesis '{h.get('area')}' is ruled_out without direct exclusion: mark it weakened (basis indirect) "
+                            "or name the evidence that observes that area itself (basis direct, observed_at)")
     ids = {h.get("id") for h in cleaned.get("hypotheses") or []}
     for h in cleaned.get("hypotheses") or []:
         bad = [n for n in h.get("lines") or [] if not isinstance(n, int) or not 1 <= n <= len(raw)]
         if bad:
             problems.append(f"hypothesis {h.get('id')}: line(s) {bad} do not exist")
     for i, o in enumerate(((cleaned.get("next_action") or {}).get("outcomes")) or []):
-        unknown = [x for x in (o.get("keeps") or []) + (o.get("rules_out") or []) if x not in ids]
+        unknown = [x for x in (o.get("keeps") or []) + (o.get("rules_out") or []) + (o.get("weakens") or []) if x not in ids]
         if unknown:
             problems.append(f"next_action.outcomes[{i}]: unknown hypothesis id(s) {unknown}")
     ev = []
@@ -367,7 +387,70 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
         problems.append("Do not state a confirmed root cause; use cause_probable and say what would confirm it")
     if cleaned.get("status") == "cause_probable" and not cleaned.get("evidence"):
         problems.append("cause_probable needs evidence lines")
+    reviewed_result(cleaned)  # whatever the model still left unproven is demoted before it is stored
     return {"problems": problems, "cleaned": cleaned, "dropped": dropped}
+
+
+# ---------------------------------------------------------------- evidence integrity (also applied to stored outputs on read)
+INTEGRITY_VERSION = "evidence-integrity-v1"
+_NOT_DIRECT = ("Kept open: no direct exclusion was recorded for this area (the deciding evidence was observed elsewhere), "
+               "so it is weakened, not ruled out.")
+
+
+def reviewed_hypotheses(hyps: Optional[List[Dict[str, Any]]]) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """A hypothesis is ruled out only on direct exclusion (basis 'direct'). Anything else, including outputs recorded before
+    the basis existed, is shown as weakened, with why. Returns (copy, notes); the stored record is never changed."""
+    out, notes = [], []
+    for h in hyps or []:
+        h = dict(h)
+        if h.get("status") == "ruled_out" and h.get("basis") != "direct":
+            h["status"], h["integrity"] = "weakened", _NOT_DIRECT
+            notes.append(f"{h.get('area')}: ruled out without direct exclusion, shown as weakened")
+        out.append(h)
+    return out, notes
+
+
+def reviewed_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    """In place: hypotheses and the experiment's branches. A branch 'rules out' only areas whose exclusion it would observe
+    directly; for outputs without that distinction (recorded before it existed) every exclusion is shown as 'weakens'."""
+    hyps, notes = reviewed_hypotheses(result.get("hypotheses"))
+    if result.get("hypotheses") is not None:
+        result["hypotheses"] = hyps
+    for o in ((result.get("next_action") or {}).get("outcomes")) or []:
+        if "weakens" not in o and o.get("rules_out"):  # recorded before direct / indirect was asked for
+            o["weakens"], o["rules_out"] = list(o["rules_out"]), []
+            notes.append(f"result '{o.get('label')}': exclusions shown as 'weakens' (not marked direct when recorded)")
+    if notes:
+        result["integrity"] = {"version": INTEGRITY_VERSION, "adjustments": notes}
+    return result
+
+
+def reviewed_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    out = json.loads(json.dumps(payload))
+    if isinstance(out.get("result"), dict):
+        reviewed_result(out["result"])
+    return out
+
+
+def finding_provenance(payload: Dict[str, Any]) -> List[Dict[str, str]]:
+    """What an engineer's result passes to the next round, item by item and labelled: the outcome they selected, Veyra's own
+    description of that outcome (proposed by Veyra, not observed: present only in results recorded before the two were kept
+    apart), and each observation as written."""
+    items: List[Dict[str, str]] = []
+    obs = (payload.get("observations") or "").strip()
+    if payload.get("outcome_selected"):
+        items.append({"kind": "selected", "text": payload["outcome_selected"]})
+    else:
+        m = re.match(r"^(.+?) \((.+?)\)\.\s*(.*)$", obs, re.S)
+        if m:
+            items.append({"kind": "selected", "text": m.group(1).strip()})
+            items.append({"kind": "veyra_description", "text": m.group(2).strip()})
+            obs = m.group(3)
+    for part in re.split(r"(?<=[.;])\s+", obs):
+        part = part.strip().rstrip(".;").strip()
+        if part:
+            items.append({"kind": "observed", "text": part})
+    return items
 
 
 # ---------------------------------------------------------------- deterministic investigation (no model)
@@ -517,7 +600,7 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
 def latest(store, case_id: str) -> Optional[Dict[str, Any]]:
     for e in reversed(store.ledger(case_id)):
         if e["kind"] == "agent_report" and e["payload"].get("kind") == "autonomous_investigation":
-            return {**e["payload"], "entry_id": e["id"], "recorded_at": e["recorded_at"]}
+            return {**reviewed_payload(e["payload"]), "entry_id": e["id"], "recorded_at": e["recorded_at"]}
     return None
 
 
@@ -574,7 +657,7 @@ def record(store, case_id: str) -> Dict[str, Any]:
             checks += len(p.get("steps") or [])
             first_inv_at = first_inv_at or e["recorded_at"]
             r = p.get("result") or {}
-            hyps = r.get("hypotheses")
+            hyps = reviewed_hypotheses(r.get("hypotheses"))[0] if r.get("hypotheses") else r.get("hypotheses")
             lead = [h["area"] for h in hyps or [] if h.get("status") == "leading"]
             chain.append({"at": e["recorded_at"], "type": "investigation", "by": "Veyra", "title": f"Investigation round {rounds}",
                           "detail": r.get("headline"), "checks": len(p.get("steps") or []), "seconds": p.get("seconds"),
@@ -590,8 +673,9 @@ def record(store, case_id: str) -> Dict[str, Any]:
             chain.append({"at": e["recorded_at"], "type": "note", "by": e["actor"],
                           "title": f"Marked {'normal' if p['verdict'] == 'normal' else 'relevant'}{' for this machine' if p['scope'] == 'machine' else ''}", "detail": p["pattern"]})
         elif k == "case_closure":
-            chain.append({"at": e["recorded_at"], "type": "closure", "by": e["actor"], "title": "Conclusion confirmed",
-                          "detail": p.get("cause") or "Closed without a cause", "recovered": p.get("resolution_status"), "status": p.get("investigation_status")})
+            chain.append({"at": e["recorded_at"], "type": "closure", "by": e["actor"], "title": "Closed after review",
+                          "detail": p.get("cause") or "Closed without a cause", "facts": closure_facts(p),
+                          "recovered": p.get("resolution_status"), "status": p.get("investigation_status")})
     last = latest(store, case_id) or {}
     res = last.get("result") or {}
     created = case.get("created_at")
@@ -611,24 +695,46 @@ def record(store, case_id: str) -> Dict[str, Any]:
             "boundary": "Written by Veyra from the case's append-only record as the investigation happened."}
 
 
-def review_to_closure(store, case_id: str, *, conclusion: str, recovered: str, correction: Optional[str] = None,
-                      fix: Optional[str] = None) -> Dict[str, Any]:
-    """Review & confirm: the engineer answers two questions; Veyra writes the closure from what the case already holds.
-    conclusion: correct | partly | wrong; recovered: yes | not_yet | unknown."""
+ACCEPTANCE = {"correct": "accepted", "partly": "partly", "wrong": "rejected"}
+
+
+def closure_facts(p: Dict[str, Any]) -> Dict[str, str]:
+    """The four facts a closure carries, kept apart: what the engineer accepted, what they observed after the fix,
+    whether the root cause was verified (inspection, reproduction or a confirming record, never a click), and whether
+    the machine is back in service."""
+    verified = p.get("investigation_status") == "cause_confirmed"
+    return {"engineer_acceptance": {"accepted": "Engineer accepted the conclusion", "partly": "Engineer accepted it in part, with a correction",
+                                    "rejected": "Engineer rejected the conclusion"}.get(p.get("engineer_acceptance") or "", "Not recorded"),
+            "symptom_after_fix": {"gone": "Symptom not seen after the fix (engineer's observation)", "still_present": "Symptom still present after the fix",
+                                  "unknown": "Not observed yet whether the symptom is gone", "no_fix": "No fix applied yet"}.get(p.get("symptom_after_fix") or "", "Not recorded"),
+            "root_cause": (f"Verified ({p.get('confirmed_by', '').replace('_', ' ')})" if verified else
+                           "Not verified: probable" if p.get("investigation_status") == "cause_probable" else "Not established"),
+            "machine": {"resolved": "Back in service", "temporary_workaround": "Running on a workaround", "not_yet_repaired": "Not restored yet",
+                        "not_resolved": "Not restored", "machine_retired": "Retired", "handed_over": "Handed over"}.get(p.get("resolution_status") or "", "Not recorded")}
+
+
+def review_to_closure(store, case_id: str, *, conclusion: str, symptom_after_fix: str, machine_restored: str,
+                      correction: Optional[str] = None, fix: Optional[str] = None) -> Dict[str, Any]:
+    """Review & close. The engineer's answers are recorded as what they are: acceptance of the conclusion, an observation
+    of the symptom after the fix, and whether the machine is back in service. None of them verifies the root cause: the
+    closure stays 'cause_probable' (engineer judgement) whatever is clicked, so its lesson is a candidate, not verified.
+    Verification needs its own record (inspection, reproduction or a fix confirmed by evidence) through the case ledger.
+    conclusion: correct | partly | wrong; symptom_after_fix: gone | still_present | unknown | no_fix;
+    machine_restored: yes | no | unknown."""
     d = draft_lesson(store, case_id)
     run = store.latest_run(case_id) or {}
     domains = run.get("domains") or {}
     domain = next((k for k, v in domains.items() if v.get("status") == "anomaly_observed"), next(iter(domains), None))
     cause = d["cause"] if conclusion == "correct" else (correction or "").strip()
-    status = "cause_unknown" if conclusion == "wrong" and not cause else "cause_probable"
+    status = "cause_unknown" if (conclusion == "wrong" and not cause) or not cause else "cause_probable"
     fix_text = (fix or "").strip() or None
-    confirmed = conclusion == "correct" and recovered == "yes" and fix_text
-    payload = {"investigation_status": "cause_confirmed" if confirmed else status,
-               "evidence_note": (d["evidence_note"] + ("; engineer: the machine recovered after the fix" if recovered == "yes" else ""))[:1000] or None,
-               "resolution_status": {"yes": "resolved", "not_yet": "not_yet_repaired", "unknown": "not_yet_repaired"}[recovered],
+    payload = {"investigation_status": status, "engineer_acceptance": ACCEPTANCE[conclusion],
+               "symptom_after_fix": symptom_after_fix if fix_text or symptom_after_fix == "no_fix" else ("no_fix" if symptom_after_fix == "unknown" else symptom_after_fix),
+               "evidence_note": d["evidence_note"][:1000] or None,
+               "resolution_status": {"yes": "resolved", "no": "not_yet_repaired", "unknown": "not_yet_repaired"}[machine_restored],
                "decisive_check": (d.get("decisive_check") or "")[:200] or None, "applies_when": d.get("applies_when") or None, "fix": fix_text}
-    if payload["investigation_status"] != "cause_unknown":
-        payload.update(cause=cause[:1000], cause_domain=domain, confirmed_by="fix_resolved_it" if confirmed else "engineer_judgement")
+    if status != "cause_unknown":
+        payload.update(cause=cause[:1000], cause_domain=domain, confirmed_by="engineer_judgement")
     if fix_text:
-        payload["fix_held"] = "held" if recovered == "yes" else "not_yet_known"
+        payload["fix_held"] = "not_yet_known"  # one observation after the fix is not a fix that held
     return payload
