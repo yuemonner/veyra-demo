@@ -123,7 +123,8 @@ function Round({ r, prev, lines, n, stepsShown }: { r: Any; prev: Any[] | null; 
   return (
     <li className={t.roundItem}>
       <div className={t.me}>
-        <span className={t.who}>Round {n} · Engineer · {r.message_kind === "result" ? "result of a check" : "guess"}{r.recorded ? " · scripted for this demo" : ""}</span>
+        <span className={t.who}>Round {n} · {r.recorded?.voice === "reviewer" ? "Reviewer · challenge (paraphrased from a robotics engineer who read the case)"
+          : `Engineer · ${r.message_kind === "result" ? "result of a check" : "guess"}${r.recorded ? " · scripted for this demo" : ""}`}</span>
         <p>{r.message}</p>
       </div>
       <div className={t.veyra}>
@@ -162,5 +163,23 @@ function Round({ r, prev, lines, n, stepsShown }: { r: Any; prev: Any[] | null; 
         {r.failure && <p className={t.bad}>{r.failure}</p>}
       </div>
     </li>
+  );
+}
+
+/** On the investigation: where the discussion has taken the case since, so the page never shows a stale next step. */
+export function DiscussionStatus({ data, onOpen }: { data: DiscussionData; onOpen: () => void }) {
+  const rounds = (data?.rounds || []).filter((r: Any) => r.result);
+  if (!rounds.length) return null;
+  const last = rounds[rounds.length - 1];
+  const lead = (last.result.hypotheses || []).filter((h: Any) => h.status === "leading").map((h: Any) => h.area);
+  const open = (last.result.still_unknown || [])[0];
+  return (
+    <div className={t.since}>
+      <span className={t.partsHead}>Since this investigation · {rounds.length} round{rounds.length > 1 ? "s" : ""} of discussion with the AI investigator{rounds.some((r: Any) => r.recorded) ? " (recorded)" : ""}</span>
+      <p><b>Latest next check (round {rounds.length}):</b> {last.result.next_check?.action}</p>
+      {lead.length > 0 && <p><b>Leading now:</b> {lead.join(", ")}</p>}
+      {open && <p><b>Still open:</b> {open}</p>}
+      <button className={t.link} onClick={onOpen}>Open the discussion</button>
+    </div>
   );
 }

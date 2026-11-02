@@ -21,8 +21,9 @@ const VERDICT: Record<string, { mark: string; label: string; cls: string }> = {
 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export default function Investigation({ caseId, call, actor, jobId, onChanged, feedback, extra, guard }:
-  { caseId: string; call: Call; actor: string; jobId?: string | null; onChanged: () => void; feedback?: Record<string, Any>; extra?: React.ReactNode; guard?: ((inv: Any) => Any) | null }) {
+export default function Investigation({ caseId, call, actor, jobId, onChanged, feedback, extra, guard, ahead }:
+  { caseId: string; call: Call; actor: string; jobId?: string | null; onChanged: () => void; feedback?: Record<string, Any>; extra?: React.ReactNode; guard?: ((inv: Any) => Any) | null;
+    ahead?: React.ReactNode }) {
   const [data, setData] = useState<Any>(null);
   const [job, setJob] = useState<Any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
   if (job) return <Live job={job} />;
   if (!data) return <section className={st.surface}><p className={st.dim}>Loading…</p></section>;
   // Every investigation, recorded or live, is held to what its evidence could observe before it is shown.
-  if (data.playback) return <Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} />;
+  if (data.playback) return <Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} ahead={ahead} />;
   const inv = guard && data.investigation ? guard(data.investigation) : data.investigation;
   const agent = data.agent || {};
   if (!inv) {
@@ -80,7 +81,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
     );
   }
   return (
-    <ResultView inv={inv} findings={data.findings || []} fb={feedback} extra={extra}
+    <ResultView inv={inv} findings={data.findings || []} fb={feedback} extra={extra} ahead={ahead}
       banner={inv.mode !== "agent" ? (
         <div className={st.banner}>
           <b>Rule-based reading only.</b> {inv.fallback_reason}.{" "}
@@ -97,8 +98,8 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
   );
 }
 
-function ResultView({ inv, findings, banner, next, footer, prev, fb, extra }: { inv: Any; findings: Any[]; banner?: React.ReactNode; next: React.ReactNode; footer?: React.ReactNode; prev?: Any[] | null;
-  fb?: Record<string, Any>; extra?: React.ReactNode }) {
+function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahead }: { inv: Any; findings: Any[]; banner?: React.ReactNode; next: React.ReactNode; footer?: React.ReactNode; prev?: Any[] | null;
+  fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode }) {
   const r = inv.result || {};
   const told = !!fb && (r.hypotheses || []).some((h: Any) => fb[h.id] && fb[h.id].verdict !== "unsure");
   const status = STATUS[r.status] || STATUS.cause_unknown;
@@ -117,6 +118,8 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra }: { 
       {(r.hypotheses || []).length > 0 && (told
         ? <FaultSpace hyps={withFeedback(r.hypotheses, fb || {})} prev={r.hypotheses} changedLead="Your checks changed the picture" />
         : <FaultSpace hyps={r.hypotheses} prev={prev} />)}
+
+      {ahead}
 
       {next}
 
@@ -293,12 +296,20 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
 
 /** A recorded investigation walked through step by step: Veyra reads the log, hands over the next action, takes the
  *  engineer's result, continues, and closes with a lesson. Nothing is written. */
-function Playback({ pb, fb, extra }: { pb: Any; fb?: Record<string, Any>; extra?: React.ReactNode }) {
+/** The recorded findings as the engineer reported them, for rounds before `stage`. */
+const recordedFindings = (pb: Any, upto: number) => (pb.findings || []).slice(0, upto).map((f: Any, i: number) => ({ id: `rec-${i}`, recorded_at: f.recorded_at, action: f.action,
+  result: f.result, outcome_selected: ((f.provenance || []).find((p: Any) => p.kind === "selected") || {}).text, observations: (f.provenance || []).filter((p: Any) => p.kind === "observed").map((p: Any) => p.text).join("; ") || f.observations }));
+
+function Playback({ pb, fb, extra, ahead }: { pb: Any; fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode }) {
   const invs: Any[] = pb.investigations;
-  const [stage, setStage] = useState(0);
-  const [shown, setShown] = useState(0);
-  const [phase, setPhase] = useState<"running" | "result" | "closing" | "closed">("running");
-  const [mine, setMine] = useState<Any[]>([]);
+  const lastStage = invs.length - 1;
+  // Opens on where the case stands now (the latest round, with the engineer's recorded result); the replay from
+  // round 1 is one click away. A finished check is never shown as the next action of the current state.
+  const [stage, setStage] = useState(lastStage);
+  const [shown, setShown] = useState((invs[lastStage].steps || []).length);
+  const [phase, setPhase] = useState<"running" | "result" | "closing" | "closed">("result");
+  const [mine, setMine] = useState<Any[]>(() => recordedFindings(pb, lastStage));
+  const [replaying, setReplaying] = useState(false);
   const [answers, setAnswers] = useState<Any>({});
   const inv = invs[stage];
   useEffect(() => {
@@ -312,6 +323,15 @@ function Playback({ pb, fb, extra }: { pb: Any; fb?: Record<string, Any>; extra?
     return <Live job={{ step: "Veyra is investigating", steps: (inv.steps || []).slice(0, shown) }}
       subtitle={stage === 0 ? "Reading the log and running the checks it can do itself." : "Continuing with what you found."} />;
   }
+  const replay = () => { setStage(0); setShown(0); setMine([]); setReplaying(true); setPhase("running"); top(); };
+  const current = () => { setStage(lastStage); setShown((invs[lastStage].steps || []).length); setMine(recordedFindings(pb, lastStage)); setReplaying(false); setPhase("result"); top(); };
+  const banner = invs.length > 1 ? (stage === lastStage && !replaying ? (
+    <div className={st.roundBar}><span><b>Round {stage + 1} of {invs.length}</b> · where the case stands now. {(pb.findings || []).length ? `Round ${stage}'s check was done; the engineer's result is under "What you found".` : ""}</span>
+      <button className={st.inline} onClick={replay}>Watch how Veyra got here, from round 1</button></div>
+  ) : (
+    <div className={st.roundBar}><span><b>Replay · round {stage + 1} of {invs.length}.</b>{stage < lastStage ? " This check was already done in the recorded case; choose the recorded result to continue." : ""}</span>
+      <button className={st.inline} onClick={current}>Skip to the current state</button></div>
+  )) : null;
   // Round n's recorded engineer result (the one that fed round n+1), with exactly what it passed on.
   const recordedHere: Any = stage + 1 < invs.length ? (pb.findings || [])[stage] || null : null;
   const recordedLabel: string | null = recordedHere ? ((recordedHere.provenance || []).find((p: Any) => p.kind === "selected") || {}).text || null : null;
@@ -344,10 +364,10 @@ function Playback({ pb, fb, extra }: { pb: Any; fb?: Record<string, Any>; extra?
       {(answers.fix || close.fix) && <p className={st.lessonNote}><b>Fix applied:</b> {answers.fix || close.fix}</p>}
       {(inv.result?.reuse_when || close.applies_when) && <p className={st.lessonNote}><b>Reused only when:</b> {inv.result?.reuse_when || close.applies_when}</p>}
       <p className={st.fine}>Written by Veyra from the investigation and your answers. Reused as a lead with its conditions, not as a verified fix.</p>
-      <div className={st.row}><button className={st.ghost} onClick={() => { setStage(0); setShown(0); setMine([]); setPhase("running"); top(); }}>Replay from the start</button></div>
+      <div className={st.row}><button className={st.ghost} onClick={replay}>Replay from the start</button></div>
     </div>
   ) : null;
-  return <ResultView inv={inv} findings={mine} fb={fb} extra={extra}
+  return <ResultView inv={inv} findings={mine} fb={fb} extra={extra} ahead={stage === lastStage ? ahead : null} banner={banner}
     prev={stage > 0 ? (invs[stage - 1].result || {}).hypotheses : null}
     next={phase === "result" ? <NextAction caseId="" call={async () => null} next={inv.result?.next_action} entry="" closed={false} onRecorded={() => undefined} demo={demo} hyps={inv.result?.hypotheses} /> : null}
     footer={footer} />;
@@ -566,3 +586,4 @@ export function AutoRecord({ caseId, call, children }: { caseId: string; call: C
     </section>
   );
 }
+

@@ -7,7 +7,7 @@ import { Lessons, RecordingRead, SignalChain } from "./SignalChain";
 import Investigation, { AutoRecord, LogEvidence } from "./Investigation";
 import { plotFor, Waveform } from "./Waveform";
 import { DataPanel, Discuss, EMPTY_TALK, NormalPanel, useMaterial, useReport, type Talk } from "./CaseTools";
-import { useDiscussion } from "./Together";
+import { DiscussionStatus, useDiscussion } from "./Together";
 import tt from "./tools.module.css";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "/local-api";
@@ -379,7 +379,8 @@ export default function FieldCasePage() {
           </nav>
           {tab === "next" && <NextAction caseId={caseId!} data={data} onChanged={() => load(caseId!)} me={me?.user?.name} onEvidence={() => go("findings")} />}
           {tab === "case" && <Investigation key={`${caseId}:${jobId || ""}`} caseId={caseId!} call={call} actor={me?.user?.name || ENGINEER} jobId={jobId} onChanged={() => load(caseId!)}
-            feedback={talk.feedback} guard={material.guard} extra={<DataPanel m={material} onAsk={openDiscuss} />} />}
+            feedback={talk.feedback} guard={material.guard} extra={<DataPanel m={material} onAsk={openDiscuss} />}
+            ahead={<DiscussionStatus data={together.data} onOpen={openDiscuss} />} />}
           {tab === "brief" && <Brief data={data} run={run} verification={verification} go={go} onAccept={acceptCheck} acceptBusy={acceptBusy} error={agentError} />}
           {tab === "brief" && <NormalPanel run={run} labels={labels} onAsk={openDiscuss} />}
           {tab === "evidence" && logCase && <LogEvidence key={caseId!} caseId={caseId!} call={call} guard={material.guard} />}
