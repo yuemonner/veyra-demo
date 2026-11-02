@@ -59,3 +59,15 @@ test('expected information gain is non-negative and zero once the answer is cert
   const sure = { ...b, families: { nominal: 1 }, active: [b.active[0]] };
   assert.equal(S.expectedInfoGain(model, sure, 'launch', S.rng(3), 16), 0);
 });
+
+test('equal knowledge: the prototype is exactly classical + detector, and knowledge never changes the first choice', () => {
+  for (const s of [80001, 80002, 80003]) {
+    const f = S.drawFault(s, S.CLOSED_WORLD);
+    const v = S.runEpisode(model, 'veyra', f.params, f.family, s), c = S.runEpisode(model, 'classical_widen', f.params, f.family, s);
+    assert.deepEqual({ ...v, method: 0 }, { ...c, method: 0 });
+    for (const sel of ['fixed', 'random', 'classical']) {
+      const a = S.runEpisode(model, sel, f.params, f.family, s), b = S.runEpisode(model, `${sel}_widen`, f.params, f.family, s);
+      assert.equal(a.steps[0].experiment, b.steps[0].experiment);
+    }
+  }
+});

@@ -33,6 +33,9 @@ export const ROBOT = { wheelRadius: 0.05, track: 0.3, motorTau: 0.08, dt: 0.01, 
 // at the end of each test (tape or marker), with centimetre-level error.
 export const NOISE = { pose: 0.03, heading: 0.03, encoder: 0.6, gyro: 0.03 };
 export const NOMINAL: Params = { aL: 20, aR: 20, wL: 30, wR: 30, eL: 1, eR: 1, gyroBias: 0, delay: 0.03, dropL: 0, dropR: 0 };
+// A robot as simulated (the world) or as assumed by the diagnostic model. Robot A is the development robot.
+export type Spec = { robot: typeof ROBOT; noise: typeof NOISE; nominal: Params };
+export const SPEC_A: Spec = { robot: ROBOT, noise: NOISE, nominal: NOMINAL };
 
 const lin = (a: number, b: number, n: number) => Array.from({ length: n }, (_, i) => +(a + ((b - a) * i) / (n - 1)).toFixed(4));
 
@@ -92,8 +95,9 @@ export function rng(seed: number) {
 export type Rng = ReturnType<typeof rng>;
 
 // ---------- simulator ----------
-export function simulate(p: Params, exp: Experiment, r: Rng | null): Trace {
-  const { wheelRadius: R, track: B, motorTau: tau, dt, sampleEvery, dropBlock } = ROBOT;
+export function simulate(p: Params, exp: Experiment, r: Rng | null, spec: Spec = SPEC_A): Trace {
+  const { wheelRadius: R, track: B, motorTau: tau, dt, sampleEvery, dropBlock } = spec.robot;
+  const NOISE = spec.noise;
   const steps = Math.round(exp.duration / dt), delaySteps = Math.round(p.delay / dt);
   const blocks = Math.ceil(exp.duration / dropBlock) + 1;
   const cutL = Array.from({ length: blocks }, () => (r && p.dropL > 0 ? r.next() < p.dropL : false));
@@ -151,21 +155,21 @@ export const MC_RUNS = 48;
 export type Prediction = { mean: Float64Array; sd: Float64Array };
 export type Model = { hyps: Hypothesis[]; pred: Record<string, Prediction[]> };
 
-export function hypotheses(includeLibrary: boolean): Hypothesis[] {
+export function hypotheses(includeLibrary: boolean, nominal: Params = NOMINAL): Hypothesis[] {
   const out: Hypothesis[] = [];
   for (const f of FAMILIES) {
     if (f.library && !includeLibrary) continue;
-    for (const v of f.grid) { const p = { ...NOMINAL }; f.apply(p, v); out.push({ family: f.id, value: v, params: p }); }
+    for (const v of f.grid) { const p = { ...nominal }; f.apply(p, v); out.push({ family: f.id, value: v, params: p }); }
   }
   return out;
 }
 
-export function buildModel(): Model {
-  const hyps = hypotheses(true), pred: Record<string, Prediction[]> = {};
+export function buildModel(spec: Spec = SPEC_A): Model {
+  const hyps = hypotheses(true, spec.nominal), pred: Record<string, Prediction[]> = {};
   for (const e of EXPERIMENTS) {
     const ei = EXPERIMENTS.indexOf(e);
     const stats = hyps.map((h, hi) => {
-      const runs = Array.from({ length: MC_RUNS }, (_, k) => features(simulate(h.params, e, rng(9_000_000 + ei * 1_000_003 + hi * 1009 + k * 7))));
+      const runs = Array.from({ length: MC_RUNS }, (_, k) => features(simulate(h.params, e, rng(9_000_000 + ei * 1_000_003 + hi * 1009 + k * 7), spec)));
       const d = runs[0].length, mean = new Float64Array(d), vr = new Float64Array(d);
       for (let j = 0; j < d; j++) {
         let m = 0; for (const r of runs) m += r[j]; m /= runs.length;
@@ -263,33 +267,45 @@ export const POLICY = { confident: 0.95, budget: 14, maxRepeats: 2, misfitP: 1e-
 export let FIXED_ORDER = ["topspeed", "launch", "spin", "hold", "cruise", "topspeed", "launch", "spin", "hold", "cruise"];
 export const setFixedOrder = (o: string[]) => { FIXED_ORDER = o; };
 
-export type MethodId = "fixed" | "random" | "classical" | "veyra";
+// Methods are a 3 x 2 design: how the next test is chosen x what the method knows.
+//   selection: fixed (best checklist) | random | classical (expected information gain per unit cost)
+//   knowledge: the initial fault list only | the list plus a misfit detector and a library of further fault types
+// "veyra" is the prototype; it is exactly classical selection with the detector and library ("classical_widen").
+export type MethodId = "fixed" | "random" | "classical" | "fixed_widen" | "random_widen" | "classical_widen" | "veyra";
 export const METHODS: Record<MethodId, { name: string; detail: string }> = {
-  fixed: { name: "Fixed checklist", detail: "The best fixed order of tests, tuned on separate calibration faults" },
+  fixed: { name: "Fixed checklist", detail: "The best fixed order of tests, tuned on calibration faults of robot A" },
   random: { name: "Random order", detail: "Tests in a random order (seeded)" },
-  classical: { name: "Classical active diagnosis", detail: "Next test by expected information gain per unit cost, over the initial fault list" },
-  veyra: { name: "Veyra (prototype)", detail: "Same as classical, plus a misfit check: when no hypothesis explains the data, widen the hypothesis space" },
+  classical: { name: "Classical active diagnosis", detail: "Next test by expected information gain per unit cost" },
+  fixed_widen: { name: "Fixed checklist + detector", detail: "Fixed checklist, plus the misfit detector and fault library" },
+  random_widen: { name: "Random order + detector", detail: "Random order, plus the misfit detector and fault library" },
+  classical_widen: { name: "Classical active + detector", detail: "Classical active diagnosis, plus the misfit detector and fault library" },
+  veyra: { name: "Veyra prototype", detail: "Identical to classical active + detector" },
 };
+export const selectionOf = (m: MethodId) => (m === "veyra" ? "classical" : m.replace("_widen", "")) as "fixed" | "random" | "classical";
+export const widens = (m: MethodId) => m === "veyra" || m.endsWith("_widen");
 
 export type Step = { experiment: string; families: Record<string, number>; misfitP: number; widened: boolean; scores?: Record<string, number> };
 export type Outcome = { method: MethodId; truth: string; declared: string | null; confident: boolean; correct: boolean; experiments: number; cost: number; widened: boolean; steps: Step[] };
 
 export function chooseNext(method: MethodId, model: Model, b: Belief, used: Record<string, number>, n: number, r: Rng, left: number): { id: string; scores?: Record<string, number> } {
   const allowed = EXPERIMENTS.filter((e) => (used[e.id] || 0) < POLICY.maxRepeats && e.cost <= left);
-  if (method === "fixed") {
+  const sel = selectionOf(method);
+  if (sel === "fixed") {
     const id = FIXED_ORDER.find((x, i) => i >= n && allowed.some((e) => e.id === x));
     return { id: id || "" };
   }
   if (!allowed.length) return { id: "" };
-  if (method === "random") return { id: allowed[Math.floor(r.next() * allowed.length)].id };
+  if (sel === "random") return { id: allowed[Math.floor(r.next() * allowed.length)].id };
   const scores: Record<string, number> = {};
   for (const e of allowed) scores[e.id] = expectedInfoGain(model, b, e.id, r, POLICY.eigSamples) / e.cost;
   const id = allowed.reduce((a, e) => (scores[e.id] > scores[a.id] ? e : a), allowed[0]).id;
   return { id, scores };
 }
 
-export function runEpisode(model: Model, method: MethodId, truth: Params, truthFamily: string, seed: number): Outcome {
-  const world = rng(seed * 7919 + 17), choice = rng(seed * 104729 + method.length);
+// world: the robot actually being tested (may differ from what the model assumes). The choice stream depends only on
+// the selection rule, so methods that share a selection rule make identical choices until their knowledge differs.
+export function runEpisode(model: Model, method: MethodId, truth: Params, truthFamily: string, seed: number, world: Spec = SPEC_A): Outcome {
+  const worldRng = rng(seed * 7919 + 17), choice = rng(seed * 104729 + selectionOf(method).length);
   const obs: Observation[] = [], used: Record<string, number> = {}, steps: Step[] = [];
   let widened = false, cost = 0;
   let b = belief(model, obs, false);
@@ -299,7 +315,7 @@ export function runEpisode(model: Model, method: MethodId, truth: Params, truthF
     const { id, scores } = chooseNext(method, model, b, used, obs.length, choice, POLICY.budget - cost);
     if (!id) break;
     used[id] = (used[id] || 0) + 1; cost += experimentById(id).cost;
-    const trace = simulate(truth, experimentById(id), world);
+    const trace = simulate(truth, experimentById(id), worldRng, world);
     obs.push({ experiment: id, y: features(trace), trace });
     b = belief(model, obs, widened);
     // misfit: how well does the best current hypothesis explain the latest observation?
@@ -308,7 +324,7 @@ export function runEpisode(model: Model, method: MethodId, truth: Params, truthF
     for (const i of b.active) { const v = b.logPost[i]; if (v > best) { best = v; bestI = i; } }
     const p = chi2Tail(chi2(model.pred[last.experiment][bestI], last.y), last.y.length);
     let widenNow = false;
-    if (method === "veyra" && !widened && p < POLICY.misfitP) { widened = widenNow = true; b = belief(model, obs, true); }
+    if (widens(method) && !widened && p < POLICY.misfitP) { widened = widenNow = true; b = belief(model, obs, true); }
     steps.push({ experiment: id, families: { ...b.families }, misfitP: p, widened: widenNow, scores });
   }
   const [declared, top] = Object.entries(b.families).reduce((a, x) => (x[1] > a[1] ? x : a), ["", -1] as [string, number]);
@@ -318,12 +334,19 @@ export function runEpisode(model: Model, method: MethodId, truth: Params, truthF
 }
 
 // ---------- hidden faults ----------
-export function drawFault(seed: number, families: string[]): { family: string; value: number; params: Params } {
+export type FaultWorld = { nominal: Params; ranges: Record<string, [number, number][]>; prevalence?: Record<string, number> };
+export const FAULTS_A: FaultWorld = { nominal: NOMINAL, ranges: TRUE_RANGES };
+export function drawFault(seed: number, families: string[], fw: FaultWorld = FAULTS_A): { family: string; value: number; params: Params } {
   const r = rng(seed * 31337 + 5);
-  const family = families[Math.floor(r.next() * families.length)];
-  const ranges = TRUE_RANGES[family], [lo, hi] = ranges[Math.floor(r.next() * ranges.length)];
+  let family: string;
+  if (fw.prevalence) {
+    const u = r.next(), tot = families.reduce((s, f) => s + (fw.prevalence![f] || 0), 0);
+    let c = 0; family = families[families.length - 1];
+    for (const f of families) { c += (fw.prevalence[f] || 0) / tot; if (u < c) { family = f; break; } }
+  } else family = families[Math.floor(r.next() * families.length)];
+  const ranges = fw.ranges[family], [lo, hi] = ranges[Math.floor(r.next() * ranges.length)];
   const value = +(lo + (hi - lo) * r.next()).toFixed(4);
-  const params = { ...NOMINAL }; familyById(family).apply(params, value);
+  const params = { ...fw.nominal }; familyById(family).apply(params, value);
   return { family, value, params };
 }
 export const CLOSED_WORLD = FAMILIES.filter((f) => !f.library).map((f) => f.id);
@@ -346,9 +369,11 @@ export function summarise(method: MethodId, outs: Outcome[], seed = 1): Summary 
            widenedRate: outs.filter((x) => x.widened).length / n };
 }
 
-export function benchmark(model: Model, world: "closed" | "open", seeds: number[], methods: MethodId[] = ["fixed", "random", "classical", "veyra"]) {
+export const ALL_METHODS: MethodId[] = ["fixed", "random", "classical", "fixed_widen", "random_widen", "classical_widen"];
+export function benchmark(model: Model, world: "closed" | "open", seeds: number[], methods: MethodId[] = ALL_METHODS,
+                          spec: Spec = SPEC_A, faults: FaultWorld = FAULTS_A) {
   const fams = world === "closed" ? CLOSED_WORLD : OPEN_WORLD;
   const outcomes: Record<string, Outcome[]> = {};
-  for (const m of methods) outcomes[m] = seeds.map((s) => { const f = drawFault(s, fams); return runEpisode(model, m, f.params, f.family, s); });
+  for (const m of methods) outcomes[m] = seeds.map((s) => { const f = drawFault(s, fams, faults); return runEpisode(model, m, f.params, f.family, s, spec); });
   return { world, seeds: [seeds[0], seeds[seeds.length - 1]], summaries: methods.map((m) => summarise(m, outcomes[m])), outcomes };
 }
