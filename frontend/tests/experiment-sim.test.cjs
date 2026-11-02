@@ -71,3 +71,10 @@ test('equal knowledge: the prototype is exactly classical + detector, and knowle
     }
   }
 });
+
+test('robot B in the library matches the preregistered robot-b.mjs exactly', async () => {
+  const B = await import('../../research/experiment-001/robot-b.mjs');
+  assert.deepEqual(S.SPEC_B_WORLD, B.B_WORLD);
+  assert.deepEqual(S.SPEC_B_MODEL, B.B_MODEL);
+  assert.deepEqual(JSON.parse(JSON.stringify(S.FAULTS_B)), JSON.parse(JSON.stringify(B.B_FAULTS)));
+});

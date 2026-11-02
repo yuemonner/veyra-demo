@@ -307,9 +307,10 @@ export default function FieldCasePage() {
         {cases.length > 1 ? (
           <label className={s.casePick}>
             <span className={s.visuallyHidden}>Case</span>
-            <select value={caseId ?? ""} onChange={(e) => { setTab("case"); load(e.target.value); }}>
+            <select value={caseId ?? ""} onChange={(e) => { if (e.target.value === "__research") { window.location.href = "/research-preview"; return; } setTab("case"); load(e.target.value); }}>
               {[...cases].reverse().filter((c) => !c.synthetic || c.id === caseId).map((c) => (
                 <option key={c.id} value={c.id}>{c.synthetic ? "Synthetic · " : "Real data · "}{caseLabel(c.title)}</option>))}
+              <option value="__research">Research preview · Diagnose a robot Veyra has never seen</option>
             </select>
           </label>
         ) : <span className={s.crumb}>Field case</span>}

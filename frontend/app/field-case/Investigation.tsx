@@ -353,7 +353,7 @@ const H_STATUS: Record<string, string> = { leading: "Leading", open: "Open", wea
 const H_ORDER: Record<string, number> = { leading: 0, open: 1, weakened: 2, ruled_out: 3 };
 
 /** Where the fault can be: the hypotheses Veyra is weighing, and what the latest evidence did to them. */
-function FaultSpace({ hyps, prev }: { hyps: Any[]; prev?: Any[] | null }) {
+export function FaultSpace({ hyps, prev }: { hyps: Any[]; prev?: Any[] | null }) {
   const before: Record<string, string> = Object.fromEntries((prev || []).map((h: Any) => [h.id, h.status]));
   const moved = prev ? hyps.filter((h) => before[h.id] && before[h.id] !== h.status) : [];
   const ruled = hyps.filter((h) => h.status === "ruled_out").length;

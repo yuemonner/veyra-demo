@@ -98,7 +98,7 @@ On robot A (not held out), adaptive selection was slightly more accurate than th
 
 ## What failed on robot B, and why (descriptive; nothing was changed)
 
-- **Every method was confidently wrong on 61-72% of known-fault cases on robot B, and none abstained.**
+- **Every method was confidently wrong on 61-74% of known-fault cases on robot B, and none abstained.**
 - Almost every failure was diagnosed as **"control delay"**: robot B's slower motors (0.14 s lag, not 0.08) and higher
   nominal latency, which the model was not told about, look exactly like a delay fault. The misfit detector rarely fired
   (10 of 300 cases), because a wrong fault explained the mismatch well.

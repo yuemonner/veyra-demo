@@ -284,7 +284,7 @@ export const METHODS: Record<MethodId, { name: string; detail: string }> = {
 export const selectionOf = (m: MethodId) => (m === "veyra" ? "classical" : m.replace("_widen", "")) as "fixed" | "random" | "classical";
 export const widens = (m: MethodId) => m === "veyra" || m.endsWith("_widen");
 
-export type Step = { experiment: string; families: Record<string, number>; misfitP: number; widened: boolean; scores?: Record<string, number> };
+export type Step = { experiment: string; families: Record<string, number>; misfitP: number; widened: boolean; scores?: Record<string, number>; trace?: Trace };
 export type Outcome = { method: MethodId; truth: string; declared: string | null; confident: boolean; correct: boolean; experiments: number; cost: number; widened: boolean; steps: Step[] };
 
 export function chooseNext(method: MethodId, model: Model, b: Belief, used: Record<string, number>, n: number, r: Rng, left: number): { id: string; scores?: Record<string, number> } {
@@ -325,7 +325,7 @@ export function runEpisode(model: Model, method: MethodId, truth: Params, truthF
     const p = chi2Tail(chi2(model.pred[last.experiment][bestI], last.y), last.y.length);
     let widenNow = false;
     if (widens(method) && !widened && p < POLICY.misfitP) { widened = widenNow = true; b = belief(model, obs, true); }
-    steps.push({ experiment: id, families: { ...b.families }, misfitP: p, widened: widenNow, scores });
+    steps.push({ experiment: id, families: { ...b.families }, misfitP: p, widened: widenNow, scores, trace });
   }
   const [declared, top] = Object.entries(b.families).reduce((a, x) => (x[1] > a[1] ? x : a), ["", -1] as [string, number]);
   const confident = top >= POLICY.confident;
@@ -376,4 +376,25 @@ export function benchmark(model: Model, world: "closed" | "open", seeds: number[
   const outcomes: Record<string, Outcome[]> = {};
   for (const m of methods) outcomes[m] = seeds.map((s) => { const f = drawFault(s, fams, faults); return runEpisode(model, m, f.params, f.family, s, spec); });
   return { world, seeds: [seeds[0], seeds[seeds.length - 1]], summaries: methods.map((m) => summarise(m, outcomes[m])), outcomes };
+}
+
+// ---------- robot B (the held-out robot of the transfer test; must match research/experiment-001/robot-b.mjs) ----------
+export const SPEC_B_WORLD: Spec = {
+  robot: { ...ROBOT, wheelRadius: 0.06, track: 0.38, motorTau: 0.14 },
+  noise: { pose: 0.04, heading: 0.04, encoder: 0.8, gyro: 0.04 },
+  nominal: { ...NOMINAL, wL: 26, wR: 26, delay: 0.05 },
+};
+export const SPEC_B_MODEL: Spec = { robot: { ...ROBOT, wheelRadius: 0.06, track: 0.38 }, noise: NOISE, nominal: { ...NOMINAL, wL: 26, wR: 26 } };
+export const FAULTS_B: FaultWorld = {
+  nominal: SPEC_B_WORLD.nominal,
+  ranges: { ...TRUE_RANGES, weak_left: [[8.5, 13.5]], weak_right: [[8.5, 13.5]], gyro_bias: [[-0.06, -0.012], [0.012, 0.06]], delay: [[0.1, 0.3]] },
+  prevalence: { nominal: 0.1, slip_left: 0.15, slip_right: 0.15, weak_left: 0.05, weak_right: 0.05, encoder_left: 0.1, encoder_right: 0.1,
+                gyro_bias: 0.15, delay: 0.15, intermittent_left: 0.5, intermittent_right: 0.5 },
+};
+
+// The most likely parameter within each fault family, given the observations (for drawing predictions).
+export function bestPerFamily(model: Model, b: Belief): Record<string, Hypothesis> {
+  const best: Record<string, [number, Hypothesis]> = {};
+  for (const i of b.active) { const h = model.hyps[i], v = b.logPost[i]; if (!best[h.family] || v > best[h.family][0]) best[h.family] = [v, h]; }
+  return Object.fromEntries(Object.entries(best).map(([k, [, h]]) => [k, h]));
 }
