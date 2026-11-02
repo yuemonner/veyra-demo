@@ -151,7 +151,8 @@ export function NormalPanel({ run, onAsk }: { run: Any; labels?: Record<string, 
 // Discussion.
 
 type Proposal = { id: string; area: string; claim: string; status: string; ask: string };
-const VLABEL: Record<string, string> = { supports: "Data agrees", against: "Data disagrees", cannot_tell: "Data can't tell", facts: "From the data" };
+const VLABEL: Record<string, string> = { supports: "Data agrees", against: "Data disagrees", cannot_tell: "Data can't tell", facts: "From the data",
+  unusual: "Unusual for this machine", normal: "Normal for this machine" };
 const FLABEL: Record<string, string> = { confirmed: "It is this", ruled_out: "Not this", unsure: "Not sure" };
 const now = () => new Date().toISOString();
 const PROPOSING = /\b(i think|i suspect|maybe|might be|could it be|could be|probably|my guess|i bet|isn'?t it|it'?s the|it is the|blame)\b/i;
@@ -228,7 +229,7 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
     }
     setTalk((x) => ({ ...x, thread: [...x.thread, { at: now(), who: "veyra", verdict: "cannot_tell", title: "Not something this data can answer yet",
       text: logMode ? "I check questions against the decoded log. That one doesn't map to anything in it. These I can check right now:" : "I couldn't match that to a signal or finding in this recording. Try naming a joint, an axis or an output, or one of these:",
-      points: canAI ? [] : ["Free-form questions go to Veyra's AI investigator, which is switched off on this public demo."] }] }));
+      points: canAI || logMode ? [] : ["Free-form questions go to Veyra's AI investigator, which is switched off on this public demo."] }] }));
   }
 
   function saveFeedback() {
@@ -328,6 +329,7 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
             </details>
           )}
 
+          {!talk.thread.length && !props.length && <p className={t.note}>Start with one of the questions below, or write your own suspicion in plain words.</p>}
           <ol className={t.thread} aria-live="polite">
             {talk.thread.map((d, i) => <Message key={i} d={d} log={m.log} run={run} caseId={caseId} call={call} />)}
             {busy && <li className={t.veyra}><span className={t.who}>Veyra</span><p className={t.dim}>Working on it…</p></li>}
@@ -346,7 +348,8 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
               placeholder={logMode ? "e.g. I think a bad switch is corrupting the packets" : "e.g. Is the left front knee just noisy from contact?"} />
             <button className={t.primary} type="submit" disabled={!q.trim() || busy}>Check</button>
           </form>
-          <p className={t.fine}>{logMode ? "Checks run on the decoded log in this browser." : "Answers come from this case's baselines and findings."} {canAI ? "Other questions go to the AI investigator." : "The AI investigator is off on the public demo."}</p>
+          <p className={t.fine}>{logMode ? "Checks run on the decoded log in this browser. Nothing is sent anywhere."
+            : `Answers come from this case's baselines and findings.${canAI ? " Other questions go to the AI investigator." : " Free-form questions need the AI investigator, which is off on the public demo."}`}</p>
         </footer>
       </aside>
     </>

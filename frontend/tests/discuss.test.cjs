@@ -60,8 +60,8 @@ test('normal behaviour: a recording is judged against the machine\'s own healthy
   assert.match(g[0].reason, /standing up or lying down/);
   const spikes = K.answerRun(runs['case-ca747f15bad8'], 'are the spikes just noise or contact?');
   assert.equal(spikes[0].check, 'noise'); assert.equal(spikes[0].verdict, 'against');
-  assert.equal(K.answerRun(runs['case-fb178a6862d9'], 'is the left front knee ok')[0].verdict, 'supports');
-  assert.equal(K.answerRun(runs['case-ca747f15bad8'], 'is the left front knee ok')[0].verdict, 'against');
+  assert.equal(K.answerRun(runs['case-fb178a6862d9'], 'is the left front knee ok')[0].verdict, 'unusual');
+  assert.equal(K.answerRun(runs['case-ca747f15bad8'], 'is the left front knee ok')[0].verdict, 'normal');
   for (const run of Object.values(runs)) for (const q of K.RUN_SUGGESTIONS(run)) assert.ok(K.answerRun(run, q).length, `suggestion answers: ${q}`);
 });
 

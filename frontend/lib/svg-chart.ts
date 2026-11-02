@@ -65,5 +65,5 @@ export function ratioBars(rows: RatioRow[], opt: { width?: number; title?: strin
   <line x1="${r1(lim)}" x2="${r1(lim)}" y1="${T - 6}" y2="${T + rows.length * rowH + 2}" stroke="${C.ink}" stroke-dasharray="3 3"/>
   <text x="${r1(lim)}" y="${T - 9}" font-size="10" fill="${C.ink}" text-anchor="middle">${esc(opt.limitLabel || "healthy limit")}</text>
   ${bars}
-  <text x="${L}" y="${H - 6}" font-size="10" fill="${C.ink3}">shaded = inside the range this machine shows in healthy data</text></svg>`;
+  <text x="${L}" y="${H - 6}" font-size="10" fill="${C.ink3}">shaded = at or below this machine's healthy level</text></svg>`;
 }

@@ -4,7 +4,7 @@
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 export type Table = { cols: string[]; rows: (string | number)[][] };
-export type Verdict = "supports" | "against" | "cannot_tell" | "facts";
+export type Verdict = "supports" | "against" | "cannot_tell" | "facts" | "unusual" | "normal";
 export type Answer = { check: string; title: string; claim: string; verdict: Verdict; text: string; points: string[]; table?: Table;
   lines: number[]; about: RegExp | null; settle?: string; plots?: { rule: string; text: string }[] };
 
@@ -110,7 +110,7 @@ export function answerRun(run: Any, question: string, labels: Record<string, str
   });
   if (ax.length) {
     const bad = ax.filter((r) => r.status === "unusual");
-    out.push({ check: "axes", title: ax.length === 1 ? `${ax[0].axis}: against its normal behaviour` : `${ax.length} axes against their normal behaviour`, claim: "", verdict: bad.length ? "supports" : "against",
+    out.push({ check: "axes", title: ax.length === 1 ? `${ax[0].axis}: against its normal behaviour` : `${ax.length} axes against their normal behaviour`, claim: "", verdict: bad.length ? "unusual" : "normal",
       text: bad.length ? bad.map((r) => `${r.axis} left its normal range${r.since ? ` at ${r.since.replace("T", " ").replace(/\.\d+Z$/, " UTC")}` : ""}: its rolling tracking error reached ${r.atStart ?? "?"}× the healthy limit and rose to ${r.peakRatio ?? "?"}×${r.peak != null ? ` (peak error ${n1(r.peak)}${r.unit})` : ""}.`).join(" ")
         : `Within normal. ${ax.map((r) => r.axis).join(", ")} ${ax.length > 1 ? "stay" : "stays"} inside the error range ${ax.length > 1 ? "they show" : "it shows"} in healthy data.`,
       points: [`Normal is judged per command size against ${ax[0].source}, using the ${ax[0].statistic} of the error. A finding needs the rolling 3 s median of the error above ${ax[0].limit}× that value for at least 2 s, so noise and short spikes (contact, touchdown) are not flagged.${ax[0].statistic === "p95" ? " 5% of healthy samples are above a 95th percentile by definition." : ""}`],
@@ -119,7 +119,7 @@ export function answerRun(run: Any, question: string, labels: Record<string, str
   }
   if (NOISE.test(q)) {
     const worst = [...A].filter((r) => r.status === "normal").sort((a, b) => b.ratio / b.limit - a.ratio / a.limit)[0];
-    out.push({ check: "noise", title: "Noise and spikes against what is normal", claim: "Spikes in the data mean a fault", verdict: A.some((r) => r.status === "unusual") ? "cannot_tell" : "against",
+    out.push({ check: "noise", title: "Do the spikes mean a fault?", claim: "Spikes in the data mean a fault", verdict: A.some((r) => r.status === "unusual") ? "cannot_tell" : "against",
       text: "A spike is only a finding if it is unusual for this machine. Veyra compares each axis with its own healthy data, at the same command size.",
       points: [
         `${A.filter((r) => r.status === "normal").length} of ${A.length} axes stay within their normal error.`,
@@ -144,7 +144,7 @@ export function answerRun(run: Any, question: string, labels: Record<string, str
   const obs = unusual(run).filter((o) => has(o.text));
   const routine = treatedAsNormal(run).filter((g) => has(g.example) || has(g.reason));
   if (!out.length && (obs.length || routine.length)) {
-    out.push({ check: "observations", title: "What the engine found about that", claim: "", verdict: obs.length ? "supports" : "against",
+    out.push({ check: "observations", title: "What the engine found about that", claim: "", verdict: obs.length ? "unusual" : "normal",
       text: obs.length ? `Unusual: ${obs.length} finding${obs.length > 1 ? "s" : ""}.` : `Normal for this machine: ${routine.reduce((n, g) => n + g.count, 0)} matching event${routine.length > 1 ? "s" : ""}, each with the reason it is routine.`,
       points: [...obs.slice(0, 4).map((o) => `${labels[o.domain] || o.domain}: ${o.text}`), ...routine.slice(0, 3).map((g) => `Routine (${g.count}×): ${g.example}. Why: ${g.reason}.`)],
       lines: [], about: null, plots: obs.slice(0, 2).map((o) => ({ rule: o.rule, text: o.text })) });

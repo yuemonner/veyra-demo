@@ -19,7 +19,7 @@ export type ReportInput = {
 };
 
 const STATUS: Record<string, string> = { leading: "Leading", open: "Open", weakened: "Weakened", ruled_out: "Ruled out" };
-const VERDICT: Record<string, string> = { supports: "Data agrees", against: "Data disagrees", cannot_tell: "Data can't tell", facts: "From the data",
+const VERDICT: Record<string, string> = { supports: "Data agrees", against: "Data disagrees", cannot_tell: "Data can't tell", facts: "From the data", unusual: "Unusual for this machine", normal: "Normal for this machine",
   confirmed: "Engineer confirmed", ruled_out: "Engineer ruled out", unsure: "Engineer unsure" };
 
 const table = (t?: Tbl) => !t || !t.rows.length ? "" : `<div class="tw"><table><thead><tr>${t.cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${
@@ -69,7 +69,7 @@ th,td{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid
 code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
 .pill{display:inline-block;border-radius:99px;padding:1px 9px;font-size:12px;font-weight:650;border:1px solid var(--line);background:var(--soft);white-space:nowrap}
 .p-leading{color:var(--thread);border-color:#c9c7f3}.p-ruled_out{color:var(--ink3);text-decoration:line-through}.p-weakened{color:var(--ink2)}
-.v-supports{color:var(--ok)}.v-against{color:var(--fault)}.v-cannot_tell{color:var(--amber)}
+.v-supports{color:var(--ok)}.v-against{color:var(--fault)}.v-unusual{color:var(--fault)}.v-normal{color:var(--ok)}.v-cannot_tell{color:var(--amber)}
 .box{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:10px 0;background:var(--soft)}
 figure{margin:10px 0}figure svg{width:100%;height:auto;display:block}figcaption{font-size:12.5px;color:var(--ink3)}
 .q,.a{border-left:3px solid var(--line);padding:4px 0 4px 12px;margin:12px 0}.a{border-color:var(--thread)}.who{font-size:12px;color:var(--ink3);display:block}
