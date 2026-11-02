@@ -103,9 +103,11 @@ def seed_discussion(store, case_id: str, sample_dir: Path) -> int:
     recorded = json.loads(rec.read_text())
     run_id = store.latest_run(case_id)["id"]
     n = 0
-    for e in recorded["entries"]:
+    voices = recorded.get("voices") or []
+    for i, e in enumerate(recorded["entries"]):
         if e["kind"] == "agent_report":
-            meta = {"at": e["recorded_at"], "note": recorded["note"], "file": rec.name, "engineer_messages": recorded.get("engineer_messages")}
+            meta = {"at": e["recorded_at"], "note": recorded["note"], "file": rec.name, "engineer_messages": recorded.get("engineer_messages"),
+                    "voice": voices[i] if i < len(voices) else "scripted"}
             store.append_trusted(case_id, "agent_report", {**e["payload"], "run_id": run_id, "recorded": meta}, actor=e["actor"], source="recorded discussion (replayed)")
             n += 1
     return n

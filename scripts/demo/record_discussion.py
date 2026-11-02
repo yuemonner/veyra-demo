@@ -1,8 +1,9 @@
 """Record a conversational-debugging session with the live AI investigator (local only; needs the Claude Code sign-in).
 
-  python scripts/demo/record_discussion.py <sample-name> <version> <messages.json>
+  python scripts/demo/record_discussion.py <sample-name> <version> <messages.json> [<earlier version to continue>]
 
-messages.json: [{"kind": "guess" | "result", "message": "..."}, ...] — the engineer's side, scripted for the demo.
+messages.json: [{"kind": "guess" | "result", "message": "...", "voice": "scripted" | "reviewer"}, ...] — the engineer's side.
+With an earlier version, its rounds are replayed unchanged first and the new rounds continue from them.
 
 1. A fresh database; the sample's real log through the upload path; Veyra's first investigation round is replayed from
    the sample's recorded walkthrough (round 1 only), so the discussion starts where the public demo starts.
@@ -41,6 +42,20 @@ def main():
     walk = json.loads(public_samples.recording(sample["dir"]).read_text())
     first = next(e for e in walk["entries"] if e["kind"] == "agent_report")
     store.append_trusted(cid, "agent_report", {**first["payload"], "run_id": store.latest_run(cid)["id"]}, actor=first["actor"], source="walkthrough round 1 (replayed)")
+    prior, voices = [], []
+    if len(sys.argv) > 4:
+        before = json.loads((sample["dir"] / f"recorded_discussion.{sys.argv[4]}.json").read_text())
+        for i, e in enumerate(before["entries"]):
+            p = e["payload"]
+            if p.get("message_kind") == "result":
+                last = prior[-1]["payload"] if prior else None
+                action = ((last or {}).get("result") or {}).get("next_check", {}).get("action") or "Engineer check (from the discussion)"
+                store.append(cid, "engineer_finding", {"action": action[:500], "result": "found", "observations": p["message"]}, actor="Engineer", source="discussion (replayed)")
+            store.append_trusted(cid, "agent_report", {**p, "run_id": store.latest_run(cid)["id"]}, actor=e["actor"], source=f"recorded discussion {sys.argv[4]} (replayed)")
+            prior.append(e)
+            voices.append((before.get("voices") or ["scripted"] * len(before["entries"]))[i])
+        print(f"replayed {len(prior)} rounds from {sys.argv[4]}", flush=True)
+    voices += [t.get("voice", "scripted") for t in script]
     say = lambda s: print(f"    {s['label']} -> {s['summary']}", flush=True)  # noqa: E731
     for i, turn in enumerate(script, 1):
         print(f"round {i} ({turn['kind']}): {turn['message']}", flush=True)
@@ -55,10 +70,12 @@ def main():
         time.sleep(1)
     entries = [{"kind": e["kind"], "recorded_at": e["recorded_at"], "actor": e["actor"], "payload": e["payload"]} for e in store.ledger(cid)
                if e["kind"] == "agent_report" and e["payload"].get("kind") == "discussion_round"]
+    cont = f" Rounds 1-{len(prior)} are replayed unchanged from recorded_discussion.{sys.argv[4]}.json." if prior else ""
+    reviewer = " A question marked 'reviewer' is a robotics engineer's challenge after reading the case, paraphrased." if "reviewer" in voices else ""
     target.write_text(json.dumps({"version": version, "discussion": discussion.DISCUSSION_VERSION,
-                                  "note": f"Recorded {time.strftime('%Y-%m-%d %H:%M')} with the live AI investigator ({model.model}) on a local instance. "
-                                          "The engineer's messages are scripted for this demo (not from the original issue thread); Veyra's replies are the model's real output.",
-                                  "engineer_messages": "scripted for this demo", "starts_from": "walkthrough round 1", "entries": entries}, indent=1))
+                                  "note": f"Recorded {time.strftime('%Y-%m-%d %H:%M')} with the live AI investigator ({model.model}) on a local instance.{cont} "
+                                          "The engineer's messages are scripted for this demo (not from the original issue thread); Veyra's replies are the model's real output." + reviewer,
+                                  "engineer_messages": "scripted for this demo", "voices": voices, "starts_from": "walkthrough round 1", "entries": entries}, indent=1))
     print("WROTE", target, flush=True)
     store.close()
 
