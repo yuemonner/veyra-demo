@@ -303,13 +303,14 @@ const recordedFindings = (pb: Any, upto: number) => (pb.findings || []).slice(0,
 function Playback({ pb, fb, extra, ahead }: { pb: Any; fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode }) {
   const invs: Any[] = pb.investigations;
   const lastStage = invs.length - 1;
-  // Opens on where the case stands now (the latest round, with the engineer's recorded result); the replay from
-  // round 1 is one click away. A finished check is never shown as the next action of the current state.
-  const [stage, setStage] = useState(lastStage);
-  const [shown, setShown] = useState((invs[lastStage].steps || []).length);
-  const [phase, setPhase] = useState<"running" | "result" | "closing" | "closed">("result");
-  const [mine, setMine] = useState<Any[]>(() => recordedFindings(pb, lastStage));
-  const [replaying, setReplaying] = useState(false);
+  // Plays the recorded investigation from round 1 (the animation), and carries on by itself with the engineer's
+  // recorded result, so the page always ends on where the case stands now. The engineer can pause, pick the result
+  // themselves, or skip straight to the current state. A finished check is never left as the current next action.
+  const [stage, setStage] = useState(0);
+  const [shown, setShown] = useState(0);
+  const [phase, setPhase] = useState<"running" | "result" | "closing" | "closed">("running");
+  const [mine, setMine] = useState<Any[]>([]);
+  const [autoplay, setAutoplay] = useState(true);
   const [answers, setAnswers] = useState<Any>({});
   const inv = invs[stage];
   useEffect(() => {
@@ -319,18 +320,26 @@ function Playback({ pb, fb, extra, ahead }: { pb: Any; fb?: Record<string, Any>;
     return () => clearTimeout(t);
   }, [phase, shown, stage]); // eslint-disable-line react-hooks/exhaustive-deps
   const top = () => { try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* ignore */ } };
+  const advance = () => { setMine(recordedFindings(pb, stage + 1)); setStage(stage + 1); setShown(0); setPhase("running"); top(); };
+  useEffect(() => {
+    if (phase !== "result" || stage >= lastStage || !autoplay || !(pb.findings || [])[stage]) return;
+    const t = setTimeout(advance, 9000);
+    return () => clearTimeout(t);
+  }, [phase, stage, autoplay]); // eslint-disable-line react-hooks/exhaustive-deps
   if (phase === "running") {
     return <Live job={{ step: "Veyra is investigating", steps: (inv.steps || []).slice(0, shown) }}
-      subtitle={stage === 0 ? "Reading the log and running the checks it can do itself." : "Continuing with what you found."} />;
+      subtitle={stage === 0 ? "Reading the log and running the checks it can do itself." : "Continuing with what the engineer found."} />;
   }
-  const replay = () => { setStage(0); setShown(0); setMine([]); setReplaying(true); setPhase("running"); top(); };
-  const current = () => { setStage(lastStage); setShown((invs[lastStage].steps || []).length); setMine(recordedFindings(pb, lastStage)); setReplaying(false); setPhase("result"); top(); };
-  const banner = invs.length > 1 ? (stage === lastStage && !replaying ? (
+  const replay = () => { setStage(0); setShown(0); setMine([]); setAutoplay(true); setPhase("running"); top(); };
+  const current = () => { setStage(lastStage); setShown((invs[lastStage].steps || []).length); setMine(recordedFindings(pb, lastStage)); setPhase("result"); top(); };
+  const banner = invs.length > 1 ? (stage === lastStage ? (
     <div className={st.roundBar}><span><b>Round {stage + 1} of {invs.length}</b> · where the case stands now. {(pb.findings || []).length ? `Round ${stage}'s check was done; the engineer's result is under "What you found".` : ""}</span>
-      <button className={st.inline} onClick={replay}>Watch how Veyra got here, from round 1</button></div>
+      <button className={st.inline} onClick={replay}>Replay from round 1</button></div>
   ) : (
-    <div className={st.roundBar}><span><b>Replay · round {stage + 1} of {invs.length}.</b>{stage < lastStage ? " This check was already done in the recorded case; choose the recorded result to continue." : ""}</span>
-      <button className={st.inline} onClick={current}>Skip to the current state</button></div>
+    <div className={st.roundBar}><span><b>Recorded investigation · round {stage + 1} of {invs.length}.</b> This check was already done in the recorded case.
+      {autoplay && (pb.findings || [])[stage] ? " Continuing with the engineer's result in a few seconds." : " Choose the recorded result to continue."}</span>
+      <span className={st.row}>{autoplay && (pb.findings || [])[stage] && <><button className={st.inline} onClick={advance}>Continue now</button><button className={st.inline} onClick={() => setAutoplay(false)}>Pause here</button></>}
+        <button className={st.inline} onClick={current}>Skip to the current state</button></span></div>
   )) : null;
   // Round n's recorded engineer result (the one that fed round n+1), with exactly what it passed on.
   const recordedHere: Any = stage + 1 < invs.length ? (pb.findings || [])[stage] || null : null;
@@ -344,7 +353,7 @@ function Playback({ pb, fb, extra, ahead }: { pb: Any; fb?: Record<string, Any>;
       if (rec) {
         setMine([...mine, { id: `demo-${mine.length}`, recorded_at: new Date().toISOString(), action: r.next_action?.action, result: rec.result,
           outcome_selected: recordedLabel, observations: (rec.provenance || []).filter((p: Any) => p.kind === "observed").map((p: Any) => p.text).join("; ") }]);
-        setStage(stage + 1); setShown(0); setPhase("running"); top();
+        setAutoplay(false); setStage(stage + 1); setShown(0); setPhase("running"); top();
       } else setPhase("closing");
     },
   };
