@@ -353,7 +353,7 @@ const H_STATUS: Record<string, string> = { leading: "Leading", open: "Open", wea
 const H_ORDER: Record<string, number> = { leading: 0, open: 1, weakened: 2, ruled_out: 3 };
 
 /** Where the fault can be: the hypotheses Veyra is weighing, and what the latest evidence did to them. */
-export function FaultSpace({ hyps, prev }: { hyps: Any[]; prev?: Any[] | null }) {
+export function FaultSpace({ hyps, prev, changedLead = "Your result changed the picture" }: { hyps: Any[]; prev?: Any[] | null; changedLead?: string }) {
   const before: Record<string, string> = Object.fromEntries((prev || []).map((h: Any) => [h.id, h.status]));
   const moved = prev ? hyps.filter((h) => before[h.id] && before[h.id] !== h.status) : [];
   const ruled = hyps.filter((h) => h.status === "ruled_out").length;
@@ -365,7 +365,7 @@ export function FaultSpace({ hyps, prev }: { hyps: Any[]; prev?: Any[] | null })
         <span className={st.dim}>{hyps.length - ruled} of {hyps.length} still possible</span>
       </div>
       {moved.length > 0 && (
-        <p className={st.changed}>Your result changed the picture: {moved.map((h) => `${h.area} ${({ ruled_out: "ruled out", leading: "now leading", weakened: "weakened", open: "reopened" } as Any)[h.status]}`).join(" · ")}</p>
+        <p className={st.changed}>{changedLead}: {moved.map((h) => `${h.area} ${({ ruled_out: "ruled out", leading: "now leading", weakened: "weakened", open: "reopened" } as Any)[h.status]}`).join(" · ")}</p>
       )}
       <ul className={st.space}>
         {sorted.map((h) => (

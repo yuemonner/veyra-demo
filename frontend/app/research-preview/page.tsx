@@ -34,24 +34,25 @@ function hypsFor(families: Record<string, number>) {
   }));
 }
 
-/** A small top-down plot of one test: where the robot actually went, and where the leading explanations said it would. */
+/** One test, top-down: the path each leading explanation predicts, and the end position actually measured.
+ *  (Like a field engineer, the simulated robot's position is measured once, at the end of each test.) */
 function TestPlot({ name, observed, predicted }: { name: string; observed: S.Trace; predicted: { label: string; trace: S.Trace }[] }) {
-  const all = [observed, ...predicted.map((p) => p.trace)];
-  const xs = all.flatMap((t) => t.x), ys = all.flatMap((t) => t.y);
-  const pad = 0.08, minX = Math.min(0, ...xs) - pad, maxX = Math.max(0.2, ...xs) + pad, minY = Math.min(-0.1, ...ys) - pad, maxY = Math.max(0.1, ...ys) + pad;
-  const span = Math.max(maxX - minX, maxY - minY), W = 220, H = 150, k = Math.min(W / span, H / span);
-  const px = (x: number) => (x - minX) * k + 6, py = (y: number) => H - (y - minY) * k - 6;
-  const path = (t: S.Trace) => t.x.map((x, i) => `${i ? "L" : "M"}${px(x).toFixed(1)} ${py(t.y[i]).toFixed(1)}`).join("");
-  const end = observed.t.length - 1;
+  const end = observed.t.length - 1, mx = observed.x[end], my = observed.y[end];
+  const xs = [mx, ...predicted.flatMap((p) => p.trace.x)], ys = [my, ...predicted.flatMap((p) => p.trace.y)];
+  const pad = 0.1, minX = Math.min(0, ...xs) - pad, maxX = Math.max(0.2, ...xs) + pad, minY = Math.min(-0.12, ...ys) - pad, maxY = Math.max(0.12, ...ys) + pad;
+  const W = 220, H = 130, k = Math.min(W / (maxX - minX), H / (maxY - minY));
+  const px = (x: number) => (x - minX) * k + 6, py = (y: number) => H - (y - minY) * k + 6;
+  const path = (t: S.Trace) => "M" + px(0).toFixed(1) + " " + py(0).toFixed(1) + t.x.map((x, i) => `L${px(x).toFixed(1)} ${py(t.y[i]).toFixed(1)}`).join("");
   const turned = (observed.th[end] * 180) / Math.PI;
   return (
     <figure className={r.plot}>
-      <svg viewBox={`0 0 ${W + 12} ${H + 12}`} role="img" aria-label={`${name}: observed path and predictions`}>
+      <svg viewBox={`0 0 ${W + 12} ${H + 12}`} role="img" aria-label={`${name}: predicted paths and measured end position`}>
         <circle cx={px(0)} cy={py(0)} r={3.5} className={r.start} />
         {predicted.map((p, i) => <path key={p.label} d={path(p.trace)} className={i === 0 ? r.predLead : r.pred} />)}
-        <path d={path(observed)} className={r.obs} />
+        <g className={r.measured}><line x1={px(mx) - 5} y1={py(my) - 5} x2={px(mx) + 5} y2={py(my) + 5} /><line x1={px(mx) - 5} y1={py(my) + 5} x2={px(mx) + 5} y2={py(my) - 5} /></g>
       </svg>
-      <figcaption><b>{name}</b> · turned {turned.toFixed(1)}°{predicted[0] ? <span> · dashed: what “{predicted[0].label}” predicts</span> : null}</figcaption>
+      <figcaption><b>{name}</b> · measured turn {turned.toFixed(1)}°
+        {predicted.map((p, i) => <span key={p.label} className={i === 0 ? r.capLead : r.capAlt}> · {i === 0 ? "dashed" : "dotted"}: {p.label}</span>)}</figcaption>
     </figure>
   );
 }
@@ -167,10 +168,10 @@ export default function ResearchPreview() {
         {ep && view && !busy && (
           <div className={r.grid}>
             <div className={r.col}>
-              <FaultSpace hyps={hypsFor(view.families)} prev={view.prevFamilies ? hypsFor(view.prevFamilies) : null} />
               {view.widenedNow && (
                 <p className={r.alert}>None of the listed causes explains this test (misfit p = {view.misfitP.toExponential(0)}). Veyra widens its search
                   to fault types that were not on its list.</p>)}
+              <FaultSpace hyps={hypsFor(view.families)} prev={view.prevFamilies ? hypsFor(view.prevFamilies) : null} changedLead="This test changed the picture" />
               {done && (
                 <div className={ep.veyra.correct ? r.verdictOk : ep.veyra.confident ? r.verdictBad : r.verdictOpen}>
                   <b>{ep.veyra.confident ? `Answer: ${famName(ep.veyra.declared!)}` : "No answer: not 95% sure within the test budget"}</b>
