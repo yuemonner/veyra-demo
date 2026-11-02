@@ -57,7 +57,7 @@ def _scripted(responses):
 # ---------------------------------------------------------------- 1. fault-space elimination
 def test_recorded_walkthrough_does_not_rule_out_the_network_path_from_a_host_capture(store):
     cid = _microros_v1(store)
-    stored = [e for e in store.ledger(cid) if e["kind"] == "agent_report"][-1]["payload"]["result"]
+    stored = [e for e in store.ledger(cid) if e["kind"] == "agent_report" and e["payload"].get("kind") == "autonomous_investigation"][-1]["payload"]["result"]
     assert {h["area"]: h["status"] for h in stored["hypotheses"]}["Network path"] == "ruled_out"     # the record itself is unchanged
     shown = inv.latest(store, cid)["result"]
     status = {h["area"]: h["status"] for h in shown["hypotheses"]}
