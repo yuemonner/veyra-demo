@@ -44,8 +44,10 @@ export function useMaterial(caseId: string | null, call: Call, logCase: boolean)
 
 /** Hypotheses with the engineer's feedback applied: what the engineer checked overrides what the data alone suggested. */
 export function withFeedback(hyps: Any[] | undefined, fb: Record<string, Feedback>): Any[] {
+  const confirmed = (hyps || []).some((h: Any) => fb[h.id]?.verdict === "confirmed");
   return (hyps || []).map((h: Any) => {
     const f = fb[h.id];
+    if ((!f || f.verdict === "unsure") && confirmed && h.status === "leading") return { ...h, status: "open", because: "Was leading; your check points to another area", lines: [] };
     if (!f || f.verdict === "unsure") return h;
     return { ...h, status: f.verdict === "ruled_out" ? "ruled_out" : "leading", because: `Your check: ${f.note || (f.verdict === "ruled_out" ? "not this" : "it is this")}`, lines: [] };
   });
@@ -240,15 +242,15 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
     const nextFb = { ...talk.feedback, [p.id]: f };
     const after = withFeedback(m.inv?.hypotheses, nextFb);
     const standing = after.filter((h: Any) => h.status !== "ruled_out");
-    const lead = after.find((h: Any) => h.status === "leading");
+    const lead = after.find((h: Any) => nextFb[h.id]?.verdict === "confirmed") || after.find((h: Any) => h.status === "leading");
     const points: string[] = [];
     let verdict: string = "facts";
     if (logMode && m.log) {
       const onArea = X.CHECKS.map((c) => c.run(m.log!)).filter((a): a is X.Answer => !!a && !!a.about && a.about.test(p.area));
       const against = onArea.filter((a) => a.verdict === "against"), fits = onArea.filter((a) => a.verdict === "supports");
-      if (pending.verdict === "confirmed" && against.length) { verdict = "against"; points.push(`Worth a second look: the log points the other way. ${against[0].text} ${against[0].points[0] || ""}`); }
+      if (pending.verdict === "confirmed" && against.length) { verdict = "against"; points.push(`Worth a second look: the log points the other way. ${against[0].text} ${against[0].points[1] ?? against[0].points[0] ?? ""}`); }
       else if (pending.verdict === "confirmed" && fits.length) { verdict = "supports"; points.push(`The log fits: ${fits[0].text}`); }
-      else if (pending.verdict === "ruled_out" && against.length) { verdict = "supports"; points.push(`The log agrees: ${against[0].text} ${against[0].points[0] || ""}`); }
+      else if (pending.verdict === "ruled_out" && against.length) { verdict = "supports"; points.push(`The log agrees: ${against[0].text} ${against[0].points[1] ?? against[0].points[0] ?? ""}`); }
       else if (pending.verdict === "ruled_out" && fits.length) { verdict = "cannot_tell"; points.push(`Recorded, but note the log fits it: ${fits[0].text} Your bench check outranks the log here.`); }
     }
     if (m.inv?.hypotheses?.length) points.push(standing.length ? `Still possible: ${standing.map((h: Any) => h.area).join(", ")}.` : "Nothing is left standing. The cause is outside what Veyra listed, so the next round has to widen the search.");

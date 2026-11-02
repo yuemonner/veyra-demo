@@ -209,11 +209,10 @@ export const CHECKS: Check[] = [
   { id: "network", title: "Could the network have corrupted it?", ask: "Could a bad cable or switch have zeroed the packet?", words: /\b(network|cable|switch|router|wire|wiring|corrupt\w*|packet loss|ethernet cable|interference|emi|noise on the line|udp checksum)\b/,
     run: (log) => {
       const z = firstZero(log), c = createOf(log), reps = repeats(log);
-      const good = log.packets.filter((p) => p.complete && p.xrce.wellFormed);
       return { check: "network", title: "The network path", claim: "The network corrupted the packet", verdict: "against",
         text: "Unlikely, from this log.",
         points: [
-          c ? `The ${good.length} valid messages (from line ${c.line}) arrived byte-perfect, including the board's create with key ${c.xrce.create?.clientKey}.` : "",
+          c ? `The well-formed messages before it (from line ${c.line}) arrived intact, including the board's create with key ${c.xrce.create?.clientKey}.` : "",
           z ? `The bad packet has a sensible length (${z.len} bytes) and every byte is zero. Damage on a cable flips or drops bits, and a damaged UDP datagram normally fails its checksum and is dropped before the agent sees it.` : "",
           reps[0] ? `The ${reps[0].len}-byte packet that follows repeats ${reps[0].count} times, byte for byte identical (lines ${reps[0].first}–${reps[0].last}). Random corruption does not repeat exactly.` : "",
         ].filter(Boolean), lines: [c?.line, z?.line, reps[0]?.first].filter(Boolean) as number[], about: /network/i,
