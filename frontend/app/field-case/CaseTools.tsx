@@ -12,6 +12,7 @@ import * as X from "../../lib/xrce-log";
 import * as K from "../../lib/run-knowledge";
 import { packetTimeline, ratioBars } from "../../lib/svg-chart";
 import { buildReport, reportFileName, type Discussed, type Feedback } from "../../lib/case-report";
+import { Together, type DiscussionData } from "./Together";
 import { AGENT_HOST, guardInvestigation, kindOf, KIND_LABEL, type Kind } from "../../lib/claim-scope";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -123,7 +124,7 @@ export function DataPanel({ m, onAsk }: { m: Material; onAsk?: (q: string) => vo
             <Points points={bytes.points} /></>}
         </div>
       </details>
-      {onAsk && <p className={t.invite}>Disagree, or suspect something else? <button className={t.link} onClick={() => onAsk("")}>Discuss it with Veyra</button>. It checks what you suggest against these bytes.</p>}
+      {onAsk && <p className={t.invite}>Disagree, or suspect something else? <button className={t.link} onClick={() => onAsk("")}>Debug it with Veyra</button>. It checks what you suggest against these bytes.</p>}
     </div>
   );
 }
@@ -170,7 +171,7 @@ export function NormalPanel({ run, onAsk }: { run: Any; labels?: Record<string, 
         <p className={t.note}>Routine events stay in the record. Nothing is hidden; they just do not count as evidence of a fault.</p>
       </>}
       {outT && <><h3 className={t.h3}>Actuator outputs against their normal range</h3><DataTable table={outT} /></>}
-      {onAsk && <p className={t.invite}>Think a spike matters, or that a flagged axis is normal? <button className={t.link} onClick={() => onAsk("")}>Discuss it with Veyra</button>.</p>}
+      {onAsk && <p className={t.invite}>Think a spike matters, or that a flagged axis is normal? <button className={t.link} onClick={() => onAsk("")}>Debug it with Veyra</button>.</p>}
     </section>
   );
 }
@@ -196,10 +197,13 @@ function proposals(m: Material, run: Any, fb: Record<string, Feedback>): Proposa
   return [];
 }
 
-export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, setTalk, agent, readOnly, onJob }: {
+export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, setTalk, agent, readOnly, onJob, together }: {
   open: boolean; onClose: () => void; caseId: string; call: Call; m: Material; run: Any; labels: Record<string, string>; talk: Talk; setTalk: (f: (t: Talk) => Talk) => void;
-  agent: Any; readOnly: boolean; onJob: (jobId: string) => void;
+  agent: Any; readOnly: boolean; onJob: (jobId: string) => void; together?: { data: DiscussionData; reload: () => Promise<void> };
 }) {
+  const hasTogether = !!together?.data && ((together.data.rounds || []).length > 0 || !!together.data.agent?.configured);
+  const [mode, setMode] = useState<"together" | "checks">("together");
+  const tab = hasTogether ? mode : "checks";
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ id: string; verdict: Feedback["verdict"] } | null>(null);
@@ -314,16 +318,26 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
       <aside className={t.drawer} role="dialog" aria-modal="false" aria-label="Discuss this case with Veyra">
         <header className={t.dHead}>
           <div>
-            <h2 className={t.dTitle}>Discuss with Veyra</h2>
-            <p className={t.dSub}>{logMode ? "Suggest a cause or ask a question. Fixed checks test it against the decoded log and cite the lines."
-              : "Ask about a joint, an axis or an output. Fixed checks answer from this machine's healthy behaviour and the findings in this recording."}</p>
-            <div className={t.modes}>
+            <h2 className={t.dTitle}>Debug with Veyra</h2>
+            {tab === "together" ? <p className={t.dSub}>Bring a guess or a bench result. The AI investigator tests it against the original data, says which parts hold, and proposes the next check.</p> : <p className={t.dSub}>{logMode ? "Suggest a cause or ask a question. Fixed checks test it against the decoded log and cite the lines."
+              : "Ask about a joint, an axis or an output. Fixed checks answer from this machine's healthy behaviour and the findings in this recording."}</p>}
+            {tab === "checks" && <div className={t.modes}>
               <span className={t.modeOn}><i aria-hidden>●</i> Fixed checks: {logMode ? `${X.CHECKS.length} written for this kind of log` : "baselines and findings"}, run in your browser, no AI</span>
               <span className={canAI ? t.modeOn : t.modeOff}><i aria-hidden>{canAI ? "●" : "○"}</i> AI investigator: {canAI ? `on${agent?.model ? ` · ${agent.model}` : ""}${logMode ? " (for new investigation rounds)" : " (for other questions)"}` : "off on the public demo"}</span>
-            </div>
+            </div>}
           </div>
           <button className={t.x} onClick={onClose} aria-label="Close the discussion">×</button>
         </header>
+        {hasTogether && (
+          <div className={t.tabs} role="tablist" aria-label="How to discuss">
+            <button role="tab" aria-selected={tab === "together"} className={tab === "together" ? t.tabOn : t.tab} onClick={() => setMode("together")}>
+              Investigate together<small>AI investigator · open-ended</small></button>
+            <button role="tab" aria-selected={tab === "checks"} className={tab === "checks" ? t.tabOn : t.tab} onClick={() => setMode("checks")}>
+              Quick checks<small>fixed · in your browser · no AI</small></button>
+          </div>)}
+        {tab === "together" && together?.data ? (
+          <div className={t.dBody}><Together caseId={caseId} call={call} lines={m.lines} data={together.data} reload={together.reload} readOnly={readOnly} /></div>
+        ) : <>
 
         <div className={t.dBody}>
           {props.length > 0 && (
@@ -388,6 +402,7 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
           <p className={t.fine}>{logMode ? "Fixed checks only. Nothing you type here is sent to an AI model."
             : canAI ? "Fixed checks first; questions they don't cover go to the AI investigator." : "Fixed checks only. Nothing you type here is sent to an AI model."}</p>
         </footer>
+        </>}
       </aside>
     </>
   );
@@ -415,7 +430,7 @@ function Message({ d, log, run, caseId, call }: { d: Discussed & { plots?: Any[]
 // ---------------------------------------------------------------------------------------------------------------
 // The report.
 
-export function useReport({ caseId, data, m, talk }: { caseId: string | null; data: Any; m: Material; talk: Talk }) {
+export function useReport({ caseId, data, m, talk, rounds = [] }: { caseId: string | null; data: Any; m: Material; talk: Talk; rounds?: Any[] }) {
   return useMemo(() => () => {
     if (!caseId || !data) return;
     const run = data.latest_run;
@@ -449,7 +464,13 @@ export function useReport({ caseId, data, m, talk }: { caseId: string | null; da
       headline: inv.headline || c.title, explanation: inv.explanation, confidence: inv.status === "cause_probable" ? inv.confidence : undefined,
       hypotheses: withFeedback(inv.hypotheses, talk.feedback), nextAction: inv.next_action, evidence: inv.evidence, checked: inv.checked, effects: inv.effects, unknowns: inv.unknowns,
       steps: m.investigation?.steps, investigator: m.investigation?.mode === "agent" ? `Investigated by ${m.investigation?.model || "the AI investigator"}; every quoted line verified against the file` : undefined,
-      data: dataSections, normal, discussion: talk.thread, feedback: Object.values(talk.feedback), log: m.lines, scope: m.investigation?.scope,
+      data: dataSections, normal, feedback: Object.values(talk.feedback), log: m.lines, scope: m.investigation?.scope,
+      discussion: [...rounds.flatMap((r: Any) => [
+        { at: r.recorded_at, who: "engineer" as const, text: `${r.message_kind === "result" ? "Result: " : "Guess: "}${r.message}${r.recorded ? " (scripted for this demo)" : ""}` },
+        ...(r.result ? [{ at: r.recorded_at, who: "veyra" as const, engine: "ai", source: `AI investigator · ${r.model || ""}${r.recorded ? " · recorded" : ""}`, title: "Tested against the data", text: r.result.reply,
+          points: [...(r.result.parts || []).map((p: Any) => ({ k: p.kind, t: `[${p.verdict.replace("_", " ")}] ${p.claim}: ${p.why}${(p.evidence || []).length ? ` (lines ${p.evidence.map((e: Any) => e.line).join(", ")})` : ""}` })),
+            ...(r.result.next_check ? [{ k: "settle", t: `Next check: ${r.result.next_check.action}` }] : [])] }] : []),
+      ]), ...talk.thread],
     });
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const a = document.createElement("a");
@@ -457,5 +478,5 @@ export function useReport({ caseId, data, m, talk }: { caseId: string | null; da
     a.download = reportFileName(c.title || "", caseId);
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  }, [caseId, data, m, talk]);
+  }, [caseId, data, m, talk, rounds]);
 }

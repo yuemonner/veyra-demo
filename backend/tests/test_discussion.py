@@ -92,3 +92,14 @@ def test_no_model_or_no_permission_no_round(tmp_path):
     with pytest.raises(ValueError):
         disc.discuss(s, cid, "guess", model=_model([]))  # no model_authorization recorded
     s.close()
+
+
+def test_hosted_showcase_replays_the_recorded_discussion_labelled(tmp_path):
+    s = CaseStore(tmp_path / "s.db")
+    cid = public_samples.seed_showcase(s)[0]
+    rounds = disc.rounds_of(s, cid)
+    assert len(rounds) >= 3 and all(r["recorded"]["note"].startswith("Recorded") and "scripted" in r["recorded"]["note"] for r in rounds)
+    assert all(r["result"]["parts"] and r["result"]["next_check"]["action"] for r in rounds)
+    assert inv.latest(s, cid)["kind"] == "autonomous_investigation"  # the walkthrough is still what the case shows
+    assert s.verify(cid)["ledger_chain"]["valid"]
+    s.close()

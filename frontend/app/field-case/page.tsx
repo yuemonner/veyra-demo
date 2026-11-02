@@ -7,6 +7,7 @@ import { Lessons, RecordingRead, SignalChain } from "./SignalChain";
 import Investigation, { AutoRecord, LogEvidence } from "./Investigation";
 import { plotFor, Waveform } from "./Waveform";
 import { DataPanel, Discuss, EMPTY_TALK, NormalPanel, useMaterial, useReport, type Talk } from "./CaseTools";
+import { useDiscussion } from "./Together";
 import tt from "./tools.module.css";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "/local-api";
@@ -306,7 +307,8 @@ export default function FieldCasePage() {
   // The discussion and the engineer's checks belong to one case.
   useEffect(() => { setTalk(EMPTY_TALK); setDiscussOpen(false); }, [caseId]);
   const material = useMaterial(caseId, call, logCase);
-  const downloadReport = useReport({ caseId, data, m: material, talk });
+  const together = useDiscussion(caseId, call, logCase);
+  const downloadReport = useReport({ caseId, data, m: material, talk, rounds: together.data?.rounds || [] });
   const labels: Record<string, string> = Object.fromEntries(Object.entries(run?.machine_profile?.domains || {}).map(([k, v]: [string, Any]) => [k, v.label]));
   const openDiscuss = () => setDiscussOpen(true);
   return (
@@ -326,7 +328,7 @@ export default function FieldCasePage() {
         <span className={s.spacer} />
         <div className={s.actions}>
           <button className={s.button} onClick={() => (recordings ? setRecordingOpen(true) : setUploadOpen(true))}>{recordings ? "Upload data" : "Upload logs"}</button>
-          {caseId && run && <button className={s.quiet} onClick={openDiscuss}>Discuss</button>}
+          {caseId && run && <button className={s.quiet} onClick={openDiscuss}>Debug with Veyra</button>}
           {caseId && !logCase && <a className={s.quiet} href={`${API}/engine/cases/${caseId}/report`} target="_blank" rel="noreferrer">Engine report</a>}
           {caseId && run && <button className={s.quiet} onClick={downloadReport} title="One HTML file with the plots, tables, discussion and data. Readable by people and by AI assistants.">Download report</button>}
           {caseId && isPrivate && <button className={s.quiet} onClick={() => setShareOpen(true)}>Share</button>}
@@ -412,9 +414,9 @@ export default function FieldCasePage() {
       {recordingOpen && <RecordingDialog onTabular={(files: File[]) => { setRecordingOpen(false); setTabularFiles(files); setUploadOpen(true); }} onClose={() => setRecordingOpen(false)} onDone={async (id: string, job?: string) => {
         setRecordingOpen(false); setJobId(job || null); setCases((await call("/engine/cases")).filter((c: Any) => c.fault_type !== "known_good_run")); setTab("case"); await load(id); }} />}
       {run && data && caseId && !discussOpen && (
-        <button className={tt.dock} onClick={openDiscuss} aria-label="Discuss this case with Veyra">Discuss with Veyra{talk.thread.length > 0 && <span className={tt.dockCount}>{talk.thread.filter((d) => d.who === "engineer").length}</span>}</button>)}
+        <button className={tt.dock} onClick={openDiscuss} aria-label="Debug this case with Veyra">Debug with Veyra{talk.thread.length > 0 && <span className={tt.dockCount}>{talk.thread.filter((d) => d.who === "engineer").length}</span>}</button>)}
       {caseId && run && <Discuss open={discussOpen} onClose={() => setDiscussOpen(false)} caseId={caseId} call={call} m={material} run={logCase ? null : run} labels={labels}
-        talk={talk} setTalk={setTalk} agent={agentInfo} readOnly={!!me?.read_only} onJob={(j) => { setDiscussOpen(false); setJobId(j); setTab("case"); }} />}
+        talk={talk} setTalk={setTalk} agent={agentInfo} readOnly={!!me?.read_only} onJob={(j) => { setDiscussOpen(false); setJobId(j); setTab("case"); }} together={together} />}
       {shareOpen && caseId && <ShareDialog caseId={caseId} title={data?.case?.title || ""} onClose={() => setShareOpen(false)} />}
       {!isPrivate && <p className={s.legacy}>Looking for the earlier workspace? <a href="/product-demo?legacy=1">Open it</a> (manual analysis, older engine).</p>}
     </div>
