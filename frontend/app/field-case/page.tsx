@@ -377,10 +377,10 @@ export default function FieldCasePage() {
           </nav>
           {tab === "next" && <NextAction caseId={caseId!} data={data} onChanged={() => load(caseId!)} me={me?.user?.name} onEvidence={() => go("findings")} />}
           {tab === "case" && <Investigation key={`${caseId}:${jobId || ""}`} caseId={caseId!} call={call} actor={me?.user?.name || ENGINEER} jobId={jobId} onChanged={() => load(caseId!)}
-            feedback={talk.feedback} extra={<DataPanel m={material} onAsk={openDiscuss} />} />}
+            feedback={talk.feedback} guard={material.guard} extra={<DataPanel m={material} onAsk={openDiscuss} />} />}
           {tab === "brief" && <Brief data={data} run={run} verification={verification} go={go} onAccept={acceptCheck} acceptBusy={acceptBusy} error={agentError} />}
           {tab === "brief" && <NormalPanel run={run} labels={labels} onAsk={openDiscuss} />}
-          {tab === "evidence" && logCase && <LogEvidence key={caseId!} caseId={caseId!} call={call} />}
+          {tab === "evidence" && logCase && <LogEvidence key={caseId!} caseId={caseId!} call={call} guard={material.guard} />}
           {tab === "evidence" && !logCase && <>
             <AgentPanel ledger={data.ledger} run={run} info={agentInfo} busy={agentBusy} error={agentError} onRun={runAgent} />
             <Hypotheses run={run} ledger={data.ledger} />

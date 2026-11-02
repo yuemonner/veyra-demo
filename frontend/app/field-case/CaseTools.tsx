@@ -12,6 +12,7 @@ import * as X from "../../lib/xrce-log";
 import * as K from "../../lib/run-knowledge";
 import { packetTimeline, ratioBars } from "../../lib/svg-chart";
 import { buildReport, reportFileName, type Discussed, type Feedback } from "../../lib/case-report";
+import { AGENT_HOST, guardInvestigation, kindOf, KIND_LABEL, type Kind } from "../../lib/claim-scope";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Call = (path: string, init?: RequestInit) => Promise<Any>;
@@ -22,20 +23,25 @@ export const EMPTY_TALK: Talk = { thread: [], feedback: {} };
 // ---------------------------------------------------------------------------------------------------------------
 // The case's material, loaded once: the original lines (a log case) and the latest investigation.
 
-export type Material = { lines: string[]; log: X.AgentLog | null; inv: Any | null; investigation: Any | null; loaded: boolean };
+export type Material = { lines: string[]; log: X.AgentLog | null; inv: Any | null; investigation: Any | null; loaded: boolean; guard: ((inv: Any) => Any) | null };
+const NO_MATERIAL: Material = { lines: [], log: null, inv: null, investigation: null, loaded: false, guard: null };
 
 export function useMaterial(caseId: string | null, call: Call, logCase: boolean): Material {
-  const [m, setM] = useState<Material>({ lines: [], log: null, inv: null, investigation: null, loaded: false });
+  const [m, setM] = useState<Material>(NO_MATERIAL);
   useEffect(() => {
-    setM({ lines: [], log: null, inv: null, investigation: null, loaded: false });
+    setM(NO_MATERIAL);
     if (!caseId || !logCase) { setM((x) => ({ ...x, loaded: true })); return; }
     let live = true;
     Promise.all([call(`/engine/cases/${caseId}/log`).catch(() => ({ lines: [] })), call(`/engine/cases/${caseId}/investigation`).catch(() => ({}))]).then(([l, d]) => {
       if (!live) return;
       const lines: string[] = l.lines || [];
       const pb = d.playback?.investigations;
-      const investigation = pb?.length ? pb[pb.length - 1] : d.investigation || null;
-      setM({ lines, log: X.looksLikeAgentLog(lines) ? X.parseAgentLog(lines) : null, inv: investigation?.result || null, investigation, loaded: true });
+      const log = X.looksLikeAgentLog(lines) ? X.parseAgentLog(lines) : null;
+      // An agent-side log can only show what the agent received and sent: every statement is held to that scope.
+      const guard = log ? (inv: Any) => guardInvestigation(inv, AGENT_HOST) : null;
+      const raw = pb?.length ? pb[pb.length - 1] : d.investigation || null;
+      const investigation = guard && raw ? guard(raw) : raw;
+      setM({ lines, log, inv: investigation?.result || null, investigation, loaded: true, guard });
     });
     return () => { live = false; };
   }, [caseId, logCase, call]);
@@ -80,40 +86,60 @@ export function DataTable({ table, max = 0, mono = [] }: { table: X.Table | K.Ta
   );
 }
 
-/** The log case's data, drawn: every packet on a time axis, decoded, and a healthy session set against this one. */
+/** The log case's data, drawn: what the agent received and sent on one time axis, the first departure from a healthy
+ *  session in one line, and the decoded protocol detail folded into an engineering view. */
 export function DataPanel({ m, onAsk }: { m: Material; onAsk?: (q: string) => void }) {
   if (!m.log || !m.log.packets.length) return null;
   const log = m.log;
   const ex = X.expectations(log);
-  const fail = ex.filter((e) => e.ok === false).length;
+  const fails = ex.filter((e) => e.ok === false);
   const zero = log.packets.find((p) => p.allZero && p.dir === "to_agent");
   const s = log.sessions[0];
+  const rep = X.repeats(log).find((g) => !g.packets[0].allZero);
   const span = (log.packets[log.packets.length - 1].t - log.packets[0].t) * 1000;
+  const bytes = rep ? X.answer(log, "what is the 13 byte packet")[0] : null;
   return (
     <div className={t.panel}>
       <div className={t.panelHead}>
-        <h2 className={t.h2}>What the data shows</h2>
-        <span className={t.dim}>decoded from the bytes in the log · {log.packets.length} packets · {span.toFixed(0)} ms</span>
+        <h2 className={t.h2}>What the agent&apos;s log shows</h2>
+        <span className={t.dim}>{log.packets.length} packets in {span.toFixed(0)} ms · recorded on the host</span>
       </div>
       <figure className={t.figure}>
-        <Svg svg={timelineSvg(log, zero ? [zero.n] : [])} label="Every packet between the board and the agent, over time" />
-        <figcaption>{s && s.closed != null ? `The session lasted ${((s.closed - (s.opened ?? s.closed)) * 1000).toFixed(0)} ms. ` : ""}{zero ? `The ${zero.len}-byte all-zero packet (outlined, line ${zero.line}) ended it. ` : ""}
-          Then the board kept sending a {X.repeats(log)[0]?.len ?? ""}-byte packet that is not a valid message. Hover a bar for its line.</figcaption>
+        <Svg svg={timelineSvg(log, zero ? [zero.n] : [])} label="Every packet the agent received and sent, over time" />
+        <figcaption><Tag k="observed" />{s && s.closed != null ? `The agent closed the session ${((s.closed - (s.opened ?? s.closed)) * 1000).toFixed(0)} ms after opening it, right after receiving` : "The agent received"}
+          {zero ? ` a ${zero.len}-byte all-zero packet (outlined, line ${zero.line}).` : "."}{rep ? ` It then received the same ${rep.len}-byte packet ${rep.count} times, which is not a valid message.` : ""}</figcaption>
       </figure>
-      <details className={t.fold}>
-        <summary>Every packet, decoded ({log.packets.length})</summary>
-        <DataTable table={X.packetTable(log)} mono={[1, 2, 5]} />
+      {fails.length > 0 && <p className={t.first}><span className={t.badPill}>{fails.length} of {ex.length} healthy-session checks fail</span> First: {fails[0].observed.replace(/^No\. /, "")}</p>}
+      <details className={t.eng}>
+        <summary><b>Engineering view</b> <span className={t.dim}>decoded packets, protocol checks{bytes ? ", the repeating bytes" : ""}</span></summary>
+        <div className={t.engBody}>
+          <h3 className={t.h3}>A healthy session, against this log</h3>
+          <p className={t.note}>Left: how a micro-ROS (DDS-XRCE) session behaves when it works (protocol knowledge). Right: what the agent&apos;s log shows.</p>
+          <DataTable table={{ cols: ["A healthy session", "This log"], rows: ex.map((e) => [e.expected, `${e.ok === false ? "✕" : e.ok ? "✓" : "•"} ${e.observed}`]) }} />
+          <h3 className={t.h3}>Every packet, decoded ({log.packets.length})</h3>
+          <p className={t.note}>&quot;Received&quot; and &quot;sent&quot; are from the agent&apos;s side. What the board transmitted is not in this log.</p>
+          <DataTable table={X.packetTable(log)} mono={[1, 2, 5]} />
+          {bytes?.table && <><h3 className={t.h3}>The repeating {rep!.len}-byte packet</h3><DataTable table={bytes.table} mono={[1, 2]} />
+            <Points points={bytes.points} /></>}
+        </div>
       </details>
-      <div className={t.subhead}>
-        <h3 className={t.h3}>A healthy session, against this one</h3>
-        <span className={fail ? t.badPill : t.goodPill}>{fail} of {ex.length} expectations fail</span>
-      </div>
-      <p className={t.note}>Left: how a micro-ROS (DDS-XRCE) session behaves when it works. Right: what this log shows. Knowing what normal looks like is what makes the first failure stand out.</p>
-      <DataTable table={{ cols: ["A healthy session", "This log"], rows: ex.map((e) => [e.expected, `${e.ok === false ? "✕" : e.ok ? "✓" : "•"} ${e.observed}`]) }} />
       {onAsk && <p className={t.invite}>Disagree, or suspect something else? <button className={t.link} onClick={() => onAsk("")}>Discuss it with Veyra</button>. It checks what you suggest against these bytes.</p>}
     </div>
   );
 }
+
+const TAG_CLASS: Record<string, string> = { observed: "kObs", inferred: "kInf", reported: "kRep", hypothesis: "kHyp", lead: "kHyp", settle: "kSet", view: "kSet" };
+const TAG_LABEL: Record<string, string> = { ...KIND_LABEL, lead: "Lead, not established", settle: "Would settle it", view: "Veyra's current view" };
+export function Tag({ k }: { k: string }) {
+  return <span className={`${t.tag} ${t[TAG_CLASS[k] || "kInf"]}`}>{TAG_LABEL[k] || k}</span>;
+}
+type AnyPoint = string | { k: string; t: string };
+const asPoint = (p: AnyPoint) => (typeof p === "string" ? { k: kindOf(p) as string, t: p } : p);
+export function Points({ points }: { points: AnyPoint[] }) {
+  if (!points.length) return null;
+  return <ul className={t.points}>{points.map((p, i) => { const q = asPoint(p); return <li key={i}><Tag k={q.k} /> {q.t}</li>; })}</ul>;
+}
+export type { Kind };
 
 /** A recording: every axis against its own healthy range, the routine set aside, the outputs against their range. */
 export function NormalPanel({ run, onAsk }: { run: Any; labels?: Record<string, string>; onAsk?: (q: string) => void }) {
@@ -157,6 +183,8 @@ const VLABEL: Record<string, string> = { supports: "Data agrees", against: "Data
   unusual: "Unusual for this machine", normal: "Normal for this machine" };
 const FLABEL: Record<string, string> = { confirmed: "It is this", ruled_out: "Not this", unsure: "Not sure" };
 const now = () => new Date().toISOString();
+// Where an answer came from. Fixed checks are deterministic code over the case's data; they never call a model.
+const SOURCE: Record<string, string> = { check: "Fixed check · ran in your browser · no AI", ai: "AI investigator", feedback: "Your check · applied by fixed rules" };
 const PROPOSING = /\b(i think|i suspect|maybe|might be|could it be|could be|probably|my guess|i bet|isn'?t it|it'?s the|it is the|blame)\b/i;
 
 function proposals(m: Material, run: Any, fb: Record<string, Feedback>): Proposal[] {
@@ -205,12 +233,12 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
     if (logMode && m.log) {
       replies = X.answer(m.log, question).map((a) => {
         const rel = related(a.about);
-        const view = rel.length ? `Veyra's current view: ${rel.map((h: Any) => `${h.area} is ${String(h.status).replace("_", " ")}`).join("; ")}.` : "";
-        return { at: now(), who: "veyra", source: "checked on the log", title: proposing && a.claim ? `You suggested: ${a.claim.toLowerCase()}` : a.title, verdict: a.verdict, text: a.text,
-          points: [...a.points, ...(view ? [view] : []), ...(a.settle ? [`What would settle it: ${a.settle}`] : [])], table: a.table, lines: a.lines } as Discussed;
+        const view = rel.length ? `${rel.map((h: Any) => `${h.area} is ${String(h.status).replace("_", " ")}`).join("; ")} (from the investigation).` : "";
+        return { at: now(), who: "veyra", engine: "check", source: SOURCE.check, title: proposing && a.claim ? `You suggested: ${a.claim.toLowerCase()}` : a.title, verdict: a.verdict, text: a.text,
+          points: [...a.points, ...(view ? [{ k: "view", t: view }] : []), ...(a.settle ? [{ k: "settle", t: a.settle }] : [])], table: a.table, lines: a.lines } as Discussed;
       });
     } else if (run) {
-      replies = K.answerRun(run, question, labels).map((a) => ({ at: now(), who: "veyra", source: "checked on the recording", title: a.title, verdict: a.verdict, text: a.text, points: a.points, table: a.table,
+      replies = K.answerRun(run, question, labels).map((a) => ({ at: now(), who: "veyra", engine: "check", source: SOURCE.check, title: a.title, verdict: a.verdict, text: a.text, points: a.points, table: a.table,
         plots: a.plots } as Discussed & { plots?: Any }));
     }
     setTalk((x) => ({ ...x, thread: [...x.thread, mine, ...replies] }));
@@ -222,16 +250,16 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
         const led = await call(`/engine/cases/${caseId}/ledger`);
         const e = [...(led.entries || led || [])].reverse().find((x: Any) => x.kind === "agent_report" && x.payload?.question === question);
         const r = e?.payload?.report || {};
-        setTalk((x) => ({ ...x, thread: [...x.thread, { at: now(), who: "veyra", source: "AI investigator", verdict: r.premise?.status === "supported" ? "supports" : r.premise?.status === "not_supported" ? "against" : "cannot_tell",
+        setTalk((x) => ({ ...x, thread: [...x.thread, { at: now(), who: "veyra", engine: "ai", source: `${SOURCE.ai}${agent?.model ? ` · ${agent.model}` : ""}`, verdict: r.premise?.status === "supported" ? "supports" : r.premise?.status === "not_supported" ? "against" : "cannot_tell",
           text: r.answer?.text || "No answer came back.", points: r.premise?.explanation ? [r.premise.explanation] : [] }] }));
       } catch (err: Any) {
-        setTalk((x) => ({ ...x, thread: [...x.thread, { at: now(), who: "veyra", text: `The AI investigator could not answer: ${err.message}` }] }));
+        setTalk((x) => ({ ...x, thread: [...x.thread, { at: now(), who: "veyra", engine: "ai", source: SOURCE.ai, text: `The AI investigator could not answer: ${err.message}` }] }));
       } finally { setBusy(false); }
       return;
     }
-    setTalk((x) => ({ ...x, thread: [...x.thread, { at: now(), who: "veyra", verdict: "cannot_tell", title: "Not something this data can answer yet",
-      text: logMode ? "I check questions against the decoded log. That one doesn't map to anything in it. These I can check right now:" : "I couldn't match that to a signal or finding in this recording. Try naming a joint, an axis or an output, or one of these:",
-      points: canAI || logMode ? [] : ["Free-form questions go to Veyra's AI investigator, which is switched off on this public demo."] }] }));
+    setTalk((x) => ({ ...x, thread: [...x.thread, { at: now(), who: "veyra", engine: "check", source: SOURCE.check, verdict: "cannot_tell", title: "No fixed check covers that",
+      text: logMode ? "The fixed checks only answer questions they were written for, and none matches this one. They can check these right now:" : "No fixed check matched a signal or finding in this recording. Try naming a joint, an axis or an output, or one of these:",
+      points: canAI && !logMode ? [] : [{ k: "view", t: "Open questions like this one need the AI investigator, which is off on the public demo. Nothing was sent to a model." }] }] }));
   }
 
   function saveFeedback() {
@@ -243,23 +271,23 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
     const after = withFeedback(m.inv?.hypotheses, nextFb);
     const standing = after.filter((h: Any) => h.status !== "ruled_out");
     const lead = after.find((h: Any) => nextFb[h.id]?.verdict === "confirmed") || after.find((h: Any) => h.status === "leading");
-    const points: string[] = [];
+    const points: (string | { k: string; t: string })[] = [];
     let verdict: string = "facts";
     if (logMode && m.log) {
       const onArea = X.CHECKS.map((c) => c.run(m.log!)).filter((a): a is X.Answer => !!a && !!a.about && a.about.test(p.area));
       const against = onArea.filter((a) => a.verdict === "against"), fits = onArea.filter((a) => a.verdict === "supports");
-      if (pending.verdict === "confirmed" && against.length) { verdict = "against"; points.push(`Worth a second look: the log points the other way. ${against[0].text} ${against[0].points[1] ?? against[0].points[0] ?? ""}`); }
+      if (pending.verdict === "confirmed" && against.length) { verdict = "against"; points.push(`Worth a second look: the log points the other way. ${against[0].text} ${(against[0].points.find((x) => x.k === "inferred") ?? against[0].points[0])?.t ?? ""}`); }
       else if (pending.verdict === "confirmed" && fits.length) { verdict = "supports"; points.push(`The log fits: ${fits[0].text}`); }
-      else if (pending.verdict === "ruled_out" && against.length) { verdict = "supports"; points.push(`The log agrees: ${against[0].text} ${against[0].points[1] ?? against[0].points[0] ?? ""}`); }
+      else if (pending.verdict === "ruled_out" && against.length) { verdict = "supports"; points.push(`The log agrees: ${against[0].text} ${(against[0].points.find((x) => x.k === "inferred") ?? against[0].points[0])?.t ?? ""}`); }
       else if (pending.verdict === "ruled_out" && fits.length) { verdict = "cannot_tell"; points.push(`Recorded, but note the log fits it: ${fits[0].text} Your bench check outranks the log here.`); }
     }
-    if (m.inv?.hypotheses?.length) points.push(standing.length ? `Still possible: ${standing.map((h: Any) => h.area).join(", ")}.` : "Nothing is left standing. The cause is outside what Veyra listed, so the next round has to widen the search.");
-    if (lead && pending.verdict !== "unsure") points.push(`Leading now: ${lead.area}.`);
-    if (!lead && standing.length && m.inv?.hypotheses?.length) points.push("No explanation leads any more; the next check should split the ones still standing.");
+    if (m.inv?.hypotheses?.length) points.push({ k: "view", t: standing.length ? `Still possible: ${standing.map((h: Any) => h.area).join(", ")}.` : "Nothing is left standing. The cause is outside what Veyra listed, so the next round has to widen the search." });
+    if (lead && pending.verdict !== "unsure") points.push({ k: "view", t: `Leading now: ${lead.area}.` });
+    if (!lead && standing.length && m.inv?.hypotheses?.length) points.push({ k: "view", t: "No explanation leads any more; the next check should split the ones still standing." });
     const text = pending.verdict === "unsure" ? `Noted as unsure. ${p.area} keeps its status.` : `Recorded as your finding: ${p.area} ${pending.verdict === "ruled_out" ? "ruled out" : "confirmed"}${f.note ? ` (${f.note})` : ""}. Where the fault can be has been updated.`;
     setTalk((x) => ({ feedback: nextFb, thread: [...x.thread,
       { at: now(), who: "engineer", text: `${p.area}: ${FLABEL[pending.verdict].toLowerCase()}${f.note ? `. ${f.note}` : ""}` },
-      { at: now(), who: "veyra", source: "your feedback", verdict, title: "Your check, applied", text, points }] }));
+      { at: now(), who: "veyra", engine: "feedback", source: SOURCE.feedback, verdict, title: "Your check, applied", text, points }] }));
     setPending(null); setNote("");
   }
 
@@ -287,8 +315,12 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
         <header className={t.dHead}>
           <div>
             <h2 className={t.dTitle}>Discuss with Veyra</h2>
-            <p className={t.dSub}>{logMode ? "Suggest a cause or ask a question. Veyra checks it against the decoded log in your browser, in a fraction of a second, and cites the lines."
-              : "Ask about a joint, an axis or an output. Veyra answers from this machine's healthy behaviour and the findings in this recording."}</p>
+            <p className={t.dSub}>{logMode ? "Suggest a cause or ask a question. Fixed checks test it against the decoded log and cite the lines."
+              : "Ask about a joint, an axis or an output. Fixed checks answer from this machine's healthy behaviour and the findings in this recording."}</p>
+            <div className={t.modes}>
+              <span className={t.modeOn}><i aria-hidden>●</i> Fixed checks: {logMode ? `${X.CHECKS.length} written for this kind of log` : "baselines and findings"}, run in your browser, no AI</span>
+              <span className={canAI ? t.modeOn : t.modeOff}><i aria-hidden>{canAI ? "●" : "○"}</i> AI investigator: {canAI ? `on${agent?.model ? ` · ${agent.model}` : ""}${logMode ? " (for new investigation rounds)" : " (for other questions)"}` : "off on the public demo"}</span>
+            </div>
           </div>
           <button className={t.x} onClick={onClose} aria-label="Close the discussion">×</button>
         </header>
@@ -332,6 +364,9 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
           )}
 
           {!talk.thread.length && !props.length && <p className={t.note}>Start with one of the questions below, or write your own suspicion in plain words.</p>}
+          {logMode && <details className={t.fixedList}><summary>What the fixed checks can answer ({X.CHECKS.length})</summary>
+            <ul>{X.CHECKS.map((c) => <li key={c.id}>{c.title}</li>)}</ul>
+            <p className={t.fine}>Each is deterministic code over the bytes in this log. Every statement it returns is labelled: observed in the log, inferred from it, or a lead.</p></details>}
           <ol className={t.thread} aria-live="polite">
             {talk.thread.map((d, i) => <Message key={i} d={d} log={m.log} run={run} caseId={caseId} call={call} />)}
             {busy && <li className={t.veyra}><span className={t.who}>Veyra</span><p className={t.dim}>Working on it…</p></li>}
@@ -350,25 +385,25 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
               placeholder={logMode ? "e.g. I think a bad switch is corrupting the packets" : "e.g. Is the left front knee just noisy from contact?"} />
             <button className={t.primary} type="submit" disabled={!q.trim() || busy}>Check</button>
           </form>
-          <p className={t.fine}>{logMode ? "Checks run on the decoded log in this browser. Nothing is sent anywhere."
-            : `Answers come from this case's baselines and findings.${canAI ? " Other questions go to the AI investigator." : " Free-form questions need the AI investigator, which is off on the public demo."}`}</p>
+          <p className={t.fine}>{logMode ? "Fixed checks only. Nothing you type here is sent to an AI model."
+            : canAI ? "Fixed checks first; questions they don't cover go to the AI investigator." : "Fixed checks only. Nothing you type here is sent to an AI model."}</p>
         </footer>
       </aside>
     </>
   );
 }
 
-function Message({ d, log, run, caseId, call }: { d: Discussed & { plots?: Any[] }; log: X.AgentLog | null; run: Any; caseId: string; call: Call }) {
+function Message({ d, log, run, caseId, call }: { d: Discussed & { plots?: Any[]; engine?: string }; log: X.AgentLog | null; run: Any; caseId: string; call: Call }) {
   if (d.who === "engineer") return <li className={t.me}><span className={t.who}>You</span><p>{d.text}</p></li>;
   const quoted = log && d.lines?.length ? [...new Set(d.lines)].filter((n) => n > 0 && n <= log.lines.length).slice(0, 4) : [];
   const highlight = log && d.lines?.length ? log.packets.filter((p) => d.lines!.includes(p.line)).map((p) => p.n) : [];
   return (
     <li className={t.veyra}>
-      <span className={t.who}>Veyra{d.source ? ` · ${d.source}` : ""}</span>
+      <span className={`${t.src} ${d.engine === "ai" ? t.srcAI : d.engine === "feedback" ? t.srcYou : t.srcCheck}`}>{d.source || "Veyra"}</span>
       {d.verdict && <span className={`${t.verdict} ${t["v_" + d.verdict] || ""}`}>{VLABEL[d.verdict] || d.verdict}</span>}
       {d.title && <b className={t.mTitle}>{d.title}</b>}
       <p>{d.text}</p>
-      {(d.points || []).length > 0 && <ul className={t.points}>{d.points!.map((p, i) => <li key={i}>{p}</li>)}</ul>}
+      <Points points={d.points || []} />
       {log && highlight.length > 0 && highlight.length < log.packets.length && <Svg svg={timelineSvg(log, highlight)} label="The packets this answer refers to, outlined" />}
       {d.table && <DataTable table={d.table} max={8} />}
       {quoted.length > 0 && <div className={t.quotes}>{quoted.map((n) => <div key={n} className={t.q}><code className={t.ln}>{n}</code><code className={t.raw}>{log!.lines[n - 1]}</code></div>)}</div>}
@@ -391,11 +426,11 @@ export function useReport({ caseId, data, m, talk }: { caseId: string | null; da
     const normal: { title: string; intro?: string; table: X.Table }[] = [];
     if (m.log) {
       const zero = m.log.packets.find((p) => p.allZero);
-      dataSections.push({ title: "Every packet between the board and the agent", svg: timelineSvg(m.log, zero ? [zero.n] : []), caption: "Bar height is bytes. Red: every byte zero. Amber: not a valid XRCE message.", table: X.packetTable(m.log) });
+      dataSections.push({ title: "Every packet the agent received and sent", svg: timelineSvg(m.log, zero ? [zero.n] : []), caption: `Recorded by the agent on the host: received above the line, sent below. Bar height is bytes. Red: every byte zero. Amber: not a valid XRCE message. What the board transmitted is not observed in this log.`, table: X.packetTable(m.log) });
       const ex = X.expectations(m.log);
       normal.push({ title: "A healthy micro-ROS session, against this log", intro: "Left column: protocol knowledge. Right column: computed from this log.", table: { cols: ["A healthy session", "This log"], rows: ex.map((e) => [e.expected, `${e.ok === false ? "✕" : e.ok ? "✓" : "•"} ${e.observed}`]) } });
       const r = X.repeats(m.log)[0];
-      if (r) { const a = X.answer(m.log, "what is the 13 byte packet")[0]; if (a?.table) dataSections.push({ title: `The repeating ${r.len}-byte packet`, caption: `${a.text} ${a.points.join(" ")}`, table: a.table }); }
+      if (r) { const a = X.answer(m.log, "what is the 13 byte packet")[0]; if (a?.table) dataSections.push({ title: `The repeating ${r.len}-byte packet`, caption: `${a.text} ${a.points.map((p) => `[${p.k}] ${p.t}`).join(" ")}`, table: a.table }); }
     } else if (run) {
       const A = K.axes(run);
       if (A.length) dataSections.push({ title: "Tracking error against this machine's healthy error", svg: ratioBars(A.map((r) => ({ label: r.axis, value: r.ratio, flagged: r.status === "unusual" })), { limitLabel: "same as healthy" }),
@@ -414,7 +449,7 @@ export function useReport({ caseId, data, m, talk }: { caseId: string | null; da
       headline: inv.headline || c.title, explanation: inv.explanation, confidence: inv.status === "cause_probable" ? inv.confidence : undefined,
       hypotheses: withFeedback(inv.hypotheses, talk.feedback), nextAction: inv.next_action, evidence: inv.evidence, checked: inv.checked, effects: inv.effects, unknowns: inv.unknowns,
       steps: m.investigation?.steps, investigator: m.investigation?.mode === "agent" ? `Investigated by ${m.investigation?.model || "the AI investigator"}; every quoted line verified against the file` : undefined,
-      data: dataSections, normal, discussion: talk.thread, feedback: Object.values(talk.feedback), log: m.lines,
+      data: dataSections, normal, discussion: talk.thread, feedback: Object.values(talk.feedback), log: m.lines, scope: m.investigation?.scope,
     });
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const a = document.createElement("a");

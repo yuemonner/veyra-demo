@@ -3,7 +3,7 @@
    What happened -> what Veyra already checked -> the one next action -> what you found (feeds the next step). */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import st from "./investigation.module.css";
-import { withFeedback } from "./CaseTools";
+import { Tag, withFeedback } from "./CaseTools";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Call = (path: string, init?: RequestInit) => Promise<Any>;
@@ -21,8 +21,8 @@ const VERDICT: Record<string, { mark: string; label: string; cls: string }> = {
 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export default function Investigation({ caseId, call, actor, jobId, onChanged, feedback, extra }:
-  { caseId: string; call: Call; actor: string; jobId?: string | null; onChanged: () => void; feedback?: Record<string, Any>; extra?: React.ReactNode }) {
+export default function Investigation({ caseId, call, actor, jobId, onChanged, feedback, extra, guard }:
+  { caseId: string; call: Call; actor: string; jobId?: string | null; onChanged: () => void; feedback?: Record<string, Any>; extra?: React.ReactNode; guard?: ((inv: Any) => Any) | null }) {
   const [data, setData] = useState<Any>(null);
   const [job, setJob] = useState<Any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -61,8 +61,9 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
 
   if (job) return <Live job={job} />;
   if (!data) return <section className={st.surface}><p className={st.dim}>Loading…</p></section>;
-  if (data.playback) return <Playback pb={data.playback} fb={feedback} extra={extra} />;
-  const inv = data.investigation;
+  // Every investigation, recorded or live, is held to what its evidence could observe before it is shown.
+  if (data.playback) return <Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} />;
+  const inv = guard && data.investigation ? guard(data.investigation) : data.investigation;
   const agent = data.agent || {};
   if (!inv) {
     return (
@@ -105,9 +106,11 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra }: { 
     <section className={st.surface}>
       {banner}
       <header className={st.head}>
-        <span className={`${st.status} ${st[status.cls]}`}>{status.label}{r.confidence && r.status === "cause_probable" ? ` · ${r.confidence} confidence` : ""}</span>
+        <div className={st.row}><span className={`${st.status} ${st[status.cls]}`}>{status.label}{r.confidence && r.status === "cause_probable" ? ` · ${r.confidence} confidence` : ""}</span>
+          {r.headline_kind && <span className={st.fine} title={r.headline_kind === "observed" ? "The headline states only what the log shows" : "The headline goes beyond what the log shows"}><Tag k={r.headline_kind} />headline</span>}</div>
         <h1 className={st.headline}>{r.headline}</h1>
-        {r.explanation && <p className={st.lead}>{named(r.explanation, r.hypotheses)}</p>}
+        {r.explanation && <p className={st.lead}>{r.explanation_kind && <Tag k={r.explanation_kind} />}{named(r.explanation, r.hypotheses)}</p>}
+        {inv.scope && <Scope scope={inv.scope} />}
         {inv.mode === "agent" && <p className={st.fine}>Veyra ran {inv.steps.length} check{inv.steps.length === 1 ? "" : "s"} on the original data in {inv.seconds} s · every quoted line verified against the file{(inv.dropped || []).length ? ` · ${inv.dropped.length} unverifiable statement${inv.dropped.length === 1 ? "" : "s"} removed` : ""}</p>}
       </header>
 
@@ -122,9 +125,10 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra }: { 
       {(r.evidence || []).length > 0 && (
         <div className={st.block}>
           <h2 className={st.h2}>Why Veyra thinks so</h2>
+          <p className={st.fine}>Each line is quoted from the data and verified against the file. The note beside it says whether it is observed in that line or inferred from it.</p>
           <ul className={st.lines}>
             {r.evidence.map((e: Any, i: number) => (
-              <li key={i}><code className={st.ln}>{e.line}</code><div><code className={st.raw}>{e.quote}</code><span className={st.shows}>{named(e.shows, r.hypotheses)}</span></div></li>))}
+              <li key={i}><code className={st.ln}>{e.line}</code><div><code className={st.raw}>{e.quote}</code><span className={st.shows}>{e.kind && <Tag k={e.kind} />}{named(e.shows, r.hypotheses)}</span></div></li>))}
           </ul>
         </div>
       )}
@@ -138,7 +142,7 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra }: { 
               return (
                 <li key={i}>
                   <span className={`${st.verdict} ${st[v.cls]}`} title={v.label}>{v.mark}</span>
-                  <div><b>{named(c.check, r.hypotheses)}</b><span className={st.result}>{named(c.result, r.hypotheses)}</span>
+                  <div><b>{named(c.check, r.hypotheses)}</b><span className={st.result}>{c.kind && <Tag k={c.kind} />}{named(c.result, r.hypotheses)}</span>
                     {c.about && <span className={st.about}>{v.label}: {named(c.about, r.hypotheses)}</span>}</div>
                 </li>);
             })}
@@ -350,6 +354,19 @@ function Playback({ pb, fb, extra }: { pb: Any; fb?: Record<string, Any>; extra?
 }
 
 
+/** What the evidence could observe, and what the claim-scope guard changed to stay within it. */
+function Scope({ scope }: { scope: Any }) {
+  const n = (scope.rewrites || []).length, left = (scope.residual || []).length;
+  return (
+    <details className={st.scope}>
+      <summary><b>Claim scope:</b> {scope.vantage?.label}. It shows what the agent received and sent; what the board transmitted is inferred, never observed.
+        {n > 0 ? ` ${n} statement${n > 1 ? "s" : ""} reworded to stay within that.` : ""}{left > 0 ? ` ${left} still overreach${left > 1 ? "" : "es"} (marked).` : ""}</summary>
+      {n > 0 && <ul className={st.rewrites}>{scope.rewrites.map((w: Any, i: number) => <li key={i}><i>{w.field}</i><s>{w.before}</s><span>{w.after}</span></li>)}</ul>}
+      {left > 0 && <ul className={st.rewrites}>{scope.residual.map((w: Any, i: number) => <li key={i}><i>{w.field}</i><span>{w.text}</span></li>)}</ul>}
+    </details>
+  );
+}
+
 /** The model refers to hypotheses by id (h1, h2); people read their names. */
 function named(text: string | undefined, hyps: Any[] | undefined): string {
   if (!text || !hyps?.length) return text || "";
@@ -431,7 +448,7 @@ const CLASS_LABEL: Record<string, string> = { root_cause_candidate: "Possible ca
 
 /** The log as Veyra read it: events grouped and classified, with the original lines. One click dismisses an event in this
  *  case only; a baseline for the machine (seen by later investigations) needs evidence, its conditions and a confirmation. */
-export function LogEvidence({ caseId, call }: { caseId: string; call: Call }) {
+export function LogEvidence({ caseId, call, guard }: { caseId: string; call: Call; guard?: ((inv: Any) => Any) | null }) {
   const [inv, setInv] = useState<Any>(null);
   const [log, setLog] = useState<string[]>([]);
   const [notes, setNotes] = useState<Record<string, Any>>({});
@@ -439,11 +456,11 @@ export function LogEvidence({ caseId, call }: { caseId: string; call: Call }) {
   const [base, setBase] = useState<Any>(null);  // the baseline being written: {pattern, lines, evidence, applies_when, confirmed}
   useEffect(() => {
     call(`/engine/cases/${caseId}/investigation`).then((d) => {
-      const pb = d.playback?.investigations; setInv(pb?.length ? pb[pb.length - 1] : d.investigation);
+      const pb = d.playback?.investigations; const raw = pb?.length ? pb[pb.length - 1] : d.investigation; setInv(guard && raw ? guard(raw) : raw);
       setNotes(Object.fromEntries((d.notes || []).map((n: Any) => [n.pattern, n])));
     }).catch((e) => setErr(e.message));
     call(`/engine/cases/${caseId}/log`).then((d) => setLog(d.lines || [])).catch(() => setLog([]));
-  }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [caseId, guard]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!inv) return <section className={st.surface}><p className={st.dim}>{err || "Loading…"}</p></section>;
   const events: Any[] = (inv.result || {}).events || [];
   const cls = (e: Any) => (notes[e.what]?.verdict === "normal" ? "routine" : notes[e.what]?.verdict === "relevant" && e.class === "routine" ? "anomaly" : e.class);

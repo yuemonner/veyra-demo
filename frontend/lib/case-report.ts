@@ -5,7 +5,8 @@ const esc = (s: string | number) => String(s).replace(/[&<>"']/g, (c) => ({ "&":
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 export type Tbl = { cols: string[]; rows: (string | number)[][] };
-export type Discussed = { at: string; who: "engineer" | "veyra"; text: string; verdict?: string; title?: string; points?: string[]; table?: Tbl; lines?: number[]; source?: string };
+export type Pt = string | { k: string; t: string };
+export type Discussed = { at: string; who: "engineer" | "veyra"; text: string; verdict?: string; title?: string; points?: Pt[]; table?: Tbl; lines?: number[]; source?: string; engine?: string };
 export type Feedback = { id: string; area: string; verdict: "confirmed" | "ruled_out" | "unsure"; note: string; at: string };
 export type ReportInput = {
   title: string; caseId: string; url?: string; provenance?: string; synthetic?: boolean;
@@ -16,12 +17,15 @@ export type ReportInput = {
   normal?: { title: string; intro?: string; table: Tbl }[];
   discussion?: Discussed[]; feedback?: Feedback[];
   log?: string[];
+  scope?: { vantage: { label: string }; rewrites: { field: string; before: string; after: string }[]; residual: { field: string; text: string }[] };
 };
 
 const STATUS: Record<string, string> = { leading: "Leading", open: "Open", weakened: "Weakened", ruled_out: "Ruled out" };
 const VERDICT: Record<string, string> = { supports: "Data agrees", against: "Data disagrees", cannot_tell: "Data can't tell", facts: "From the data", unusual: "Unusual for this machine", normal: "Normal for this machine",
   confirmed: "Engineer confirmed", ruled_out: "Engineer ruled out", unsure: "Engineer unsure" };
 
+const KIND: Record<string, string> = { observed: "Observed", inferred: "Inferred", reported: "Engineer report", hypothesis: "Hypothesis", lead: "Lead, not established", settle: "Would settle it", view: "Veyra's current view" };
+const pt = (p: Pt) => (typeof p === "string" ? `<li>${esc(p)}</li>` : `<li><span class="k k-${esc(p.k)}">${esc(KIND[p.k] || p.k)}</span> ${esc(p.t)}</li>`);
 const table = (t?: Tbl) => !t || !t.rows.length ? "" : `<div class="tw"><table><thead><tr>${t.cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${
   t.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
 
@@ -41,6 +45,7 @@ export function buildReport(r: ReportInput): string {
     data_tables: (r.data || []).filter((d) => d.table).map((d) => ({ title: d.title, ...d.table })),
     normal_behaviour: (r.normal || []).map((n) => ({ title: n.title, ...n.table })),
     discussion: r.discussion || [], log_lines: r.log || [],
+    claim_scope: r.scope ? { recorded_by: r.scope.vantage.label, rewrites: r.scope.rewrites, still_out_of_scope: r.scope.residual } : null,
   };
   const hyps = (r.hypotheses || []).map((h) => {
     const f = fb.get(h.id);
@@ -52,7 +57,7 @@ export function buildReport(r: ReportInput): string {
   const disc = (r.discussion || []).map((d) => d.who === "engineer"
     ? `<div class="q"><span class="who">Engineer</span><p>${esc(d.text)}</p></div>`
     : `<div class="a"><span class="who">Veyra${d.source ? ` · ${esc(d.source)}` : ""}</span>${d.verdict ? `<span class="pill v-${esc(d.verdict)}">${esc(VERDICT[d.verdict] || d.verdict)}</span>` : ""}
-       ${d.title ? `<h4>${esc(d.title)}</h4>` : ""}<p>${esc(d.text)}</p>${(d.points || []).length ? `<ul>${d.points!.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>` : ""}
+       ${d.title ? `<h4>${esc(d.title)}</h4>` : ""}<p>${esc(d.text)}</p>${(d.points || []).length ? `<ul>${d.points!.map(pt).join("")}</ul>` : ""}
        ${table(d.table)}${(d.lines || []).length ? `<p class="muted">Lines: ${esc(d.lines!.join(", "))}</p>` : ""}</div>`).join("");
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -74,7 +79,8 @@ code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.
 figure{margin:10px 0}figure svg{width:100%;height:auto;display:block}figcaption{font-size:12.5px;color:var(--ink3)}
 .q,.a{border-left:3px solid var(--line);padding:4px 0 4px 12px;margin:12px 0}.a{border-color:var(--thread)}.who{font-size:12px;color:var(--ink3);display:block}
 ol.log{font-family:ui-monospace,Menlo,monospace;font-size:12px;padding-left:44px;white-space:pre-wrap;word-break:break-all}
-.ai{font-size:13px;color:var(--ink2)}@media print{h2{break-after:avoid}.tw{overflow:visible}}
+.ai{font-size:13px;color:var(--ink2)}.k{display:inline-block;font-size:11px;font-weight:700;border-radius:4px;padding:0 5px;margin-right:4px;background:var(--soft);border:1px solid var(--line)}
+.k-observed{color:var(--ok)}.k-inferred{color:var(--amber)}.k-reported{color:var(--thread)}.k-hypothesis,.k-lead{color:var(--ink2);font-style:italic}@media print{h2{break-after:avoid}.tw{overflow:visible}}
 </style></head><body><main>
 <p class="kicker">Veyra case report${r.synthetic ? " · SYNTHETIC data" : ""}</p>
 <h1>${esc(r.headline || r.title)}</h1>
@@ -82,6 +88,8 @@ ol.log{font-family:ui-monospace,Menlo,monospace;font-size:12px;padding-left:44px
 ${r.explanation ? `<p class="lead">${esc(r.explanation)}</p>` : ""}
 ${r.status ? `<p><span class="pill">${esc(r.status)}${r.confidence ? ` · ${esc(r.confidence)} confidence` : ""}</span>${r.investigator ? ` <span class="muted">${esc(r.investigator)}</span>` : ""}</p>` : ""}
 ${r.provenance ? `<p class="muted">Source: ${esc(r.provenance)}</p>` : ""}
+
+${r.scope ? `<div class="box"><b>Claim scope.</b> The evidence is ${esc(r.scope.vantage.label)}: it shows what the agent received and sent, not what the board transmitted. Statements are labelled <span class="k k-observed">Observed</span> <span class="k k-inferred">Inferred</span> <span class="k k-reported">Engineer report</span> <span class="k k-hypothesis">Hypothesis</span>.${r.scope.rewrites.length ? ` Veyra reworded ${r.scope.rewrites.length} statement${r.scope.rewrites.length > 1 ? "s" : ""} of the recorded investigation that described the board's transmission as observed (listed at the end).` : ""}${r.scope.residual.length ? ` <b>${r.scope.residual.length} statement${r.scope.residual.length > 1 ? "s" : ""} still go beyond the evidence</b> and are marked.` : ""}</div>` : ""}
 
 ${hyps ? `<h2>Where the fault can be</h2><div class="tw"><table><thead><tr><th>Status</th><th>Area</th><th>Why</th><th>Engineer's check</th></tr></thead><tbody>${hyps}</tbody></table></div>` : ""}
 
@@ -93,8 +101,8 @@ ${(r.data || []).length ? `<h2>What the data shows</h2>${r.data!.map((d) => `<h3
 
 ${(r.normal || []).length ? `<h2>Normal behaviour, against this case</h2>${r.normal!.map((n) => `<h3>${esc(n.title)}</h3>${n.intro ? `<p class="muted">${esc(n.intro)}</p>` : ""}${table(n.table)}`).join("")}` : ""}
 
-${(r.evidence || []).length ? `<h2>Why Veyra thinks so</h2>${table({ cols: ["Line", "Quoted from the data", "What it shows"], rows: r.evidence!.map((e: Any) => [e.line, e.quote, e.shows]) })}` : ""}
-${(r.checked || []).length ? `<h2>Already checked</h2>${table({ cols: ["Check", "Result", "Verdict"], rows: r.checked!.map((c: Any) => [c.check, c.result, `${String(c.verdict || "").replace("_", " ")}${c.about ? `: ${c.about}` : ""}`]) })}` : ""}
+${(r.evidence || []).length ? `<h2>Why Veyra thinks so</h2>${table({ cols: ["Line", "Quoted from the data (observed)", "What it shows", "Kind"], rows: r.evidence!.map((e: Any) => [e.line, e.quote, e.shows, KIND[e.kind] || ""]) })}` : ""}
+${(r.checked || []).length ? `<h2>Already checked</h2>${table({ cols: ["Check", "Result", "Kind", "Verdict"], rows: r.checked!.map((c: Any) => [c.check, c.result, KIND[c.kind] || "", `${String(c.verdict || "").replace("_", " ")}${c.about ? `: ${c.about}` : ""}`]) })}` : ""}
 ${(r.effects || []).length ? `<h3>Effects, not causes</h3>${table({ cols: ["Line", "Quoted", "Why it is an effect"], rows: r.effects!.map((e: Any) => [e.line, e.quote, e.why]) })}` : ""}
 ${(r.unknowns || []).length ? `<h3>Not established by the data</h3><ul>${r.unknowns!.map((u) => `<li>${esc(u)}</li>`).join("")}</ul>` : ""}
 
@@ -104,8 +112,10 @@ ${(r.steps || []).length ? `<h2>How Veyra investigated</h2><ol>${r.steps!.map((s
 
 ${(r.log || []).length ? `<h2>The data, line by line (${r.log!.length} lines)</h2><ol class="log">${r.log!.map((l) => `<li>${esc(l)}</li>`).join("")}</ol>` : ""}
 
+${r.scope && r.scope.rewrites.length ? `<h2>Claim-scope rewrites</h2><p class="muted">Statements in the recorded investigation that described the board's transmission as observed, and how they read now.</p>${table({ cols: ["Where", "As recorded", "As shown"], rows: r.scope.rewrites.map((w) => [w.field, w.before, w.after]) })}` : ""}
+
 <h2>For AI assistants</h2>
-<p class="ai">This file embeds the whole case as JSON in the element <code>#veyra-case</code> (schema <code>veyra-case-report-v1</code>): the conclusion, every hypothesis with its status and the engineer's feedback, the evidence with line numbers, the tables behind each plot, the discussion, and the original data lines. Cite line numbers when you reason about it. Engineer feedback is reported, not verified.</p>
+<p class="ai">This file embeds the whole case as JSON in the element <code>#veyra-case</code> (schema <code>veyra-case-report-v1</code>): where the evidence was recorded (<code>claim_scope</code>), the conclusion, every hypothesis with its status and the engineer's feedback, the evidence with line numbers, the tables behind each plot, the discussion, and the original data lines. Cite line numbers when you reason about it. Engineer feedback is reported, not verified. Evidence items and checks carry a <code>kind</code>: observed, inferred or reported.</p>
 <script type="application/json" id="veyra-case">${JSON.stringify(machine).replace(/</g, "\\u003c")}</script>
 <p class="muted">Written by Veyra in the browser from the case data. No AI model was involved in writing this file.</p>
 </main></body></html>`;

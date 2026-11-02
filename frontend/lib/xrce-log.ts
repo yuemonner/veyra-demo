@@ -110,6 +110,14 @@ export function parseAgentLog(lines: string[]): AgentLog {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// Where this log was recorded: by the micro-ROS agent on the host. It shows what the agent RECEIVED and SENT. What
+// the board transmitted, or what was on the cable, is never observed here: it can only be inferred. Every sentence
+// below keeps to that, and every statement carries its kind: observed in the log, inferred from it, or a lead.
+
+export const VANTAGE = "the micro-ROS agent's log, recorded on the host";
+export const RX = "received by the agent", TX = "sent by the agent";
+
+// ---------------------------------------------------------------------------------------------------------------
 // What a healthy session looks like (XRCE protocol), set against what this log shows. The left column is protocol
 // knowledge, stated once; the right column is computed from this log.
 
@@ -121,34 +129,34 @@ export function expectations(log: AgentLog): Expectation[] {
   const P = log.packets;
   const create = P.find((p) => p.dir === "to_agent" && p.xrce.create);
   const reply = create ? P.find((p) => p.dir === "from_agent" && p.t >= create.t && p.xrce.status) : undefined;
-  rows.push({ expected: "The board opens with CREATE_CLIENT and the agent answers STATUS_AGENT OK.",
-    observed: create && reply ? `Yes: ${create.len}-byte create (line ${create.line}), ${reply.len}-byte reply with result ${reply.xrce.status?.name} ${ms(reply.t - create.t)} later (line ${reply.line}).` : "No valid create and reply found.",
+  rows.push({ expected: "The agent receives CREATE_CLIENT and answers STATUS_AGENT OK.",
+    observed: create && reply ? `Yes: received a ${create.len}-byte create (line ${create.line}), sent a ${reply.len}-byte reply with result ${reply.xrce.status?.name} ${ms(reply.t - create.t)} later (line ${reply.line}).` : "No valid create and reply in the log.",
     ok: !!(create && reply && reply.xrce.status?.code === 0), lines: [create?.line, reply?.line].filter(Boolean) as number[] });
   const sess = create?.xrce.create?.session;
   const after = create ? P.filter((p) => p.dir === "to_agent" && p.t > create.t) : [];
   const first = after[0];
-  rows.push({ expected: sess != null ? `Every later board message carries the session it asked for (0x${hex(sess)}).` : "Later board messages carry the session that was opened.",
-    observed: first ? (first.xrce.session === sess ? `Yes, from line ${first.line}.` : `No. The next board message (line ${first.line}) has session 0x${hex(first.xrce.session)}${first.allZero ? " (every byte is zero)" : ""}.`) : "No later board message.",
+  rows.push({ expected: sess != null ? `Every later message the agent receives from that client carries the session it asked for (0x${hex(sess)}).` : "Later messages carry the session that was opened.",
+    observed: first ? (first.xrce.session === sess ? `Yes, from line ${first.line}.` : `No. The next message the agent received (line ${first.line}) has session byte 0x${hex(first.xrce.session)}${first.allZero ? " (every byte is zero)" : ""}.`) : "No later message received.",
     ok: first ? first.xrce.session === sess : null, lines: first ? [first.line] : [] });
   const key = create?.xrce.create?.clientKey;
   const keyed = after.filter((p) => p.key && p.key !== key);
-  rows.push({ expected: key ? `The client key stays ${key} for the life of the session.` : "The client key stays the same for the session.",
-    observed: keyed.length ? `No. ${keyed.length} of ${after.length} later board messages arrive with key ${keyed[0].key} (from line ${keyed[0].line}).` : "Yes.",
+  rows.push({ expected: key ? `The agent attributes every later message to client key ${key}.` : "The client key stays the same for the session.",
+    observed: keyed.length ? `No. The agent logged key ${keyed[0].key} for ${keyed.length} of the ${after.length} later messages it received (from line ${keyed[0].line}).` : "Yes.",
     ok: keyed.length === 0, lines: keyed.slice(0, 1).map((p) => p.line) });
   const bad = P.filter((p) => p.dir === "to_agent" && p.complete && !p.xrce.wellFormed);
-  rows.push({ expected: "Every message is a valid XRCE header plus submessages that fit inside the packet.",
-    observed: bad.length ? `No. ${bad.length} board message${bad.length > 1 ? "s are" : " is"} not valid: ${[...new Set(bad.map((p) => `${p.len}-byte (${p.xrce.problems[0]})`))].join("; ")}.` : "Yes.",
+  rows.push({ expected: "Every message received is a valid XRCE header plus submessages that fit inside the packet.",
+    observed: bad.length ? `No. ${bad.length} received message${bad.length > 1 ? "s are" : " is"} not valid: ${[...new Set(bad.map((p) => `${p.len}-byte (${p.xrce.problems[0]})`))].join("; ")}.` : "Yes.",
     ok: bad.length === 0, lines: bad.slice(0, 2).map((p) => p.line) });
   const s = log.sessions[0];
-  rows.push({ expected: "Once established, the session stays up while the board runs.",
-    observed: s ? (s.closed != null ? `No. Session ${s.key} closed ${ms(s.closed - (s.opened ?? s.closed))} after it opened (lines ${s.openLine}–${s.closeLine}).` : "Yes, it stays open to the end of the log.") : "No session was established.",
+  rows.push({ expected: "Once established, the session stays open.",
+    observed: s ? (s.closed != null ? `No. The agent closed session ${s.key} ${ms(s.closed - (s.opened ?? s.closed))} after opening it (lines ${s.openLine}–${s.closeLine}).` : "Yes, it stays open to the end of the log.") : "No session was established.",
     ok: s ? s.closed == null : false, lines: s ? [s.openLine, s.closeLine].filter(Boolean) as number[] : [] });
   const warn = log.events.filter((e) => /warn|error/i.test(e.level));
   rows.push({ expected: "The agent logs no warnings or errors of its own.",
-    observed: warn.length ? `${warn.length} warning${warn.length > 1 ? "s" : ""}: ${warn.map((w) => `“${w.msg}” (line ${w.line})`).join(", ")}${warn.every((w) => /client key/.test(w.msg)) ? ", a reaction to the data it received" : ""}.` : "None.",
+    observed: warn.length ? `${warn.length} warning${warn.length > 1 ? "s" : ""}: ${warn.map((w) => `“${w.msg}” (line ${w.line})`).join(", ")}${warn.every((w) => /client key/.test(w.msg)) ? ", about the data it received" : ""}.` : "None.",
     ok: warn.length === 0 ? true : null, lines: warn.map((w) => w.line) });
   if (log.port.requested != null) rows.push({ expected: "The agent listens on the port it was started with (1–65535).",
-    observed: log.port.wrapped ? `No. Started with ${log.port.requested}, listening on ${log.port.used} (= ${log.port.requested} mod 65536). The board still reached it, so this did not stop the session.` : `Yes, port ${log.port.used ?? log.port.requested}.`,
+    observed: log.port.wrapped ? `No. Started with ${log.port.requested}, listening on ${log.port.used} (= ${log.port.requested} mod 65536). It still received a create on that port (line ${create?.line ?? "?"}).` : `Yes, port ${log.port.used ?? log.port.requested}.`,
     ok: log.port.wrapped ? null : true, lines: [1, 2] });
   return rows;
 }
@@ -170,53 +178,58 @@ export function repeats(log: AgentLog) {
 
 export type Table = { cols: string[]; rows: (string | number)[][] };
 export const packetTable = (log: AgentLog): Table => ({
-  cols: ["#", "Line", "Time", "Direction", "Bytes", "Key the agent logged", "Read from the bytes"],
-  rows: log.packets.map((p) => [p.n, p.line, `+${((p.t - (log.packets[0]?.t ?? p.t)) * 1000).toFixed(1)} ms`, p.dir === "to_agent" ? "board → agent" : "agent → board",
+  cols: ["#", "Line", "Time", "In the agent's log", "Bytes", "Key the agent logged", "Read from the bytes"],
+  rows: log.packets.map((p) => [p.n, p.line, `+${((p.t - (log.packets[0]?.t ?? p.t)) * 1000).toFixed(1)} ms`, p.dir === "to_agent" ? "received" : "sent",
     p.complete ? p.len : `${p.len} (bytes not in log)`, p.key, p.complete ? (p.allZero ? `all ${p.len} bytes zero · ${p.xrce.reading}` : p.xrce.reading) : "—"]),
 });
 
 // ---------------------------------------------------------------------------------------------------------------
 // Discussion: an engineer's question or proposed cause, checked against this log. Each check names the claim it
-// tests, computes from the log, and says what would settle what the log cannot.
+// tests, computes from the log, and says what would settle what the log cannot. Each point says what kind it is.
 
 export type Verdict = "supports" | "against" | "cannot_tell" | "facts";
-export type Answer = { check: string; title: string; claim: string; verdict: Verdict; text: string; points: string[]; table?: Table;
+export type PointKind = "observed" | "inferred" | "lead";
+export type Point = { k: PointKind; t: string };
+const O = (t: string): Point => ({ k: "observed", t }), I = (t: string): Point => ({ k: "inferred", t }), L = (t: string): Point => ({ k: "lead", t });
+export type Answer = { check: string; title: string; claim: string; verdict: Verdict; text: string; points: Point[]; table?: Table;
   lines: number[]; about: RegExp | null; settle?: string; highlight?: number[] };
 type Check = { id: string; title: string; ask: string; words: RegExp; run: (log: AgentLog) => Answer | null };
 
-const pct = (a: number, b: number) => `${a} of ${b}`;
 const firstZero = (log: AgentLog) => log.packets.find((p) => p.dir === "to_agent" && p.allZero && p.complete);
 const createOf = (log: AgentLog) => log.packets.find((p) => p.dir === "to_agent" && p.xrce.create);
+const keep = (xs: (Point | false | null | undefined)[]) => xs.filter(Boolean) as Point[];
 
 export const CHECKS: Check[] = [
   { id: "summary", title: "Every packet, decoded", ask: "What traffic is in this log?", words: /\b(summary|overview|traffic|packets?|what happened|timeline|everything|all messages?|decode)\b/,
     run: (log) => {
       const to = log.packets.filter((p) => p.dir === "to_agent").length, from = log.packets.length - to;
-      return { check: "summary", title: "Every packet, decoded", claim: "", verdict: "facts", text: `${log.packets.length} packets: ${to} from the board to the agent, ${from} from the agent to the board. Each one read from the bytes printed in the log.`,
+      return { check: "summary", title: "Every packet, decoded", claim: "", verdict: "facts", text: `${log.packets.length} packets in the agent's log: ${to} received, ${from} sent. Each one read from the bytes the agent printed.`,
         points: [], table: packetTable(log), lines: log.packets.map((p) => p.line), about: null, highlight: log.packets.map((p) => p.n) };
     } },
   { id: "zero", title: "Is the 36-byte packet really all zeros?", ask: "Is the 36-byte packet really empty?", words: /\b(zero|zeros|zeroes|36|empty|blank|null bytes?|garbage)\b/,
     run: (log) => {
       const z = firstZero(log), c = createOf(log), r = z && log.packets.find((p) => p.dir === "from_agent" && p.t < z.t && p.t >= (c?.t ?? 0));
       if (!z) return null;
-      return { check: "zero", title: "The 36-byte packet", claim: "The board sent a packet of zeros", verdict: "supports",
-        text: `Yes. ${pct(z.bytes.filter((x) => x === 0).length, z.len)} bytes are 0x00 (lines ${[z.line, ...z.dataLines].join(", ")}). It came from the same client (key ${z.key}) ${r ? `${ms(z.t - r.t)} after the agent's reply` : ""}.`,
-        points: [`Read as an XRCE message it is ${z.xrce.header}. That is why the agent logs “invalid client key 0x00000000”${log.events.find((e) => /invalid client key/.test(e.msg)) ? ` at line ${log.events.find((e) => /invalid client key/.test(e.msg))!.line}` : ""}.`,
-          "Every byte is zero, not a few flipped bits. That fits a buffer that was never filled, or data that never reached memory the Ethernet controller reads. This log, recorded on the agent's side, cannot tell those apart."],
+      const warn = log.events.find((e) => /invalid client key/.test(e.msg));
+      return { check: "zero", title: "The 36-byte packet", claim: "A packet of zeros arrived", verdict: "supports",
+        text: `Yes. The agent received ${z.len} bytes, every one 0x00 (lines ${[z.line, ...z.dataLines].join(", ")}), ${r ? `${ms(z.t - r.t)} after it sent its reply` : ""}, and logged it under client key ${z.key}.`,
+        points: keep([O(`Read as an XRCE message it is ${z.xrce.header}.`), warn && O(`The agent then logged “invalid client key 0x00000000” (line ${warn.line}).`),
+          I("Every byte is zero, not a few flipped bits. That fits a buffer that was never filled, or data that never reached memory the Ethernet controller reads. A log recorded on the agent's side cannot tell those apart, or say where between the board and the agent the zeros appeared.")]),
         lines: [z.line, ...z.dataLines], about: /firmware|buffer|ethernet|dma|lwip/i, highlight: [z.n],
-        settle: "Compare the transmit buffer at the board's send call with a capture on the wire (the next action)." };
+        settle: "Compare the transmit buffer at the board's send call with a capture next to the board." };
     } },
   { id: "network", title: "Could the network have corrupted it?", ask: "Could a bad cable or switch have zeroed the packet?", words: /\b(network|cable|switch|router|wire|wiring|corrupt\w*|packet loss|ethernet cable|interference|emi|noise on the line|udp checksum)\b/,
     run: (log) => {
       const z = firstZero(log), c = createOf(log), reps = repeats(log);
       return { check: "network", title: "The network path", claim: "The network corrupted the packet", verdict: "against",
-        text: "Unlikely, from this log.",
-        points: [
-          c ? `The well-formed messages before it (from line ${c.line}) arrived intact, including the board's create with key ${c.xrce.create?.clientKey}.` : "",
-          z ? `The bad packet has a sensible length (${z.len} bytes) and every byte is zero. Damage on a cable flips or drops bits, and a damaged UDP datagram normally fails its checksum and is dropped before the agent sees it.` : "",
-          reps[0] ? `The ${reps[0].len}-byte packet that follows repeats ${reps[0].count} times, byte for byte identical (lines ${reps[0].first}–${reps[0].last}). Random corruption does not repeat exactly.` : "",
-        ].filter(Boolean), lines: [c?.line, z?.line, reps[0]?.first].filter(Boolean) as number[], about: /network/i,
-        settle: "A capture on the board's side of the cable (or a direct cable to the PC) would close it." };
+        text: "Unlikely, from this log, though it cannot rule it out.",
+        points: keep([
+          c && O(`The create received at line ${c.line} decodes cleanly (client key ${c.xrce.create?.clientKey}).`),
+          z && O(`The bad packet has a plausible length (${z.len} bytes) and every byte is zero.`),
+          reps[0] && O(`The ${reps[0].len}-byte packet received next repeats ${reps[0].count} times, byte for byte identical (lines ${reps[0].first}–${reps[0].last}).`),
+          I("Damage on a cable flips or drops bits, and a damaged UDP datagram normally fails its checksum and is dropped by the host before the agent sees it. Exact zeros and exact repeats do not look like line damage."),
+        ]), lines: [c?.line, z?.line, reps[0]?.first].filter(Boolean) as number[], about: /network/i,
+        settle: "This log is recorded at the agent. A capture next to the board (or a direct cable to the PC) would close it." };
     } },
   { id: "agent", title: "Is the agent mishandling valid data?", ask: "Is the micro-ROS agent the problem?", words: /\b(agent|host|pc|laptop|server|ros ?2 side|micro_ros_agent|linux side|docker)\b/,
     run: (log) => {
@@ -225,23 +238,24 @@ export const CHECKS: Check[] = [
         const next = log.packets.find((x) => x.line > p.line && x.dir === "to_agent");
         const own = log.events.filter((e) => e.line > p.line && (!next || e.line < next.line));
         rows.push([p.line, `${p.len} B · ${p.allZero ? "all zero" : p.xrce.wellFormed ? p.xrce.sub?.name ?? "" : "not valid XRCE"}`,
-          own.length ? own.map((e) => (e.fn === "send_message" ? `replies ${e.fields.len} B (${(log.packets.find((x) => x.line === e.line)?.xrce.status?.name) || "?"})` : e.msg)).join(" · ") : "nothing (no session)"]);
+          own.length ? own.map((e) => (e.fn === "send_message" ? `sends ${e.fields.len} B (${(log.packets.find((x) => x.line === e.line)?.xrce.status?.name) || "?"})` : e.msg)).join(" · ") : "nothing (no session)"]);
       }
       const warn = log.events.filter((e) => /warn|error/i.test(e.level));
       return { check: "agent", title: "The agent's side", claim: "The agent mishandles valid data", verdict: "against",
         text: "The agent's reactions match what it received.",
-        points: ["It answered the valid create with OK, rejected the all-zero message with ERR_INVALID_DATA, and stayed silent to packets that are not XRCE.",
-          `It logs ${warn.length} warning${warn.length === 1 ? "" : "s"}, ${warn.length ? `about the data it received (${warn.map((w) => `line ${w.line}`).join(", ")})` : ""} and no internal error.`],
-        table: { cols: ["Line", "Board sent", "Agent did"], rows: rows.slice(0, 6) }, lines: rows.slice(0, 6).map((r) => Number(r[0])), about: /host|agent side/i,
+        points: [O("It answered the valid create with OK, answered the all-zero message with ERR_INVALID_DATA, and stayed silent to packets that are not XRCE."),
+          O(`It logs ${warn.length} warning${warn.length === 1 ? "" : "s"}${warn.length ? `, about the data it received (${warn.map((w) => `line ${w.line}`).join(", ")})` : ""}, and no internal error.`),
+          I("So the agent looks like it is reacting correctly to bad input, not producing it.")],
+        table: { cols: ["Line", "Agent received", "Agent did"], rows: rows.slice(0, 6) }, lines: rows.slice(0, 6).map((r) => Number(r[0])), about: /host|agent side/i,
         settle: "Running a known-good client against the same agent would close it." };
     } },
   { id: "port", title: "Was the port setting the problem?", ask: "Did port 457879 break it?", words: /\b(port|457879|64663|udp4|config\w*|settings?|argument|command line)\b/,
     run: (log) => {
       if (log.port.requested == null) return null;
       const s = log.sessions[0];
-      return { check: "port", title: "The agent's port", claim: "The port setting stopped the board and agent talking", verdict: "against",
+      return { check: "port", title: "The agent's port", claim: "The port setting stopped the two from talking", verdict: "against",
         text: log.port.wrapped ? `No. ${log.port.requested} is out of range; the agent kept the low 16 bits and listened on ${log.port.used} (${log.port.requested} mod 65536 = ${log.port.requested % 65536}).` : "The port is in range.",
-        points: [s ? `The board reached the agent on that port: a session opened at line ${s.openLine}. So the port did not cause the failure. It is still worth fixing.` : ""].filter(Boolean),
+        points: keep([s && O(`The agent received a create on that port and opened a session (line ${s.openLine}).`), s && I("So the port did not cause the failure. It is still worth fixing.")]),
         lines: [1, 2, ...(s?.openLine ? [s.openLine] : [])], about: /port/i };
     } },
   { id: "timing", title: "Is it a timeout or timing problem?", ask: "Did something time out?", words: /\b(tim(e|ed|ing)|timeout|delay|interval|latency|period|ms|slow|fast|race|when)\b/,
@@ -251,27 +265,29 @@ export const CHECKS: Check[] = [
       const del = log.events.find((e) => /delete_client|destroy_session/.test(e.fn));
       const t0 = log.packets[0]?.t ?? 0;
       const rows: (string | number)[][] = [];
-      if (c) rows.push(["Board create", c.line, "+0.0 ms"]);
-      if (reply) rows.push(["Agent reply", reply.line, `+${((reply.t - t0) * 1000).toFixed(1)} ms`]);
-      if (z) rows.push(["All-zero packet", z.line, `+${((z.t - t0) * 1000).toFixed(1)} ms`]);
+      if (c) rows.push(["Agent receives the create", c.line, "+0.0 ms"]);
+      if (reply) rows.push(["Agent sends its reply", reply.line, `+${((reply.t - t0) * 1000).toFixed(1)} ms`]);
+      if (z) rows.push(["Agent receives the all-zero packet", z.line, `+${((z.t - t0) * 1000).toFixed(1)} ms`]);
       if (del) rows.push(["Agent deletes the client", del.line, `+${((del.t - t0) * 1000).toFixed(1)} ms`]);
-      if (reps[0]) rows.push([`${reps[0].len}-byte packet ×${reps[0].count}`, `${reps[0].first}–${reps[0].last}`, `every ${(reps[0].meanGap * 1000).toFixed(1)} ms (${(reps[0].minGap * 1000).toFixed(1)}–${(reps[0].maxGap * 1000).toFixed(1)})`]);
+      if (reps[0]) rows.push([`Agent receives the ${reps[0].len}-byte packet ×${reps[0].count}`, `${reps[0].first}–${reps[0].last}`, `every ${(reps[0].meanGap * 1000).toFixed(1)} ms (${(reps[0].minGap * 1000).toFixed(1)}–${(reps[0].maxGap * 1000).toFixed(1)})`]);
       return { check: "timing", title: "Timing", claim: "Something timed out", verdict: "against",
-        text: "Nothing timed out. The session closed in reaction to data, not to silence.",
-        points: [reply && c ? `The agent replied to the create in ${ms(reply.t - c.t)}.` : "", del && z ? `It deleted the client ${ms(del.t - z.t)} after the all-zero packet arrived: a reaction, not a timeout.` : "",
-          reps[0] ? `Afterwards the board sends the same ${reps[0].len} bytes every ${(reps[0].meanGap * 1000).toFixed(0)} ms, a steady timer, so its scheduler keeps running.` : ""].filter(Boolean),
-        table: { cols: ["Event", "Line", "Time"], rows }, lines: rows.map((r) => Number(String(r[1]).split("–")[0])), about: null };
+        text: "Nothing timed out. The agent closed the session in reaction to data, not to silence.",
+        points: keep([reply && c && O(`The agent replied to the create in ${ms(reply.t - c.t)}.`), del && z && O(`It deleted the client ${ms(del.t - z.t)} after receiving the all-zero packet.`),
+          reps[0] && O(`Afterwards it receives the same ${reps[0].len} bytes every ${(reps[0].meanGap * 1000).toFixed(0)} ms.`),
+          reps[0] && I("A steady 100 ms rhythm means whatever sends it keeps running on a timer.")]),
+        table: { cols: ["In the agent's log", "Line", "Time"], rows }, lines: rows.map((r) => Number(String(r[1]).split("–")[0])), about: null };
     } },
-  { id: "repeat", title: "What is the repeating 13-byte packet?", ask: "What is the small packet the board keeps sending?", words: /\b(13|small packets?|repeat\w*|keeps? sending|e8|keep-?alive|heartbeat|retry|retries|after the close|what is the)\b/,
+  { id: "repeat", title: "What is the repeating 13-byte packet?", ask: "What is the small packet the agent keeps receiving?", words: /\b(13|small packets?|repeat\w*|keeps? (sending|receiving)|e8|keep-?alive|heartbeat|retry|retries|after the close|what is the)\b/,
     run: (log) => {
       const g = repeats(log).find((x) => !x.packets[0].allZero);
       if (!g) return null;
       const p = g.packets[0], ints = asInt32(p.bytes);
       return { check: "repeat", title: `The repeating ${g.len}-byte packet`, claim: "", verdict: "facts",
         text: `It is not a valid XRCE message: ${p.xrce.problems.join("; ")}.`,
-        points: [`Sent ${g.count} times, identical, every ${(g.meanGap * 1000).toFixed(0)} ms (lines ${g.first}–${g.last}); the agent ignores it.`,
-          `Read as little-endian 32-bit integers the bytes give ${ints.map((x) => x.toLocaleString("en-US")).join(" · ")}${p.bytes.length % 4 ? ` and ${p.bytes.length % 4} more byte${p.bytes.length % 4 > 1 ? "s" : ""}` : ""}. Round numbers like 1,000 and 1,000,000,000 look like time settings (milliseconds, nanoseconds), not a message.`,
-          "A lead, not established: the board may be sending memory that holds settings instead of a message buffer, which would also fit a buffer or DMA problem."],
+        points: [O(`The agent received it ${g.count} times, identical, every ${(g.meanGap * 1000).toFixed(0)} ms (lines ${g.first}–${g.last}), and did not answer it.`),
+          O(`Read as little-endian 32-bit integers the bytes give ${ints.map((x) => x.toLocaleString("en-US")).join(" · ")}${p.bytes.length % 4 ? ` and ${p.bytes.length % 4} more byte${p.bytes.length % 4 > 1 ? "s" : ""}` : ""}.`),
+          I("Round numbers like 1,000 and 1,000,000,000 look like time settings (milliseconds, nanoseconds), not a message."),
+          L("Not established: the sender may be transmitting memory that holds settings instead of a message buffer, which would also fit a buffer or DMA problem.")],
         table: { cols: ["Offset", "Bytes", "As int32 (LE)"], rows: ints.map((v, i) => [i * 4, p.bytes.slice(i * 4, i * 4 + 4).map((x) => hex(x)).join(" "), v.toLocaleString("en-US")]) },
         lines: [p.line, ...p.dataLines], about: /firmware|buffer|ethernet|dma/i, highlight: g.packets.map((x) => x.n),
         settle: "Find which variable or struct holds 1000 and 1000000000 in the board's firmware and whether its address matches the transmit buffer." };
@@ -281,8 +297,8 @@ export const CHECKS: Check[] = [
       const rows = log.packets.filter((p) => p.dir === "to_agent").map((p) => [p.line, p.len, p.key, p.xrce.clientKey ?? (p.xrce.create ? p.xrce.create.clientKey : "—"), `0x${hex(p.xrce.session)}`]);
       const c = createOf(log);
       return { check: "key", title: "Client key and session", claim: "", verdict: "facts",
-        text: c ? `The board identified itself as ${c.xrce.create?.clientKey} and asked for session 0x${hex(c.xrce.create?.session ?? 0)}. The next message has session 0x00 and key 0x00000000, because those bytes are zeros. The board never sends its key again.` : "No create found.",
-        points: ["The agent's column shows the key the agent attributed to each message; the byte columns show what the board actually sent."],
+        text: c ? `The create the agent received names client ${c.xrce.create?.clientKey} and asks for session 0x${hex(c.xrce.create?.session ?? 0)}. The next message it received has session byte 0x00 and key bytes 0x00000000, because those bytes are zeros. No later message carries the key again.` : "No create found.",
+        points: [O("Column 3 is the key the agent attributed to each message it received; columns 4 and 5 are what the bytes contain.")],
         table: { cols: ["Line", "Bytes", "Agent attributes to key", "Key in the bytes", "Session byte"], rows }, lines: rows.map((r) => Number(r[0])), about: /firmware|buffer/i };
     } },
   { id: "buffer", title: "Board buffers or the Ethernet DMA?", ask: "Is it the D-cache or DMA on the H7?", words: /\b(dma|cache|d-?cache|mpu|lwip|pbuf|buffers?|firmware|stm32|h7|memory|descriptor|stream|init\w*|uninitiali[sz]ed|freertos|heap|stack)\b/,
@@ -290,23 +306,21 @@ export const CHECKS: Check[] = [
       const z = firstZero(log);
       return { check: "buffer", title: "Buffers or DMA", claim: "", verdict: "cannot_tell",
         text: "This log cannot separate the two. Both fit what it shows.",
-        points: [z ? `The data was already zeros when it reached the agent (line ${z.line}), and the earlier create was correct. So the fault sits on the board, after a correct first send.` : "",
-          "An application or stream buffer that is never filled, and an Ethernet DMA that reads stale memory (D-cache not cleaned) would both put zeros on the wire.",
-          "What separates them is whether the bytes are correct at the board's send call."].filter(Boolean),
+        points: keep([z && O(`The agent received the create correctly, then received zeros (line ${z.line}).`),
+          I("So the data was already wrong when it reached the agent. Where it went wrong, on the board or on the way, is beyond this log."),
+          L("An application or stream buffer that is never filled, and an Ethernet DMA that reads stale memory (D-cache not cleaned), would both produce zeros. What separates them is whether the bytes are correct at the board's send call.")]),
         lines: z ? [z.line, ...z.dataLines] : [], about: /firmware|buffer|ethernet|dma|lwip/i,
-        settle: "Breakpoint at the transport write callback: correct bytes there and zeros on the wire means DMA or cache; zeros there means the client's buffers." };
+        settle: "Breakpoint at the transport write callback: correct bytes there and zeros in a capture next to the board means DMA or cache; zeros there means the client's buffers." };
     } },
   { id: "normal", title: "What should a healthy session look like?", ask: "What would a normal session look like?", words: /\b(normal|expected|healthy|should|supposed|usual|unusual|baseline|compare)\b/,
     run: (log) => {
       const ex = expectations(log);
       return { check: "normal", title: "A healthy session, against this log", claim: "", verdict: "facts",
-        text: `${ex.filter((e) => e.ok === false).length} of ${ex.length} expectations fail. The first failure is the first board message after the handshake.`,
+        text: `${ex.filter((e) => e.ok === false).length} of ${ex.length} expectations fail. The first failure is the first message the agent received after the handshake.`,
         points: [], table: { cols: ["A healthy session", "This log"], rows: ex.map((e) => [e.expected, `${e.ok === false ? "✕ " : e.ok ? "✓ " : "• "}${e.observed}`]) },
         lines: [...new Set(ex.flatMap((e) => e.lines))].sort((a, b) => a - b), about: null };
     } },
 ];
-
-const STOP = /\b(the|a|an|is|it|this|that|of|to|in|on|and|or|be|was|were|could|can|do|does|did|i|we|you|think|maybe|might|what|why|how)\b/g;
 
 /** Pick the checks a question or proposed cause is about. Returns the best one (and a second when it is close). */
 export function route(question: string): Check[] {
@@ -319,5 +333,3 @@ export function route(question: string): Check[] {
 export function answer(log: AgentLog, question: string): Answer[] {
   return route(question).map((c) => c.run(log)).filter(Boolean) as Answer[];
 }
-
-export const meaningful = (q: string) => q.toLowerCase().replace(STOP, " ").replace(/\s+/g, " ").trim().length > 0;
