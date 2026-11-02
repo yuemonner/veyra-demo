@@ -6,6 +6,8 @@ import s from "./field-case.module.css";
 import { Lessons, RecordingRead, SignalChain } from "./SignalChain";
 import Investigation, { AutoRecord, LogEvidence } from "./Investigation";
 import { plotFor, Waveform } from "./Waveform";
+import { DataPanel, Discuss, EMPTY_TALK, NormalPanel, useMaterial, useReport, type Talk } from "./CaseTools";
+import tt from "./tools.module.css";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "/local-api";
 const STORY_TITLE = "EX1 boom kept moving after joystick release (SYNTHETIC)";
@@ -178,6 +180,8 @@ export default function FieldCasePage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [me, setMe] = useState<Any>(null);
   const [acceptBusy, setAcceptBusy] = useState(false);
+  const [talk, setTalk] = useState<Talk>(EMPTY_TALK);
+  const [discussOpen, setDiscussOpen] = useState(false);
   const isPrivate = !!me?.private;
   const recordings = isPrivate || !!me?.recordings;  // the hosted demo can take logs and recordings too (VEYRA_ALLOW_RECORDINGS)
 
@@ -299,6 +303,12 @@ export default function FieldCasePage() {
     if (logCase && (tab === "brief" || tab === "next")) setTab("case");
     if (!logCase && tab === "case") setTab("brief");
   }, [caseId, logCase]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The discussion and the engineer's checks belong to one case.
+  useEffect(() => { setTalk(EMPTY_TALK); setDiscussOpen(false); }, [caseId]);
+  const material = useMaterial(caseId, call, logCase);
+  const downloadReport = useReport({ caseId, data, m: material, talk });
+  const labels: Record<string, string> = Object.fromEntries(Object.entries(run?.machine_profile?.domains || {}).map(([k, v]: [string, Any]) => [k, v.label]));
+  const openDiscuss = () => setDiscussOpen(true);
   return (
     <div className={s.page}>
       {accessAsk && <AccessDialog detail={accessAsk.detail} onDone={(code) => { accessAsk.resolve(code); setAccessAsk(null); }} />}
@@ -307,17 +317,18 @@ export default function FieldCasePage() {
         {cases.length > 1 ? (
           <label className={s.casePick}>
             <span className={s.visuallyHidden}>Case</span>
-            <select value={caseId ?? ""} onChange={(e) => { if (e.target.value === "__research") { window.location.href = "/research-preview"; return; } setTab("case"); load(e.target.value); }}>
+            <select value={caseId ?? ""} onChange={(e) => { setTab("case"); load(e.target.value); }}>
               {[...cases].reverse().filter((c) => !c.synthetic || c.id === caseId).map((c) => (
                 <option key={c.id} value={c.id}>{c.synthetic ? "Synthetic · " : "Real data · "}{caseLabel(c.title)}</option>))}
-              <option value="__research">Research preview · Diagnose a robot Veyra has never seen</option>
             </select>
           </label>
         ) : <span className={s.crumb}>Field case</span>}
         <span className={s.spacer} />
         <div className={s.actions}>
           <button className={s.button} onClick={() => (recordings ? setRecordingOpen(true) : setUploadOpen(true))}>{recordings ? "Upload data" : "Upload logs"}</button>
-          {caseId && <a className={s.quiet} href={`${API}/engine/cases/${caseId}/report`} target="_blank" rel="noreferrer">Open report</a>}
+          {caseId && run && <button className={s.quiet} onClick={openDiscuss}>Discuss</button>}
+          {caseId && !logCase && <a className={s.quiet} href={`${API}/engine/cases/${caseId}/report`} target="_blank" rel="noreferrer">Engine report</a>}
+          {caseId && run && <button className={s.quiet} onClick={downloadReport} title="One HTML file with the plots, tables, discussion and data. Readable by people and by AI assistants.">Download report</button>}
           {caseId && isPrivate && <button className={s.quiet} onClick={() => setShareOpen(true)}>Share</button>}
           {isPrivate && me?.user && <span className={s.who} title={me.user.email}>{me.user.name} · {me.user.workspace_name}
             {!me.signin_off && <button className={s.link} onClick={async () => { await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include", headers: { "x-veyra-request": "1" } }); window.location.href = "/login"; }}>Sign out</button>}</span>}
@@ -365,8 +376,10 @@ export default function FieldCasePage() {
               </button>))}
           </nav>
           {tab === "next" && <NextAction caseId={caseId!} data={data} onChanged={() => load(caseId!)} me={me?.user?.name} onEvidence={() => go("findings")} />}
-          {tab === "case" && <Investigation key={`${caseId}:${jobId || ""}`} caseId={caseId!} call={call} actor={me?.user?.name || ENGINEER} jobId={jobId} onChanged={() => load(caseId!)} />}
+          {tab === "case" && <Investigation key={`${caseId}:${jobId || ""}`} caseId={caseId!} call={call} actor={me?.user?.name || ENGINEER} jobId={jobId} onChanged={() => load(caseId!)}
+            feedback={talk.feedback} extra={<DataPanel m={material} onAsk={openDiscuss} />} />}
           {tab === "brief" && <Brief data={data} run={run} verification={verification} go={go} onAccept={acceptCheck} acceptBusy={acceptBusy} error={agentError} />}
+          {tab === "brief" && <NormalPanel run={run} labels={labels} onAsk={openDiscuss} />}
           {tab === "evidence" && logCase && <LogEvidence key={caseId!} caseId={caseId!} call={call} />}
           {tab === "evidence" && !logCase && <>
             <AgentPanel ledger={data.ledger} run={run} info={agentInfo} busy={agentBusy} error={agentError} onRun={runAgent} />
@@ -398,6 +411,10 @@ export default function FieldCasePage() {
         setUploadOpen(false); setCases((await call("/engine/cases")).filter((c: Any) => c.fault_type !== "known_good_run")); setTab("case"); await load(id); }} />}
       {recordingOpen && <RecordingDialog onTabular={(files: File[]) => { setRecordingOpen(false); setTabularFiles(files); setUploadOpen(true); }} onClose={() => setRecordingOpen(false)} onDone={async (id: string, job?: string) => {
         setRecordingOpen(false); setJobId(job || null); setCases((await call("/engine/cases")).filter((c: Any) => c.fault_type !== "known_good_run")); setTab("case"); await load(id); }} />}
+      {run && data && caseId && !discussOpen && (
+        <button className={tt.dock} onClick={openDiscuss} aria-label="Discuss this case with Veyra">Discuss with Veyra{talk.thread.length > 0 && <span className={tt.dockCount}>{talk.thread.filter((d) => d.who === "engineer").length}</span>}</button>)}
+      {caseId && run && <Discuss open={discussOpen} onClose={() => setDiscussOpen(false)} caseId={caseId} call={call} m={material} run={logCase ? null : run} labels={labels}
+        talk={talk} setTalk={setTalk} agent={agentInfo} readOnly={!!me?.read_only} onJob={(j) => { setDiscussOpen(false); setJobId(j); setTab("case"); }} />}
       {shareOpen && caseId && <ShareDialog caseId={caseId} title={data?.case?.title || ""} onClose={() => setShareOpen(false)} />}
       {!isPrivate && <p className={s.legacy}>Looking for the earlier workspace? <a href="/product-demo?legacy=1">Open it</a> (manual analysis, older engine).</p>}
     </div>

@@ -3,6 +3,7 @@
    What happened -> what Veyra already checked -> the one next action -> what you found (feeds the next step). */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import st from "./investigation.module.css";
+import { withFeedback } from "./CaseTools";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Call = (path: string, init?: RequestInit) => Promise<Any>;
@@ -20,8 +21,8 @@ const VERDICT: Record<string, { mark: string; label: string; cls: string }> = {
 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export default function Investigation({ caseId, call, actor, jobId, onChanged }:
-  { caseId: string; call: Call; actor: string; jobId?: string | null; onChanged: () => void }) {
+export default function Investigation({ caseId, call, actor, jobId, onChanged, feedback, extra }:
+  { caseId: string; call: Call; actor: string; jobId?: string | null; onChanged: () => void; feedback?: Record<string, Any>; extra?: React.ReactNode }) {
   const [data, setData] = useState<Any>(null);
   const [job, setJob] = useState<Any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +61,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
 
   if (job) return <Live job={job} />;
   if (!data) return <section className={st.surface}><p className={st.dim}>Loading…</p></section>;
-  if (data.playback) return <Playback pb={data.playback} />;
+  if (data.playback) return <Playback pb={data.playback} fb={feedback} extra={extra} />;
   const inv = data.investigation;
   const agent = data.agent || {};
   if (!inv) {
@@ -78,7 +79,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
     );
   }
   return (
-    <ResultView inv={inv} findings={data.findings || []}
+    <ResultView inv={inv} findings={data.findings || []} fb={feedback} extra={extra}
       banner={inv.mode !== "agent" ? (
         <div className={st.banner}>
           <b>Rule-based reading only.</b> {inv.fallback_reason}.{" "}
@@ -95,8 +96,10 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged }:
   );
 }
 
-function ResultView({ inv, findings, banner, next, footer, prev }: { inv: Any; findings: Any[]; banner?: React.ReactNode; next: React.ReactNode; footer?: React.ReactNode; prev?: Any[] | null }) {
+function ResultView({ inv, findings, banner, next, footer, prev, fb, extra }: { inv: Any; findings: Any[]; banner?: React.ReactNode; next: React.ReactNode; footer?: React.ReactNode; prev?: Any[] | null;
+  fb?: Record<string, Any>; extra?: React.ReactNode }) {
   const r = inv.result || {};
+  const told = !!fb && (r.hypotheses || []).some((h: Any) => fb[h.id] && fb[h.id].verdict !== "unsure");
   const status = STATUS[r.status] || STATUS.cause_unknown;
   return (
     <section className={st.surface}>
@@ -108,9 +111,13 @@ function ResultView({ inv, findings, banner, next, footer, prev }: { inv: Any; f
         {inv.mode === "agent" && <p className={st.fine}>Veyra ran {inv.steps.length} check{inv.steps.length === 1 ? "" : "s"} on the original data in {inv.seconds} s · every quoted line verified against the file{(inv.dropped || []).length ? ` · ${inv.dropped.length} unverifiable statement${inv.dropped.length === 1 ? "" : "s"} removed` : ""}</p>}
       </header>
 
-      {(r.hypotheses || []).length > 0 && <FaultSpace hyps={r.hypotheses} prev={prev} />}
+      {(r.hypotheses || []).length > 0 && (told
+        ? <FaultSpace hyps={withFeedback(r.hypotheses, fb || {})} prev={r.hypotheses} changedLead="Your checks changed the picture" />
+        : <FaultSpace hyps={r.hypotheses} prev={prev} />)}
 
       {next}
+
+      {extra}
 
       {(r.evidence || []).length > 0 && (
         <div className={st.block}>
@@ -282,7 +289,7 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
 
 /** A recorded investigation walked through step by step: Veyra reads the log, hands over the next action, takes the
  *  engineer's result, continues, and closes with a lesson. Nothing is written. */
-function Playback({ pb }: { pb: Any }) {
+function Playback({ pb, fb, extra }: { pb: Any; fb?: Record<string, Any>; extra?: React.ReactNode }) {
   const invs: Any[] = pb.investigations;
   const [stage, setStage] = useState(0);
   const [shown, setShown] = useState(0);
@@ -336,7 +343,7 @@ function Playback({ pb }: { pb: Any }) {
       <div className={st.row}><button className={st.ghost} onClick={() => { setStage(0); setShown(0); setMine([]); setPhase("running"); top(); }}>Replay from the start</button></div>
     </div>
   ) : null;
-  return <ResultView inv={inv} findings={mine}
+  return <ResultView inv={inv} findings={mine} fb={fb} extra={extra}
     prev={stage > 0 ? (invs[stage - 1].result || {}).hypotheses : null}
     next={phase === "result" ? <NextAction caseId="" call={async () => null} next={inv.result?.next_action} entry="" closed={false} onRecorded={() => undefined} demo={demo} hyps={inv.result?.hypotheses} /> : null}
     footer={footer} />;
