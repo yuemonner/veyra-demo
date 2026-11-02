@@ -146,3 +146,38 @@ def test_hosted_showcase_replays_the_recorded_investigation_labelled(store):
     assert inv_["mode"] == "agent" and inv_["recorded"]["note"].startswith("Recorded") and inv_["result"]["hypotheses"]
     assert [e["kind"] for e in store.ledger(ids[0]) if e["kind"] in ("agent_report", "engineer_finding")] == ["agent_report", "engineer_finding", "agent_report"]
     assert store.verify(ids[0])["ledger_chain"]["valid"]
+
+
+def test_every_model_call_records_tokens_cost_latency_and_model(store):
+    out = public_samples.run_sample(store, "rplidar-no-scans")
+    cid = out["case_id"]
+    store.append(cid, "model_authorization", {"provider": "anthropic", "scope": "test", "authorized_by": "t", "evidence": "test"}, actor="t")
+    raw = inv.LogTools(store, cid).raw
+    n = next(i for i, l in enumerate(raw, 1) if l.strip())
+    report = {"headline": "No scan", "status": "cause_unknown", "confidence": "low", "explanation": "",
+              "evidence": [{"line": n, "quote": raw[n - 1][:40], "shows": "first line", "calls": ["a1"]}], "checked": [],
+              "next_action": {"action": "Read the health status", "why": "splits device from driver", "how": [], "where": "remote",
+                              "outcomes": [{"label": "Error", "means": "device"}, {"label": "Healthy", "means": "driver"}]}, "unknowns": []}
+    u1 = {"input_tokens": 1200, "cache_read_input_tokens": 30000, "cache_creation_input_tokens": 5000, "output_tokens": 800}
+    u2 = {"input_tokens": 900, "cache_read_input_tokens": 36000, "cache_creation_input_tokens": 0, "output_tokens": 1500}
+    model = _scripted([
+        {"content": [{"type": "tool_use", "id": "a1", "name": "overview", "input": {}}], "usage": u1, "model_id": "claude-sonnet-x", "cost_usd": 0.031, "api_ms": 4100},
+        {"content": [{"type": "tool_use", "id": "a2", "name": "submit_report", "input": report}], "usage": u2, "model_id": "claude-sonnet-x", "cost_usd": 0.027, "api_ms": 6200},
+    ])
+    r = inv.investigate(store, cid, model=model)
+    calls = r["model_calls"]
+    assert [c["call"] for c in calls] == [1, 2] and all(c["model_id"] == "claude-sonnet-x" for c in calls)
+    assert calls[0]["cache_creation_input_tokens"] == 5000 and calls[1]["output_tokens"] == 1500
+    assert calls[0]["requested"] == ["overview"] and calls[1]["requested"] == ["submit_report"]
+    assert all(isinstance(c["ms"], int) and c["ms"] >= 0 for c in calls) and calls[1]["api_ms"] == 6200
+    u = r["usage"]
+    assert u["input_tokens"] == 1200 + 30000 + 900 + 36000 and u["output_tokens"] == 2300     # same meaning as earlier records
+    assert u["uncached_input_tokens"] == 2100 and u["cache_read_input_tokens"] == 66000 and u["cache_creation_input_tokens"] == 5000
+    assert u["cost_usd"] == 0.058 and u["model_calls"] == 2 and u["model_ids"] == ["claude-sonnet-x"]
+    assert inv.latest(store, cid)["model_calls"] == calls                                            # stored in the case history
+
+
+def test_cost_is_left_unknown_when_any_step_did_not_report_it(store):
+    calls = [inv.model_call_record(1, {"usage": {"input_tokens": 10}, "cost_usd": 0.01}, 5, "m"),
+             inv.model_call_record(2, {"usage": {"input_tokens": 10}}, 5, "m")]
+    assert inv.usage_totals(calls)["cost_usd"] is None and calls[1]["model_id"] == "m"

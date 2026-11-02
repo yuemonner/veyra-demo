@@ -522,6 +522,27 @@ def run_summary(store, case_id: str) -> Optional[str]:
 
 
 # ---------------------------------------------------------------- the agent loop
+def model_call_record(n: int, reply: Dict[str, Any], ms: int, fallback_model: Optional[str]) -> Dict[str, Any]:
+    """One model step, as billed: tokens by kind, cost if the backend reports it, wall-clock latency and the exact model."""
+    u = reply.get("usage") or {}
+    requested = [b.get("name") for b in (reply.get("content") or []) if isinstance(b, dict) and b.get("type") == "tool_use"]
+    return {"call": n, "model_id": reply.get("model_id") or reply.get("model") or fallback_model,
+            "input_tokens": int(u.get("input_tokens") or 0), "cache_read_input_tokens": int(u.get("cache_read_input_tokens") or 0),
+            "cache_creation_input_tokens": int(u.get("cache_creation_input_tokens") or 0), "output_tokens": int(u.get("output_tokens") or 0),
+            "cost_usd": reply.get("cost_usd"), "cost_basis": reply.get("cost_basis"), "ms": ms, "api_ms": reply.get("api_ms"),
+            "requested": requested}
+
+
+def usage_totals(calls: List[Dict[str, Any]]) -> Dict[str, Any]:
+    costs = [c["cost_usd"] for c in calls if isinstance(c.get("cost_usd"), (int, float))]
+    return {"uncached_input_tokens": sum(c["input_tokens"] for c in calls),
+            "cache_read_input_tokens": sum(c["cache_read_input_tokens"] for c in calls),
+            "cache_creation_input_tokens": sum(c["cache_creation_input_tokens"] for c in calls),
+            "model_calls": len(calls), "model_ms": sum(c["ms"] for c in calls),
+            "cost_usd": round(sum(costs), 6) if costs and len(costs) == len(calls) else None,
+            "model_ids": sorted({c["model_id"] for c in calls if c.get("model_id")})}
+
+
 def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investigator", on_step: Callable[[Dict[str, Any]], None] = lambda s: None,
                 max_turns: int = MAX_TURNS) -> Dict[str, Any]:
     from app.agent.runner import egress_allowed
@@ -532,6 +553,7 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
     tools = LogTools(store, case_id)
     steps: List[Dict[str, Any]] = []
     mode, usage, report, dropped = "deterministic", {"input_tokens": 0, "output_tokens": 0}, None, []
+    model_calls: List[Dict[str, Any]] = []
     why_deterministic = None
     if model is None or not model.available():
         why_deterministic = "No model is configured on this instance"
@@ -546,13 +568,16 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
         attempts = 0
         try:
             for _ in range(max_turns):
+                t_call = time.time()
                 try:
                     reply = model.create(system=SYSTEM_PROMPT, messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
                 except Exception:  # noqa: BLE001  one retry: a transient CLI / network failure is not a verdict
                     time.sleep(2)
                     reply = model.create(system=SYSTEM_PROMPT, messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
-                for k in usage:
-                    usage[k] += int((reply.get("usage") or {}).get(k) or 0)
+                call = model_call_record(len(model_calls) + 1, reply, int((time.time() - t_call) * 1000), getattr(model, "model", None))
+                model_calls.append(call)
+                usage["input_tokens"] += call["input_tokens"] + call["cache_read_input_tokens"]  # comparable with earlier records
+                usage["output_tokens"] += call["output_tokens"]
                 content = reply.get("content") or []
                 messages.append({"role": "assistant", "content": content})
                 calls = [b for b in content if b.get("type") == "tool_use"]
@@ -602,7 +627,8 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
         report = deterministic(store, case_id, why_deterministic)
     result = {"kind": "autonomous_investigation", "version": INVESTIGATOR_VERSION, "run_id": run["id"], "mode": mode,
               "model": getattr(model, "model", None) if mode == "agent" else None, "fallback_reason": why_deterministic,
-              "steps": steps, "result": report, "dropped": dropped, "usage": usage, "seconds": round(time.time() - started, 1),
+              "steps": steps, "result": report, "dropped": dropped, "usage": {**usage, **usage_totals(model_calls)}, "model_calls": model_calls,
+              "seconds": round(time.time() - started, 1),
               "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it."}
     store.append_trusted(case_id, "agent_report", result, actor=actor, source=INVESTIGATOR_VERSION)
     return result

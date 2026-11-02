@@ -170,8 +170,18 @@ class ClaudeCodeModel:
                 self._ids += 1
                 content.append({"type": "tool_use", "id": f"cc_{self._ids}", "name": str(call["name"]), "input": call.get("input") or {}})
         usage = envelope.get("usage") or {}
-        return {"content": content, "usage": {"input_tokens": int(usage.get("input_tokens") or 0) + int(usage.get("cache_read_input_tokens") or 0),
-                                              "output_tokens": int(usage.get("output_tokens") or 0)}}
+        model_ids = sorted((envelope.get("modelUsage") or {}).keys())
+        # Raw counts, kept apart so cost can be checked: uncached input, cache reads and cache writes are priced differently.
+        # total_cost_usd is Claude Code's own API-equivalent estimate; on a subscription sign-in it is not billed per call.
+        return {"content": content,
+                "usage": {"input_tokens": int(usage.get("input_tokens") or 0),
+                          "cache_read_input_tokens": int(usage.get("cache_read_input_tokens") or 0),
+                          "cache_creation_input_tokens": int(usage.get("cache_creation_input_tokens") or 0),
+                          "output_tokens": int(usage.get("output_tokens") or 0)},
+                "model_id": ",".join(model_ids) or self.model,
+                "cost_usd": envelope.get("total_cost_usd"),
+                "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+                "api_ms": envelope.get("duration_api_ms")}
 
 
 def from_environment():
