@@ -144,7 +144,8 @@ def test_hosted_showcase_replays_the_recorded_investigation_labelled(store):
     assert len(ids) == 1 and public_samples.seed_showcase(store) == []            # once
     inv_ = inv.latest(store, ids[0])
     assert inv_["mode"] == "agent" and inv_["recorded"]["note"].startswith("Recorded") and inv_["result"]["hypotheses"]
-    assert [e["kind"] for e in store.ledger(ids[0]) if e["kind"] in ("agent_report", "engineer_finding")] == ["agent_report", "engineer_finding", "agent_report"]
+    assert [e["kind"] for e in store.ledger(ids[0]) if e["kind"] == "engineer_finding" or (e["kind"] == "agent_report"
+            and e["payload"].get("kind") == "autonomous_investigation")] == ["agent_report", "engineer_finding", "agent_report"]
     assert store.verify(ids[0])["ledger_chain"]["valid"]
 
 

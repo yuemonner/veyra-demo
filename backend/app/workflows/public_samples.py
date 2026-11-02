@@ -84,8 +84,31 @@ def seed_showcase(store, version: Optional[str] = None) -> List[str]:
             elif e["kind"] == "engineer_finding":
                 p = {k: v for k, v in e["payload"].items() if k in ("action", "outcome_selected", "result", "observations")}
                 store.append(cid, "engineer_finding", p, actor=e["actor"], source="recorded investigation (replayed)")
+        seed_discussion(store, cid, s["dir"])
         ids.append(cid)
     return ids
+
+
+def discussion_recording(sample_dir: Path) -> Optional[Path]:
+    """The newest recorded discussion of a sample (recorded_discussion.v1.json, v2...), if any."""
+    versions = sorted(sample_dir.glob("recorded_discussion.v*.json"), key=lambda p: int(re.sub(r"\D", "", p.stem.split(".")[-1]) or 0))
+    return versions[-1] if versions else None
+
+
+def seed_discussion(store, case_id: str, sample_dir: Path) -> int:
+    """Replay a recorded discussion (real model rounds, labelled as recorded) into a showcase case. Returns rounds added."""
+    rec = discussion_recording(sample_dir)
+    if rec is None:
+        return 0
+    recorded = json.loads(rec.read_text())
+    run_id = store.latest_run(case_id)["id"]
+    n = 0
+    for e in recorded["entries"]:
+        if e["kind"] == "agent_report":
+            meta = {"at": e["recorded_at"], "note": recorded["note"], "file": rec.name, "engineer_messages": recorded.get("engineer_messages")}
+            store.append_trusted(case_id, "agent_report", {**e["payload"], "run_id": run_id, "recorded": meta}, actor=e["actor"], source="recorded discussion (replayed)")
+            n += 1
+    return n
 
 
 def recording_versions(name: str) -> List[Dict[str, Any]]:

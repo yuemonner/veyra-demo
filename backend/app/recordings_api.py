@@ -477,3 +477,64 @@ def case_log(case_id: str, request: Request):
         return {"lines": tools.raw[:20000], "total": len(tools.raw), "available": tools.available()}
     finally:
         store.close()
+
+
+# ---------------------------------------------------------------- conversational debugging
+class DiscussIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    message: str = Field(min_length=1, max_length=1500)
+    kind: str = Field(default="guess", pattern="^(guess|result)$")
+
+
+@router.get("/cases/{case_id}/discussion")
+def get_discussion(case_id: str, request: Request):
+    """Every round of the discussion (recorded ones say so), the fault space after the latest round, and whether a live
+    model can run the next round here."""
+    from app.agent import discussion
+    from app.agent.runner import egress_allowed
+    from app.engine_api import store_path
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(store_path(request))
+    try:
+        model = _investigator_model()
+        return {"rounds": discussion.rounds_of(store, case_id), "hypotheses": discussion.current_hypotheses(store, case_id),
+                "agent": {"configured": bool(model and model.available()), "model": getattr(model, "model", None) if model else None,
+                          "allowed": bool(model and egress_allowed(store, case_id, model.provider))}}
+    finally:
+        store.close()
+
+
+def _run_discussion(job, db, case_id, message, kind, actor):
+    from app.agent import discussion
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(db)
+    try:
+        out = discussion.discuss(store, case_id, message, kind=kind, model=_investigator_model(), actor=actor,
+                                 on_step=lambda st: job["steps"].append(st))
+        job.update(state="failed" if out.get("failure") else "done", error=out.get("failure"), step="Done", result={"entry_id": out["entry_id"]}, finished_at=time.time())
+    except Exception as error:  # noqa: BLE001
+        traceback.print_exc()
+        job.update(state="failed", error=f"{type(error).__name__}: {error}", finished_at=time.time())
+    finally:
+        store.close()
+
+
+@router.post("/cases/{case_id}/discuss")
+def discuss_round(case_id: str, body: DiscussIn, request: Request):
+    """One round with a live model: Veyra tests the engineer's guess or result against the data (in the background)."""
+    from app.agent.runner import egress_allowed
+    from app.engine_api import store_path
+    from app.store.sqlite_store import CaseStore
+    model = _investigator_model()
+    if model is None or not model.available():
+        raise HTTPException(409, "The AI investigator is not configured on this instance")
+    store = CaseStore(store_path(request))
+    try:
+        if not egress_allowed(store, case_id, model.provider):
+            raise HTTPException(409, f"No permission recorded to send this case's data to {model.provider}")
+    finally:
+        store.close()
+    job = _new_job(request, case_id=case_id)
+    job.update(step="Veyra is testing it against the data")
+    threading.Thread(target=_run_discussion, args=(job, store_path(request), case_id, body.message, body.kind, actor_for(request, "Engineer")), daemon=True).start()
+    return {"job_id": job["id"]}
