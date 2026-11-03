@@ -543,14 +543,25 @@ def usage_totals(calls: List[Dict[str, Any]]) -> Dict[str, Any]:
             "model_ids": sorted({c["model_id"] for c in calls if c.get("model_id")})}
 
 
-LANGUAGE = {"zh": ("\n\nLanguage: write every text a person reads (headline, explanation, shows, check, result, why, claim, because, "
-                  "action, how, means, then, unknowns, events, lesson, reuse_when, reply, still_unknown) in simplified Chinese, in plain words an engineer "
-                  "uses at work, not academic. Keep technical terms, signal and message names, units, codes and numbers in English as "
-                  "they appear in the data (VCU, BMS, DCL, MCU, EPB, CAN, TqCmd_Out, DTC 0x2A11, 55.0 V). Quotes stay exactly as in the data.")}
+LANGUAGE = {"zh": ("\n\nLanguage: write every text a person reads in simplified Chinese: headline, explanation, shows, check, result, why, "
+                  "claim, area, because, basis, action, how, where, label, means, then, unknowns, events, lesson, reuse_when, reply, "
+                  "still_unknown, and every other free-text field. No English sentences or English hypothesis names. Use plain words an "
+                  "engineer uses at work, not academic. Keep technical terms, signal and message names, units, codes and numbers in "
+                  "English as they appear in the data (VCU, BMS, DCL, MCU, EPB, CAN, HSA, TqCmd_Out, DTC 0x2A11, 55.0 V). Quotes stay "
+                  "exactly as in the data. Ids and enum values stay as the schema defines them.")}
 
 
 def prompt_for(base: str, lang: Optional[str]) -> str:
     return base + LANGUAGE.get(lang or "", ("",))[0]
+
+
+# Repeated in the first message: an instruction at the end of a long system prompt alone is easy to drop.
+LANGUAGE_REMINDER = {"zh": " 最终提交里给人看的每一段文字（包括 hypotheses 的 area 和 claim、claim、why、next_action、outcomes）都用简体中文写；"
+                           "技术术语、信号名、单位、代码和数字保持英文原样。"}
+
+
+def language_reminder(lang: Optional[str]) -> str:
+    return LANGUAGE_REMINDER.get(lang or "", "")
 
 
 def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investigator", on_step: Callable[[Dict[str, Any]], None] = lambda s: None,
@@ -574,7 +585,7 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
     if why_deterministic is None:
         mode = "agent"
         outputs: Dict[str, str] = {}
-        messages: List[Dict[str, Any]] = [{"role": "user", "content": f"Investigate case {case_id}. Start with overview and case_context."}]
+        messages: List[Dict[str, Any]] = [{"role": "user", "content": f"Investigate case {case_id}. Start with overview and case_context.{language_reminder(lang)}"}]
         attempts = 0
         try:
             for _ in range(max_turns):

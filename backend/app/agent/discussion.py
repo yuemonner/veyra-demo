@@ -226,7 +226,7 @@ def discuss(store, case_id: str, message: str, *, kind: str = "guess", model=Non
     first = (f"The engineer's {'result from a check they ran' if kind == 'result' else 'guess or question'}:\n\"{message}\"\n\n"
              "Current state (investigation so far and this discussion):\n" + json.dumps(_state(store, case_id), default=str)[:12000] +
              "\n\nTest it with the tools, then call submit_round.")
-    messages: List[Dict[str, Any]] = [{"role": "user", "content": first}]
+    messages: List[Dict[str, Any]] = [{"role": "user", "content": first + inv.language_reminder(lang)}]
     result, attempts, failure = None, 0, None
     try:
         for _ in range(max_turns):

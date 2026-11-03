@@ -1,0 +1,531 @@
+{
+ "version": "v1",
+ "note": "Recorded 2026-11-03 11:18 with the live investigator (claude-code:sonnet) on a local instance. SYNTHETIC case: the data is generated for this demo.",
+ "investigator": "veyra-investigator-v1",
+ "integrity_rules": "evidence-integrity-v2",
+ "entries": [
+  {
+   "kind": "agent_report",
+   "recorded_at": "2026-11-03T11:18:09.877168+00:00",
+   "actor": "Veyra investigator",
+   "payload": {
+    "kind": "autonomous_investigation",
+    "version": "veyra-investigator-v1",
+    "run_id": "run-e0b1cb098410",
+    "mode": "agent",
+    "model": "claude-code:sonnet",
+    "fallback_reason": null,
+    "steps": [
+     {
+      "id": "cc_1",
+      "tool": "overview",
+      "input": {},
+      "label": "Read the whole log",
+      "summary": "3289 lines; first failure at line 1101",
+      "ms": 1
+     },
+     {
+      "id": "cc_2",
+      "tool": "case_context",
+      "input": {},
+      "label": "Read the report and earlier results",
+      "summary": "",
+      "ms": 2
+     },
+     {
+      "id": "cc_3",
+      "tool": "lessons",
+      "input": {},
+      "label": "Compared with earlier cases",
+      "summary": "0 earlier case(s) compared",
+      "ms": 80
+     },
+     {
+      "id": "cc_4",
+      "tool": "read_lines",
+      "input": {
+       "start": 1380,
+       "end": 1440
+      },
+      "label": "Read lines 1380\u20131440",
+      "summary": "61 lines",
+      "ms": 0
+     },
+     {
+      "id": "cc_5",
+      "tool": "search",
+      "input": {
+       "pattern": "snapshot|^# ",
+       "context": 0
+      },
+      "label": "Searched for \u201csnapshot|^# \u201d",
+      "summary": "9 matching lines",
+      "ms": 17
+     },
+     {
+      "id": "cc_6",
+      "tool": "search",
+      "input": {
+       "pattern": "DCL|SOC|pack_v|bus_v|undervolt|temp",
+       "context": 0
+      },
+      "label": "Searched for \u201cDCL|SOC|pack_v|bus_v|undervolt|temp\u201d",
+      "summary": "329 matching lines",
+      "ms": 21
+     },
+     {
+      "id": "cc_7",
+      "tool": "search",
+      "input": {
+       "pattern": "BMS_Event|MCU_FR_Event|VCU_Event|AD_Event",
+       "context": 0
+      },
+      "label": "Searched for \u201cBMS_Event|MCU_FR_Event|VCU_Event|AD_Event\u201d",
+      "summary": "7 matching lines",
+      "ms": 21
+     },
+     {
+      "id": "cc_8",
+      "tool": "measure",
+      "input": {
+       "pattern": "BMS_Event\\s+WARN",
+       "then_pattern": "MCU_FR_Event"
+      },
+      "label": "Measured \u201cBMS_Event\\s+WARN\u201d",
+      "summary": "1 occurrence; followed by \u201cMCU_FR_Event\u201d after 0.15\u20130.15 s",
+      "ms": 4
+     },
+     {
+      "id": "cc_9",
+      "tool": "search",
+      "input": {
+       "pattern": "VCU_TqDebug.*TqHSA_FF=(3[0-9]|4[0-9]|5[0-9])\\.",
+       "context": 0
+      },
+      "label": "Searched for \u201cVCU_TqDebug.*TqHSA_FF=(3[0-9]|4[0-9]|5[0-9])\\.\u201d",
+      "summary": "17 matching lines",
+      "ms": 3
+     },
+     {
+      "id": "cc_10",
+      "tool": "read_lines",
+      "input": {
+       "start": 2198,
+       "end": 2215
+      },
+      "label": "Read lines 2198\u20132215",
+      "summary": "18 lines",
+      "ms": 0
+     }
+    ],
+    "result": {
+     "headline": "Cold-morning HSA launch drew 232 A, past the BMS limit; pack sagged and the FR inverter tripped on undervoltage.",
+     "status": "cause_unknown",
+     "explanation": "Probably a cold, low-SOC pack (DCL 150 A) sagging under the VCU 2.4.1 hill-start torque ramp, which exceeded the BMS limit. The FR inverter is the first to cross 55 V. FR-specific wiring is not excluded.",
+     "confidence": "medium",
+     "evidence": [
+      {
+       "line": 1396,
+       "quote": "VCU_TqDebug   TqReq_Base=69.1 TqHSA_FF=39.4 TqLim_BMS=80.2 TqCmd_Out=108.5 (N.m per wheel)",
+       "shows": "HSA feed-forward adds to the base request. Output torque exceeds the BMS torque limit of 80.2 and reaches 125.2 at line 1416.",
+       "calls": [
+        "cc_4",
+        "cc_9"
+       ]
+      },
+      {
+       "line": 1393,
+       "quote": "BMS_Event     WARN discharge current 174 A above DCL 150 A",
+       "shows": "First warning in the chain, 0.15 s before the inverter DTC. Current later reaches 232.1 A.",
+       "calls": [
+        "cc_4",
+        "cc_8"
+       ]
+      },
+      {
+       "line": 1424,
+       "quote": "MCU_FR_Event  ERROR DTC 0x2A11 DC bus under-voltage (54.3 V < 55.0 V for >= 50 ms), torque disabled",
+       "shows": "The FR inverter trips on bus undervoltage as the pack sags to 55.85 V at 232.1 A. Cell 13 is at 2.664 V and cells are at 2-4 \u00b0C.",
+       "calls": [
+        "cc_4",
+        "cc_7"
+       ]
+      },
+      {
+       "line": 1410,
+       "quote": "MCU_FR        DC_V=54.37 Tq_Act=124.1 Spd_rpm=14 T_inv=6 DTC=0x0000",
+       "shows": "FR reads lower than FL (55.45 V at line 1409) at the same instant, so it crosses the threshold first.",
+       "calls": [
+        "cc_4"
+       ]
+      },
+      {
+       "line": 2202,
+       "quote": "BMS_Status    Pack_V=74.28 Pack_I=3.0 SOC=61 DCL_A=300 T_cell_min=18 T_cell_max=20 SOH=91",
+       "shows": "In the afternoon the pack is warm with SOC 61 and DCL 300 A. TqLim_BMS is 161.7 and the same HSA ramp is capped at 132. No fault in that launch.",
+       "calls": [
+        "cc_10",
+        "cc_9"
+       ]
+      }
+     ],
+     "checked": [
+      {
+       "check": "Read lines 1380-1440 around the fault",
+       "result": "Warning, then inverter DTC, then VCU fault, then e-stop. Pack voltage falls from 60.18 V (line 1386) to 55.85 V (line 1407) as current rises to 232.1 A.",
+       "verdict": "supports",
+       "about": "Pack sag under load",
+       "calls": [
+        "cc_4"
+       ]
+      },
+      {
+       "check": "Time from BMS WARN to FR DTC",
+       "result": "One BMS warning, 0.15 s (30 lines) before MCU_FR_Event.",
+       "verdict": "supports",
+       "about": "Pack limit exceeded before the inverter trip",
+       "calls": [
+        "cc_8"
+       ]
+      },
+      {
+       "check": "Searched for event messages across the three snapshots",
+       "result": "The 10/09 launch (VCU 2.3.8, before the OTA) logs 'HSA not available'. The 10/28 launches log 'HSA enabled'. Only the morning launch has the BMS warning and the faults.",
+       "verdict": "supports",
+       "about": "VCU 2.4.1 HSA torque ramp",
+       "calls": [
+        "cc_7"
+       ]
+      },
+      {
+       "check": "Compared HSA feed-forward and BMS limit, morning vs afternoon",
+       "result": "Same HSA ramp (FF 45.0). The morning cap is 80.2 and the command reaches 125.2. The afternoon cap is 161.7 and the command is held at 132.",
+       "verdict": "supports",
+       "about": "Cold pack limit not applied to the HSA torque",
+       "calls": [
+        "cc_9"
+       ]
+      },
+      {
+       "check": "Looked for a controller-side explanation",
+       "result": "FR shows no DTC before its bus voltage drops (line 1410, DTC=0x0000). The other inverters track the same sag (FL 55.45 V). The controller was already replaced on 10/21 and the problem returned (line 4).",
+       "verdict": "weakens",
+       "about": "FR inverter hardware",
+       "calls": [
+        "cc_4",
+        "cc_5"
+       ]
+      }
+     ],
+     "effects": [
+      {
+       "line": 1435,
+       "quote": "VCU_Event     ERROR FaultLevel=3 MotorFault_FR=1: torque cut on all wheels, EPB apply, Remote_Code=7",
+       "why": "Reaction to the FR DTC."
+      },
+      {
+       "line": 1436,
+       "quote": "AD_Event      ERROR chassis fault reported by VCU -> EMERGENCY STOP, mission paused",
+       "why": "Autonomy response to the VCU fault."
+      },
+      {
+       "line": 1431,
+       "quote": "MCU_FR        DC_V=58.75 Tq_Act=0.0 Spd_rpm=22 T_inv=6 DTC=0x2A11",
+       "why": "Torque is disabled, so the load drops and the voltage recovers (72.32 V by line 1440). This is not a separate fault."
+      }
+     ],
+     "next_action": {
+      "action": "Measure voltage at the FR inverter input versus the pack terminals during a loaded launch.",
+      "why": "Separates a pack/VCU current problem from an FR-specific supply drop, since FR reads lower than FL on CAN.",
+      "how": [
+       "Put a logger or meter on the pack terminals and at the FR and FL inverter DC inputs.",
+       "Run a B-ramp launch in the cold morning with HSA on.",
+       "Compare FR-to-pack drop against FL-to-pack drop at peak launch current.",
+       "Inspect the FR DC connector and busbar for heating or high resistance."
+      ],
+      "where": "on_site",
+      "outcomes": [
+       {
+        "label": "FR drop clearly larger than FL",
+        "means": "FR supply path (connector or cable) adds resistance and makes FR trip first.",
+        "keeps": [
+         "h4",
+         "h1",
+         "h2"
+        ],
+        "rules_out": [],
+        "weakens": [
+         "h3"
+        ],
+        "then": "Plan a repair of the FR supply path, then re-test the cold launch."
+       },
+       {
+        "label": "Drops equal, pack itself sags below 55 V",
+        "means": "Pack sag under cold, low SOC, high current. The VCU does not honour the BMS limit.",
+        "keeps": [
+         "h1",
+         "h2"
+        ],
+        "rules_out": [
+         "h4"
+        ],
+        "weakens": [
+         "h3"
+        ],
+        "then": "Propose a VCU HSA clamp to TqLim_BMS and a cold/SOC check."
+       },
+       {
+        "label": "No fault and voltage stays above 55 V",
+        "means": "The condition is not reproduced. Try again with a colder, lower-SOC pack.",
+        "keeps": [
+         "h1",
+         "h2",
+         "h3",
+         "h4"
+        ],
+        "rules_out": [],
+        "then": "Repeat at the next cold, low-SOC morning."
+       }
+      ]
+     },
+     "unknowns": [
+      "Whether the VCU is meant to clamp HSA torque to TqLim_BMS, or whether the HSA feed-forward bypasses it.",
+      "Whether the earlier incidents on 10/20 and 10/21 had the same cold, low-SOC conditions (only 10/28 data is available).",
+      "Why FR reads lower than FL, RL and RR (wiring versus measurement offset)."
+     ],
+     "hypotheses": [
+      {
+       "id": "h1",
+       "area": "Battery pack sag",
+       "claim": "A cold, low-SOC pack with a 150 A discharge limit sags below 55 V under launch current.",
+       "status": "leading",
+       "because": "Pack falls to 55.85 V at 232.1 A with cell 13 at 2.664 V and 2-4 \u00b0C. The warm afternoon launch has a 300 A limit and no fault.",
+       "basis": "indirect",
+       "observed_at": "BMS_Status and MCU DC_V on chassis CAN",
+       "lines": [
+        1393,
+        1407,
+        1408,
+        2202
+       ]
+      },
+      {
+       "id": "h2",
+       "area": "VCU 2.4.1 HSA torque",
+       "claim": "HSA feed-forward pushes torque past the BMS torque limit, so current exceeds DCL.",
+       "status": "leading",
+       "because": "TqCmd_Out reaches 125.2 against TqLim_BMS 80.2. The pre-OTA launch (2.3.8, no HSA) had no fault. Problems started after the 10/14 OTA.",
+       "basis": "indirect",
+       "observed_at": "VCU_TqDebug",
+       "lines": [
+        1396,
+        1416,
+        239,
+        1332
+       ]
+      },
+      {
+       "id": "h3",
+       "area": "FR inverter hardware",
+       "claim": "The FR inverter has a fault or a mis-set undervoltage threshold.",
+       "status": "weakened",
+       "because": "The inverter was replaced on 10/21 and the problem returned. The trip follows a real bus-voltage drop and the other inverters show the same trend.",
+       "basis": "indirect",
+       "observed_at": "MCU_FR DC_V on CAN; the inverter was not tested directly",
+       "lines": [
+        1410,
+        1420,
+        1424
+       ]
+      },
+      {
+       "id": "h4",
+       "area": "FR DC supply wiring",
+       "claim": "High resistance in the FR supply path makes FR read the lowest bus voltage.",
+       "status": "open",
+       "because": "FR reads lower than FL throughout the ramp (54.37 V vs 55.45 V at line 1409-1410). The log cannot tell a wiring drop from a measurement offset.",
+       "basis": "indirect",
+       "observed_at": "MCU DC_V readings on CAN",
+       "lines": [
+        1389,
+        1400,
+        1410
+       ]
+      }
+     ],
+     "events": [
+      {
+       "lines": [
+        1385,
+        1396,
+        1406,
+        1416
+       ],
+       "what": "HSA feed-forward raises torque command above the BMS limit",
+       "class": "root_cause_candidate",
+       "why": "Torque ramps to 125.2 against TqLim_BMS 80.2 on the cold pack."
+      },
+      {
+       "lines": [
+        1407,
+        1408
+       ],
+       "what": "Pack voltage sags to 55.85 V; cell 13 at 2.664 V",
+       "class": "root_cause_candidate",
+       "why": "Bus voltage nears the 55 V inverter threshold."
+      },
+      {
+       "lines": [
+        1393
+       ],
+       "what": "BMS warns discharge current above DCL",
+       "class": "anomaly",
+       "why": "Earliest explicit warning, before the inverter trip."
+      },
+      {
+       "lines": [
+        1389,
+        1400,
+        1410
+       ],
+       "what": "FR bus voltage consistently below the other inverters",
+       "class": "anomaly",
+       "why": "Could be FR-specific supply drop."
+      },
+      {
+       "lines": [
+        1420,
+        1424
+       ],
+       "what": "FR DTC 0x2A11 undervoltage, torque disabled",
+       "class": "effect",
+       "why": "Result of the bus dropping below 55 V for 50 ms."
+      },
+      {
+       "lines": [
+        1435,
+        1436,
+        1438
+       ],
+       "what": "VCU fault level 3, code 7, e-stop",
+       "class": "effect",
+       "why": "Response to the FR DTC."
+      },
+      {
+       "lines": [
+        239,
+        1332,
+        2429
+       ],
+       "what": "Launch-on-grade INFO lines",
+       "class": "routine",
+       "why": "Normal start-up messages; they show HSA enabled only after the OTA."
+      }
+     ],
+     "lesson": "No earlier cases are available for this signature.",
+     "reuse_when": "Machines with VCU 2.4.1 hill-start assist on an NCM 20S pack that cold-start on grade with low SOC; log shows BMS WARN above DCL, then an inverter undervoltage DTC and VCU remote code 7."
+    },
+    "dropped": [],
+    "usage": {
+     "input_tokens": 55948,
+     "output_tokens": 10071,
+     "uncached_input_tokens": 10,
+     "cache_read_input_tokens": 55938,
+     "cache_creation_input_tokens": 103299,
+     "model_calls": 5,
+     "model_ms": 90950,
+     "cost_usd": 0.51952,
+     "model_ids": [
+      "claude-sonnet-5-5"
+     ]
+    },
+    "model_calls": [
+     {
+      "call": 1,
+      "model_id": "claude-sonnet-5-5",
+      "input_tokens": 2,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 22451,
+      "output_tokens": 79,
+      "cost_usd": 0.090598,
+      "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+      "ms": 10722,
+      "api_ms": 6272,
+      "requested": [
+       "overview",
+       "case_context",
+       "lessons"
+      ]
+     },
+     {
+      "call": 2,
+      "model_id": "claude-sonnet-5-5",
+      "input_tokens": 2,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 21102,
+      "output_tokens": 168,
+      "cost_usd": 0.086092,
+      "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+      "ms": 6337,
+      "api_ms": 5353,
+      "requested": [
+       "read_lines",
+       "search",
+       "search"
+      ]
+     },
+     {
+      "call": 3,
+      "model_id": "claude-sonnet-5-5",
+      "input_tokens": 2,
+      "cache_read_input_tokens": 18646,
+      "cache_creation_input_tokens": 15383,
+      "output_tokens": 279,
+      "cost_usd": 0.0661906,
+      "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+      "ms": 6802,
+      "api_ms": 5918,
+      "requested": [
+       "search",
+       "measure",
+       "search",
+       "read_lines"
+      ]
+     },
+     {
+      "call": 4,
+      "model_id": "claude-sonnet-5-5",
+      "input_tokens": 2,
+      "cache_read_input_tokens": 18646,
+      "cache_creation_input_tokens": 20171,
+      "output_tokens": 5054,
+      "cost_usd": 0.1330926,
+      "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+      "ms": 37318,
+      "api_ms": 36676,
+      "requested": [
+       "submit_report"
+      ]
+     },
+     {
+      "call": 5,
+      "model_id": "claude-sonnet-5-5",
+      "input_tokens": 2,
+      "cache_read_input_tokens": 18646,
+      "cache_creation_input_tokens": 24192,
+      "output_tokens": 4491,
+      "cost_usd": 0.14354660000000002,
+      "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+      "ms": 29771,
+      "api_ms": 28920,
+      "requested": [
+       "submit_report"
+      ]
+     }
+    ],
+    "seconds": 91.5,
+    "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it."
+   }
+  }
+ ]
+}

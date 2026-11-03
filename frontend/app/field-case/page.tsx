@@ -9,6 +9,10 @@ import { plotFor, Waveform } from "./Waveform";
 import { DataPanel, Discuss, EMPTY_TALK, NormalPanel, useMaterial, useReport, type Talk } from "./CaseTools";
 import { DiscussionStatus, useDiscussion } from "./Together";
 import tt from "./tools.module.css";
+import { CanPanel } from "./CanPanel";
+import { LangContext, langOf } from "./lang";
+import { ZhText } from "./ZhText";
+import { looksLikeCanLog } from "../../lib/can-log";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "/local-api";
 const STORY_TITLE = "EX1 boom kept moving after joystick release (SYNTHETIC)";
@@ -175,6 +179,8 @@ export default function FieldCasePage() {
   const [tab, setTab] = useState<"case" | "brief" | "next" | "evidence" | "audit">("case");
   const [jobId, setJobId] = useState<string | null>(null);
   const [cases, setCases] = useState<Any[]>([]);
+  // Titles of the public sample cases: the synthetic ones among them are listed in the picker too.
+  const [sampleTitles, setSampleTitles] = useState<string[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [tabularFiles, setTabularFiles] = useState<File[]>([]);
   const [recordingOpen, setRecordingOpen] = useState(false);
@@ -226,16 +232,21 @@ export default function FieldCasePage() {
         if (who?.private && !who.user) { window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`; return; }
         setMe(who);
         call("/engine/connectors").then((c) => setAgentInfo(c.agent)).catch(() => setAgentInfo(null));
-        const wanted = new URLSearchParams(window.location.search).get("case");
+        const params = new URLSearchParams(window.location.search);
+        const wanted = params.get("case"), wantedSample = params.get("sample");
         const all: Any[] = (await call("/engine/cases")).filter((c: Any) => c.fault_type !== "known_good_run");
         setCases(all);
         // Showcase first: the earliest real case (the seeded demo case on a hosted engine), so a visitor's
         // upload never becomes what everyone else sees. Uploaders are taken to their own case directly.
         // A real public log with its investigation (the hosted demo's showcase) comes first when there is one.
-        const sampleTitles: string[] = await call("/engine/samples").then((l: Any[]) => l.map((x) => x.title)).catch(() => []);
+        const samples: Any[] = await call("/engine/samples").catch(() => []);
+        const sampleTitles: string[] = samples.map((x) => x.title);
+        setSampleTitles(sampleTitles);
+        // ?sample=<name> opens that sample's case: a stable link, since case ids change when the hosted demo is reseeded.
+        const bySample = wantedSample ? all.filter((c) => c.title === samples.find((x) => x.name === wantedSample)?.title).pop() : null;
         const showcase = all.find((c) => !c.synthetic && sampleTitles.includes(c.title));
         const real = showcase || all.find((c) => !c.synthetic);
-        const story = (wanted && all.find((c) => c.id === wanted)) || real || all.filter((c) => c.title === STORY_TITLE).pop() || all[all.length - 1];
+        const story = (wanted && all.find((c) => c.id === wanted)) || bySample || real || all.filter((c) => c.title === STORY_TITLE).pop() || all[all.length - 1];
         if (story) await load(story.id);
         else setState("empty");
       } catch (e: Any) {
@@ -311,7 +322,12 @@ export default function FieldCasePage() {
   const downloadReport = useReport({ caseId, data, m: material, talk, rounds: together.data?.rounds || [] });
   const labels: Record<string, string> = Object.fromEntries(Object.entries(run?.machine_profile?.domains || {}).map(([k, v]: [string, Any]) => [k, v.label]));
   const openDiscuss = () => setDiscussOpen(true);
+  // A case written in Chinese is shown with Chinese labels (technical terms stay in English).
+  const lang = langOf(data?.case?.title);
+  const canLog = logCase && looksLikeCanLog(material.lines);
   return (
+    <LangContext.Provider value={lang}>
+    {lang === "zh" && <ZhText />}
     <div className={s.page}>
       {accessAsk && <AccessDialog detail={accessAsk.detail} onDone={(code) => { accessAsk.resolve(code); setAccessAsk(null); }} />}
       <header className={s.topbar}>
@@ -320,8 +336,8 @@ export default function FieldCasePage() {
           <label className={s.casePick}>
             <span className={s.visuallyHidden}>Case</span>
             <select value={caseId ?? ""} onChange={(e) => { setTab("case"); load(e.target.value); }}>
-              {[...cases].reverse().filter((c) => !c.synthetic || c.id === caseId).map((c) => (
-                <option key={c.id} value={c.id}>{c.synthetic ? "Synthetic · " : "Real data · "}{caseLabel(c.title)}</option>))}
+              {[...cases].reverse().filter((c) => !c.synthetic || c.id === caseId || sampleTitles.includes(c.title)).map((c) => (
+                <option key={c.id} value={c.id}>{`${c.synthetic ? (langOf(c.title) === "zh" ? "合成案例 · " : "Synthetic · ") : "Real data · "}${caseLabel(c.title)}`}</option>))}
             </select>
           </label>
         ) : <span className={s.crumb}>Field case</span>}
@@ -379,7 +395,7 @@ export default function FieldCasePage() {
           </nav>
           {tab === "next" && <NextAction caseId={caseId!} data={data} onChanged={() => load(caseId!)} me={me?.user?.name} onEvidence={() => go("findings")} />}
           {tab === "case" && <Investigation key={`${caseId}:${jobId || ""}`} caseId={caseId!} call={call} actor={me?.user?.name || ENGINEER} jobId={jobId} onChanged={() => load(caseId!)}
-            feedback={talk.feedback} guard={material.guard} extra={<DataPanel m={material} onAsk={openDiscuss} />}
+            feedback={talk.feedback} guard={material.guard} extra={canLog ? <CanPanel lines={material.lines} onAsk={openDiscuss} /> : <DataPanel m={material} onAsk={openDiscuss} />}
             ahead={<DiscussionStatus data={together.data} onOpen={openDiscuss} />} />}
           {tab === "brief" && <Brief data={data} run={run} verification={verification} go={go} onAccept={acceptCheck} acceptBusy={acceptBusy} error={agentError} />}
           {tab === "brief" && <NormalPanel run={run} labels={labels} onAsk={openDiscuss} />}
@@ -421,6 +437,7 @@ export default function FieldCasePage() {
       {shareOpen && caseId && <ShareDialog caseId={caseId} title={data?.case?.title || ""} onClose={() => setShareOpen(false)} />}
       {!isPrivate && <p className={s.legacy}>Looking for the earlier workspace? <a href="/product-demo?legacy=1">Open it</a> (manual analysis, older engine).</p>}
     </div>
+    </LangContext.Provider>
   );
 }
 

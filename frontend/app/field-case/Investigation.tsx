@@ -333,10 +333,10 @@ function Playback({ pb, fb, extra, ahead }: { pb: Any; fb?: Record<string, Any>;
   const replay = () => { setStage(0); setShown(0); setMine([]); setAutoplay(true); setPhase("running"); top(); };
   const current = () => { setStage(lastStage); setShown((invs[lastStage].steps || []).length); setMine(recordedFindings(pb, lastStage)); setPhase("result"); top(); };
   const banner = invs.length > 1 ? (stage === lastStage ? (
-    <div className={st.roundBar}><span><b>Round {stage + 1} of {invs.length}</b> · where the case stands now. {(pb.findings || []).length ? `Round ${stage}'s check was done; the engineer's result is under "What you found".` : ""}</span>
+    <div className={st.roundBar}><span><b>{`Round ${stage + 1} of ${invs.length}`}</b>{" · where the case stands now."} {(pb.findings || []).length ? `Round ${stage}'s check was done; the engineer's result is under "What you found".` : ""}</span>
       <button className={st.inline} onClick={replay}>Replay from round 1</button></div>
   ) : (
-    <div className={st.roundBar}><span><b>Recorded investigation · round {stage + 1} of {invs.length}.</b> This check was already done in the recorded case.
+    <div className={st.roundBar}><span><b>{`Recorded investigation · round ${stage + 1} of ${invs.length}.`}</b> This check was already done in the recorded case.
       {autoplay && (pb.findings || [])[stage] ? " Continuing with the engineer's result in a few seconds." : " Choose the recorded result to continue."}</span>
       <span className={st.row}>{autoplay && (pb.findings || [])[stage] && <><button className={st.inline} onClick={advance}>Continue now</button><button className={st.inline} onClick={() => setAutoplay(false)}>Pause here</button></>}
         <button className={st.inline} onClick={current}>Skip to the current state</button></span></div>

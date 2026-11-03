@@ -114,6 +114,14 @@ export function Together({ caseId, call, lines, data, reload, readOnly }: { case
   );
 }
 
+/** Who wrote the message: the reviewer, a named role (a scripted demo message written for that role), or the engineer. */
+function voiceLabel(n: number, r: Any): string {
+  const v = r.recorded?.voice, kind = r.message_kind === "result" ? "result of a check" : "guess";
+  if (v === "reviewer") return `Round ${n} · Reviewer · challenge (paraphrased from a robotics engineer who read the case)`;
+  if (v && v !== "scripted") return `Round ${n} · ${v} · ${kind} · scripted for this demo`;
+  return `Round ${n} · Engineer · ${kind}${r.recorded ? " · scripted for this demo" : ""}`;
+}
+
 function Round({ r, prev, lines, n, stepsShown }: { r: Any; prev: Any[] | null; lines: string[]; n: number; stepsShown?: number }) {
   const res = r.result;
   const steps = realSteps(r);
@@ -123,12 +131,11 @@ function Round({ r, prev, lines, n, stepsShown }: { r: Any; prev: Any[] | null; 
   return (
     <li className={t.roundItem}>
       <div className={t.me}>
-        <span className={t.who}>Round {n} · {r.recorded?.voice === "reviewer" ? "Reviewer · challenge (paraphrased from a robotics engineer who read the case)"
-          : `Engineer · ${r.message_kind === "result" ? "result of a check" : "guess"}${r.recorded ? " · scripted for this demo" : ""}`}</span>
+        <span className={t.who}>{voiceLabel(n, r)}</span>
         <p>{r.message}</p>
       </div>
       <div className={t.veyra}>
-        <span className={`${t.src} ${t.srcAI}`}>AI investigator{r.model ? ` · ${r.model}` : ""}{r.recorded ? ` · recorded ${String(r.recorded.at || "").slice(0, 10)}` : " · live"}{r.seconds ? ` · ${r.seconds} s` : ""}</span>
+        <span className={`${t.src} ${t.srcAI}`}>{`AI investigator${r.model ? ` · ${r.model}` : ""}${r.recorded ? ` · recorded ${String(r.recorded.at || "").slice(0, 10)}` : " · live"}${r.seconds ? ` · ${r.seconds} s` : ""}`}</span>
         <ol className={t.qsteps} aria-label="What Veyra queried">
           {steps.slice(0, busy ? stepsShown : steps.length).map((s: Any) => <li key={s.id}><span>{s.label}</span><span className={t.dim}>{s.summary}</span></li>)}
           {busy && <li className={t.now}><span className={t.pulse} aria-hidden /> {steps.length && stepsShown! >= steps.length && !res ? "Writing the round" : "Querying the data"}</li>}
@@ -153,7 +160,7 @@ function Round({ r, prev, lines, n, stepsShown }: { r: Any; prev: Any[] | null; 
           {!moved.length && res.hypotheses?.length > 0 && <p className={t.movedQuiet}>Leading: {(res.hypotheses.filter((h: Any) => h.status === "leading").map((h: Any) => h.area).join(", ")) || "none"} · {res.hypotheses.filter((h: Any) => h.status !== "ruled_out").length} of {res.hypotheses.length} still possible</p>}
           {res.next_check && (
             <div className={t.nextCheck}>
-              <span className={t.partsHead}>Next check{res.next_check.where ? ` · ${String(res.next_check.where).replace("_", " ")}` : ""}</span>
+              <span className={t.partsHead}>{`Next check${res.next_check.where ? ` · ${String(res.next_check.where).replace("_", " ")}` : ""}`}</span>
               <b>{res.next_check.action}</b>
               {res.next_check.why && <span className={t.dim}>{res.next_check.why}</span>}
               <ul>{(res.next_check.outcomes || []).map((o: Any, i: number) => <li key={i}><b>{o.label}</b> → {o.means}</li>)}</ul>

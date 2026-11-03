@@ -203,7 +203,9 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
 }) {
   const hasTogether = !!together?.data && ((together.data.rounds || []).length > 0 || !!together.data.agent?.configured);
   const [mode, setMode] = useState<"together" | "checks">("together");
-  const tab = hasTogether ? mode : "checks";
+  // A log no fixed check was written for (a decoded CAN log, say) has only the open-ended discussion.
+  const hasChecks = !!m.log || !!run;
+  const tab = hasTogether ? (hasChecks ? mode : "together") : "checks";
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ id: string; verdict: Feedback["verdict"] } | null>(null);
@@ -328,7 +330,7 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
           </div>
           <button className={t.x} onClick={onClose} aria-label="Close the discussion">×</button>
         </header>
-        {hasTogether && (
+        {hasTogether && hasChecks && (
           <div className={t.tabs} role="tablist" aria-label="How to discuss">
             <button role="tab" aria-selected={tab === "together"} className={tab === "together" ? t.tabOn : t.tab} onClick={() => setMode("together")}>
               Investigate together<small>AI investigator · open-ended</small></button>

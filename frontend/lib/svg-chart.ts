@@ -67,3 +67,49 @@ export function ratioBars(rows: RatioRow[], opt: { width?: number; title?: strin
   ${bars}
   <text x="${L}" y="${H - 6}" font-size="10" fill="${C.ink3}">shaded = at or below this machine's healthy level</text></svg>`;
 }
+
+export type Line = { label: string; color: string; dash?: string; pts: { t: number; v: number }[]; width?: number };
+export type Panel = { title: string; unit: string; lines: Line[]; hlines?: { y: number; label: string; color: string }[]; band?: { from: number; to: number; color: string; label: string } };
+
+/** Several signals on one shared time axis, one panel per quantity, with the events marked across all panels. */
+export function stackedChart(panels: Panel[], opt: { x0: number; x1: number; markers?: { t: number; label: string; color: string }[]; width?: number; xLabel?: string }): string {
+  const W = opt.width ?? 760, L = 56, R = 150, T = 26, PH = 112, GAP = 26, B = 30;
+  const H = T + panels.length * (PH + GAP) - GAP + B;
+  const x = (t: number) => L + ((t - opt.x0) / (opt.x1 - opt.x0)) * (W - L - R);
+  const step = [0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10].find((s) => (opt.x1 - opt.x0) / s <= 8) ?? 10;
+  let out = "";
+  panels.forEach((p, i) => {
+    const top = T + i * (PH + GAP), bot = top + PH;
+    const vals = p.lines.flatMap((l) => l.pts.filter((q) => q.t >= opt.x0 && q.t <= opt.x1).map((q) => q.v)).concat((p.hlines || []).map((h) => h.y));
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    const pad = (hi - lo || 1) * 0.12; lo -= pad; hi += pad;
+    const y = (v: number) => bot - ((v - lo) / (hi - lo)) * PH;
+    out += `<rect x="${L}" y="${top}" width="${W - L - R}" height="${PH}" fill="#fff" stroke="${C.grid}"/>`;
+    for (let k = 0; k <= 3; k++) { const v = lo + ((hi - lo) * k) / 3; out += `<line x1="${L}" x2="${W - R}" y1="${r1(y(v))}" y2="${r1(y(v))}" stroke="${C.grid}"/><text x="${L - 5}" y="${r1(y(v) + 3)}" font-size="9.5" fill="${C.ink3}" text-anchor="end">${v.toFixed(Math.abs(hi - lo) < 10 ? 1 : 0)}</text>`; }
+    out += `<text x="${L}" y="${top - 5}" font-size="11" font-weight="650" fill="${C.ink}">${esc(p.title)} <tspan font-weight="400" fill="${C.ink3}">${esc(p.unit)}</tspan></text>`;
+    if (p.band) out += `<rect x="${r1(x(p.band.from))}" y="${top}" width="${r1(Math.max(1, x(p.band.to) - x(p.band.from)))}" height="${PH}" fill="${p.band.color}" opacity="0.18"><title>${esc(p.band.label)}</title></rect>`;
+    for (const h of p.hlines || []) out += `<line x1="${L}" x2="${W - R}" y1="${r1(y(h.y))}" y2="${r1(y(h.y))}" stroke="${h.color}" stroke-dasharray="5 3" stroke-width="1.3"/>`;
+    p.lines.forEach((l, j) => {
+      const pts = l.pts.filter((q) => q.t >= opt.x0 && q.t <= opt.x1);
+      if (!pts.length) return;
+      out += `<polyline fill="none" stroke="${l.color}" stroke-width="${l.width ?? 1.7}" ${l.dash ? `stroke-dasharray="${l.dash}"` : ""} points="${pts.map((q) => `${r1(x(q.t))},${r1(y(q.v))}`).join(" ")}"/>`;
+      out += `<line x1="${W - R + 10}" x2="${W - R + 26}" y1="${top + 12 + j * 15}" y2="${top + 12 + j * 15}" stroke="${l.color}" stroke-width="2" ${l.dash ? `stroke-dasharray="${l.dash}"` : ""}/><text x="${W - R + 30}" y="${top + 15 + j * 15}" font-size="10" fill="${C.ink2}">${esc(l.label)}</text>`;
+    });
+    (p.hlines || []).forEach((h, j) => { const k = p.lines.length + j; out += `<line x1="${W - R + 10}" x2="${W - R + 26}" y1="${top + 12 + k * 15}" y2="${top + 12 + k * 15}" stroke="${h.color}" stroke-dasharray="5 3"/><text x="${W - R + 30}" y="${top + 15 + k * 15}" font-size="10" fill="${C.ink2}">${esc(h.label)}</text>`; });
+  });
+  const allBot = T + panels.length * (PH + GAP) - GAP;
+  for (let s = Math.ceil(opt.x0 / step) * step; s <= opt.x1 + 1e-9; s += step) out += `<text x="${r1(x(s))}" y="${allBot + 14}" font-size="9.5" fill="${C.ink3}" text-anchor="middle">${r1(s)} s</text>`;
+  // Events: a numbered tick on the chart, and one row per event under the axis, so close events never overlap.
+  const ms = [...(opt.markers || [])].sort((a, b) => a.t - b.t);
+  ms.forEach((m, i) => {
+    const mx = r1(x(m.t));
+    out += `<line x1="${mx}" x2="${mx}" y1="${T - 2}" y2="${allBot}" stroke="${m.color}" stroke-width="1.2" stroke-dasharray="2 2"><title>${esc(m.label)}</title></line>`;
+    out += `<circle cx="${mx}" cy="${T - 9}" r="6.5" fill="${m.color}"/><text x="${mx}" y="${T - 5.8}" font-size="9" font-weight="700" fill="#fff" text-anchor="middle">${i + 1}</text>`;
+    const ry = allBot + 32 + i * 15;
+    out += `<circle cx="${L + 6}" cy="${ry - 3.5}" r="6" fill="${m.color}"/><text x="${L + 6}" y="${ry - 0.5}" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle">${i + 1}</text>`;
+    out += `<text x="${L + 18}" y="${ry}" font-size="10.5" fill="${C.ink2}"><tspan font-weight="650" fill="${C.ink}">${m.t.toFixed(2)} s</tspan>  ${esc(m.label)}</text>`;
+  });
+  if (opt.xLabel) out += `<text x="${W - R + 10}" y="${allBot + 14}" font-size="9.5" fill="${C.ink3}">${esc(opt.xLabel)}</text>`;
+  const extra = ms.length ? 26 + ms.length * 15 : 10;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H + extra}" role="img" font-family="system-ui, -apple-system, Segoe UI, sans-serif">${out}</svg>`;
+}
