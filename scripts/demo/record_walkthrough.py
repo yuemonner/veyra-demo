@@ -33,9 +33,21 @@ def main():
     store.append(cid, "model_authorization", {"provider": model.provider, "model": model.model, "scope": "Public log, demo walkthrough",
                                              "authorized_by": "Demo recording", "evidence": "Log from a public issue thread"}, actor="Demo recording")
     say = lambda s: print(f"  {s['label']} -> {s['summary']}", flush=True)  # noqa: E731
-    r1 = investigator.investigate(store, cid, model=model, on_step=say)
+    lang = public_samples.SAMPLES[name].get("lang")
+    r1 = investigator.investigate(store, cid, model=model, on_step=say, lang=lang)
     print("round 1:", r1["mode"], r1["seconds"], "s", r1["result"]["headline"], flush=True)
     assert r1["mode"] == "agent", r1["fallback_reason"]
+    if observed.strip() == "-":  # one round only: the discussion carries the case on from here
+        r2 = None
+    else:
+        r2 = second_round(store, cid, r1, observed, keywords, model, say, lang)
+    entries = [{"kind": e["kind"], "recorded_at": e["recorded_at"], "actor": e["actor"], "payload": e["payload"]} for e in store.ledger(cid)
+               if (e["kind"] == "agent_report" and e["payload"].get("mode") == "agent") or e["kind"] == "engineer_finding"]
+    write(name, version, model, entries)
+    store.close()
+
+
+def second_round(store, cid, r1, observed, keywords, model, say, lang):
     na = r1["result"]["next_action"]
     score = lambda o: sum(k in (o["label"] + " " + o["means"]).lower() for k in keywords)  # noqa: E731
     pick = max(na["outcomes"], key=score)
@@ -43,19 +55,21 @@ def main():
     store.append(cid, "engineer_finding", {"action": na["action"][:500], "outcome_selected": pick["label"][:200], "result": "found",
                                            "observations": observed}, actor="Engineer")
     time.sleep(1)
-    r2 = investigator.investigate(store, cid, model=model, on_step=say)
+    r2 = investigator.investigate(store, cid, model=model, on_step=say, lang=lang)
     print("round 2:", r2["mode"], r2["seconds"], "s", r2["result"]["headline"], flush=True)
     assert r2["mode"] == "agent", r2["fallback_reason"]
-    entries = [{"kind": e["kind"], "recorded_at": e["recorded_at"], "actor": e["actor"], "payload": e["payload"]} for e in store.ledger(cid)
-               if (e["kind"] == "agent_report" and e["payload"].get("mode") == "agent") or e["kind"] == "engineer_finding"]
+    return r2
+
+
+def write(name, version, model, entries):
     target = public_samples.SAMPLES[name]["dir"] / f"recorded_investigation.{version}.json"
     if target.exists():
         raise SystemExit(f"{target} exists: recordings are versioned, pick a new version")
     from app.agent.investigator import INTEGRITY_VERSION, INVESTIGATOR_VERSION
-    target.write_text(json.dumps({"version": version, "note": f"Recorded {time.strftime('%Y-%m-%d %H:%M')} with the live investigator ({model.model}) on a local instance.",
+    synthetic = " SYNTHETIC case: the data is generated for this demo." if public_samples.SAMPLES[name].get("synthetic") else ""
+    target.write_text(json.dumps({"version": version, "note": f"Recorded {time.strftime('%Y-%m-%d %H:%M')} with the live investigator ({model.model}) on a local instance.{synthetic}",
                                   "investigator": INVESTIGATOR_VERSION, "integrity_rules": INTEGRITY_VERSION, "entries": entries}, indent=1))
     print("WROTE", target, flush=True)
-    store.close()
 
 
 if __name__ == "__main__":

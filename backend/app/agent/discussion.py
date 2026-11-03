@@ -198,7 +198,7 @@ def verify_round(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]
 
 
 def discuss(store, case_id: str, message: str, *, kind: str = "guess", model=None, actor: str = "Engineer",
-            on_step: Callable[[Dict[str, Any]], None] = lambda s: None, max_turns: int = MAX_TURNS) -> Dict[str, Any]:
+            on_step: Callable[[Dict[str, Any]], None] = lambda s: None, max_turns: int = MAX_TURNS, lang: Optional[str] = None) -> Dict[str, Any]:
     """One round. kind: 'guess' (a suspected cause or a question) or 'result' (what the engineer found)."""
     from app.agent.runner import egress_allowed
     started = time.time()
@@ -231,7 +231,7 @@ def discuss(store, case_id: str, message: str, *, kind: str = "guess", model=Non
     try:
         for _ in range(max_turns):
             t0 = time.time()
-            reply = model.create(system=SYSTEM_PROMPT, messages=messages, tools=TOOLS + [SUBMIT_ROUND])
+            reply = model.create(system=inv.prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=TOOLS + [SUBMIT_ROUND])
             calls_log.append(inv.model_call_record(len(calls_log) + 1, reply, int((time.time() - t0) * 1000), getattr(model, "model", None)))
             content = reply.get("content") or []
             messages.append({"role": "assistant", "content": content})

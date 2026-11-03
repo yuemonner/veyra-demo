@@ -59,7 +59,7 @@ def main():
     say = lambda s: print(f"    {s['label']} -> {s['summary']}", flush=True)  # noqa: E731
     for i, turn in enumerate(script, 1):
         print(f"round {i} ({turn['kind']}): {turn['message']}", flush=True)
-        out = discussion.discuss(store, cid, turn["message"], kind=turn["kind"], model=model, on_step=say)
+        out = discussion.discuss(store, cid, turn["message"], kind=turn["kind"], model=model, on_step=say, lang=sample.get("lang"))
         if out.get("failure"):
             raise SystemExit(f"round {i} failed: {out['failure']}")
         r = out["result"]
@@ -72,6 +72,8 @@ def main():
                if e["kind"] == "agent_report" and e["payload"].get("kind") == "discussion_round"]
     cont = f" Rounds 1-{len(prior)} are replayed unchanged from recorded_discussion.{sys.argv[4]}.json." if prior else ""
     reviewer = " A question marked 'reviewer' is a robotics engineer's challenge after reading the case, paraphrased." if "reviewer" in voices else ""
+    if sample.get("synthetic"):
+        reviewer += " SYNTHETIC case: the data is generated for this demo; each engineer message is written for the role it names."
     target.write_text(json.dumps({"version": version, "discussion": discussion.DISCUSSION_VERSION,
                                   "note": f"Recorded {time.strftime('%Y-%m-%d %H:%M')} with the live AI investigator ({model.model}) on a local instance.{cont} "
                                           "The engineer's messages are scripted for this demo (not from the original issue thread); Veyra's replies are the model's real output." + reviewer,

@@ -14,14 +14,18 @@ from typing import Any, Dict, List, Optional
 from app.workflows.debrief import debrief_recording
 
 ROOT = Path(__file__).resolve().parents[3] / "fixtures" / "real" / "public"
+# SYNTHETIC demo cases (generated data, labelled as such everywhere): shown beside the real samples on the hosted demo.
+DEMO_ROOT = Path(__file__).resolve().parents[3] / "fixtures" / "synthetic" / "demo"
 
 
 def _load() -> Dict[str, Dict[str, Any]]:
     out = {}
-    if ROOT.exists():
-        for d in sorted(ROOT.iterdir()):
-            if (d / "source.json").exists() and (d / "log.txt").exists():
-                out[d.name] = {**json.loads((d / "source.json").read_text()), "dir": d}
+    for root in (ROOT, DEMO_ROOT):
+        if root.exists():
+            for d in sorted(root.iterdir()):
+                if (d / "source.json").exists() and (d / "log.txt").exists():
+                    src = json.loads((d / "source.json").read_text())
+                    out[d.name] = {**src, "synthetic": bool(src.get("synthetic")) or root == DEMO_ROOT, "dir": d}
     return out
 
 
@@ -52,14 +56,15 @@ def recording(sample_dir: Path, version: Optional[str] = None) -> Optional[Path]
 
 
 def listing() -> List[Dict[str, Any]]:
-    return [{"name": k, "walkthrough": recording(v["dir"]) is not None, **{f: v[f] for f in ("title", "platform", "symptom", "source_url", "project")}}
+    return [{"name": k, "walkthrough": recording(v["dir"]) is not None, "synthetic": v["synthetic"], "lang": v.get("lang", "en"),
+             **{f: v.get(f) for f in ("title", "platform", "symptom", "source_url", "project")}}
             for k, v in SAMPLES.items()]
 
 
 def run_sample(store, name: str, progress=lambda step: None) -> Dict[str, Any]:
     s = SAMPLES[name]
     return debrief_recording(store, s["dir"] / "log.txt", {}, machine_id=s["machine_id"], title=s["title"],
-                             actor="Engineer (sample)", report={"stated_reason": s["symptom"]}, source_name=f"{name}.log", synthetic=False,
+                             actor="Engineer (sample)", report={"stated_reason": s["symptom"]}, source_name=f"{name}.log", synthetic=s["synthetic"],
                              progress=progress)
 
 

@@ -543,8 +543,18 @@ def usage_totals(calls: List[Dict[str, Any]]) -> Dict[str, Any]:
             "model_ids": sorted({c["model_id"] for c in calls if c.get("model_id")})}
 
 
+LANGUAGE = {"zh": ("\n\nLanguage: write every text a person reads (headline, explanation, shows, check, result, why, claim, because, "
+                  "action, how, means, then, unknowns, events, lesson, reuse_when, reply, still_unknown) in simplified Chinese, in plain words an engineer "
+                  "uses at work, not academic. Keep technical terms, signal and message names, units, codes and numbers in English as "
+                  "they appear in the data (VCU, BMS, DCL, MCU, EPB, CAN, TqCmd_Out, DTC 0x2A11, 55.0 V). Quotes stay exactly as in the data.")}
+
+
+def prompt_for(base: str, lang: Optional[str]) -> str:
+    return base + LANGUAGE.get(lang or "", ("",))[0]
+
+
 def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investigator", on_step: Callable[[Dict[str, Any]], None] = lambda s: None,
-                max_turns: int = MAX_TURNS) -> Dict[str, Any]:
+                max_turns: int = MAX_TURNS, lang: Optional[str] = None) -> Dict[str, Any]:
     from app.agent.runner import egress_allowed
     started = time.time()
     run = store.latest_run(case_id)
@@ -570,10 +580,10 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
             for _ in range(max_turns):
                 t_call = time.time()
                 try:
-                    reply = model.create(system=SYSTEM_PROMPT, messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
+                    reply = model.create(system=prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
                 except Exception:  # noqa: BLE001  one retry: a transient CLI / network failure is not a verdict
                     time.sleep(2)
-                    reply = model.create(system=SYSTEM_PROMPT, messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
+                    reply = model.create(system=prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
                 call = model_call_record(len(model_calls) + 1, reply, int((time.time() - t_call) * 1000), getattr(model, "model", None))
                 model_calls.append(call)
                 usage["input_tokens"] += call["input_tokens"] + call["cache_read_input_tokens"]  # comparable with earlier records
