@@ -336,7 +336,9 @@ export default function FieldCasePage() {
           <label className={s.casePick}>
             <span className={s.visuallyHidden}>Case</span>
             <select value={caseId ?? ""} onChange={(e) => { setTab("case"); load(e.target.value); }}>
-              {[...cases].reverse().filter((c) => !c.synthetic || c.id === caseId || sampleTitles.includes(c.title)).map((c) => (
+              {[...cases].reverse().filter((c) => !c.synthetic || c.id === caseId || sampleTitles.includes(c.title))
+                // Real cases first (micro-ROS is the showcase); synthetic sample cases, such as the Chinese one, at the end.
+                .sort((x, y) => Number(!!x.synthetic) - Number(!!y.synthetic)).map((c) => (
                 <option key={c.id} value={c.id}>{`${c.synthetic ? (langOf(c.title) === "zh" ? "合成案例 · " : "Synthetic · ") : "Real data · "}${caseLabel(c.title)}`}</option>))}
             </select>
           </label>
