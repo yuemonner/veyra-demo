@@ -28,8 +28,13 @@ def _scripted(responses):
 def test_samples_are_real_and_attributed():
     names = {x["name"]: x for x in public_samples.listing()}
     assert len(names) >= 3
-    for x in names.values():
+    real = [x for x in names.values() if not x["synthetic"]]
+    assert len(real) >= 3
+    for x in real:
         assert x["source_url"].startswith("https://") and "synthetic" not in x["title"].lower()
+    for x in names.values():                                  # a generated demo case says so wherever it is listed
+        if x["synthetic"]:
+            assert x["name"] in public_samples.SAMPLES and public_samples.SAMPLES[x["name"]]["dir"].parent == public_samples.DEMO_ROOT
 
 
 def test_original_lines_and_values_are_kept(store):
@@ -140,8 +145,10 @@ def test_api_upload_to_investigation_to_finding(tmp_path, monkeypatch):
 
 
 def test_hosted_showcase_replays_the_recorded_investigation_labelled(store):
-    ids = public_samples.seed_showcase(store)
-    assert len(ids) == 1 and public_samples.seed_showcase(store) == []            # once
+    seeded = public_samples.seed_showcase(store)
+    assert public_samples.seed_showcase(store) == []                              # once
+    ids = [i for i in seeded if not store.case(i).get("synthetic")]
+    assert len(ids) == 1 and len(seeded) == len(ids) + sum(1 for x in public_samples.listing() if x["synthetic"] and x["walkthrough"])
     inv_ = inv.latest(store, ids[0])
     assert inv_["mode"] == "agent" and inv_["recorded"]["note"].startswith("Recorded") and inv_["result"]["hypotheses"]
     assert [e["kind"] for e in store.ledger(ids[0]) if e["kind"] == "engineer_finding" or (e["kind"] == "agent_report"

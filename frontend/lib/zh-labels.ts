@@ -44,6 +44,12 @@ export const DICT: Record<string, string> = {
   "Not the cause here": "这次不是原因", "Dismiss in this case": "本案忽略", "Not routine": "不是常规", "Undo": "撤销",
   "Veyra has not investigated this case yet": "Veyra 还没有分析这个案例",
   "Investigate now": "开始分析", "Read the log now": "读取日志",
+  "Veyra reads the original data, runs the checks it can do itself, and gives you one next action.": "Veyra 读取原始数据，先做它自己能做的检查，然后给你一个下一步动作。",
+  "This check was already done in the recorded case.": "录制的案例里这项检查已经做过。",
+  " Continuing with the engineer's result in a few seconds.": " 几秒后用工程师的结果继续。",
+  " Choose the recorded result to continue.": " 选择录制的结果继续。",
+  "Recorded with the live AI investigator.": "由实时 AI investigator 录制。",
+  "Show the steps": "显示步骤", "Hide the steps": "隐藏步骤",
   // Tags
   "Observed": "观测", "Inferred": "推断", "Engineer report": "工程师报告", "Hypothesis": "假设",
   "Lead, not established": "线索，未确定", "Would settle it": "能下结论的检查", "Veyra's current view": "Veyra 当前判断",
