@@ -151,13 +151,13 @@ function Round({ r, prev, lines, n, stepsShown }: { r: Any; prev: Any[] | null; 
               return (
                 <div key={i} className={t.part}>
                   <div className={t.partHead}><span className={`${t.verdict} ${t[cls] || ""}`}>{label}</span><b>{p.claim}</b></div>
-                  <p className={t.partWhy}><Tag k={p.kind} />{why}{p.observed_at ? <span className={t.dim}> · seen at: {p.observed_at}</span> : null}</p>
+                  <p className={t.partWhy}><Tag k={p.kind} />{why}{p.observed_at ? <span className={t.dim}>{` · seen at: ${p.observed_at}`}</span> : null}</p>
                   {ev.length > 0 && <div className={t.quotes}>{ev.map((e: Any) => <div key={e.line} className={t.q}><code className={t.ln}>{e.line}</code><code className={t.raw}>{lines[e.line - 1]}</code></div>)}</div>}
                 </div>);
             })}
           </div>
-          {moved.length > 0 && <p className={t.moved}>Where the fault can be: {moved.map((h: Any) => `${h.area} ${STATUS[before[h.id]]} → ${STATUS[h.status]}`).join(" · ")}</p>}
-          {!moved.length && res.hypotheses?.length > 0 && <p className={t.movedQuiet}>Leading: {(res.hypotheses.filter((h: Any) => h.status === "leading").map((h: Any) => h.area).join(", ")) || "none"} · {res.hypotheses.filter((h: Any) => h.status !== "ruled_out").length} of {res.hypotheses.length} still possible</p>}
+          {moved.length > 0 && <p className={t.moved}>{`Where the fault can be: ${moved.map((h: Any) => `${h.area} ${STATUS[before[h.id]]} → ${STATUS[h.status]}`).join(" · ")}`}</p>}
+          {!moved.length && res.hypotheses?.length > 0 && <p className={t.movedQuiet}>{`Leading: ${(res.hypotheses.filter((h: Any) => h.status === "leading").map((h: Any) => h.area).join(", ")) || "none"} · ${res.hypotheses.filter((h: Any) => h.status !== "ruled_out").length} of ${res.hypotheses.length} still possible`}</p>}
           {res.next_check && (
             <div className={t.nextCheck}>
               <span className={t.partsHead}>{`Next check${res.next_check.where ? ` · ${String(res.next_check.where).replace("_", " ")}` : ""}`}</span>
@@ -165,7 +165,7 @@ function Round({ r, prev, lines, n, stepsShown }: { r: Any; prev: Any[] | null; 
               {res.next_check.why && <span className={t.dim}>{res.next_check.why}</span>}
               <ul>{(res.next_check.outcomes || []).map((o: Any, i: number) => <li key={i}><b>{o.label}</b> → {o.means}</li>)}</ul>
             </div>)}
-          {(res.still_unknown || []).length > 0 && <p className={t.fine}>Still unknown: {res.still_unknown.join(" · ")}</p>}
+          {(res.still_unknown || []).length > 0 && <p className={t.fine}>{`Still unknown: ${res.still_unknown.join(" · ")}`}</p>}
         </>}
         {r.failure && <p className={t.bad}>{r.failure}</p>}
       </div>
@@ -182,8 +182,8 @@ export function DiscussionStatus({ data, onOpen }: { data: DiscussionData; onOpe
   const open = (last.result.still_unknown || [])[0];
   return (
     <div className={t.since}>
-      <span className={t.partsHead}>Since this investigation · {rounds.length} round{rounds.length > 1 ? "s" : ""} of discussion with the AI investigator{rounds.some((r: Any) => r.recorded) ? " (recorded)" : ""}</span>
-      <p><b>Latest next check (round {rounds.length}):</b> {last.result.next_check?.action}</p>
+      <span className={t.partsHead}>{`Since this investigation · ${rounds.length} round${rounds.length > 1 ? "s" : ""} of discussion with the AI investigator${rounds.some((r: Any) => r.recorded) ? " (recorded)" : ""}`}</span>
+      <p><b>{`Latest next check (round ${rounds.length}):`}</b> {last.result.next_check?.action}</p>
       {lead.length > 0 && <p><b>Leading now:</b> {lead.join(", ")}</p>}
       {open && <p><b>Still open:</b> {open}</p>}
       <button className={t.link} onClick={onOpen}>Open the discussion</button>

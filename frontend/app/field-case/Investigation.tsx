@@ -107,12 +107,12 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahea
     <section className={st.surface}>
       {banner}
       <header className={st.head}>
-        <div className={st.row}><span className={`${st.status} ${st[status.cls]}`}>{status.label}{r.confidence && r.status === "cause_probable" ? ` · ${r.confidence} confidence` : ""}</span>
+        <div className={st.row}><span className={`${st.status} ${st[status.cls]}`}>{`${status.label}${r.confidence && r.status === "cause_probable" ? ` · ${r.confidence} confidence` : ""}`}</span>
           {r.headline_kind && <span className={st.fine} title={r.headline_kind === "observed" ? "The headline states only what the log shows" : "The headline goes beyond what the log shows"}><Tag k={r.headline_kind} />headline</span>}</div>
         <h1 className={st.headline}>{r.headline}</h1>
         {r.explanation && <p className={st.lead}>{r.explanation_kind && <Tag k={r.explanation_kind} />}{named(r.explanation, r.hypotheses)}</p>}
         {inv.scope && <Scope scope={inv.scope} />}
-        {inv.mode === "agent" && <p className={st.fine}>Veyra ran {inv.steps.length} check{inv.steps.length === 1 ? "" : "s"} on the original data in {inv.seconds} s · every quoted line verified against the file{(inv.dropped || []).length ? ` · ${inv.dropped.length} unverifiable statement${inv.dropped.length === 1 ? "" : "s"} removed` : ""}</p>}
+        {inv.mode === "agent" && <p className={st.fine}>{`Veyra ran ${inv.steps.length} check${inv.steps.length === 1 ? "" : "s"} on the original data in ${inv.seconds} s · every quoted line verified against the file${(inv.dropped || []).length ? ` · ${inv.dropped.length} unverifiable statement${inv.dropped.length === 1 ? "" : "s"} removed` : ""}`}</p>}
       </header>
 
       {(r.hypotheses || []).length > 0 && (told
@@ -155,7 +155,7 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahea
 
       {(r.effects || []).length > 0 && (
         <details className={st.fold}>
-          <summary>Effects, not causes ({r.effects.length})</summary>
+          <summary>{`Effects, not causes (${r.effects.length})`}</summary>
           <ul className={st.lines}>
             {r.effects.map((e: Any, i: number) => (<li key={i}><code className={st.ln}>{e.line}</code><div><code className={st.raw}>{e.quote}</code><span className={st.shows}>{e.why}</span></div></li>))}
           </ul>
@@ -184,7 +184,7 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahea
 
       {(inv.steps || []).length > 0 && (
         <details className={st.fold}>
-          <summary>How Veyra investigated ({inv.steps.length} steps)</summary>
+          <summary>{`How Veyra investigated (${inv.steps.length} steps)`}</summary>
           <ol className={st.steps}>{inv.steps.map((s: Any) => <li key={s.id}><span>{s.label}</span><span className={st.dim}>{s.summary}</span></li>)}</ol>
         </details>
       )}
@@ -237,7 +237,7 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
   }
   return (
     <div className={st.next}>
-      <span className={st.nextLabel}>Your next action{next.where ? ` · ${({ remote: "remote", on_site: "on site", lab: "in the lab" } as Any)[next.where] || next.where}` : ""}</span>
+      <span className={st.nextLabel}>{`Your next action${next.where ? ` · ${({ remote: "remote", on_site: "on site", lab: "in the lab" } as Any)[next.where] || next.where}` : ""}`}</span>
       <h2 className={st.action}>{next.action}</h2>
       {next.why && <p className={st.why}>{named(next.why, hyps)}</p>}
       {(next.how || []).length > 0 && (
@@ -415,7 +415,7 @@ export function FaultSpace({ hyps, prev, changedLead = "Your result changed the 
     <div className={st.block}>
       <div className={st.spaceHead}>
         <h2 className={st.h2}>Where the fault can be</h2>
-        <span className={st.dim}>{hyps.length - ruled} of {hyps.length} still possible</span>
+        <span className={st.dim}>{`${hyps.length - ruled} of ${hyps.length} still possible`}</span>
       </div>
       {moved.length > 0 && (
         <p className={st.changed}>{changedLead}: {moved.map((h) => `${h.area} ${({ ruled_out: "ruled out", leading: "now leading", weakened: "weakened", open: "reopened" } as Any)[h.status]}`).join(" · ")}</p>

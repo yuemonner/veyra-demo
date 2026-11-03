@@ -70,11 +70,33 @@ export const DICT: Record<string, string> = {
   "No discussion recorded for this case. Live rounds need the AI investigator, which is off here.": "这个案例没有录制讨论。实时讨论需要 AI investigator，这里没有开启。",
   // Investigator steps (from the engine, shown as they ran)
   " · where the case stands now.": " · 案例当前的结论。", "· where the case stands now.": "· 案例当前的结论。",
+  "supports": "支持", "weakens": "削弱", "against": "反对", "Looking for the earlier workspace?": "找旧版工作区？", "Open it": "打开",
+  "(manual analysis, older engine).": "（手动分析，旧版引擎）。", "now leading": "变为最可能", "reopened": "重新待查",
   "Read the whole log": "读取整个日志", "Compared with earlier cases": "对比历史案例", "Read the report and earlier results": "读取报告和之前的结果",
   "Decoded every packet in the log": "解码日志里的每个数据包",
 };
 
+const CONF: Record<string, string> = { high: "高", medium: "中等", low: "低" };
+const WHERE: Record<string, string> = { remote: "远程", "on site": "现场", "in the lab": "实验室" };
+
 export const RULES: [RegExp, (...m: string[]) => string][] = [
+  [/^(Probable cause|Cause not established|No failure found in the data) · (high|medium|low) confidence$/, (_, a, c) => `${DICT[a] || a} · ${CONF[c]}置信度`],
+  [/^Veyra ran (\d+) checks? on the original data in ([\d.]+) s · every quoted line verified against the file(?: · (\d+) unverifiable statements? removed)?$/,
+    (_, n, s, d) => `Veyra 在原始数据上执行了 ${n} 项检查，用时 ${s} s · 每条引用都已和文件逐行核对${d ? ` · 删除了 ${d} 条无法核实的说法` : ""}`],
+  [/^Effects, not causes \((\d+)\)$/, (_, n) => `是结果，不是原因（${n}）`],
+  [/^How Veyra investigated \((\d+) steps\)$/, (_, n) => `Veyra 的排查过程（${n} 步）`],
+  [/^Your next action(?: · (.+))?$/, (_, w) => `你的下一步动作${w ? ` · ${WHERE[w] || w}` : ""}`],
+  [/^(\d+) of (\d+) still possible$/, (_, a, b) => `${b} 个里还有 ${a} 个可能`],
+  [/^· seen at: (.+)$/, (_, w) => `· 观测位置：${w}`],
+  [/^Leading: (.+) · (\d+) of (\d+) still possible$/, (_, l, a, b) => `最可能：${l === "none" ? "无" : l} · ${b} 个里还有 ${a} 个可能`],
+  [/^Still unknown: (.+)$/s, (_, u) => `仍未确定：${u}`],
+  [/^Since this investigation · (\d+) rounds? of discussion with the AI investigator( \(recorded\))?$/, (_, n, r) => `这次排查之后 · 和 AI investigator 讨论了 ${n} 轮${r ? "（录制）" : ""}`],
+  [/^Latest next check \(round (\d+)\):$/, (_, n) => `最新的下一步检查（第 ${n} 轮）：`],
+  [/^Where the fault can be: (.+)$/s, (_, x) => `故障可能在哪里：${x.replace(/ leading\b/g, " 最可能").replace(/ weakened\b/g, " 可能性下降").replace(/ ruled out\b/g, " 已排除").replace(/ open\b/g, " 待查")}`],
+  [/^(\d+) earlier case\(s\) compared$/, (_, n) => `对比了 ${n} 个历史案例`],
+  [/^(\d+) occurrences?; followed by (“.*”) after ([\d.]+)–([\d.]+) s$/, (_, n, q, a, b) => `${n} 次；之后 ${a === b ? a : `${a}–${b}`} s 出现 ${q}`],
+  [/^Recorded (\S+ \S+) with the live AI investigator \(([^)]+)\) on a local instance\..*SYNTHETIC case.*$/s,
+    (_, at, m) => `录制于 ${at}，使用实时 AI investigator（${m}），在本地实例上运行。工程师一方的消息是为演示编写的脚本，每条按所标角色编写；Veyra 的回复是模型的真实输出，未经修改。合成案例：数据为本演示生成。`],
   [/^Round (\d+) of (\d+)$/, (_, a, b) => `第 ${a} 轮，共 ${b} 轮`],
   [/^Recorded investigation · round (\d+) of (\d+)\.$/, (_, a, b) => `录制的排查 · 第 ${a} 轮，共 ${b} 轮。`],
   [/^Round (\d+): the engineer replies$/, (_, a) => `第 ${a} 轮：工程师回复`],
