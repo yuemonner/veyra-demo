@@ -343,6 +343,21 @@ def get_investigation(case_id: str, request: Request):
         store.close()
 
 
+@router.get("/cases/{case_id}/electrical")
+def get_electrical(case_id: str, request: Request):
+    """Physics relations over the case's decoded CAN log (deterministic): branch and pack resistance with uncertainty, the
+    command limit, and which mechanisms the recorded signals can and cannot tell apart."""
+    from app.agent import investigator
+    from app.engine_api import store_path
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(store_path(request))
+    try:
+        tools = investigator.LogTools(store, case_id)
+        return tools.electrical() if tools.electrical_applies() else {"applies": False}
+    finally:
+        store.close()
+
+
 class FindingIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     action: str = Field(min_length=1, max_length=500)

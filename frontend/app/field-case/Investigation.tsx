@@ -6,6 +6,7 @@ import st from "./investigation.module.css";
 import { Tag, withFeedback } from "./CaseTools";
 import { BeforeAsking, RetestSpec } from "./Acquire";
 import { CaseStatus, RoleTag } from "./CaseStatus";
+import { Electrical } from "./Electrical";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Call = (path: string, init?: RequestInit) => Promise<Any>;
@@ -66,7 +67,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
   if (!data) return <section className={st.surface}><p className={st.dim}>Loading…</p></section>;
   // Every investigation, recorded or live, is held to what its evidence could observe before it is shown.
   const lastResult = data.playback ? (data.playback.investigations[data.playback.investigations.length - 1] || {}).result : (data.investigation || {}).result;
-  const standing = data.ladder ? <CaseStatus ladder={data.ladder} metrics={data.metrics} result={lastResult} caseId={caseId} call={call} actor={actor} onChanged={() => { load(); onChanged(); }} /> : null;
+  const standing = <>{data.ladder ? <CaseStatus ladder={data.ladder} metrics={data.metrics} result={lastResult} caseId={caseId} call={call} actor={actor} onChanged={() => { load(); onChanged(); }} /> : null}<Electrical caseId={caseId} call={call} /></>;
   if (data.playback) return <Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} ahead={ahead} standing={standing} />;
   const inv = guard && data.investigation ? guard(data.investigation) : data.investigation;
   const agent = data.agent || {};

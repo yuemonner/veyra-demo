@@ -55,6 +55,10 @@ How to work:
    hypotheses. Machine data that exists elsewhere (another time window, a normal run under the same conditions, another
    vehicle, a freeze-frame) is a data_request to the engineering team, not a question for the customer. Physical facts no signal in this data can show (a connector's seating, a terminal's torque, a harness
    under tension) go in unobservable, with how a person could observe them. Stop guessing where the data ends: ask.
+   For a battery-electric machine an electrical tool may be offered: it checks the physical relations (Ohm's law per
+   branch, pack drop against current and temperature, command against limit) and says which mechanisms the recorded
+   signals cannot tell apart. Use it; a relation that does not add up is evidence even when no alarm fired, and its
+   isolability result tells you which measurement to ask for.
    A re-test is not "run it again": the next action names the operating conditions to reproduce (temperature, state
    of charge, vehicle state, route, load), the baseline to compare with (a normal run under the same conditions, or a
    snapshot in this data), the signals to record, and whether it needs an engineer's approval (it changes the vehicle's
@@ -207,6 +211,16 @@ class LogTools:
     def available(self) -> bool:
         return bool(self.raw)
 
+    def electrical_applies(self) -> bool:
+        from app.physics import electrical
+        return bool(self.raw) and electrical.detect(self.raw) is not None
+
+    def electrical(self) -> Dict[str, Any]:
+        """Physics relations over a decoded CAN log: branch and pack resistance with uncertainty, the command limit, and
+        which mechanisms the recorded signals can and cannot separate."""
+        from app.physics import electrical
+        return electrical.analyse(self.raw) or {"applies": False, "note": "No pack voltage, pack current and per-branch voltages in this log."}
+
     def _line(self, n: int) -> Dict[str, Any]:
         p = self.parsed.get(n)
         out = {"line": n, "text": self.raw[n - 1][:400]}
@@ -316,7 +330,15 @@ TOOL_SPECS = [
      "input_schema": {"type": "object", "properties": {}}},
 ]
 
-STEP_LABEL = {"overview": "Read the whole log", "read_lines": "Read lines {start}–{end}", "search": "Searched for “{pattern}”",
+ELECTRICAL_SPEC = {"name": "electrical", "description": "For a decoded CAN log of a battery-electric machine: checks physical relations (Ohm's law per high-voltage branch, pack voltage drop against current and cell temperature, torque command against the BMS limit), estimates each branch's and the pack's resistance with standard errors, and says which mechanisms the recorded signals can and cannot tell apart, with the measurement that would separate them. Deterministic, computed from the file.",
+                   "input_schema": {"type": "object", "properties": {}}}
+
+
+def tool_specs(tools: "LogTools") -> List[Dict[str, Any]]:
+    return TOOL_SPECS + ([ELECTRICAL_SPEC] if tools.electrical_applies() else [])
+
+
+STEP_LABEL = {"electrical": "Checked the electrical relations", "overview": "Read the whole log", "read_lines": "Read lines {start}–{end}", "search": "Searched for “{pattern}”",
               "measure": "Measured “{pattern}”", "lessons": "Compared with earlier cases", "case_context": "Read the report and earlier results"}
 
 
@@ -371,6 +393,9 @@ def _summary(name: str, result: Any) -> str:
                 f"{len(result.get('restarts') or [])} restart(s)" if result.get("restarts") else "no failure line recognised"))
     if name == "lessons":
         return f"{len(result.get('lessons') or [])} earlier case(s) compared"
+    if name == "electrical":
+        broken = result.get("relations_broken") or []
+        return f"{len(broken)} relation{'s' if len(broken) != 1 else ''} broken" + (f": {', '.join(broken)}" if broken else "")
     if name == "read_lines":
         return f"{len(result.get('lines') or [])} lines"
     return ""
@@ -686,10 +711,10 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
             for _ in range(max_turns):
                 t_call = time.time()
                 try:
-                    reply = model.create(system=prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
+                    reply = model.create(system=prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=tool_specs(tools) + [SUBMIT_SPEC])
                 except Exception:  # noqa: BLE001  one retry: a transient CLI / network failure is not a verdict
                     time.sleep(2)
-                    reply = model.create(system=prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=TOOL_SPECS + [SUBMIT_SPEC])
+                    reply = model.create(system=prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=tool_specs(tools) + [SUBMIT_SPEC])
                 call = model_call_record(len(model_calls) + 1, reply, int((time.time() - t_call) * 1000), getattr(model, "model", None))
                 model_calls.append(call)
                 usage["input_tokens"] += call["input_tokens"] + call["cache_read_input_tokens"]  # comparable with earlier records
