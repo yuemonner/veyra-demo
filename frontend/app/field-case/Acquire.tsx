@@ -31,7 +31,7 @@ export function BeforeAsking({ r, hyps = [] }: { r: Any; hyps?: Any[] }) {
   return (
     <div className={st.block}>
       <h2 className={st.h2}>Before asking the field</h2>
-      <p className={st.fine}>{`Veyra answered ${answered.length} question${answered.length === 1 ? "" : "s"} from the data, so nobody has to ask them. It asks ${questions.length} that only a person can answer.`}</p>
+      <p className={st.fine}>{`Veyra answered ${answered.length} question${answered.length === 1 ? "" : "s"} from the data, so nobody has to ask them. ${questions.length ? `It asks ${questions.length} that only a person can answer.` : "It needs nothing from the field this round."}`}</p>
       {answered.length > 0 && (
         <ul className={st.answered}>
           {answered.map((a, i) => (

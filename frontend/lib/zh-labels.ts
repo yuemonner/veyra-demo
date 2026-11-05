@@ -115,6 +115,8 @@ export const RULES: [RegExp, (...m: string[]) => string][] = [
   [/^Next check · (.+)$/, (_, w) => `下一步检查 · ${WHERE[w] || w}`],
   [/^Veyra answered (\d+) questions? from the data, so nobody has to ask them\. It asks (\d+) that only a person can answer\.$/,
     (_, a, q) => `Veyra 已经从数据里回答了 ${a} 个问题，不用再问现场；只有 ${q} 个问题需要人来回答。`],
+  [/^Veyra answered (\d+) questions? from the data, so nobody has to ask them\. It needs nothing from the field this round\.$/,
+    (_, a) => `Veyra 已经从数据里回答了 ${a} 个问题，这一轮不需要再问现场。`],
   [/^Ask: (Field engineer|Customer|Supplier)$/, (_, w) => `问：${({ "Field engineer": "现场工程师", Customer: "客户", Supplier: "供应商" } as Record<string, string>)[w]}`],
   [/^Leaves: (.+)$/s, (_, x) => `保留：${x}`],
   [/^Weakens: (.+)$/s, (_, x) => `削弱：${x}`],
