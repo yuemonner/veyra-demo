@@ -66,8 +66,8 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
   if (!data) return <section className={st.surface}><p className={st.dim}>Loading…</p></section>;
   // Every investigation, recorded or live, is held to what its evidence could observe before it is shown.
   const lastResult = data.playback ? (data.playback.investigations[data.playback.investigations.length - 1] || {}).result : (data.investigation || {}).result;
-  const status = data.ladder ? <CaseStatus ladder={data.ladder} metrics={data.metrics} result={lastResult} caseId={caseId} call={call} actor={actor} onChanged={() => { load(); onChanged(); }} /> : null;
-  if (data.playback) return <Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} ahead={ahead} status={status} />;
+  const standing = data.ladder ? <CaseStatus ladder={data.ladder} metrics={data.metrics} result={lastResult} caseId={caseId} call={call} actor={actor} onChanged={() => { load(); onChanged(); }} /> : null;
+  if (data.playback) return <Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} ahead={ahead} standing={standing} />;
   const inv = guard && data.investigation ? guard(data.investigation) : data.investigation;
   const agent = data.agent || {};
   if (!inv) {
@@ -85,7 +85,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
     );
   }
   return (
-    <ResultView inv={inv} findings={data.findings || []} fb={feedback} extra={extra} ahead={ahead} status={status}
+    <ResultView inv={inv} findings={data.findings || []} fb={feedback} extra={extra} ahead={ahead} standing={standing}
       banner={inv.mode !== "agent" ? (
         <div className={st.banner}>
           <b>Rule-based reading only.</b> {inv.fallback_reason}.{" "}
@@ -102,8 +102,8 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
   );
 }
 
-function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahead, status }: { inv: Any; findings: Any[]; banner?: React.ReactNode; next: React.ReactNode; footer?: React.ReactNode; prev?: Any[] | null;
-  fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode; status?: React.ReactNode }) {
+function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahead, standing }: { inv: Any; findings: Any[]; banner?: React.ReactNode; next: React.ReactNode; footer?: React.ReactNode; prev?: Any[] | null;
+  fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode; standing?: React.ReactNode }) {
   const r = inv.result || {};
   const told = !!fb && (r.hypotheses || []).some((h: Any) => fb[h.id] && fb[h.id].verdict !== "unsure");
   const status = STATUS[r.status] || STATUS.cause_unknown;
@@ -123,7 +123,7 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahea
         ? <FaultSpace hyps={withFeedback(r.hypotheses, fb || {})} prev={r.hypotheses} changedLead="Your checks changed the picture" />
         : <FaultSpace hyps={r.hypotheses} prev={prev} />)}
 
-      {status}
+      {standing}
 
       {ahead}
 
@@ -309,7 +309,7 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
 const recordedFindings = (pb: Any, upto: number) => (pb.findings || []).slice(0, upto).map((f: Any, i: number) => ({ id: `rec-${i}`, recorded_at: f.recorded_at, action: f.action,
   result: f.result, outcome_selected: ((f.provenance || []).find((p: Any) => p.kind === "selected") || {}).text, observations: (f.provenance || []).filter((p: Any) => p.kind === "observed").map((p: Any) => p.text).join("; ") || f.observations }));
 
-function Playback({ pb, fb, extra, ahead, status }: { pb: Any; fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode; status?: React.ReactNode }) {
+function Playback({ pb, fb, extra, ahead, standing }: { pb: Any; fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode; standing?: React.ReactNode }) {
   const invs: Any[] = pb.investigations;
   const lastStage = invs.length - 1;
   // Plays the recorded investigation from round 1 (the animation), and carries on by itself with the engineer's
@@ -385,7 +385,7 @@ function Playback({ pb, fb, extra, ahead, status }: { pb: Any; fb?: Record<strin
       <div className={st.row}><button className={st.ghost} onClick={replay}>Replay from the start</button></div>
     </div>
   ) : null;
-  return <ResultView inv={inv} findings={mine} fb={fb} extra={extra} ahead={stage === lastStage ? ahead : null} status={stage === lastStage ? status : null} banner={banner}
+  return <ResultView inv={inv} findings={mine} fb={fb} extra={extra} ahead={stage === lastStage ? ahead : null} standing={stage === lastStage ? standing : null} banner={banner}
     prev={stage > 0 ? (invs[stage - 1].result || {}).hypotheses : null}
     next={phase === "result" ? <NextAction caseId="" call={async () => null} next={inv.result?.next_action} entry="" closed={false} onRecorded={() => undefined} demo={demo} hyps={inv.result?.hypotheses} /> : null}
     footer={footer} />;
