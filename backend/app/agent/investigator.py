@@ -52,7 +52,8 @@ How to work:
    answer yourself and list them in already_answered, with the line that answers it. Only what the data cannot show
    becomes a field_question (at most 3): a fact that changes the next step. For each, cite the tool calls where you
    looked for it (searched_calls), say why the data cannot answer it, and say how each possible answer would move the
-   hypotheses. Physical facts no signal in this data can show (a connector's seating, a terminal's torque, a harness
+   hypotheses. Machine data that exists elsewhere (another time window, a normal run under the same conditions, another
+   vehicle, a freeze-frame) is a data_request to the engineering team, not a question for the customer. Physical facts no signal in this data can show (a connector's seating, a terminal's torque, a harness
    under tension) go in unobservable, with how a person could observe them. Stop guessing where the data ends: ask.
    A re-test is not "run it again": the next action names the operating conditions to reproduce (temperature, state
    of charge, vehicle state, route, load), the baseline to compare with (a normal run under the same conditions, or a
@@ -78,6 +79,9 @@ Rules:
   observations are evidence; never treat your own description of an outcome as observed.
 - In all text a person reads, name hypotheses by their area ("Network path"), never by id; ids go only in keeps / rules_out.
 - Fill reuse_when: the conditions under which your explanation, once confirmed, would apply to another machine.
+- Give each hypothesis that is not ruled out a role: main_cause (removing it removes the fault), trigger (a condition or
+  event that lets the fault show, without being the fault), amplifier (makes it worse or decides where it shows first),
+  or effect (a consequence of the fault). A failure often has one main cause and several triggers and amplifiers.
 Finish by calling submit_report exactly once."""
 
 SUBMIT_SPEC = {
@@ -124,6 +128,14 @@ SUBMIT_SPEC = {
                 "answer": {"type": "string", "description": "The answer from the data, under 25 words"},
                 "line": {"type": "integer"}, "quote": {"type": "string"},
                 "calls": {"type": "array", "items": {"type": "string"}}}, "required": ["question", "answer", "line", "quote", "calls"]}},
+            "data_requests": {"type": "array", "maxItems": 3, "description": "Machine data that exists somewhere but is not in this case (another time window, a normal run under the same conditions, another vehicle, a controller's freeze-frame). Asked of the engineering team or their systems, never of the customer", "items": {"type": "object", "properties": {
+                "what": {"type": "string", "description": "The data, under 20 words"},
+                "window": {"type": "string", "description": "Time window or runs, under 20 words"},
+                "conditions": {"type": "string", "description": "Operating conditions it must match, under 25 words"},
+                "signals": {"type": "array", "maxItems": 10, "items": {"type": "string"}},
+                "why_needed": {"type": "string", "description": "Which decision it settles, under 25 words"},
+                "searched_calls": {"type": "array", "items": {"type": "string"}, "description": "Tool call ids that show it is not in this case"}},
+                "required": ["what", "why_needed", "searched_calls"]}},
             "field_questions": {"type": "array", "maxItems": 3, "description": "Only facts the data cannot show and that change the next step", "items": {"type": "object", "properties": {
                 "question": {"type": "string", "description": "One concrete question, under 20 words"},
                 "ask": {"type": "string", "enum": ["field_engineer", "customer", "supplier"]},
@@ -145,6 +157,7 @@ SUBMIT_SPEC = {
                 "area": {"type": "string", "description": "Where the fault would be, 2-5 words"},
                 "claim": {"type": "string", "description": "The hypothesis, under 20 words"},
                 "status": {"type": "string", "enum": ["leading", "open", "weakened", "ruled_out"]},
+                "role": {"type": "string", "enum": ["main_cause", "trigger", "amplifier", "effect"], "description": "The part it plays if it holds: main_cause (removing it removes the fault), trigger (a condition that lets the fault show), amplifier (makes it worse or decides where it shows first), effect (a consequence)"},
                 "because": {"type": "string", "description": "What decided this status, under 25 words"},
                 "basis": {"type": "string", "enum": ["direct", "indirect"], "description": "direct: the evidence observes this area itself; required for ruled_out"},
                 "observed_at": {"type": "string", "description": "Where the deciding evidence was observed (e.g. 'agent host NIC', 'board Tx buffer')"},
@@ -468,6 +481,14 @@ def check_acquisition(cleaned: Dict[str, Any], raw: List[str], outputs: Dict[str
                 err = f"field_questions[{i}]: unknown hypothesis id(s) {unknown}"
         (problems.append(err) if err else keep.append(f))
     cleaned["field_questions"] = keep
+    keep = []
+    for i, d in enumerate(cleaned.get("data_requests") or []):
+        calls = d.get("searched_calls") or []
+        if not calls or any(c not in outputs for c in calls):
+            problems.append(f"data_requests[{i}]: cite the tool call ids that show this data is not in the case (got {calls})")
+        else:
+            keep.append(d)
+    cleaned["data_requests"] = keep
     return problems
 
 
@@ -824,7 +845,78 @@ def record(store, case_id: str) -> Dict[str, Any]:
                         "rounds": rounds, "checks_run": checks, "engineer_actions": actions, "seconds_to_first_answer": t_first,
                         "closed": closure is not None, "recovered": (closure or {}).get("payload", {}).get("resolution_status")},
             "chain": chain, "integrity": store.verify(case_id)["ledger_chain"]["valid"],
+            "metrics": case_metrics(store, case_id), "ladder": verification_ladder(store, case_id),
             "boundary": "Written by Veyra from the case's append-only record as the investigation happened."}
+
+
+LADDER = [
+    {"level": "probable", "label": "Probable cause", "needs": "An investigation that points to one explanation, with the main alternatives weakened or ruled out by the data."},
+    {"level": "reproduced", "label": "Reproduced", "needs": "The symptom reproduced on purpose under stated conditions (bench, field or simulation), recorded by an engineer."},
+    {"level": "verified", "label": "Verified", "needs": "Confirmed by inspection, by reproduction, or by data showing the fix removed the fault and it held."},
+]
+
+
+def verification_ladder(store, case_id: str) -> Dict[str, Any]:
+    """Where the case stands on the way from a probable cause to a verified one, from the append-only record. Veyra can
+    only reach 'probable' on its own; 'reproduced' and 'verified' need records an engineer writes (a reproduction attempt,
+    a closure confirmed by inspection, reproduction or a fix that held)."""
+    led = store.ledger(case_id)
+    case = store.case(case_id)
+    reached: Dict[str, Dict[str, Any]] = {}
+    agent = [e for e in led if e["kind"] == "agent_report" and e["payload"].get("kind") == "autonomous_investigation" and e["payload"].get("mode") == "agent"]
+    last = agent[-1] if agent else None
+    if last and (last["payload"].get("result") or {}).get("status") == "cause_probable":
+        reached["probable"] = {"at": last["recorded_at"], "by": "Veyra", "evidence": (last["payload"].get("result") or {}).get("headline")}
+    for e in led:
+        p = e["payload"]
+        if e["kind"] == "reproduction_attempt" and p.get("result") == "reproduced":
+            reached["reproduced"] = {"at": e["recorded_at"], "by": e["actor"], "evidence": f"{p.get('environment')}: {p.get('setup')} -> {p.get('observations')}"}
+        if e["kind"] == "case_closure":
+            if p.get("investigation_status") in ("cause_probable", "cause_confirmed") and "probable" not in reached:
+                reached["probable"] = {"at": e["recorded_at"], "by": e["actor"], "evidence": p.get("cause")}
+            if p.get("investigation_status") == "cause_confirmed" or p.get("fix_held") == "held":
+                reached["verified"] = {"at": e["recorded_at"], "by": e["actor"],
+                                       "evidence": p.get("evidence_note") or p.get("cause") or "", "method": p.get("confirmed_by") or ("fix held" if p.get("fix_held") == "held" else None)}
+    level = next((r["level"] for r in reversed(LADDER) if r["level"] in reached), "open")
+    nxt = next((r for r in LADDER if r["level"] not in reached), None)
+    run = store.latest_run(case_id) or {}
+    report = next((e["payload"].get("stated_reason") for e in led if e["kind"] == "intervention_report"), None)
+    return {"level": level, "rungs": [{**r, "reached": reached.get(r["level"])} for r in LADDER],
+            "next": nxt, "run_id": run.get("id"),
+            "case": {"title": case["title"], "machine_id": case["machine_id"], "created_at": case.get("created_at"), "reported": report,
+                     "synthetic": bool(case.get("synthetic"))}}
+
+
+def case_metrics(store, case_id: str) -> Dict[str, Any]:
+    """What this case cost and what Veyra saved, counted from the record: how fast the first answer came, how many
+    checks Veyra ran, how many questions it answered from the data instead of asking someone, how many it asked."""
+    from app.agent import discussion
+    led = store.ledger(case_id)
+    case = store.case(case_id)
+    results = [e["payload"].get("result") or {} for e in led if e["kind"] == "agent_report"
+               and e["payload"].get("kind") == "autonomous_investigation" and e["payload"].get("mode") == "agent"]
+    steps = sum(len(e["payload"].get("steps") or []) for e in led if e["kind"] == "agent_report" and e["payload"].get("mode") == "agent")
+    rounds = discussion.rounds_of(store, case_id)
+    allr = results + [r.get("result") or {} for r in rounds]
+    first = next((e["recorded_at"] for e in led if e["kind"] == "agent_report" and e["payload"].get("mode") == "agent"), None)
+    secs = None
+    try:
+        from datetime import datetime
+        if first and case.get("created_at"):
+            secs = round((datetime.fromisoformat(first) - datetime.fromisoformat(case["created_at"])).total_seconds(), 1)
+    except ValueError:
+        pass
+    model_s = sum(float(e["payload"].get("seconds") or 0) for e in led if e["kind"] == "agent_report" and e["payload"].get("mode") == "agent") + \
+        sum(float(r.get("seconds") or 0) for r in rounds)
+    return {"seconds_to_first_answer": secs, "investigation_seconds": round(model_s, 1), "checks_run": steps,
+            "investigation_rounds": len(results), "discussion_rounds": len(rounds),
+            "answered_from_data": sum(len(r.get("already_answered") or []) for r in allr),
+            "questions_for_people": sum(len(r.get("field_questions") or []) for r in allr),
+            "data_requests": sum(len(r.get("data_requests") or []) for r in allr),
+            "engineer_results": sum(1 for e in led if e["kind"] == "engineer_finding"),
+            "reproductions": sum(1 for e in led if e["kind"] == "reproduction_attempt"),
+            "verification": verification_ladder(store, case_id)["level"],
+            "note": "Counted from the case record. Engineer time outside Veyra is not measured here."}
 
 
 ACCEPTANCE = {"correct": "accepted", "partly": "partly", "wrong": "rejected"}

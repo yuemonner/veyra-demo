@@ -12,7 +12,7 @@ export type ReportInput = {
   title: string; caseId: string; url?: string; provenance?: string; synthetic?: boolean;
   status?: string; headline?: string; explanation?: string; confidence?: string;
   hypotheses?: Any[]; nextAction?: Any; evidence?: Any[]; checked?: Any[]; effects?: Any[]; unknowns?: string[];
-  alreadyAnswered?: Any[]; fieldQuestions?: Any[]; unobservable?: Any[];
+  alreadyAnswered?: Any[]; fieldQuestions?: Any[]; unobservable?: Any[]; dataRequests?: Any[]; ladder?: Any; metrics?: Any;
   steps?: Any[]; investigator?: string;
   data?: { title: string; svg?: string; caption?: string; table?: Tbl }[];
   normal?: { title: string; intro?: string; table: Tbl }[];
@@ -43,7 +43,8 @@ export function buildReport(r: ReportInput): string {
     hypotheses: (r.hypotheses || []).map((h) => ({ id: h.id, area: h.area, status: h.status, claim: h.claim, because: h.because, lines: h.lines || [],
       engineer_feedback: fb.get(h.id) ? { verdict: fb.get(h.id)!.verdict, note: fb.get(h.id)!.note, at: fb.get(h.id)!.at } : null })),
     next_action: r.nextAction || null, already_answered: r.alreadyAnswered || [], field_questions: r.fieldQuestions || [],
-    unobservable: r.unobservable || [], evidence: r.evidence || [], checked: r.checked || [], effects: r.effects || [], unknowns: r.unknowns || [],
+    unobservable: r.unobservable || [], data_requests: r.dataRequests || [], verification: r.ladder ? { level: r.ladder.level, rungs: (r.ladder.rungs || []).map((g: Any) => ({ level: g.level, reached: !!g.reached })) } : null,
+    metrics: r.metrics || null, evidence: r.evidence || [], checked: r.checked || [], effects: r.effects || [], unknowns: r.unknowns || [],
     data_tables: (r.data || []).filter((d) => d.table).map((d) => ({ title: d.title, ...d.table })),
     normal_behaviour: (r.normal || []).map((n) => ({ title: n.title, ...n.table })),
     discussion: r.discussion || [], log_lines: r.log || [],
@@ -51,7 +52,7 @@ export function buildReport(r: ReportInput): string {
   };
   const hyps = (r.hypotheses || []).map((h) => {
     const f = fb.get(h.id);
-    return `<tr class="h-${esc(h.status)}"><td><span class="pill p-${esc(h.status)}">${esc(STATUS[h.status] || h.status)}</span></td><td><b>${esc(h.area)}</b><br><span class="muted">${esc(h.claim || "")}</span></td>
+    return `<tr class="h-${esc(h.status)}"><td><span class="pill p-${esc(h.status)}">${esc(STATUS[h.status] || h.status)}</span></td><td><b>${esc(h.area)}</b>${h.role && h.status !== "ruled_out" ? ` <span class="pill">${esc(({ main_cause: "main cause", trigger: "trigger", amplifier: "amplifier", effect: "effect" } as Any)[h.role] || h.role)}</span>` : ""}<br><span class="muted">${esc(h.claim || "")}</span></td>
       <td>${esc(h.because || "")}${(h.lines || []).length ? ` <span class="muted">· lines ${esc((h.lines || []).join(", "))}</span>` : ""}</td>
       <td>${f ? `<b>${esc(VERDICT[f.verdict])}</b>${f.note ? `: ${esc(f.note)}` : ""}` : `<span class="muted">—</span>`}</td></tr>`;
   }).join("");
@@ -101,9 +102,11 @@ ${na.conditions || na.baseline || (na.record || []).length || na.needs_approval 
   ...(na.conditions ? [["Conditions", na.conditions]] : []), ...(na.baseline ? [["Compare with", na.baseline]] : []),
   ...((na.record || []).length ? [["Record", na.record.join(", ")]] : []), ...(na.needs_approval ? [["Approval", "Needs an engineer's approval before it is run"]] : [])] }) : ""}
 ${(na.outcomes || []).length ? table({ cols: ["If you find", "It means", "Then"], rows: na.outcomes.map((o: Any) => [o.label, o.means || "", o.then || ""]) }) : ""}</div>` : ""}
-${(r.alreadyAnswered || []).length || (r.fieldQuestions || []).length ? `<h2>Before asking the field</h2>
+${r.ladder ? `<h2>How sure we are</h2><p>${(r.ladder.rungs || []).map((g: Any) => `${g.reached ? "✓" : "○"} ${esc(g.label)}`).join(" → ")}</p>${r.metrics ? `<p class="muted">Checks Veyra ran: ${esc(r.metrics.checks_run ?? 0)} · answered from the data: ${esc(r.metrics.answered_from_data ?? 0)} · questions for people: ${esc(r.metrics.questions_for_people ?? 0)} · data requests: ${esc(r.metrics.data_requests ?? 0)}</p>` : ""}` : ""}
+${(r.alreadyAnswered || []).length || (r.fieldQuestions || []).length || (r.dataRequests || []).length ? `<h2>Before asking the field</h2>
 ${(r.alreadyAnswered || []).length ? `<h3>Answered from the data (nobody has to ask)</h3>${table({ cols: ["Question", "Answer", "Line", "Quoted from the data"], rows: r.alreadyAnswered!.map((a: Any) => [a.question, a.answer, a.line, a.quote]) })}` : ""}
 ${(r.fieldQuestions || []).length ? `<h3>Questions only a person can answer</h3>${table({ cols: ["Ask", "Question", "Why it matters", "Not in the data", "If the answer is"], rows: r.fieldQuestions!.map((q: Any) => [String(q.ask || "").replace("_", " "), q.question, q.why_needed, q.not_in_data, (q.if_answers || []).map((o: Any) => `${o.answer}: ${o.means}`).join(" · ")]) })}` : ""}
+${(r.dataRequests || []).length ? `<h3>Data to pull from your systems</h3>${table({ cols: ["Data", "Window", "Must match", "Signals", "Why"], rows: r.dataRequests!.map((d: Any) => [d.what, d.window || "", d.conditions || "", (d.signals || []).join(", "), d.why_needed]) })}` : ""}
 ${(r.unobservable || []).length ? `<h3>No signal in this data can show</h3>${table({ cols: ["Fact", "Why it matters", "How to see it"], rows: r.unobservable!.map((b: Any) => [b.fact, b.why_it_matters || "", b.how_to_observe]) })}` : ""}` : ""}
 
 ${(r.data || []).length ? `<h2>What the data shows</h2>${r.data!.map((d) => `<h3>${esc(d.title)}</h3>${d.svg ? `<figure>${d.svg}${d.caption ? `<figcaption>${esc(d.caption)}</figcaption>` : ""}</figure>` : d.caption ? `<p class="muted">${esc(d.caption)}</p>` : ""}${table(d.table)}`).join("")}` : ""}

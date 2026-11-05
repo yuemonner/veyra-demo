@@ -26,7 +26,8 @@ export function RetestSpec({ next, light = false }: { next: Any; light?: boolean
 /** What the data already answered, the few questions only a person can answer, and what no signal can show. */
 export function BeforeAsking({ r, hyps = [] }: { r: Any; hyps?: Any[] }) {
   const answered: Any[] = r?.already_answered || [], questions: Any[] = r?.field_questions || [], blind: Any[] = r?.unobservable || [];
-  if (!answered.length && !questions.length && !blind.length) return null;
+  const pulls: Any[] = r?.data_requests || [];
+  if (!answered.length && !questions.length && !blind.length && !pulls.length) return null;
   const area = (id: string) => (hyps.find((h: Any) => h.id === id) || {}).area || id;
   return (
     <div className={st.block}>
@@ -41,6 +42,20 @@ export function BeforeAsking({ r, hyps = [] }: { r: Any; hyps?: Any[] }) {
               <span className={st.aline}><code className={st.ln}>{a.line}</code><code className={st.raw}>{a.quote}</code></span>
             </li>))}
         </ul>
+      )}
+      {pulls.length > 0 && (
+        <div className={st.dataReq}>
+          <span className={st.blindHead}>Data to pull from your systems (nobody in the field needs to answer)</span>
+          <ul>
+            {pulls.map((d, i) => (
+              <li key={i}><b>{d.what}</b>
+                {d.window && <span>{`Window: ${d.window}`}</span>}
+                {d.conditions && <span>{`Must match: ${d.conditions}`}</span>}
+                {(d.signals || []).length > 0 && <span className={st.signals}>{d.signals.map((x: string) => <code key={x}>{x}</code>)}</span>}
+                <span className={st.observe}>{`Why: ${d.why_needed}`}</span>
+              </li>))}
+          </ul>
+        </div>
       )}
       {questions.length > 0 && (
         <div className={st.questions}>

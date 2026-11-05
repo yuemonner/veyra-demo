@@ -72,6 +72,16 @@ export const DICT: Record<string, string> = {
   " · where the case stands now.": " · 案例当前的结论。", "· where the case stands now.": "· 案例当前的结论。",
   "supports": "支持", "weakens": "削弱", "against": "反对", "Looking for the earlier workspace?": "找旧版工作区？", "Open it": "打开",
   "(manual analysis, older engine).": "（手动分析，旧版引擎）。", "now leading": "变为最可能", "reopened": "重新待查",
+  "How sure we are": "结论有多可靠", "Download quality record (CSV)": "下载质量记录（CSV）", "Reproduced": "已复现", "Verified": "已验证",
+  "An investigation that points to one explanation, with the main alternatives weakened or ruled out by the data.": "调查指向一个解释，主要的其他可能已被数据削弱或排除。",
+  "The symptom reproduced on purpose under stated conditions (bench, field or simulation), recorded by an engineer.": "在写明的工况下（台架、现场或仿真）有意复现了故障现象，并由工程师记录。",
+  "Confirmed by inspection, by reproduction, or by data showing the fix removed the fault and it held.": "通过拆检、复现，或有数据证明修复后故障消失且没有复发。",
+  "Record a reproduction": "记录一次复现", "An engineer's record moves the case up the ladder; Veyra cannot do it alone.": "只有工程师的记录能把案例往上推一级，Veyra 自己做不到。",
+  "Where": "地点", "Field": "现场", "Bench": "台架", "Simulation": "仿真", "Log replay": "日志回放", "Conditions and setup": "工况和设置", "Result": "结果",
+  "Partly reproduced": "部分复现", "Not reproduced": "未复现", "Inconclusive": "无法判断", "What you saw": "看到了什么", "Save to the case": "保存到案例",
+  "Checks Veyra ran": "Veyra 执行的检查", "Answered from the data": "从数据里回答的问题", "Questions for people": "需要问人的问题", "Data requests": "需要补的数据",
+  "Discussion rounds": "讨论轮次", "Investigation time": "AI 调查用时",
+  "Data to pull from your systems (nobody in the field needs to answer)": "需要从系统里调取的数据（不用问现场）",
   "Before asking the field": "问现场之前，先查数据", "Why it matters": "为什么要问", "Not in the data": "数据里为什么没有",
   "No signal in this data can show": "这份数据里没有信号能看到的", "Conditions": "工况", "Compare with": "对照对象", "Approval": "审批",
   "Needs an engineer's approval before it is run": "执行前需要工程师批准",
@@ -121,6 +131,9 @@ export const RULES: [RegExp, (...m: string[]) => string][] = [
   [/^Leaves: (.+)$/s, (_, x) => `保留：${x}`],
   [/^Weakens: (.+)$/s, (_, x) => `削弱：${x}`],
   [/^How to see it: (.+)$/s, (_, x) => `怎么看到：${x}`],
+  [/^Window: (.+)$/s, (_, x) => `时间范围：${x}`],
+  [/^Must match: (.+)$/s, (_, x) => `工况要求：${x}`],
+  [/^Why: (.+)$/s, (_, x) => `原因：${x}`],
 ];
 
 export function zh(text: string): string | null {

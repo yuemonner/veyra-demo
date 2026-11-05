@@ -46,3 +46,44 @@ def test_a_retest_carries_conditions_baseline_signals_and_approval():
     assert na["conditions"] and na["baseline"] and na["record"] == ["Pack_I", "MCU_FR.DC_V"] and na["needs_approval"] is True
     spec = inv.SUBMIT_SPEC["input_schema"]["properties"]["next_action"]["properties"]
     assert {"conditions", "baseline", "record", "needs_approval"} <= set(spec)
+
+
+def test_a_data_request_needs_a_search_first_and_is_kept_apart_from_questions_for_people():
+    d = {"what": "A normal cold-morning launch from the same vehicle", "window": "any morning since 10/14", "conditions": "cell temperature below 5 °C",
+         "signals": ["Pack_I"], "why_needed": "baseline for the HSA-on launch"}
+    v = inv.verify(_report(data_requests=[{**d, "searched_calls": []}]), RAW, OUT)
+    assert v["cleaned"]["data_requests"] == [] and any("data_requests" in p for p in v["problems"])
+    v = inv.verify(_report(data_requests=[{**d, "searched_calls": ["c1"]}]), RAW, OUT)
+    assert len(v["cleaned"]["data_requests"]) == 1 and v["cleaned"].get("field_questions", []) == []
+
+
+def test_hypotheses_carry_a_role():
+    roles = inv.SUBMIT_SPEC["input_schema"]["properties"]["hypotheses"]["items"]["properties"]["role"]["enum"]
+    assert roles == ["main_cause", "trigger", "amplifier", "effect"]
+
+
+def test_the_ladder_moves_only_on_records_and_the_metrics_count_what_was_saved(tmp_path):
+    from app.store.sqlite_store import CaseStore
+    from app.workflows import public_samples
+    store = CaseStore(tmp_path / "l.db")
+    try:
+        cid = public_samples.run_sample(store, "shuttle-hill-start-stop")["case_id"]
+        lad = inv.verification_ladder(store, cid)
+        assert lad["level"] == "open" and lad["next"]["level"] == "probable" and lad["case"]["synthetic"]
+        run_id = store.latest_run(cid)["id"]
+        result = {"status": "cause_probable", "headline": "h", "hypotheses": HYPS,
+                  "already_answered": [{"question": "q", "answer": "a", "line": 1, "quote": "x", "calls": []}] * 3,
+                  "field_questions": [{"question": "q"}], "data_requests": [{"what": "w"}]}
+        store.append_trusted(cid, "agent_report", {"kind": "autonomous_investigation", "mode": "agent", "run_id": run_id, "result": result,
+                                                   "steps": [{"id": "a1"}, {"id": "a2"}], "seconds": 40.5}, actor="Veyra", source="test")
+        lad = inv.verification_ladder(store, cid)
+        assert lad["level"] == "probable" and lad["next"]["level"] == "reproduced"
+        store.append(cid, "reproduction_attempt", {"run_id": run_id, "environment": "field", "platform": "SHUTTLE-03", "setup": "cold launch, HSA on",
+                                                  "result": "reproduced", "observations": "code 7 again", "performed_at": "2026-11-05T07:40:00+00:00"}, actor="Engineer", source="test")
+        lad = inv.verification_ladder(store, cid)
+        assert lad["level"] == "reproduced" and lad["next"]["level"] == "verified"
+        m = inv.case_metrics(store, cid)
+        assert (m["answered_from_data"], m["questions_for_people"], m["data_requests"], m["checks_run"], m["reproductions"]) == (3, 1, 1, 2, 1)
+        assert m["verification"] == "reproduced" and m["investigation_seconds"] == 40.5
+    finally:
+        store.close()

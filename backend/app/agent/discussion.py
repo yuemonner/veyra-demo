@@ -44,7 +44,9 @@ Each round:
    Name the operating conditions to reproduce, the baseline to compare with, the signals to record, and whether it
    needs an engineer's approval. Before asking a person anything, look for it in the data: list what the data already
    answers (already_answered, with the line), and ask only what it cannot show (field_questions, citing the tool calls
-   where you looked, with how each answer would move the hypotheses).
+   where you looked, with how each answer would move the hypotheses). Machine data that exists elsewhere is a
+   data_request to the engineering team, never a question for the customer. Give each hypothesis a role (main_cause,
+   trigger, amplifier, effect).
 6. reply: two or three sentences to the engineer, direct and specific. Disagree when the data disagrees.
 
 Claim scope: the evidence has a vantage point. A log written by the receiving side shows what it received and sent;
@@ -76,6 +78,7 @@ SUBMIT_ROUND = {
             "next_check": inv.SUBMIT_SPEC["input_schema"]["properties"]["next_action"],
             "still_unknown": {"type": "array", "maxItems": 3, "items": {"type": "string"}},
             "already_answered": inv.SUBMIT_SPEC["input_schema"]["properties"]["already_answered"],
+            "data_requests": inv.SUBMIT_SPEC["input_schema"]["properties"]["data_requests"],
             "field_questions": inv.SUBMIT_SPEC["input_schema"]["properties"]["field_questions"],
             "unobservable": inv.SUBMIT_SPEC["input_schema"]["properties"]["unobservable"],
         },

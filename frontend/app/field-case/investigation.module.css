@@ -223,3 +223,31 @@
 .retestLight { background: var(--sr-thread-soft); color: var(--sr-ink-2); font-size: 12.5px; }
 .retestLight .signals code { background: #fff; color: var(--sr-ink); }
 .lines li > div { min-width: 0; }
+
+/* verification ladder, case metrics, hypothesis roles */
+.ladder { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; counter-reset: rung; }
+.rung, .rungOn { position: relative; display: grid; gap: 3px; align-content: start; padding: 10px 12px 10px 34px; border-radius: 12px; border: 1px dashed var(--sr-edge-strong); font-size: 12.5px; color: var(--sr-ink-3); min-width: 0; }
+.rung::before, .rungOn::before { counter-increment: rung; content: counter(rung); position: absolute; left: 10px; top: 10px; width: 17px; height: 17px; border-radius: 50%; font-size: 11px; font-weight: 700; display: grid; place-items: center; border: 1.5px solid var(--sr-edge-strong); color: var(--sr-ink-3); }
+.rung b { color: var(--sr-ink-2); font-size: 13.5px; }
+.rungOn { border-style: solid; border-color: rgba(16, 128, 106, 0.4); background: var(--sr-verified-soft); color: var(--sr-ink-2); }
+.rungOn::before { content: "✓"; background: var(--sr-verified); border-color: var(--sr-verified); color: #fff; }
+.rungOn b { color: var(--sr-ink); font-size: 13.5px; }
+.needs { line-height: 1.35; }
+.reproForm { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--sr-edge-strong); background: var(--sr-glass-strong); }
+.reproForm label { display: grid; gap: 4px; }
+.reproForm input, .reproForm select { font: inherit; font-size: 13.5px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--sr-edge-strong); background: #fff; color: var(--sr-ink); min-width: 0; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.metrics div { display: grid; gap: 1px; padding: 8px 12px; border-radius: 10px; background: var(--sr-glass-strong); border: 1px solid var(--sr-edge); }
+.metrics b { font-size: 20px; color: var(--sr-ink); font-variant-numeric: tabular-nums; }
+.metrics span { font-size: 12px; color: var(--sr-ink-3); }
+.role { display: inline-block; vertical-align: 1px; margin-right: 8px; font-size: 11px; font-weight: 650; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--sr-edge-strong); color: var(--sr-ink-2); background: #fff; }
+.r_main_cause { color: #fff; background: var(--sr-thread); border-color: var(--sr-thread); }
+.r_trigger { color: var(--sr-anomaly); border-color: rgba(176, 106, 0, 0.35); background: var(--sr-anomaly-soft); }
+.r_amplifier { color: var(--sr-thread); border-color: var(--sr-thread-line); background: var(--sr-thread-soft); }
+.r_effect { color: var(--sr-ink-3); }
+.dataReq { display: grid; gap: 6px; }
+.dataReq li { list-style: none; display: grid; gap: 3px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--sr-edge-strong); font-size: 13px; color: var(--sr-ink-2); }
+.dataReq ul { margin: 0; padding: 0; display: grid; gap: 6px; }
+.dataReq b { color: var(--sr-ink); font-size: 14px; }
+@media (max-width: 640px) { .ladder { grid-template-columns: minmax(0, 1fr); } }
+.dataReq .signals code { background: var(--sr-thread-soft); color: var(--sr-ink); }

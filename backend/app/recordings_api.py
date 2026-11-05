@@ -337,7 +337,8 @@ def get_investigation(case_id: str, request: Request):
                 "previous_hypotheses": previous,
                 "agent": {"configured": bool(model and model.available()), "model": getattr(model, "model", None) if model else None,
                           "allowed": bool(model and egress_allowed(store, case_id, model.provider))},
-                "closed": any(e["kind"] == "case_closure" for e in store.ledger(case_id))}
+                "closed": any(e["kind"] == "case_closure" for e in store.ledger(case_id)),
+                "ladder": investigator.verification_ladder(store, case_id), "metrics": investigator.case_metrics(store, case_id)}
     finally:
         store.close()
 
