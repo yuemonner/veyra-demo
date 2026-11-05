@@ -47,6 +47,17 @@ How to work:
    hypotheses still standing. One concrete action a field engineer can do (a command to run, a value to read, a part to
    inspect, a config to check). For each possible result: which hypotheses it keeps, which it directly rules out, which
    it only weakens, and what Veyra would do next. Never propose an action you could have done yourself with the tools.
+4b. Check the data before you ask a person. A field engineer or a customer is usually asked many questions (when was it
+   charged, when was the plug pulled, what was done before, which software version). Answer every one the data can
+   answer yourself and list them in already_answered, with the line that answers it. Only what the data cannot show
+   becomes a field_question (at most 3): a fact that changes the next step. For each, cite the tool calls where you
+   looked for it (searched_calls), say why the data cannot answer it, and say how each possible answer would move the
+   hypotheses. Physical facts no signal in this data can show (a connector's seating, a terminal's torque, a harness
+   under tension) go in unobservable, with how a person could observe them. Stop guessing where the data ends: ask.
+   A re-test is not "run it again": the next action names the operating conditions to reproduce (temperature, state
+   of charge, vehicle state, route, load), the baseline to compare with (a normal run under the same conditions, or a
+   snapshot in this data), the signals to record, and whether it needs an engineer's approval (it changes the vehicle's
+   state, energises high voltage, drives the vehicle, or touches safety functions).
 5. Classify the log's notable events into groups (events): root_cause_candidate, anomaly, effect, or routine (start-up,
    configuration, normal traffic). Group repeated messages together. Routine events need no attention from anyone.
 
@@ -94,6 +105,10 @@ SUBMIT_SPEC = {
                 "why": {"type": "string", "description": "What it will settle, under 30 words"},
                 "how": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
                 "where": {"type": "string", "enum": ["remote", "on_site", "lab"]},
+                "conditions": {"type": "string", "description": "Operating conditions to reproduce for the check (temperature, state of charge, vehicle state, route, load), under 30 words"},
+                "baseline": {"type": "string", "description": "What to compare the result with: a normal run under the same conditions, or a snapshot or lines in this data, under 25 words"},
+                "record": {"type": "array", "maxItems": 8, "items": {"type": "string"}, "description": "Signals or values to record during the check, by their names in the data"},
+                "needs_approval": {"type": "boolean", "description": "True when the check changes the vehicle's state, energises high voltage, drives the vehicle or touches safety functions"},
                 "outcomes": {"type": "array", "minItems": 2, "maxItems": 3, "items": {"type": "object", "properties": {
                     "label": {"type": "string", "description": "What the engineer would find, under 8 words"},
                     "means": {"type": "string", "description": "What that would mean, under 20 words"},
@@ -104,6 +119,27 @@ SUBMIT_SPEC = {
                     "required": ["label", "means", "keeps", "rules_out"]}}},
                 "required": ["action", "why", "how", "where", "outcomes"]},
             "unknowns": {"type": "array", "maxItems": 3, "items": {"type": "string"}},
+            "already_answered": {"type": "array", "maxItems": 6, "description": "Questions a person would normally be asked about this failure that the data already answers, so nobody has to ask them", "items": {"type": "object", "properties": {
+                "question": {"type": "string", "description": "The question as a field engineer or customer would be asked it, under 15 words"},
+                "answer": {"type": "string", "description": "The answer from the data, under 25 words"},
+                "line": {"type": "integer"}, "quote": {"type": "string"},
+                "calls": {"type": "array", "items": {"type": "string"}}}, "required": ["question", "answer", "line", "quote", "calls"]}},
+            "field_questions": {"type": "array", "maxItems": 3, "description": "Only facts the data cannot show and that change the next step", "items": {"type": "object", "properties": {
+                "question": {"type": "string", "description": "One concrete question, under 20 words"},
+                "ask": {"type": "string", "enum": ["field_engineer", "customer", "supplier"]},
+                "why_needed": {"type": "string", "description": "Which decision it settles, under 25 words"},
+                "not_in_data": {"type": "string", "description": "What you looked for and why the data cannot answer it, under 30 words"},
+                "searched_calls": {"type": "array", "items": {"type": "string"}, "description": "Tool call ids where you looked for this in the data"},
+                "if_answers": {"type": "array", "minItems": 2, "maxItems": 3, "items": {"type": "object", "properties": {
+                    "answer": {"type": "string", "description": "A possible answer, under 8 words"},
+                    "means": {"type": "string", "description": "What it would change, under 20 words"},
+                    "keeps": {"type": "array", "items": {"type": "string"}},
+                    "weakens": {"type": "array", "items": {"type": "string"}}}, "required": ["answer", "means"]}}},
+                "required": ["question", "ask", "why_needed", "not_in_data", "searched_calls", "if_answers"]}},
+            "unobservable": {"type": "array", "maxItems": 4, "description": "Physical facts that matter here but that no signal in this data can show", "items": {"type": "object", "properties": {
+                "fact": {"type": "string", "description": "under 15 words"},
+                "why_it_matters": {"type": "string", "description": "Which hypothesis depends on it, under 20 words"},
+                "how_to_observe": {"type": "string", "description": "What a person would measure or inspect, under 20 words"}}, "required": ["fact", "how_to_observe"]}},
             "hypotheses": {"type": "array", "minItems": 2, "maxItems": 6, "items": {"type": "object", "properties": {
                 "id": {"type": "string", "description": "h1, h2... keep ids from earlier rounds"},
                 "area": {"type": "string", "description": "Where the fault would be, 2-5 words"},
@@ -382,6 +418,7 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
         unknown = [x for x in (o.get("keeps") or []) + (o.get("rules_out") or []) + (o.get("weakens") or []) if x not in ids]
         if unknown:
             problems.append(f"next_action.outcomes[{i}]: unknown hypothesis id(s) {unknown}")
+    problems += check_acquisition(cleaned, raw, outputs, ids)
     ev = []
     for g in cleaned.get("events") or []:
         g["lines"] = [n for n in g.get("lines") or [] if isinstance(n, int) and 1 <= n <= len(raw)]
@@ -395,6 +432,43 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
         problems.append("cause_probable needs evidence lines")
     reviewed_result(cleaned)  # whatever the model still left unproven is demoted before it is stored
     return {"problems": problems, "cleaned": cleaned, "dropped": dropped}
+
+
+def check_acquisition(cleaned: Dict[str, Any], raw: List[str], outputs: Dict[str, str], ids: set) -> List[str]:
+    """Evidence acquisition: what the data already answers must cite the line that answers it, and a question for a person
+    is allowed only after the data was searched for it (searched_calls name real tool calls). Invalid items are dropped."""
+    problems: List[str] = []
+    keep = []
+    for i, a in enumerate(cleaned.get("already_answered") or []):
+        n, q = a.get("line"), _norm(a.get("quote"))
+        err = None
+        if not isinstance(n, int) or not 1 <= n <= len(raw):
+            err = f"already_answered[{i}]: line {n} does not exist"
+        elif q and q.rstrip(".…") not in _norm(raw[n - 1]):
+            err = f"already_answered[{i}]: the quote is not in line {n} (it reads: {raw[n - 1][:160]!r})"
+        elif any(c not in outputs for c in a.get("calls") or []):
+            err = f"already_answered[{i}]: unknown tool call id(s)"
+        else:
+            pool = " ".join(outputs.get(c, "") for c in a.get("calls") or []) + " " + raw[n - 1]
+            bad = [x for x in _NUM.findall(a.get("answer") or "") if len(x) > 1 and x not in pool and x.lstrip("-") not in pool]
+            if bad:
+                err = f"already_answered[{i}]: number(s) {', '.join(bad[:4])} not in line {n} or the cited results"
+        (problems.append(err) if err else keep.append(a))
+    cleaned["already_answered"] = keep
+    keep = []
+    for i, f in enumerate(cleaned.get("field_questions") or []):
+        calls = f.get("searched_calls") or []
+        err = None
+        if not calls or any(c not in outputs for c in calls):
+            err = (f"field_questions[{i}]: before asking a person, search the data for it and cite those tool call ids in "
+                   f"searched_calls (got {calls})")
+        else:
+            unknown = [x for o in f.get("if_answers") or [] for x in (o.get("keeps") or []) + (o.get("weakens") or []) if x not in ids]
+            if unknown:
+                err = f"field_questions[{i}]: unknown hypothesis id(s) {unknown}"
+        (problems.append(err) if err else keep.append(f))
+    cleaned["field_questions"] = keep
+    return problems
 
 
 # ---------------------------------------------------------------- evidence integrity (also applied to stored outputs on read)

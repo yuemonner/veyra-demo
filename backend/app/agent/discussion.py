@@ -41,6 +41,10 @@ Each round:
    excluded_by data). An engineer's report can weaken an area or make one leading, never rule one out.
 5. Propose the ONE next check that best splits what is still standing: an experiment a field engineer can do, with
    2-3 possible results and what each would keep, rule out or weaken. Never propose what you could check yourself.
+   Name the operating conditions to reproduce, the baseline to compare with, the signals to record, and whether it
+   needs an engineer's approval. Before asking a person anything, look for it in the data: list what the data already
+   answers (already_answered, with the line), and ask only what it cannot show (field_questions, citing the tool calls
+   where you looked, with how each answer would move the hypotheses).
 6. reply: two or three sentences to the engineer, direct and specific. Disagree when the data disagrees.
 
 Claim scope: the evidence has a vantage point. A log written by the receiving side shows what it received and sent;
@@ -71,6 +75,9 @@ SUBMIT_ROUND = {
             "hypotheses": inv.SUBMIT_SPEC["input_schema"]["properties"]["hypotheses"],
             "next_check": inv.SUBMIT_SPEC["input_schema"]["properties"]["next_action"],
             "still_unknown": {"type": "array", "maxItems": 3, "items": {"type": "string"}},
+            "already_answered": inv.SUBMIT_SPEC["input_schema"]["properties"]["already_answered"],
+            "field_questions": inv.SUBMIT_SPEC["input_schema"]["properties"]["field_questions"],
+            "unobservable": inv.SUBMIT_SPEC["input_schema"]["properties"]["unobservable"],
         },
         "required": ["reply", "parts", "hypotheses", "next_check"],
     },
@@ -191,6 +198,7 @@ def verify_round(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]
         unknown = [x for x in (o.get("keeps") or []) + (o.get("rules_out") or []) + (o.get("weakens") or []) if x not in ids]
         if unknown:
             problems.append(f"next_check.outcomes[{i}]: unknown hypothesis id(s) {unknown}")
+    problems += inv.check_acquisition(cleaned, raw, outputs, ids)
     if inv._CONFIRMED.search(cleaned.get("reply") or ""):
         problems.append("Do not state a confirmed root cause in the reply")
     cleaned["hypotheses"] = inv.reviewed_hypotheses(cleaned.get("hypotheses"))[0]

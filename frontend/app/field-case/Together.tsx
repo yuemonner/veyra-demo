@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import t from "./tools.module.css";
 import { Tag } from "./CaseTools";
 import { rewrite } from "../../lib/claim-scope";
+import { BeforeAsking, RetestSpec } from "./Acquire";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Call = (path: string, init?: RequestInit) => Promise<Any>;
@@ -163,8 +164,10 @@ function Round({ r, prev, lines, n, stepsShown }: { r: Any; prev: Any[] | null; 
               <span className={t.partsHead}>{`Next check${res.next_check.where ? ` · ${String(res.next_check.where).replace("_", " ")}` : ""}`}</span>
               <b>{res.next_check.action}</b>
               {res.next_check.why && <span className={t.dim}>{res.next_check.why}</span>}
+              <RetestSpec next={res.next_check} light />
               <ul>{(res.next_check.outcomes || []).map((o: Any, i: number) => <li key={i}><b>{o.label}</b> → {o.means}</li>)}</ul>
             </div>)}
+          <BeforeAsking r={res} hyps={res.hypotheses} />
           {(res.still_unknown || []).length > 0 && <p className={t.fine}>{`Still unknown: ${res.still_unknown.join(" · ")}`}</p>}
         </>}
         {r.failure && <p className={t.bad}>{r.failure}</p>}

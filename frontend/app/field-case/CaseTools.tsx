@@ -464,7 +464,7 @@ export function useReport({ caseId, data, m, talk, rounds = [] }: { caseId: stri
       provenance: c.synthetic ? "Synthetic data, not field evidence" : (data.imports || []).map((i: Any) => i.filename).filter(Boolean).join(", "),
       status: inv.status ? ({ cause_probable: "Probable cause", cause_unknown: "Cause not established", no_failure_found: "No failure found" } as Any)[inv.status] || inv.status : undefined,
       headline: inv.headline || c.title, explanation: inv.explanation, confidence: inv.status === "cause_probable" ? inv.confidence : undefined,
-      hypotheses: withFeedback(inv.hypotheses, talk.feedback), nextAction: inv.next_action, evidence: inv.evidence, checked: inv.checked, effects: inv.effects, unknowns: inv.unknowns,
+      hypotheses: withFeedback(inv.hypotheses, talk.feedback), nextAction: inv.next_action, alreadyAnswered: inv.already_answered, fieldQuestions: inv.field_questions, unobservable: inv.unobservable, evidence: inv.evidence, checked: inv.checked, effects: inv.effects, unknowns: inv.unknowns,
       steps: m.investigation?.steps, investigator: m.investigation?.mode === "agent" ? `Investigated by ${m.investigation?.model || "the AI investigator"}; every quoted line verified against the file` : undefined,
       data: dataSections, normal, feedback: Object.values(talk.feedback), log: m.lines, scope: m.investigation?.scope,
       discussion: [...rounds.flatMap((r: Any) => [

@@ -4,6 +4,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import st from "./investigation.module.css";
 import { Tag, withFeedback } from "./CaseTools";
+import { BeforeAsking, RetestSpec } from "./Acquire";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Call = (path: string, init?: RequestInit) => Promise<Any>;
@@ -123,6 +124,8 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahea
 
       {next}
 
+      <BeforeAsking r={r} hyps={r.hypotheses} />
+
       {extra}
 
       {(r.evidence || []).length > 0 && (
@@ -240,6 +243,7 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
       <span className={st.nextLabel}>{`Your next action${next.where ? ` · ${({ remote: "remote", on_site: "on site", lab: "in the lab" } as Any)[next.where] || next.where}` : ""}`}</span>
       <h2 className={st.action}>{next.action}</h2>
       {next.why && <p className={st.why}>{named(next.why, hyps)}</p>}
+      <RetestSpec next={next} />
       {(next.how || []).length > 0 && (
         <div className={st.howWrap}>
           <ol className={st.how}>{next.how.map((h: string, i: number) => <li key={i}>{h}</li>)}</ol>

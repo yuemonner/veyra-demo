@@ -72,6 +72,9 @@ export const DICT: Record<string, string> = {
   " · where the case stands now.": " · 案例当前的结论。", "· where the case stands now.": "· 案例当前的结论。",
   "supports": "支持", "weakens": "削弱", "against": "反对", "Looking for the earlier workspace?": "找旧版工作区？", "Open it": "打开",
   "(manual analysis, older engine).": "（手动分析，旧版引擎）。", "now leading": "变为最可能", "reopened": "重新待查",
+  "Before asking the field": "问现场之前，先查数据", "Why it matters": "为什么要问", "Not in the data": "数据里为什么没有",
+  "No signal in this data can show": "这份数据里没有信号能看到的", "Conditions": "工况", "Compare with": "对照对象", "Approval": "审批",
+  "Needs an engineer's approval before it is run": "执行前需要工程师批准",
   "Read the whole log": "读取整个日志", "Compared with earlier cases": "对比历史案例", "Read the report and earlier results": "读取报告和之前的结果",
   "Decoded every packet in the log": "解码日志里的每个数据包",
 };
@@ -109,7 +112,13 @@ export const RULES: [RegExp, (...m: string[]) => string][] = [
   [/^(\d+) lines?$/, (_, n) => `${n} 行`],
   [/^Round (\d+) · (.+) · (guess|result of a check) · scripted for this demo$/, (_, n, who, k) => `第 ${n} 轮 · ${who} · ${k === "guess" ? "判断" : "检查结果"} · 为演示编写`],
   [/^AI investigator · (.+) · recorded (\S+)(?: · (\d+) s)?$/, (_, m, d, s) => `AI investigator · ${m} · 录制于 ${d}${s ? ` · ${s} s` : ""}`],
-  [/^Next check · (.+)$/, (_, w) => `下一步检查 · ${w}`],
+  [/^Next check · (.+)$/, (_, w) => `下一步检查 · ${WHERE[w] || w}`],
+  [/^Veyra answered (\d+) questions? from the data, so nobody has to ask them\. It asks (\d+) that only a person can answer\.$/,
+    (_, a, q) => `Veyra 已经从数据里回答了 ${a} 个问题，不用再问现场；只有 ${q} 个问题需要人来回答。`],
+  [/^Ask: (Field engineer|Customer|Supplier)$/, (_, w) => `问：${({ "Field engineer": "现场工程师", Customer: "客户", Supplier: "供应商" } as Record<string, string>)[w]}`],
+  [/^Leaves: (.+)$/s, (_, x) => `保留：${x}`],
+  [/^Weakens: (.+)$/s, (_, x) => `削弱：${x}`],
+  [/^How to see it: (.+)$/s, (_, x) => `怎么看到：${x}`],
 ];
 
 export function zh(text: string): string | null {
