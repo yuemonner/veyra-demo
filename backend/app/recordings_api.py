@@ -353,7 +353,7 @@ def get_electrical(case_id: str, request: Request):
     store = CaseStore(store_path(request))
     try:
         tools = investigator.LogTools(store, case_id)
-        return tools.electrical() if tools.electrical_applies() else {"applies": False}
+        return tools.electrical_full() if tools.electrical_applies() else {"applies": False}
     finally:
         store.close()
 

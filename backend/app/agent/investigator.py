@@ -55,10 +55,16 @@ How to work:
    hypotheses. Machine data that exists elsewhere (another time window, a normal run under the same conditions, another
    vehicle, a freeze-frame) is a data_request to the engineering team, not a question for the customer. Physical facts no signal in this data can show (a connector's seating, a terminal's torque, a harness
    under tension) go in unobservable, with how a person could observe them. Stop guessing where the data ends: ask.
-   For a battery-electric machine an electrical tool may be offered: it checks the physical relations (Ohm's law per
-   branch, pack drop against current and temperature, command against limit) and says which mechanisms the recorded
-   signals cannot tell apart. Use it; a relation that does not add up is evidence even when no alarm fired, and its
-   isolability result tells you which measurement to ask for.
+   For a battery-electric machine an electrical tool may be offered. Call it; a relation that does not add up is evidence
+   even when no alarm fired. Cite its findings in checked with its call id, by relation (e.g. B_FR, R_FR, P) and tier:
+   a "measured" finding is read from the signals; a "model" finding holds only under the assumptions listed with it,
+   and you state them (a branch resistance assumes a current share: never call it measured or identified). The
+   candidates it marks consistent are what the recorded signals cannot tell apart: keep each as an open hypothesis
+   (none of them is ruled out, and none leads the others on this data alone), and give each its role. Similar wheel
+   torque does not show similar DC current. A pack resistance comparison names what else differs (state of charge,
+   current, launch length); do not attribute it to temperature alone when it says so. The next action is the
+   measurement it recommends (or a cheaper check you can show separates the same candidates), with the result each
+   candidate predicts and its follow-up if the result could mislead.
    A re-test is not "run it again": the next action names the operating conditions to reproduce (temperature, state
    of charge, vehicle state, route, load), the baseline to compare with (a normal run under the same conditions, or a
    snapshot in this data), the signals to record, and whether it needs an engineer's approval (it changes the vehicle's
@@ -215,11 +221,16 @@ class LogTools:
         from app.physics import electrical
         return bool(self.raw) and electrical.detect(self.raw) is not None
 
-    def electrical(self) -> Dict[str, Any]:
-        """Physics relations over a decoded CAN log: branch and pack resistance with uncertainty, the command limit, and
-        which mechanisms the recorded signals can and cannot separate."""
+    def electrical_full(self) -> Dict[str, Any]:
+        """Physics relations over a decoded CAN log, in full (for the case page)."""
         from app.physics import electrical
-        return electrical.analyse(self.raw) or {"applies": False, "note": "No pack voltage, pack current and per-branch voltages in this log."}
+        return electrical.analyse(self.raw) or {"applies": False}
+
+    def electrical(self) -> Dict[str, Any]:
+        """What the agent is given: measured and model-derived findings with their assumptions, the mechanisms the recorded
+        signals cannot separate, and the measurement plan."""
+        from app.physics import electrical
+        return electrical.agent_view(electrical.analyse(self.raw))
 
     def _line(self, n: int) -> Dict[str, Any]:
         p = self.parsed.get(n)
@@ -330,7 +341,7 @@ TOOL_SPECS = [
      "input_schema": {"type": "object", "properties": {}}},
 ]
 
-ELECTRICAL_SPEC = {"name": "electrical", "description": "For a decoded CAN log of a battery-electric machine: checks physical relations (Ohm's law per high-voltage branch, pack voltage drop against current and cell temperature, torque command against the BMS limit), estimates each branch's and the pack's resistance with standard errors, and says which mechanisms the recorded signals can and cannot tell apart, with the measurement that would separate them. Deterministic, computed from the file.",
+ELECTRICAL_SPEC = {"name": "electrical", "description": "For a decoded CAN log of a battery-electric machine: checks the physical relations (each inverter's voltage drop from the pack against pack current, the pack's voltage drop against current, inverter voltages at rest, torque command against the BMS limit). Separates what is measured from what a model derives (a branch resistance needs the branch's current share, which is not recorded, so it is given over the plausible range of shares) and from what no signal shows. For a branch that does not add up, lists the candidate mechanisms as consistent or weakened (never ruled out), and the measurements that would separate them with the result each candidate predicts, their cost and blind spots, and the lowest-cost one that discriminates. Deterministic, computed from the file.",
                    "input_schema": {"type": "object", "properties": {}}}
 
 
@@ -394,8 +405,12 @@ def _summary(name: str, result: Any) -> str:
     if name == "lessons":
         return f"{len(result.get('lessons') or [])} earlier case(s) compared"
     if name == "electrical":
-        broken = result.get("relations_broken") or []
-        return f"{len(broken)} relation{'s' if len(broken) != 1 else ''} broken" + (f": {', '.join(broken)}" if broken else "")
+        if result.get("applies") is False:
+            return "not applicable to this log"
+        fs = [f["relation"] for f in result.get("findings") or [] if f.get("kind") == "anomaly"]
+        open_ = sum(len([c for c in a["candidates"] if c["status"] == "consistent"]) for a in result.get("assessments") or [])
+        return (f"{len(fs)} relation{'s' if len(fs) != 1 else ''} not adding up" + (f": {', '.join(fs)}" if fs else "")
+                + (f"; {open_} mechanisms the data cannot separate" if open_ else ""))
     if name == "read_lines":
         return f"{len(result.get('lines') or [])} lines"
     return ""
@@ -457,6 +472,7 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
         if unknown:
             problems.append(f"next_action.outcomes[{i}]: unknown hypothesis id(s) {unknown}")
     problems += check_acquisition(cleaned, raw, outputs, ids)
+    problems += check_physics(cleaned, outputs)
     ev = []
     for g in cleaned.get("events") or []:
         g["lines"] = [n for n in g.get("lines") or [] if isinstance(n, int) and 1 <= n <= len(raw)]
@@ -514,6 +530,78 @@ def check_acquisition(cleaned: Dict[str, Any], raw: List[str], outputs: Dict[str
         else:
             keep.append(d)
     cleaned["data_requests"] = keep
+    return problems
+
+
+def _strings(obj: Any) -> List[str]:
+    if isinstance(obj, str):
+        return [obj]
+    if isinstance(obj, dict):
+        return [x for v in obj.values() for x in _strings(v)]
+    if isinstance(obj, list):
+        return [x for v in obj for x in _strings(v)]
+    return []
+
+
+def _calls(obj: Any) -> List[str]:
+    if isinstance(obj, dict):
+        return list(obj.get("calls") or []) + list(obj.get("searched_calls") or []) + [x for k, v in obj.items() if k not in ("calls", "searched_calls") for x in _calls(v)]
+    if isinstance(obj, list):
+        return [x for v in obj for x in _calls(v)]
+    return []
+
+
+_MEASURED_R = re.compile(r"\b(measured|identified|confirmed)\s+(\w+\s+){0,2}resistance|resistance\s+(measured|identified|confirmed)\b|resistance\s+(of\s+\S+\s+)?(is|was|has been)\s+(measured|identified|confirmed)|"
+                         r"测得的?\S{0,4}电阻|电阻(已确认|已测得|已识别|为实测)", re.I)
+_TORQUE = re.compile(r"torque|扭矩", re.I)
+
+
+def check_physics(cleaned: Dict[str, Any], outputs: Dict[str, str], next_key: str = "next_action") -> List[str]:
+    """When the electrical tool ran and found a branch that does not add up: the report cites it, does not call a
+    model-derived resistance measured, keeps the mechanisms it cannot separate open, does not use torque to dismiss a
+    current difference, keeps confidence below high while they are open, and surfaces the recommended measurement."""
+    from app.physics.electrical import CAND_WORDS, MEAS_WORDS
+    elec = {}
+    for cid, text in outputs.items():
+        if '"version": "electrical-relations-v2"' in text:
+            try:
+                elec[cid] = json.loads(text)
+            except ValueError:
+                continue
+    problems: List[str] = []
+    for cid, r in elec.items():
+        assessments = r.get("assessments") or []
+        if not assessments:
+            continue
+        if cid not in _calls(cleaned):
+            problems.append(f"the electrical check ({cid}) found a branch that does not add up: cite it (its call id) in checked or evidence")
+        text = " ".join(_strings({k: v for k, v in cleaned.items() if k not in ("events",)}))
+        if _MEASURED_R.search(text):
+            problems.append("a branch resistance here is model-derived (it assumes the branch's share of current, which is not recorded): "
+                            "say 'if the current is shared equally' or give the range; do not call it measured, identified or confirmed")
+        hyps = cleaned.get("hypotheses") or []
+        for a in assessments:
+            open_ = [c["id"] for c in a["candidates"] if c["status"] == "consistent"]
+            for h in hyps:
+                ht = f"{h.get('area', '')} {h.get('claim', '')}"
+                hit = [c for c in open_ if c in CAND_WORDS and re.search(CAND_WORDS[c], ht, re.I) and (a["wheel"] in ht or len(assessments) == 1)]
+                if not hit:
+                    continue
+                if h.get("status") == "ruled_out":
+                    problems.append(f"hypothesis '{h.get('area')}' is ruled out, but the electrical check shows the recorded signals cannot separate "
+                                    f"{', '.join(open_)} at {a['wheel']}: keep it open or weakened, and name the measurement that would separate them")
+                if "inverter_draw" in hit and h.get("status") in ("weakened", "ruled_out") and _TORQUE.search(h.get("because") or ""):
+                    problems.append(f"hypothesis '{h.get('area')}': similar torque does not show similar DC current (losses are not recorded); "
+                                    "do not weaken an inverter drawing more current on torque alone")
+                if h.get("status") == "leading" and len(open_) >= 2 and cleaned.get("confidence") == "high":
+                    problems.append(f"confidence cannot be high: the electrical check leaves {len(open_)} mechanisms at {a['wheel']} that this data cannot separate")
+            rec = a.get("recommended")
+            if rec and rec in MEAS_WORDS:
+                where = " ".join(_strings({k: cleaned.get(k) for k in (next_key, "unobservable", "data_requests", "field_questions")}))
+                if not re.search(MEAS_WORDS[rec], where, re.I):
+                    m = next((x for x in a.get("measurements") or [] if x["id"] == rec), {})
+                    problems.append(f"the electrical check's lowest-cost discriminating measurement is: {m.get('what', rec)}. Use it as the next action "
+                                    "(with what each candidate predicts), or list it under unobservable with how to observe it")
     return problems
 
 
@@ -616,6 +704,11 @@ def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str
     for x in q.get("questions") or []:
         if x.get("status") == "answered" and x["id"].startswith("log:check"):
             checked.append({"check": x["question"], "result": x["answer"], "verdict": "supports", "calls": []})
+    if raw and tools.electrical_applies():
+        from app.physics import electrical as _el
+        for f in (_el.analyse(raw) or {}).get("findings") or []:
+            checked.append({"check": f"Electrical relation {f['relation']} ({'measured' if f['tier'] == 'measured' else 'model-derived'})",
+                            "result": f["text"], "verdict": "supports" if f["kind"] == "anomaly" else "inconclusive", "calls": []})
     nxt = q.get("next") or {}
     events = []
     if raw:  # the rule-based grouping: warnings and errors by message, the rest is routine
@@ -746,6 +839,8 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
                             value = _case_context(store, case_id)
                         elif name in ("overview", "read_lines", "search", "measure"):
                             value = getattr(tools, name)(**args)
+                        elif name == "electrical" and tools.electrical_applies():
+                            value = tools.electrical()
                         else:
                             raise ValueError(f"Unknown tool {name}")
                         text, error = json.dumps(value, default=str)[:24000], None

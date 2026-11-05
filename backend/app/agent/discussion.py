@@ -202,6 +202,7 @@ def verify_round(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]
         if unknown:
             problems.append(f"next_check.outcomes[{i}]: unknown hypothesis id(s) {unknown}")
     problems += inv.check_acquisition(cleaned, raw, outputs, ids)
+    problems += inv.check_physics(cleaned, outputs, next_key="next_check")
     if inv._CONFIRMED.search(cleaned.get("reply") or ""):
         problems.append("Do not state a confirmed root cause in the reply")
     cleaned["hypotheses"] = inv.reviewed_hypotheses(cleaned.get("hypotheses"))[0]
@@ -271,6 +272,8 @@ def discuss(store, case_id: str, message: str, *, kind: str = "guess", model=Non
                         value = decode_packets(tools.raw)
                     elif name in ("overview", "read_lines", "search", "measure"):
                         value = getattr(tools, name)(**args)
+                    elif name == "electrical" and tools.electrical_applies():
+                        value = tools.electrical()
                     else:
                         raise ValueError(f"Unknown tool {name}")
                     text, error = json.dumps(value, default=str)[:24000], None

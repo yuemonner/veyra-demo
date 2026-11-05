@@ -786,3 +786,38 @@ def identifiability(sig: Dict[str, Any]) -> Dict[str, List[str]]:
     if not sig["torque"] and sig["wheels"]:
         unobs.append("Each wheel's load (no per-wheel torque is recorded)")
     return {"measured": measured, "model_derived": derived, "unobservable": unobs}
+
+
+# ---------------------------------------------------------------- what the investigating agent is given
+MEAS_WORDS = {"segment_r": r"four[- ]wire|4[- ]wire|segment resistance|四线|分段电阻|段电阻",
+              "segment_dv_loaded": r"(voltage|drop) across (each )?(the )?(connector|segment)|segment drop|分段压降|接插件两侧|跨接",
+              "branch_i": r"clamp|branch current|DC current into|电流钳|支路电流|输入电流",
+              "meter_v": r"voltmeter|reference meter|万用表|电压表|标准表",
+              "t_inv_trend": r"inverter temperature|T_inv|逆变器温度"}
+CAND_WORDS = {"contact": r"connector|terminal|contact|crimp|接插件|端子|接触|压接",
+              "conductor": r"cable|busbar|fuse|harness|conductor|线缆|母排|保险丝|线束|导线",
+              "inverter_draw": r"inverter|motor loss|efficien|draws? more|逆变器|电机损耗|效率",
+              "sensor_gain": r"sensor|gain|calibrat|传感器|增益|标定"}
+
+
+def agent_view(r: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """A compact copy for the investigating agent: tiers, findings with assumptions, candidates and the measurement plan."""
+    if not r:
+        return {"applies": False, "note": "No pack voltage, pack current or inverter DC voltage in this log."}
+    out = {"version": r["version"], "relations": r["relations"], "identifiability": r["identifiability"],
+           "findings": [{k: f[k] for k in ("relation", "tier", "kind", "text", "assumptions")} for f in r["findings"]],
+           "torque_note": (r.get("torque_note") or {}).get("text"), "boundary": r["boundary"],
+           "how_to_use": ("Cite a finding by its relation id and tier. 'measured' is read from the signals; 'model' depends on the "
+                          "assumptions listed with it: never call a model-derived resistance measured or identified. The candidates "
+                          "marked consistent cannot be told apart by this data: keep them open (none is ruled out here). Use the "
+                          "recommended measurement, with what each candidate predicts, as the next action unless a cheaper check "
+                          "separates them.")}
+    for w, rows in (r.get("model") or {}).get("sensitivity", {}).items():
+        out.setdefault("resistance_vs_share", {})[w] = [f"{x['share']:.0%} share: {x['r_ohm'] * 1000:.1f} mΩ (others {x['others_r_ohm'] * 1000:.1f})"
+                                                        for x in rows if x.get("others_r_ohm") is not None]
+    out["assessments"] = [{"wheel": a["wheel"], "load_dependent": a.get("load_dependent"),
+                           "candidates": [{k: c[k] for k in ("id", "name", "status", "why")} for c in a["candidates"]],
+                           "recommended": a["recommended"], "then": a.get("then"), "t_inv": (a.get("t_inv") or {}).get("note"),
+                           "measurements": [{k: m[k] for k in ("id", "what", "cost_label", "needs_approval", "strength", "blind_spot", "expected")}
+                                            for m in a["measurements"]]} for a in r.get("assessments") or []]
+    return out
