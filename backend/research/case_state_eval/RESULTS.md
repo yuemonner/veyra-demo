@@ -56,8 +56,10 @@ counts, the status, the next check and the latest discussion round all read from
 - The replay: "最后查出来的原因" (the cause that was found), showing the engineers' conclusion.
 
 **After.**
-- The state comes from discussion round 5 of 5: cause not established, 3 of 5 explanations still possible (2
-  leading, 1 open, 2 weakened).
+- The state comes from discussion round 5 of 5: cause not established. All 5 explanations are still possible (none is ruled out): 2
+  leading, 1 open, and 2 weakened but not excluded. "Still possible" now counts the same way as the fault-space
+  panel. A first version of the summary counted only leading and open; a local preview showed "3 of 4" next to the
+  panel's "4 of 4", so the counts were aligned.
 - The discussion panel reads the same hypotheses; a test checks that they are identical.
 - The investigation round is listed under "Earlier conclusions" and marked as superseded by discussion round 1.
 - Its own next action is labelled as superseded.

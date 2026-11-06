@@ -64,7 +64,8 @@ def _status(a: Dict[str, Any]) -> str:
 
 def _counts(hs: List[Dict[str, Any]]) -> Dict[str, int]:
     c = {k: sum(1 for h in hs if h.get("status") == k) for k in ("leading", "open", "weakened", "ruled_out")}
-    return {"total": len(hs), **c, "standing": c["leading"] + c["open"]}
+    # still possible = not ruled out (a weakened explanation is not excluded), as the fault-space panel counts it
+    return {"total": len(hs), **c, "possible": len(hs) - c["ruled_out"], "standing": c["leading"] + c["open"]}
 
 
 def _norm(t: Optional[str]) -> str:

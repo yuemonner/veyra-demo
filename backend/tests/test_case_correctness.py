@@ -103,6 +103,8 @@ def test_one_state_for_summary_counts_and_latest_discussion(showcase):
     assert [(h["id"], h["status"]) for h in cur["hypotheses"]] == ids_now        # the discussion panel and the summary agree
     n = cur["counts"]
     assert n["total"] == len(cur["hypotheses"]) and n["standing"] == n["leading"] + n["open"] == 3
+    # 'still possible' counts as the fault-space panel does: everything not ruled out (weakened is not excluded)
+    assert n["possible"] == len([h for h in cur["hypotheses"] if h["status"] != "ruled_out"]) == 5
     assert cur["next_action"]["action"] == discussion.rounds_of(store, cid)[-1]["result"]["next_check"]["action"]
     # the investigation round is history, superseded, never current
     assert s["history"][0]["source"] == "investigation" and s["history"][0]["superseded_by"]["source"] == "discussion"

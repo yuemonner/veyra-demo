@@ -65,8 +65,8 @@ export default function CaseStateBar({ state, superseded }: { state: Any; supers
           `状态 ${state.state_version?.id} · 来自${SRC(true, c.from)}（共 ${c.from?.of} 轮${c.from?.recorded ? "，录制" : ""}）`)}</span>
       </div>
       <p className={st.stateStatus}><b>{(STATUS[c.status] || STATUS.cause_unknown)[zh ? 1 : 0]}</b>
-        {T(` · ${n.standing} of ${n.total} explanations still possible: ${n.leading} leading, ${n.open} open, ${n.weakened} weakened, ${n.ruled_out} ruled out`,
-          ` · ${n.total} 个可能里还剩 ${n.standing} 个：${n.leading} 个最可能，${n.open} 个待确认，${n.weakened} 个被削弱，${n.ruled_out} 个已排除`)}</p>
+        {T(` · ${n.possible} of ${n.total} explanations still possible: ${n.leading} leading, ${n.open} open, ${n.weakened} weakened (not excluded), ${n.ruled_out} ruled out`,
+          ` · ${n.total} 个可能里还有 ${n.possible} 个：${n.leading} 个最可能，${n.open} 个待确认，${n.weakened} 个被削弱（未排除），${n.ruled_out} 个已排除`)}</p>
       {[...lead, ...open].length > 0 && (
         <ul className={st.stateHyps}>
           {[...lead, ...open].map((h: Any) => (
