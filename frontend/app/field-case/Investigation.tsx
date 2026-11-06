@@ -336,14 +336,15 @@ function Playback({ pb, fb, extra, ahead, standing, superseded = false }: { pb: 
   useEffect(() => {
     if (phase !== "running") return;
     const steps = inv.steps || [];
-    const t = setTimeout(() => (shown < steps.length ? setShown(shown + 1) : setPhase("result")), shown < steps.length ? 850 : 700);
+    // Each check Veyra ran appears in turn at reading pace; nothing is skipped.
+    const t = setTimeout(() => (shown < steps.length ? setShown(shown + 1) : setPhase("result")), shown < steps.length ? 1500 : 1400);
     return () => clearTimeout(t);
   }, [phase, shown, stage]); // eslint-disable-line react-hooks/exhaustive-deps
   const top = () => { try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* ignore */ } };
   const advance = () => { setMine(recordedFindings(pb, stage + 1)); setStage(stage + 1); setShown(0); setPhase("running"); top(); };
   useEffect(() => {
     if (phase !== "result" || stage >= lastStage || !autoplay || !(pb.findings || [])[stage]) return;
-    const t = setTimeout(advance, 9000);
+    const t = setTimeout(advance, 18000);   // time to read the round before the engineer's result moves it on
     return () => clearTimeout(t);
   }, [phase, stage, autoplay]); // eslint-disable-line react-hooks/exhaustive-deps
   if (phase === "running") {
@@ -351,7 +352,6 @@ function Playback({ pb, fb, extra, ahead, standing, superseded = false }: { pb: 
       subtitle={stage === 0 ? "Reading the log and running the checks it can do itself." : "Continuing with what the engineer found."} />;
   }
   const replay = () => { setStage(0); setShown(0); setMine([]); setAutoplay(true); setPhase("running"); top(); };
-  const current = () => { setStage(lastStage); setShown((invs[lastStage].steps || []).length); setMine(recordedFindings(pb, lastStage)); setPhase("result"); top(); };
   const banner = invs.length > 1 ? (stage === lastStage ? (
     <div className={st.roundBar}><span><b>{`Round ${stage + 1} of ${invs.length}`}</b>{superseded ? " · the last investigation round; the case continued in the discussion (current state at the top)." : " · where the case stands now."} {(pb.findings || []).length ? `Round ${stage}'s check was done; the engineer's result is under "What you found".` : ""}</span>
       <button className={st.inline} onClick={replay}>Replay from round 1</button></div>
@@ -359,7 +359,7 @@ function Playback({ pb, fb, extra, ahead, standing, superseded = false }: { pb: 
     <div className={st.roundBar}><span><b>{`Recorded investigation · round ${stage + 1} of ${invs.length}.`}</b> This check was already done in the recorded case.
       {autoplay && (pb.findings || [])[stage] ? " Continuing with the engineer's result in a few seconds." : " Choose the recorded result to continue."}</span>
       <span className={st.row}>{autoplay && (pb.findings || [])[stage] && <><button className={st.inline} onClick={advance}>Continue now</button><button className={st.inline} onClick={() => setAutoplay(false)}>Pause here</button></>}
-        <button className={st.inline} onClick={current}>Skip to the current state</button></span></div>
+        </span></div>
   )) : null;
   // Round n's recorded engineer result (the one that fed round n+1), with exactly what it passed on.
   const recordedHere: Any = stage + 1 < invs.length ? (pb.findings || [])[stage] || null : null;

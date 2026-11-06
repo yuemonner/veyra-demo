@@ -35,23 +35,37 @@ export function Together({ caseId, call, lines, data, reload, readOnly }: { case
   const live = !!data?.agent?.configured && !!data?.agent?.allowed && !readOnly;
   const [shown, setShown] = useState(0);            // rounds fully shown
   const [playing, setPlaying] = useState<{ i: number; steps: number } | null>(null);
+  const [auto, setAuto] = useState(false);        // play every recorded round in turn, at reading pace
+  const autoRef = useRef(false);
   const [msg, setMsg] = useState("");
   const [kind, setKind] = useState<"guess" | "result">("guess");
   const [job, setJob] = useState<Any>(null);
   const [err, setErr] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { setShown(0); setPlaying(null); }, [caseId]);
+  useEffect(() => { setShown(0); setPlaying(null); setAuto(false); autoRef.current = false; }, [caseId]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [shown, playing?.steps, job?.steps?.length]);
 
+  // Each query appears in turn; the round's answer stays on screen long enough to read before the next round starts.
+  const STEP_MS = 1500, AFTER_MS = 1200, READ_MS = 9000;
   async function play(i: number) {
     const r = rounds[i];
     const n = realSteps(r).length;
     setPlaying({ i, steps: 0 });
-    await sleep(700);
-    for (let k = 1; k <= n; k++) { setPlaying({ i, steps: k }); await sleep(650); }
-    await sleep(400);
+    await sleep(1200);
+    for (let k = 1; k <= n; k++) { setPlaying({ i, steps: k }); await sleep(STEP_MS); }
+    await sleep(AFTER_MS);
     setPlaying(null); setShown(i + 1);
   }
+  async function playFrom(i: number) {
+    setAuto(true); autoRef.current = true;
+    for (let k = i; k < rounds.length; k++) {
+      if (!autoRef.current) return;
+      await play(k);
+      if (k + 1 < rounds.length) { await sleep(READ_MS); }
+    }
+    setAuto(false); autoRef.current = false;
+  }
+  const pause = () => { autoRef.current = false; setAuto(false); };
 
   async function send() {
     const text = msg.trim();
@@ -90,10 +104,14 @@ export function Together({ caseId, call, lines, data, reload, readOnly }: { case
       </ol>
       <div ref={endRef} />
 
-      {!playing && !job && nextIdx < rounds.length && (
+      {auto && !job && nextIdx < rounds.length && (
         <div className={t.row}>
-          <button className={t.primary} onClick={() => play(nextIdx)}>{nextIdx === 0 ? "Play the recorded session" : `Round ${nextIdx + 1}: the engineer replies`}</button>
-          <button className={t.ghost} onClick={() => setShown(rounds.length)}>Show all rounds</button>
+          <span className={t.fine}>{playing ? `Playing round ${playing.i + 1} of ${rounds.length}` : `Round ${nextIdx + 1} of ${rounds.length} starts in a few seconds`}</span>
+          <button className={t.ghost} onClick={pause}>Pause after this round</button>
+        </div>)}
+      {!auto && !playing && !job && nextIdx < rounds.length && (
+        <div className={t.row}>
+          <button className={t.primary} onClick={() => playFrom(nextIdx)}>{nextIdx === 0 ? "Play the recorded session" : `Continue: round ${nextIdx + 1} of ${rounds.length}`}</button>
         </div>)}
 
       {done && !job && (live ? (

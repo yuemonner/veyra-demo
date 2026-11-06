@@ -17,7 +17,7 @@ const BEFORE: Record<string, [string, string]> = {
   answerable: ["Signals that bear on it were already in the log (nobody has checked what they would have shown)", "日志里当时已经有相关的信号（还要有人去读，没核实过当时会读出什么）"],
   weakened: ["The data already argued against it", "数据当时已经说明，这个可能性不大"],
   no_anomaly: ["The data showed this branch normal", "数据显示这一路是正常的"],
-  physical_only: ["No signal shows it: needs a person at the vehicle", "数据看不到，只能派人去车上查"],
+  physical_only: ["No signal shows it: needs a person at the machine or the bench", "数据看不到，只能派人去车上查"],
   later_data: ["Only data recorded later shows it", "只有后来的数据才看得到"],
   not_in_data: ["Nothing in this data answers it", "这份数据里没有能回答它的信息"],
 };
@@ -54,7 +54,11 @@ function whyZh(t: string): string {
 }
 const blankStep = () => ({ check: "", why: "", kind: "check", result: "not_the_issue", when: "", minutes: "", cost: "" });
 
-export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
+// Played step by step: each engineer step appears, then what the data said before it, then after it and in hindsight.
+const TICK_MS = 1600;      // one part of one step
+const START_MS = 900;
+
+export function DebugReplay({ caseId, call, autoplay = true }: { caseId: string; call: Call; autoplay?: boolean }) {
   const zh = useZh();
   const T = (en: string, cn: string) => (zh ? cn : en);
   const L = (m: Record<string, [string, string]>, k: string) => (m[k] ? m[k][zh ? 1 : 0] : k);
@@ -63,8 +67,17 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
   const [paste, setPaste] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { let live = true; call(`/engine/cases/${caseId}/walkthrough`).then((x) => live && setD(x)).catch(() => live && setD(null)); return () => { live = false; }; }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [tick, setTick] = useState(autoplay ? 0 : 9999);
+  const [paused, setPaused] = useState(false);
+  useEffect(() => { let live = true; setTick(autoplay ? 0 : 9999); call(`/engine/cases/${caseId}/walkthrough`).then((x) => live && setD(x)).catch(() => live && setD(null)); return () => { live = false; }; }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const total = ((d?.replay?.steps || []).length) * 3;
+  useEffect(() => {
+    if (!d?.replay || paused || tick >= total) return;
+    const t = setTimeout(() => setTick(tick + 1), tick === 0 ? START_MS : TICK_MS);
+    return () => clearTimeout(t);
+  }, [d, tick, paused, total]);
   if (!d) return null;
+  const done = tick >= total;
   const w = d.walkthrough, r = d.replay;
 
   async function draft() {
@@ -83,6 +96,7 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
       const body = { steps, architecture: edit.architecture, source: edit.source, ...(edit.system ? { system: edit.system } : {}),
         ...(edit.final_cause ? { final_cause: edit.final_cause } : {}), ...(edit.currency ? { currency: edit.currency } : {}) };
       setD(await call(`/engine/cases/${caseId}/walkthrough`, { method: "POST", body: JSON.stringify(body) }));
+      setPaused(false); setTick(0);
       setEdit(null); setPaste("");
     } catch (e: Any) { setErr(e.message); } finally { setBusy(false); }
   }
@@ -101,8 +115,16 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
       <p className={st.fine}>{T("Not only what happened to the machine, but why engineers took the path they did, and which work the data shows could have been avoided. Each step, replayed against the data: could the data before it have settled it, and does the data after it confirm the result? Computed by code, not by the AI.",
         "不只看机器出了什么事，还复盘工程师为什么这样排查，以及数据能证明哪些工作本可以省掉。把每一步放回数据里看：做之前，数据是不是已经有答案？做之后，数据能不能证明结论？这些由程序计算，不是 AI 猜的。")}</p>
       {w && w.source === "example" && <p className={st.fine}>{T("Example walkthrough written for this synthetic case, not a real service history.", "这是为演示案例写的示例，不是真实的维修记录。")}</p>}
+      {w && w.source === "chat" && <p className={st.fine}>{T("From a public discussion thread, as the participants posted it (summarised by the Veyra team): steps in the order posted; dates, time and costs were not recorded.",
+        "来自公开讨论帖，按参与者发布的内容整理（Veyra 团队摘要）：步骤按发布顺序；没有记录日期、用时和费用。")}</p>}
+      {r && r.steps.length > 0 && (
+        <div className={st.row}>
+          {!done && <span className={st.fine}>{T(`Replaying step ${Math.min(Math.floor(tick / 3) + 1, r.steps.length)} of ${r.steps.length}…`, `正在复盘第 ${Math.min(Math.floor(tick / 3) + 1, r.steps.length)} 步，共 ${r.steps.length} 步…`)}</span>}
+          {!done && <button className={st.inline} onClick={() => setPaused(!paused)}>{paused ? T("Resume", "继续") : T("Pause", "暂停")}</button>}
+          {done && <button className={st.inline} onClick={() => { setPaused(false); setTick(0); }}>{T("Replay from the first step", "从第一步重新复盘")}</button>}
+        </div>)}
 
-      {m && (
+      {m && done && (
         <div className={st.metrics}>
           <div><b>{m.steps}</b><span>{T("Steps", "一共几步")}</span></div>
           <div><b>{m.not_the_issue}</b><span>{T("Were not the issue", "不是问题所在的步骤")}</span></div>
@@ -117,8 +139,10 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
         <ol className={st.replaySteps}>
           {r.steps.map((s: Any, i: number) => {
             const ws = w.steps[i] || {};
+            const phase = tick - i * 3;          // 1: the step, 2: the data before it, 3: after it and in hindsight
+            if (phase < 1) return null;
             return (
-              <li key={s.id} className={s.hindsight === "verified_avoidable" || s.hindsight === "potentially_avoidable" ? st.replayHot : ""}>
+              <li key={s.id} className={phase >= 3 && (s.hindsight === "verified_avoidable" || s.hindsight === "potentially_avoidable") ? st.replayHot : ""}>
                 <div className={st.replayHead}>
                   <span className={st.fine}>{[ws.when, L(KIND, s.kind), ws.minutes ? `${ws.minutes} min` : null, ws.cost ? `${ws.cost}${cur}` : null].filter(Boolean).join(" · ")}</span>
                   <b>{s.check}</b>
@@ -127,23 +151,23 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
                 <dl className={st.replayDl}>
                   {ws.why && <><dt>{T("Why this step", "为什么走这一步")}</dt><dd>{ws.why}</dd></>}
                   {ws.decided_by && <><dt>{T("What decided it", "靠什么判断的")}</dt><dd>{ws.decided_by}</dd></>}
-                  <dt>{T("Before", "做之前")}</dt><dd>{zh ? L(BEFORE, s.before.verdict) : s.before.text}</dd>
-                  {s.after && <><dt>{T("After", "做之后")}</dt><dd>{zh ? `${L(AFTER, s.after.verdict)}（${Number(s.after.values?.before_ratio).toFixed(2)}× → ${Number(s.after.values?.after_ratio).toFixed(2)}×）` : s.after.text}</dd></>}
-                  {s.cheaper && <><dt>{T("Cheaper first", "更省的做法")}</dt><dd>{zh ? `${MEAS_ZH[s.cheaper.measurement] || s.cheaper.what}（${["看已有数据就行", "车停在场站就能做", "要装仪器实车起步"][s.cheaper.cost_tier] || ""}）` : `${s.cheaper.what} (${s.cheaper.cost_label})`}</dd></>}
-                  {s.hindsight && s.hindsight !== "not_assessed" && s.hindsight !== "not_decidable" && <><dt>{T("In hindsight", "回头看")}</dt><dd>{L(HINDSIGHT, s.hindsight)}
+                  {phase >= 2 && <><dt>{T("Before", "做之前")}</dt><dd>{zh ? L(BEFORE, s.before.verdict) : s.before.text}</dd></>}
+                  {phase >= 3 && s.after && <><dt>{T("After", "做之后")}</dt><dd>{zh ? `${L(AFTER, s.after.verdict)}（${Number(s.after.values?.before_ratio).toFixed(2)}× → ${Number(s.after.values?.after_ratio).toFixed(2)}×）` : s.after.text}</dd></>}
+                  {phase >= 3 && s.cheaper && <><dt>{T("Cheaper first", "更省的做法")}</dt><dd>{zh ? `${MEAS_ZH[s.cheaper.measurement] || s.cheaper.what}（${["看已有数据就行", "车停在场站就能做", "要装仪器实车起步"][s.cheaper.cost_tier] || ""}）` : `${s.cheaper.what} (${s.cheaper.cost_label})`}</dd></>}
+                  {phase >= 3 && s.hindsight && s.hindsight !== "not_assessed" && s.hindsight !== "not_decidable" && <><dt>{T("In hindsight", "回头看")}</dt><dd>{L(HINDSIGHT, s.hindsight)}
                     {!zh && (s.hindsight_why || []).length > 0 && <span className={st.fine}>{` ${s.hindsight_why.join("; ")}.`}</span>}
                     {zh && (s.hindsight_why || []).length > 0 && <span className={st.fine}>{`（${s.hindsight_why.map(whyZh).join("；")}）`}</span>}</dd></>}
-                  {s.evidence.length > 0 && <><dt>{T("Lines", "相关日志")}</dt><dd className={st.replayLines}>{s.evidence.slice(0, 2).map((e: Any) => <code key={e.line}>{`${e.line}  ${e.quote}`}</code>)}</dd></>}
+                  {phase >= 2 && s.evidence.length > 0 && <><dt>{T("Lines", "相关日志")}</dt><dd className={st.replayLines}>{s.evidence.slice(0, 2).map((e: Any) => <code key={e.line}>{`${e.line}  ${e.quote}`}</code>)}</dd></>}
                 </dl>
               </li>);
           })}
         </ol>)}
-      {m && m.signal_additions.length > 0 && (
+      {done && m && m.signal_additions.length > 0 && (
         <div className={st.dataReq}>
           <span className={st.blindHead}>{T("Logging this would let the data settle more of these steps", "以后多记录下面这些数据，很多步骤看数据就能定")}</span>
           <ul>{m.signal_additions.map((a: Any) => <li key={a.what}><b>{zh && a.what.startsWith("per-branch") ? "在 CAN 上记录每一路的直流电流（这样就能分清是线路电阻大，还是逆变器用电多）" : a.what}</b><span>{T(`Steps ${a.steps.join(", ")}`, `涉及步骤 ${a.steps.join("、")}`)}</span></li>)}</ul>
         </div>)}
-      {w?.final_cause && <p className={st.fine}>{T(`Engineers' reported conclusion (not verified: no record with data confirms it): ${w.final_cause}`, `工程师报告的结论（未验证：没有带数据的记录证实它）：${w.final_cause}`)}</p>}
+      {done && w?.final_cause && <p className={st.fine}>{T(`Engineers' reported conclusion (not verified: no record with data confirms it): ${w.final_cause}`, `工程师报告的结论（未验证：没有带数据的记录证实它）：${w.final_cause}`)}</p>}
 
       {edit && (
         <div className={st.reproForm}>

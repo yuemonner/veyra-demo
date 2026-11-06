@@ -131,3 +131,19 @@ the board) are low-risk and not flagged.
 - How well the hazard classifier recalls on real field procedures is unknown.
 - Whether "status rests on an engineer report" matches how engineers judge their own evidence needs real cases with
   engineers reviewing it.
+
+## Update: micro-ROS investigation replay
+
+The micro-ROS case now has an investigation replay too. It contains the three steps the public thread reports, in the
+order posted, with no dates, time or costs:
+
+1. Inspected in the debugger what the board sends.
+2. Disabled the D-cache, which worked around the problem.
+3. Cleaned the D-cache on the Tx buffers.
+
+Replayed against the agent-side log:
+- Steps 1 and 3 are "no recorded signal shows this". Step 2 is "nothing in this log answers it".
+- Nothing is called avoidable.
+- The thread's conclusion is shown as reported.
+
+The replay plays step by step on the case page and in the "Debug with Veyra" panel.

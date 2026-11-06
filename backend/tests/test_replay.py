@@ -122,7 +122,7 @@ def test_api_round_trip(tmp_path, monkeypatch):
     with TestClient(main.app) as c:
         got = c.get(f"/engine/cases/{cid}/walkthrough").json()
         assert got["walkthrough"]["source"] == "example" and got["replay"]["summary"]["steps"] == 5
-        assert c.get("/engine/feasibility").json()["cases"] == 1
+        assert c.get("/engine/feasibility").json()["cases"] == 2   # shuttle (example) and micro-ROS (public thread)
         bad = c.post(f"/engine/cases/{cid}/walkthrough", json={"steps": [{"check": "x", "result": "not_the_issue", "when": "21 Oct"}]})
         assert bad.status_code == 422
         ok = c.post(f"/engine/cases/{cid}/walkthrough", json={"system": "HV", "steps": [{"check": "Replaced the FR inverter", "kind": "swap", "result": "not_the_issue", "when": "2026-10-21", "minutes": 240}]})

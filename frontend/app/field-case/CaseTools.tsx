@@ -13,6 +13,7 @@ import * as K from "../../lib/run-knowledge";
 import { packetTimeline, ratioBars } from "../../lib/svg-chart";
 import { buildReport, reportFileName, type Discussed, type Feedback } from "../../lib/case-report";
 import { Together, type DiscussionData } from "./Together";
+import { DebugReplay } from "./DebugReplay";
 import { AGENT_HOST, guardInvestigation, kindOf, KIND_LABEL, type Kind } from "../../lib/claim-scope";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -203,10 +204,11 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
   agent: Any; readOnly: boolean; onJob: (jobId: string) => void; together?: { data: DiscussionData; reload: () => Promise<void> };
 }) {
   const hasTogether = !!together?.data && ((together.data.rounds || []).length > 0 || !!together.data.agent?.configured);
-  const [mode, setMode] = useState<"together" | "checks">("together");
+  const [mode, setMode] = useState<"together" | "checks" | "replay">("together");
   // A log no fixed check was written for (a decoded CAN log, say) has only the open-ended discussion.
   const hasChecks = !!m.log || !!run;
-  const tab = hasTogether ? (hasChecks ? mode : "together") : "checks";
+  // The engineers' investigation, replayed step by step, is always available beside the discussion and the checks.
+  const tab = mode === "replay" ? "replay" : hasTogether ? (hasChecks ? mode : "together") : "checks";
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ id: string; verdict: Feedback["verdict"] } | null>(null);
@@ -322,7 +324,8 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
         <header className={t.dHead}>
           <div>
             <h2 className={t.dTitle}>Debug with Veyra</h2>
-            {tab === "together" ? <p className={t.dSub}>Bring a guess or a bench result. The AI investigator tests it against the original data, says which parts hold, and proposes the next check.</p> : <p className={t.dSub}>{logMode ? "Suggest a cause or ask a question. Fixed checks test it against the decoded log and cite the lines."
+            {tab === "replay" ? <p className={t.dSub}>How the engineers investigated this case, replayed step by step against the data: what the data showed before each step, and what it shows after.</p>
+              : tab === "together" ? <p className={t.dSub}>Bring a guess or a bench result. The AI investigator tests it against the original data, says which parts hold, and proposes the next check.</p> : <p className={t.dSub}>{logMode ? "Suggest a cause or ask a question. Fixed checks test it against the decoded log and cite the lines."
               : "Ask about a joint, an axis or an output. Fixed checks answer from this machine's healthy behaviour and the findings in this recording."}</p>}
             {tab === "checks" && <div className={t.modes}>
               <span className={t.modeOn}><i aria-hidden>●</i> Fixed checks: {logMode ? `${X.CHECKS.length} written for this kind of log` : "baselines and findings"}, run in your browser, no AI</span>
@@ -331,14 +334,17 @@ export function Discuss({ open, onClose, caseId, call, m, run, labels, talk, set
           </div>
           <button className={t.x} onClick={onClose} aria-label="Close the discussion">×</button>
         </header>
-        {hasTogether && hasChecks && (
-          <div className={t.tabs} role="tablist" aria-label="How to discuss">
-            <button role="tab" aria-selected={tab === "together"} className={tab === "together" ? t.tabOn : t.tab} onClick={() => setMode("together")}>
-              Investigate together<small>AI investigator · open-ended</small></button>
-            <button role="tab" aria-selected={tab === "checks"} className={tab === "checks" ? t.tabOn : t.tab} onClick={() => setMode("checks")}>
-              Quick checks<small>fixed · in your browser · no AI</small></button>
-          </div>)}
-        {tab === "together" && together?.data ? (
+        <div className={t.tabs} role="tablist" aria-label="How to discuss">
+          {hasTogether && <button role="tab" aria-selected={tab === "together"} className={tab === "together" ? t.tabOn : t.tab} onClick={() => setMode("together")}>
+            Investigate together<small>AI investigator · open-ended</small></button>}
+          <button role="tab" aria-selected={tab === "replay"} className={tab === "replay" ? t.tabOn : t.tab} onClick={() => setMode("replay")}>
+            Investigation replay<small>the engineers&apos; steps · against the data</small></button>
+          {hasChecks && <button role="tab" aria-selected={tab === "checks"} className={tab === "checks" ? t.tabOn : t.tab} onClick={() => setMode("checks")}>
+            Quick checks<small>fixed · in your browser · no AI</small></button>}
+        </div>
+        {tab === "replay" ? (
+          <div className={t.dBody}><DebugReplay key={`${caseId}-drawer`} caseId={caseId} call={call} /></div>
+        ) : tab === "together" && together?.data ? (
           <div className={t.dBody}><Together caseId={caseId} call={call} lines={m.lines} data={together.data} reload={together.reload} readOnly={readOnly} /></div>
         ) : <>
 

@@ -242,3 +242,14 @@ def test_state_api(tmp_path, monkeypatch):
         assert i["playback"]["investigations"][-1]["result"]["next_action"]["safety"]["hazardous"]
         el = c.get(f"/engine/cases/{cid}/electrical").json()
         assert el["assessments"][0]["safety_plan"]["then"] == "segment_r"
+
+
+def test_micro_ros_has_an_investigation_replay_from_the_public_thread(showcase):
+    store, by = showcase
+    from app.agent import replay as R
+    rc = R.replay_case(store, _id(by, "micro-ROS"))
+    assert rc and rc["walkthrough"]["source"] == "chat" and len(rc["replay"]["steps"]) == 3
+    # the agent-side log cannot answer what the board wrote or what the D-cache did: nothing is called avoidable
+    assert rc["replay"]["summary"]["verified_avoidable"] == 0 and rc["replay"]["summary"]["potentially_avoidable"] == 0
+    s = CS.build(store, _id(by, "micro-ROS"))
+    assert any(f["source"] == "walkthrough_final_cause" for f in s["provenance"]["flags"])   # the thread's conclusion is reported

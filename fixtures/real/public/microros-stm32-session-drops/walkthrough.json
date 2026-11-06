@@ -1,0 +1,39 @@
+{
+ "note": "Reconstructed by the Veyra team from the public GitHub thread micro_ros_stm32cubemx_utils #139 (what the participants posted, in the order posted). Dates, time and costs were not recorded in the thread summary, so they are left empty. Not an interview.",
+ "actor": "Public thread participants (summarised)",
+ "source": "public thread (summarised)",
+ "walkthrough": {
+  "system": "Board Ethernet transport (STM32H7, LwIP, micro-ROS client)",
+  "symptom": "The micro-ROS agent opens a session with the board and closes it almost at once; the board then keeps sending small packets.",
+  "architecture": "integrated",
+  "source": "chat",
+  "why_ambiguous": "The agent log records only what the agent received and sent. It cannot see what the board wrote into its buffer or what went on the wire, so a firmware, network or agent fault all fit it.",
+  "steps": [
+   {
+    "check": "Inspect in the debugger what the board sends",
+    "part": "Board firmware (transport write)",
+    "kind": "check",
+    "result": "inconclusive",
+    "why": "The agent dropped the session right after it was created",
+    "decided_by": "The debugger showed unexpected data being sent by the board"
+   },
+   {
+    "check": "Disable the D-cache (SCB_DisableDCache) and run the session again",
+    "part": "STM32H7 D-cache",
+    "kind": "check",
+    "result": "partly",
+    "why": "Unexpected bytes from a buffer the CPU had written point at memory the Ethernet DMA reads",
+    "decided_by": "With the D-cache disabled the problem was worked around"
+   },
+   {
+    "check": "Clean the D-cache (SCB_CleanDCache_by_Addr, 32-byte aligned) on the Tx buffers in low_level_output() of ethernetif.c",
+    "part": "LwIP Ethernet port (ethernetif.c)",
+    "kind": "repair",
+    "result": "fault_found",
+    "why": "Keep the D-cache on and make the Tx buffers coherent before the DMA reads them",
+    "decided_by": "The reporter wrote it was indeed a cache coherence issue; another user reported the patch works on a Nucleo F7"
+   }
+  ],
+  "final_cause": "Cache coherence in the STM32H7 LwIP Ethernet port: the D-cache was not cleaned before the Ethernet DMA sent a frame, so the agent received zeroed packets (as reported in the thread)."
+ }
+}

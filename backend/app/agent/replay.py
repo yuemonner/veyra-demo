@@ -198,7 +198,7 @@ def replay_step(step: Dict[str, Any], lines: List[str], spans, elec_all: Optiona
                                      "(someone still has to read it; Veyra does not judge it automatically)."}
             out["signals"], out["evidence"] = found, ev + out["evidence"]
         elif PHYSICAL.search(text):
-            out["before"] = {"verdict": "physical_only", "how": "none", "text": "No recorded signal shows this; it needs a person at the vehicle."}
+            out["before"] = {"verdict": "physical_only", "how": "none", "text": "No recorded signal shows this; it needs a person at the machine or the bench."}
         else:
             found_all, ev_all = _signal_lines(lines, text, step.get("part") or "")
             if found_all and when is not None:
