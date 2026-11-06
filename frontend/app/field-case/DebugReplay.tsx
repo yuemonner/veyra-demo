@@ -1,8 +1,9 @@
 "use client";
 /* How engineers debugged the case, replayed against the data (app/agent/replay.py, deterministic). Each step the
    engineers took is asked two questions: could the data recorded before it have settled it, and does the data after it
-   confirm what they concluded. Steps that were not the issue and that the data could have answered, or that a cheaper
-   check could have preceded, are counted in time and money. Engineers add a walkthrough by pasting a chat or service
+   confirm what they concluded. A step that was not the issue is verified avoidable only when a computed relation in data
+   recorded within a day before it showed nothing where it looked, and nothing later implicated it; only those count time
+   and money. Potentially avoidable is an estimate with no time or money; insufficient evidence says the data cannot judge it. Engineers add a walkthrough by pasting a chat or service
    note (drafted into steps they correct) or by entering the steps. */
 import React, { useEffect, useState } from "react";
 import st from "./investigation.module.css";
@@ -25,10 +26,11 @@ const AFTER: Record<string, [string, string]> = {
   resolved: ["After it, the relation adds up again", "做完以后，数据恢复正常：说明修对了"],
 };
 const HINDSIGHT: Record<string, [string, string]> = {
-  avoidable: ["Could have been answered from the data", "这一步本可以省掉：看数据就够了"],
-  cheaper_first: ["A cheaper discriminating check could have come first", "本可以先做一个更便宜的检查，确认了再决定要不要做这一步"],
+  verified_avoidable: ["Verified avoidable: data from just before it showed nothing where it looked", "确认可以省掉：做之前一天内的数据已经显示这里没有问题"],
+  potentially_avoidable: ["Potentially avoidable (an estimate, not a saving)", "可能可以省掉（只是估计，不算节省）"],
+  insufficient_evidence: ["Insufficient evidence to say it was avoidable", "证据不够，不能说这一步可以省掉"],
   needed: ["Needed", "这一步是必要的"],
-  not_decidable: ["", ""],
+  not_assessed: ["", ""],
 };
 const RESULT: Record<string, [string, string]> = { fault_found: ["Fault found", "找到故障"], not_the_issue: ["Not the issue", "不是问题所在"], inconclusive: ["Inconclusive", "没查出结论"], partly: ["Partly", "有一部分关系"] };
 const KIND: Record<string, [string, string]> = { check: ["Check", "检查"], swap: ["Swap", "更换"], repair: ["Repair", "维修"] };
@@ -36,6 +38,20 @@ const MEAS_ZH: Record<string, string> = {
   segment_r: "断开高压后、先别拔插头：用四线法量这一路每一段的电阻，再和一个正常的轮对比", branch_i: "起步时用直流电流钳，同时量这一路和一个正常轮的电流",
   segment_dv_loaded: "起步时量这一路每一段的压降，再和一个正常的轮对比", meter_v: "用标准电压表量一下，看逆变器报的电压准不准", t_inv_trend: "调一整班的日志，比一比各个逆变器的温度",
 };
+// plain Chinese for the reasons replay.py gives (English is shown as returned)
+function whyZh(t: string): string {
+  if (t.startsWith("a later step")) return "后面的步骤发现同一个部件或功能也有关系，它可能是原因之一";
+  if (t.startsWith("the data before this step pointed toward it")) return "做之前的数据反而指向它";
+  if (t.startsWith("the data before this step could not answer it")) return "做之前的数据回答不了这个问题";
+  if (t.startsWith("a cheaper check")) return "当时有一个更便宜、能分清几种可能的检查";
+  const m = t.match(/data before it was (\d+) days old|but the data was (\d+) days old/);
+  if (m) return `当时的数据已经是 ${m[1] || m[2]} 天前的`;
+  if (t.startsWith("the data argued against it")) return "数据说明可能性不大，但只是推断，没有排除";
+  if (t.startsWith("the signals that answer it")) return "日志里有能回答它的信号，但没人核实过当时会读出正常";
+  if (t.startsWith("a computed relation in data recorded within a day")) return "做之前一天内的数据经计算显示这里没有异常";
+  if (t.startsWith("nothing in the data")) return "做之前的数据没有反对它的证据";
+  return t;
+}
 const blankStep = () => ({ check: "", why: "", kind: "check", result: "not_the_issue", when: "", minutes: "", cost: "" });
 
 export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
@@ -82,17 +98,19 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
         <h2 className={st.h2}>{T("Replay of how engineers debugged it", "复盘排查过程")}</h2>
         {!edit && <button className={st.inline} onClick={start}>{w ? T("Record another walkthrough", "记录新的排查过程") : T("Add the engineers' walkthrough", "添加工程师的排查过程")}</button>}
       </div>
-      <p className={st.fine}>{T("Not only what happened to the machine, but why engineers took the path they did and which work could have been avoided. Each step, replayed against the data: could the data before it have settled it, and does the data after it confirm the result? Computed by code, not by the AI.",
-        "不只看机器出了什么事，还复盘工程师为什么这样排查、哪些工作本可以省掉。把每一步放回数据里看：做之前，数据是不是已经有答案？做之后，数据能不能证明结论？这些由程序计算，不是 AI 猜的。")}</p>
+      <p className={st.fine}>{T("Not only what happened to the machine, but why engineers took the path they did, and which work the data shows could have been avoided. Each step, replayed against the data: could the data before it have settled it, and does the data after it confirm the result? Computed by code, not by the AI.",
+        "不只看机器出了什么事，还复盘工程师为什么这样排查，以及数据能证明哪些工作本可以省掉。把每一步放回数据里看：做之前，数据是不是已经有答案？做之后，数据能不能证明结论？这些由程序计算，不是 AI 猜的。")}</p>
       {w && w.source === "example" && <p className={st.fine}>{T("Example walkthrough written for this synthetic case, not a real service history.", "这是为演示案例写的示例，不是真实的维修记录。")}</p>}
 
       {m && (
         <div className={st.metrics}>
           <div><b>{m.steps}</b><span>{T("Steps", "一共几步")}</span></div>
           <div><b>{m.not_the_issue}</b><span>{T("Were not the issue", "白做的步骤")}</span></div>
-          <div><b>{m.avoidable + m.cheaper_first}</b><span>{T("Of those, the data could have saved or redirected", "其中看数据本可以省掉或先做便宜检查的")}</span></div>
-          {m.minutes_avoidable > 0 && <div><b>{`${Math.round(m.minutes_avoidable / 6) / 10} h`}</b><span>{T("Time on those steps", "这些步骤花的时间")}</span></div>}
-          {m.cost_avoidable > 0 && <div><b>{`${m.cost_avoidable.toLocaleString()}${cur}`}</b><span>{T("Parts on those steps", "这些步骤花的零件钱")}</span></div>}
+          <div><b>{m.verified_avoidable ?? 0}</b><span>{T("Verified avoidable", "确认可以省掉")}</span></div>
+          <div><b>{m.potentially_avoidable ?? 0}</b><span>{T("Potentially avoidable (estimate)", "可能可以省掉（估计）")}</span></div>
+          <div><b>{m.insufficient_evidence ?? 0}</b><span>{T("Insufficient evidence", "证据不够，判断不了")}</span></div>
+          {m.minutes_verified_avoidable > 0 && <div><b>{`${Math.round(m.minutes_verified_avoidable / 6) / 10} h`}</b><span>{T("Time on verified avoidable steps", "确认可以省掉的步骤花的时间")}</span></div>}
+          {m.cost_verified_avoidable > 0 && <div><b>{`${m.cost_verified_avoidable.toLocaleString()}${cur}`}</b><span>{T("Parts on verified avoidable steps", "确认可以省掉的步骤花的零件钱")}</span></div>}
         </div>)}
 
       {r && (
@@ -100,7 +118,7 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
           {r.steps.map((s: Any, i: number) => {
             const ws = w.steps[i] || {};
             return (
-              <li key={s.id} className={s.hindsight === "avoidable" || s.hindsight === "cheaper_first" ? st.replayHot : ""}>
+              <li key={s.id} className={s.hindsight === "verified_avoidable" || s.hindsight === "potentially_avoidable" ? st.replayHot : ""}>
                 <div className={st.replayHead}>
                   <span className={st.fine}>{[ws.when, L(KIND, s.kind), ws.minutes ? `${ws.minutes} min` : null, ws.cost ? `${ws.cost}${cur}` : null].filter(Boolean).join(" · ")}</span>
                   <b>{s.check}</b>
@@ -112,7 +130,9 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
                   <dt>{T("Before", "做之前")}</dt><dd>{zh ? L(BEFORE, s.before.verdict) : s.before.text}</dd>
                   {s.after && <><dt>{T("After", "做之后")}</dt><dd>{zh ? `${L(AFTER, s.after.verdict)}（${Number(s.after.values?.before_ratio).toFixed(2)}× → ${Number(s.after.values?.after_ratio).toFixed(2)}×）` : s.after.text}</dd></>}
                   {s.cheaper && <><dt>{T("Cheaper first", "更省的做法")}</dt><dd>{zh ? `${MEAS_ZH[s.cheaper.measurement] || s.cheaper.what}（${["看已有数据就行", "车停在场站就能做", "要装仪器实车起步"][s.cheaper.cost_tier] || ""}）` : `${s.cheaper.what} (${s.cheaper.cost_label})`}</dd></>}
-                  {s.hindsight !== "not_decidable" && <><dt>{T("In hindsight", "回头看")}</dt><dd>{L(HINDSIGHT, s.hindsight)}</dd></>}
+                  {s.hindsight && s.hindsight !== "not_assessed" && s.hindsight !== "not_decidable" && <><dt>{T("In hindsight", "回头看")}</dt><dd>{L(HINDSIGHT, s.hindsight)}
+                    {!zh && (s.hindsight_why || []).length > 0 && <span className={st.fine}>{` ${s.hindsight_why.join("; ")}.`}</span>}
+                    {zh && (s.hindsight_why || []).length > 0 && <span className={st.fine}>{`（${s.hindsight_why.map(whyZh).join("；")}）`}</span>}</dd></>}
                   {s.evidence.length > 0 && <><dt>{T("Lines", "相关日志")}</dt><dd className={st.replayLines}>{s.evidence.slice(0, 2).map((e: Any) => <code key={e.line}>{`${e.line}  ${e.quote}`}</code>)}</dd></>}
                 </dl>
               </li>);

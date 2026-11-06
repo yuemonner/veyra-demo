@@ -31,22 +31,34 @@ def test_the_inverter_swap_is_replayed_before_and_after():
     assert swap["before"]["verdict"] == "not_separable" and "could not tell" in swap["before"]["text"]
     assert swap["cheaper"]["measurement"] == "segment_r" and swap["cheaper"]["cost_tier"] == 1
     assert swap["after"]["verdict"] == "unchanged" and swap["after"]["values"]["after_ratio"] > 2.5
-    assert swap["hindsight"] == "cheaper_first" and swap["snapshots_before"] == 1 and swap["snapshots_after"] == 2
+    # a cheaper discriminating check existed, but the data before it was 12 days old: an estimate, not a verified saving
+    assert swap["hindsight"] == "potentially_avoidable" and swap["data_age_days"] == 12
+    assert swap["snapshots_before"] == 1 and swap["snapshots_after"] == 2
 
 
 def test_checks_the_log_could_answer_are_found_with_lines():
     s = {x["id"]: x for x in _replay()["steps"]}
     assert s["s1"]["before"]["verdict"] == "answerable" and "DTC" in s["s1"]["signals"]          # reading codes is not an inverter question
-    assert s["s3"]["hindsight"] == "avoidable" and s["s3"]["evidence"] and "SOC" in s["s3"]["signals"]
+    assert s["s3"]["evidence"] and "SOC" in s["s3"]["signals"]
     assert s["s4"]["signals"][0] == "HSA"
     for e in s["s3"]["evidence"]:
         assert LOG[e["line"] - 1].strip().startswith(e["quote"][:40])
 
 
-def test_summary_counts_time_and_money_and_the_signal_to_add():
+def test_regression_battery_check_is_not_called_avoidable():
+    """v1 called s3 (battery SOC and cells) avoidable because the signals were in the log. The battery was a contributing
+    factor: the data before it pointed toward the battery, and a later step (s4) found the BMS limit involved."""
+    s3 = {x["id"]: x for x in _replay()["steps"]}["s3"]
+    assert s3["hindsight"] == "insufficient_evidence"
+    assert any("later step (s4)" in w for w in s3["hindsight_why"])
+    assert any("pointed toward" in w for w in s3["hindsight_why"])
+
+
+def test_summary_counts_time_and_money_only_for_verified_avoidable():
     m = _replay()["summary"]
-    assert (m["steps"], m["not_the_issue"], m["avoidable"], m["cheaper_first"]) == (5, 2, 1, 1)
-    assert m["minutes_avoidable"] == 285 and m["cost_avoidable"] == 1800
+    assert (m["steps"], m["not_the_issue"], m["verified_avoidable"], m["potentially_avoidable"], m["insufficient_evidence"]) == (5, 2, 0, 1, 1)
+    assert m["minutes_verified_avoidable"] == 0 and m["cost_verified_avoidable"] == 0
+    assert not any(k in m for k in ("avoidable", "cheaper_first", "minutes_avoidable", "cost_avoidable"))
     assert m["signal_additions"][0]["what"].startswith("per-branch DC current") and m["signal_additions"][0]["steps"] == ["s2", "s5"]
 
 
@@ -71,11 +83,11 @@ def test_the_ledger_validates_a_walkthrough(tmp_path):
         store.append(cid, "debug_walkthrough", WALK, actor="Engineer", source="test")
         rc = R.replay_case(store, cid)
         assert rc["walkthrough"]["verification_grade"] == "engineer_reported_not_independently_reviewed"
-        assert rc["replay"]["summary"]["cheaper_first"] == 1
+        assert rc["replay"]["summary"]["potentially_avoidable"] == 1 and rc["replay"]["summary"]["verified_avoidable"] == 0
         tried = inv._case_context(store, cid)["engineers_already_tried"]
         assert tried[1]["data_after"] == "unchanged" and tried[1]["result"] == "not_the_issue"
         f = R.fleet(store)
-        assert f["cases"] == 1 and f["systems"][0]["architecture"] == "modular" and f["systems"][0]["share_wasted_avoidable"] == 1.0
+        assert f["cases"] == 1 and f["systems"][0]["architecture"] == "modular" and f["systems"][0]["share_verified_avoidable"] == 0.0
     finally:
         store.close()
 
@@ -115,3 +127,30 @@ def test_api_round_trip(tmp_path, monkeypatch):
         assert bad.status_code == 422
         ok = c.post(f"/engine/cases/{cid}/walkthrough", json={"system": "HV", "steps": [{"check": "Replaced the FR inverter", "kind": "swap", "result": "not_the_issue", "when": "2026-10-21", "minutes": 240}]})
         assert ok.status_code == 200 and ok.json()["replay"]["steps"][0]["after"]["verdict"] == "unchanged"
+
+
+def test_fresh_no_anomaly_is_verified_and_stale_is_not():
+    st = {"before": {"verdict": "no_anomaly"}, "data_age_days": 1, "points_toward": []}
+    step = {"check": "swap FR inverter", "result": "not_the_issue"}
+    assert R._hindsight(st, step, [])[0] == "verified_avoidable"
+    assert R._hindsight(dict(st, data_age_days=5), step, [])[0] == "potentially_avoidable"
+    later = [{"id": "s9", "check": "FR inverter firmware", "result": "partly"}]
+    assert R._hindsight(st, step, later)[0] == "insufficient_evidence"
+
+
+def test_live_replay_is_consistent_with_the_blind_benchmark():
+    """Same synthetic case through the benchmark (frozen protocol v1) and the live replay: the replay never claims more."""
+    import sys
+    sys.path.insert(0, str(ROOT / "backend/research/investigation_benchmark"))
+    import run as H
+    b = H.run_case(str(ROOT / "backend/research/investigation_benchmark/cases/shuttle-synthetic"))
+    truth_causes = {b["truth"]["main_cause"], *b["truth"]["contributing"]}
+    rp = {x["id"]: x for x in _replay()["steps"]}
+    verified_b = {v["step"] for v in b["score"]["avoidable"]["verified"]}
+    assert {i for i, x in rp.items() if x["hindsight"] == "verified_avoidable"} <= verified_b
+    case = H.load_case(str(ROOT / "backend/research/investigation_benchmark/cases/shuttle-synthetic"))
+    for st in case["steps"]:
+        if set(H.J.targets(st, case["space"])) & truth_causes:
+            assert rp[st["id"]]["hindsight"] not in ("verified_avoidable", "potentially_avoidable"), st["id"]
+    est_b = {e["step"] for e in b["score"]["avoidable"]["estimated"]}
+    assert est_b <= {i for i, x in rp.items() if x["hindsight"] == "potentially_avoidable"}

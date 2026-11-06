@@ -27,8 +27,16 @@ from datetime import date
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.physics import electrical as E
+from app.physics import expected as X
 
-VERSION = "debug-replay-v1"
+VERSION = "debug-replay-v2"
+# v2 (2026-11-06): hindsight split into verified avoidable / potentially avoidable / insufficient evidence; time and
+# parts are totalled only for verified avoidable steps. v1 called a step "avoidable" whenever its signals were in the
+# log, which labelled the shuttle's battery check avoidable although the battery was a contributing factor.
+STALE_DAYS = 1
+# the SYNONYMS groups that name a component or function (not a measured quantity): used to see whether a later step
+# implicated the same thing
+COMPONENT_GROUPS = {1, 2, 4, 7, 8, 12, 13, 14}
 
 WHEEL_WORDS = {"FL": r"\bFL\b|front[- ]left|左前", "FR": r"\bFR\b|front[- ]right|右前", "RL": r"\bRL\b|rear[- ]left|左后", "RR": r"\bRR\b|rear[- ]right|右后"}
 PHYSICAL = re.compile(r"inspect|visual|look(ed)? at|re-?torque|torqu(ed|ing) the|reseat|re-?crimp|crimp|clean|corros|discolou?r|burn|multimeter|"
@@ -201,11 +209,83 @@ def replay_step(step: Dict[str, Any], lines: List[str], spans, elec_all: Optiona
                 out["before"] = {"verdict": "not_in_data", "how": "none",
                                  "text": "Nothing in this log answers it. If a signal on the vehicle would, it should be logged."}
                 out["needs"] = ["a signal for: " + (step.get("part") or step["check"])[:80]]
-    # 3. what the step is worth in hindsight
-    avoidable = step["result"] == "not_the_issue" and out["before"]["verdict"] in ("answerable", "weakened", "no_anomaly")
-    redirectable = step["result"] == "not_the_issue" and out["before"]["verdict"] == "not_separable" and out["cheaper"] is not None
-    out["hindsight"] = ("avoidable" if avoidable else "cheaper_first" if redirectable else "needed" if step["result"] in ("fault_found", "partly") else "not_decidable")
+    # 3. what the step is worth in hindsight (filled in by _hindsight, which also needs the later steps)
+    out["data_age_days"] = (when - spans_before_latest(spans, when)).days if when and spans_before_latest(spans, when) else None
+    out["points_toward"] = _points_toward(before_lines, text) if n_before else []
     return out
+
+
+def spans_before_latest(spans, when: date) -> Optional[date]:
+    ds = [s[2] for s in spans if s[2] is not None and s[2] < when]
+    return max(ds) if ds else None
+
+
+def _groups(text: str) -> set:
+    return {i for i, (pat, _) in enumerate(SYNONYMS) if i in COMPONENT_GROUPS and re.search(pat, text, re.I)}
+
+
+def _points_toward(before_lines: List[str], text: str) -> List[str]:
+    """Limit relations (a value against the limit a component sets) that the data before the step showed broken, and
+    whose signals belong to what the step tested. Such a step was testing something the data pointed toward."""
+    names = [n for i, (pat, ns) in enumerate(SYNONYMS) if i in COMPONENT_GROUPS and re.search(pat, text, re.I) for n in ns]
+    if not names:
+        return []
+    try:
+        ex = X.analyse(before_lines)
+    except Exception:  # noqa: BLE001
+        return []
+    if not ex or not ex.get("applies"):
+        return []
+    spec = next((x for x in X.load_specs() if x["id"] == (ex.get("spec") or {}).get("id")), {})
+    items = {i["id"]: i for i in spec.get("expectations") or []}
+    out = []
+    for sn in ex.get("snapshots") or []:
+        for r in sn.get("results") or []:
+            it = items.get(r["id"]) or {}
+            if r.get("status") == "violated" and it.get("kind") == "holds" and it.get("ref"):
+                sig = f"{it.get('signal')} {it.get('ref')}"
+                if any(n.lower() in sig.lower() for n in names) and r["text"] not in out:
+                    out.append(r["text"])
+    return out
+
+
+def _hindsight(st: Dict[str, Any], step: Dict[str, Any], later: List[Dict[str, Any]]) -> Tuple[str, List[str]]:
+    """verified_avoidable / potentially_avoidable / insufficient_evidence for a step that was not the issue."""
+    if step["result"] in ("fault_found", "partly"):
+        return "needed", []
+    if step["result"] != "not_the_issue":
+        return "not_assessed", ["the step's result was inconclusive"]
+    verdict = (st.get("before") or {}).get("verdict")
+    g = _groups(f"{step.get('check', '')} {step.get('part') or ''}")
+    implicated = [l["id"] for l in later if l["result"] in ("fault_found", "partly")
+                  and g & _groups(f"{l.get('check', '')} {l.get('part') or ''} {l.get('decided_by') or ''}")]
+    blockers = []
+    if implicated:
+        blockers.append(f"a later step ({', '.join(implicated)}) found the same part or function involved, so it may be a contributing factor")
+    if st.get("points_toward"):
+        blockers.append("the data before this step pointed toward it: " + "; ".join(st["points_toward"]))
+    if verdict in (None, "not_in_data", "physical_only", "later_data"):
+        blockers.append("the data before this step could not answer it")
+    if blockers:
+        return "insufficient_evidence", blockers
+    age = st.get("data_age_days")
+    fresh = age is not None and age <= STALE_DAYS
+    if verdict == "no_anomaly" and fresh:
+        return "verified_avoidable", ["a computed relation in data recorded within a day before the step showed no anomaly where the step looked"]
+    why = []
+    if verdict == "no_anomaly":
+        why.append(f"a computed relation showed no anomaly where the step looked, but the data was {age} days old")
+    elif verdict == "weakened":
+        why.append("the data argued against it, but only as an inference (weakened, not excluded)")
+    elif verdict == "answerable":
+        why.append("the signals that answer it were in the log; nobody has checked that they would have read normal")
+    elif verdict == "not_separable" and st.get("cheaper"):
+        why.append("a cheaper check that separates it from the other explanations existed: " + st["cheaper"]["what"])
+    else:
+        return "insufficient_evidence", ["nothing in the data before the step argued against it"]
+    if age is not None and age > STALE_DAYS and verdict != "no_anomaly":
+        why.append(f"the data before it was {age} days old")
+    return "potentially_avoidable", why
 
 
 def replay(lines: List[str], walkthrough: Dict[str, Any]) -> Dict[str, Any]:
@@ -213,18 +293,21 @@ def replay(lines: List[str], walkthrough: Dict[str, Any]) -> Dict[str, Any]:
     if spans and all(s[2] is None for s in spans):
         spans = []
     elec = E.analyse(lines) if lines else None
-    steps = [replay_step(st, lines, spans, elec) for st in walkthrough.get("steps") or []]
+    ws = walkthrough.get("steps") or []
+    steps = [replay_step(st, lines, spans, elec) for st in ws]
+    for i, (st, out) in enumerate(zip(ws, steps)):
+        out["hindsight"], out["hindsight_why"] = _hindsight(out, st, ws[i + 1:])
     return {"version": VERSION, "steps": steps, "summary": summarise(walkthrough, steps),
             "electrical": bool(elec and elec.get("assessments")),
-            "boundary": "Replays the engineers' account against the recorded data. 'Answerable' means the signals are in the log, "
-                        "not that Veyra has read them correctly; nothing here confirms a cause."}
+            "boundary": "Replays the engineers' account against the data recorded before each step. Only verified avoidable steps "
+                        "count time and parts; potentially avoidable is an estimate with no time or money attached. Nothing here confirms a cause."}
 
 
 def summarise(w: Dict[str, Any], steps: List[Dict[str, Any]]) -> Dict[str, Any]:
     by_id = {s["id"]: s for s in w.get("steps") or []}
     nti = [s for s in steps if s["result"] == "not_the_issue"]
-    avoid = [s for s in nti if s["hindsight"] == "avoidable"]
-    cheaper = [s for s in nti if s["hindsight"] == "cheaper_first"]
+    by = lambda h: [s for s in nti if s["hindsight"] == h]  # noqa: E731
+    ver, pot, ins = by("verified_avoidable"), by("potentially_avoidable"), by("insufficient_evidence")
     mins = lambda xs: sum((by_id[s["id"]].get("minutes") or 0) for s in xs)  # noqa: E731
     cost = lambda xs: sum((by_id[s["id"]].get("cost") or 0) for s in xs)  # noqa: E731
     counts: Dict[str, int] = {}
@@ -235,10 +318,10 @@ def summarise(w: Dict[str, Any], steps: List[Dict[str, Any]]) -> Dict[str, Any]:
     for s in steps:
         for n in s["needs"]:
             adds.setdefault(n, []).append(s["id"])
-    return {"steps": len(steps), "not_the_issue": len(nti), "avoidable": len(avoid), "cheaper_first": len(cheaper),
-            "verdicts": counts, "data_speaks_to": data_could,
-            "minutes_not_the_issue": mins(nti), "minutes_avoidable": mins(avoid) + mins(cheaper),
-            "cost_not_the_issue": cost(nti), "cost_avoidable": cost(avoid) + cost(cheaper), "currency": w.get("currency"),
+    return {"steps": len(steps), "not_the_issue": len(nti), "verified_avoidable": len(ver), "potentially_avoidable": len(pot),
+            "insufficient_evidence": len(ins), "verdicts": counts, "data_speaks_to": data_could,
+            "minutes_not_the_issue": mins(nti), "cost_not_the_issue": cost(nti),
+            "minutes_verified_avoidable": mins(ver), "cost_verified_avoidable": cost(ver), "currency": w.get("currency"),
             "confirmed_after": sum(1 for s in steps if (s.get("after") or {}).get("verdict") in ("unchanged", "resolved")),
             "signal_additions": [{"what": k, "steps": v} for k, v in sorted(adds.items(), key=lambda kv: -len(kv[1]))]}
 
@@ -249,15 +332,17 @@ def fleet_summary(cases: List[Dict[str, Any]]) -> Dict[str, Any]:
     for c in cases:
         w, s = c["walkthrough"], c["replay"]["summary"]
         key = (w.get("system") or "unspecified", w.get("architecture") or "unknown")
-        g = groups.setdefault(key, {"system": key[0], "architecture": key[1], "cases": 0, "steps": 0, "not_the_issue": 0, "avoidable": 0,
-                                    "cheaper_first": 0, "data_speaks_to": 0, "minutes_avoidable": 0, "minutes_not_the_issue": 0})
+        g = groups.setdefault(key, {"system": key[0], "architecture": key[1], "cases": 0, "steps": 0, "not_the_issue": 0, "verified_avoidable": 0,
+                                    "potentially_avoidable": 0, "insufficient_evidence": 0, "data_speaks_to": 0,
+                                    "minutes_verified_avoidable": 0, "minutes_not_the_issue": 0})
         g["cases"] += 1
-        for k in ("steps", "not_the_issue", "avoidable", "cheaper_first", "data_speaks_to", "minutes_avoidable", "minutes_not_the_issue"):
+        for k in ("steps", "not_the_issue", "verified_avoidable", "potentially_avoidable", "insufficient_evidence", "data_speaks_to",
+                  "minutes_verified_avoidable", "minutes_not_the_issue"):
             g[k] += s[k]
     rows = sorted(groups.values(), key=lambda g: -g["cases"])
     for g in rows:
         g["share_data_speaks_to"] = round(g["data_speaks_to"] / g["steps"], 2) if g["steps"] else None
-        g["share_wasted_avoidable"] = round((g["avoidable"] + g["cheaper_first"]) / g["not_the_issue"], 2) if g["not_the_issue"] else None
+        g["share_verified_avoidable"] = round(g["verified_avoidable"] / g["not_the_issue"], 2) if g["not_the_issue"] else None
     return {"version": VERSION, "systems": rows, "cases": len(cases),
             "note": "Feasibility from the engineers' own walkthroughs. Few cases per system means wide uncertainty; read it as a direction."}
 
