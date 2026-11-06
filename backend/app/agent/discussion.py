@@ -53,6 +53,10 @@ Claim scope: the evidence has a vantage point. A log written by the receiving si
 it never observes what the sender transmitted or what was on the cable. Write observed claims from the vantage point
 ("the agent received 36 zero bytes"), and mark anything beyond it as inferred.
 Every number you write must come from a tool result you cite or a line you quote. Quote lines exactly.
+Safety: prefer checks on data already recorded, simulation or a bench test. A check that touches high voltage, runs or
+moves the machine, or reproduces the fault on purpose is hazardous: set needs_approval, say a qualified engineer must
+review it, and name the safer check if one answers the same question.
+An engineer's report is reported evidence: it can make an area leading, never a confirmed cause.
 Never claim a confirmed root cause. Name hypotheses by area in text people read; ids only in keeps / rules_out / weakens.
 Finish by calling submit_round exactly once."""
 
@@ -205,6 +209,7 @@ def verify_round(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]
     problems += inv.check_acquisition(cleaned, raw, outputs, ids)
     problems += inv.check_physics(cleaned, outputs, next_key="next_check")
     problems += inv.check_expected(cleaned, outputs)
+    problems += inv.check_safety(cleaned, raw, next_key="next_check")
     if inv._CONFIRMED.search(cleaned.get("reply") or ""):
         problems.append("Do not state a confirmed root cause in the reply")
     cleaned["hypotheses"] = inv.reviewed_hypotheses(cleaned.get("hypotheses"))[0]

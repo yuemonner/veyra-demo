@@ -125,15 +125,19 @@ export function Electrical({ caseId, call }: { caseId: string; call: Call }) {
             <span className={st.isoHead}>{T("Measurements that would separate them, cheapest first:", "能把它们区分开的测量（按成本从低到高）：")}</span>
             <ol className={st.measList}>
               {plan.map((m: Any) => {
-                const rec = m.id === a.recommended;
+                const sp = a.safety_plan || {};
+                const rec = m.id === (sp.recommended || a.recommended);
+                const then = !!sp.then && m.id === sp.then;
                 const M = MEAS[m.id];
                 return (
                   <li key={m.id} className={rec ? st.measRec : !m.discriminates ? st.measDim : ""}>
-                    {rec && <span className={st.recTag}>{T("Recommended", "建议先做")}</span>}
+                    {rec && <span className={st.recTag}>{sp.recommended ? T("Do first: the safest check that separates them", "建议先做：能区分的检查里最安全的") : T("Recommended", "建议先做")}</span>}
+                    {then && <span className={st.recTag}>{sp.then_requires_review ? T("Then, after review by a qualified engineer", "然后：经有资质的工程师审核后再做") : T("Then", "然后")}</span>}
                     <b>{M ? M[zh ? 1 : 0].replace("{w}", a.wheel) : m.what}</b>
                     <span className={st.fine}>{`${COST[m.cost] ? COST[m.cost][zh ? 1 : 0] : m.cost_label}${m.needs_approval ? T(" · needs an engineer's approval", " · 需要工程师批准") : ""} · ${m.strength === "strong" ? T("separates clearly", "区分清楚") : T("weak evidence", "弱证据")}${!m.discriminates ? T(" · does not separate the open candidates", " · 分不开剩下的可能") : ""}`}</span>
                     {m.discriminates && !zh && <ul className={st.expect}>{Object.entries(m.expected || {}).map(([c, e]: [string, Any]) => <li key={c}><i>{`If ${CAND[c] ? CAND[c][0] : c}:`}</i> {e}</li>)}</ul>}
                     <span className={st.blindSpot}>{M ? M[zh ? 3 : 2] : m.blind_spot}</span>
+                    {m.safety && <span className={m.safety.hazardous ? st.provReported : st.fine}>{`${zh ? m.safety.label_zh : m.safety.label}${m.safety.requires_review ? T(" · needs review by a qualified engineer before it is done", " · 做之前必须由有资质的工程师审核") : ""}`}</span>}
                   </li>);
               })}
             </ol>

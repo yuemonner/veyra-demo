@@ -311,6 +311,38 @@ def _run_investigation(job, db, case_id, allow_model, actor):
         store.close()
 
 
+def _with_safety(store, case_id: str, payloads, key: str):
+    """Annotate each next action / next check with its hazard class and the review it needs (computed when read; the
+    stored record is not changed)."""
+    from app.agent import experiment_safety
+    from app.agent.investigator import LogTools
+    try:
+        hv = experiment_safety.has_hv(experiment_safety.system_voltage(LogTools(store, case_id).raw or []), (store.case(case_id) or {}).get("title", ""))
+    except Exception:  # noqa: BLE001
+        hv = False
+    for p in payloads:
+        r = (p or {}).get("result")
+        if isinstance(r, dict) and isinstance(r.get(key), dict):
+            r[key] = {**r[key], "safety": experiment_safety.classify(r[key], hv_system=hv)}
+    return payloads
+
+
+@router.get("/cases/{case_id}/state")
+def get_case_state(case_id: str, request: Request):
+    """The case's canonical, versioned state: current findings (the latest assessment), counts, status, the latest
+    discussion round, earlier conclusions marked superseded, claim provenance, the next action's safety, and what each
+    engineer input changed."""
+    from app.agent import case_state
+    from app.engine_api import store_path
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(store_path(request))
+    try:
+        store.case(case_id)
+        return case_state.build(store, case_id)
+    finally:
+        store.close()
+
+
 @router.get("/cases/{case_id}/investigation")
 def get_investigation(case_id: str, request: Request):
     from app.agent import investigator
@@ -333,7 +365,9 @@ def get_investigation(case_id: str, request: Request):
         rounds = [e["payload"] for e in store.ledger(case_id) if e["kind"] == "agent_report"
                   and e["payload"].get("kind") == "autonomous_investigation" and e["payload"].get("mode") == "agent"]
         previous = investigator.reviewed_hypotheses((rounds[-2].get("result") or {}).get("hypotheses"))[0] if len(rounds) > 1 else None
-        return {"investigation": investigator.latest(store, case_id), "findings": findings, "playback": playback, "notes": list(notes.values()),
+        latest_inv = investigator.latest(store, case_id)
+        _with_safety(store, case_id, [latest_inv] + ((playback or {}).get("investigations") or []), "next_action")
+        return {"investigation": latest_inv, "findings": findings, "playback": playback, "notes": list(notes.values()),
                 "previous_hypotheses": previous,
                 "agent": {"configured": bool(model and model.available()), "model": getattr(model, "model", None) if model else None,
                           "allowed": bool(model and egress_allowed(store, case_id, model.provider))},
@@ -610,7 +644,7 @@ def get_discussion(case_id: str, request: Request):
     store = CaseStore(store_path(request))
     try:
         model = _investigator_model()
-        return {"rounds": discussion.rounds_of(store, case_id), "hypotheses": discussion.current_hypotheses(store, case_id),
+        return {"rounds": _with_safety(store, case_id, discussion.rounds_of(store, case_id), "next_check"), "hypotheses": discussion.current_hypotheses(store, case_id),
                 "agent": {"configured": bool(model and model.available()), "model": getattr(model, "model", None) if model else None,
                           "allowed": bool(model and egress_allowed(store, case_id, model.provider))}}
     finally:

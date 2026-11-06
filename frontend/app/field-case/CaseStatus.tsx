@@ -53,9 +53,11 @@ export function CaseStatus({ ladder, metrics, result, caseId, call, actor, onCha
         {rungs.map((r) => (
           <li key={r.level} className={r.reached ? st.rungOn : st.rung}>
             <b>{r.label}</b>
-            {r.reached ? <span>{`${r.reached.by} · ${String(r.reached.at || "").slice(0, 10)}`}</span> : <span className={st.needs}>{r.needs}</span>}
+            {r.reached ? <span>{`${r.reached.by} · ${String(r.reached.at || "").slice(0, 10)}`}{r.reached.provenance === "engineer_reported" ? (zh ? " · 工程师报告，未附数据" : " · engineer reported, no data attached") : ""}</span> : <span className={st.needs}>{r.needs}</span>}
           </li>))}
       </ol>
+      {ladder.engineer_reported_confirmation && <p className={st.fine}>{zh ? `工程师记录了原因已确认（${ladder.engineer_reported_confirmation.method || ""}）。没有带数据的记录支持，所以不算“已验证”。`
+        : `The engineer recorded the cause as confirmed (${ladder.engineer_reported_confirmation.method || "no method"}). No record with data backs it, so it is not counted as verified.`}</p>}
       {ladder.next && ladder.next.level !== "probable" && !form && (
         <div className={st.row}>
           <button className={st.ghost} onClick={() => setForm({ environment: "field", setup: "", result: "reproduced", observations: "" })}>Record a reproduction</button>

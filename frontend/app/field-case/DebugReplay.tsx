@@ -143,7 +143,7 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
           <span className={st.blindHead}>{T("Logging this would let the data settle more of these steps", "以后多记录下面这些数据，很多步骤看数据就能定")}</span>
           <ul>{m.signal_additions.map((a: Any) => <li key={a.what}><b>{zh && a.what.startsWith("per-branch") ? "在 CAN 上记录每一路的直流电流（这样就能分清是线路电阻大，还是逆变器用电多）" : a.what}</b><span>{T(`Steps ${a.steps.join(", ")}`, `涉及步骤 ${a.steps.join("、")}`)}</span></li>)}</ul>
         </div>)}
-      {w?.final_cause && <p className={st.fine}>{T(`Engineers' conclusion: ${w.final_cause}`, `最后查出来的原因：${w.final_cause}`)}</p>}
+      {w?.final_cause && <p className={st.fine}>{T(`Engineers' reported conclusion (not verified: no record with data confirms it): ${w.final_cause}`, `工程师报告的结论（未验证：没有带数据的记录证实它）：${w.final_cause}`)}</p>}
 
       {edit && (
         <div className={st.reproForm}>

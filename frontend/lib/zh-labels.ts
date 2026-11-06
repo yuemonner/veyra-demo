@@ -69,7 +69,8 @@ export const DICT: Record<string, string> = {
   "Loading the discussion…": "正在加载讨论…",
   "No discussion recorded for this case. Live rounds need the AI investigator, which is off here.": "这个案例没有录制讨论。实时讨论需要 AI investigator，这里没有开启。",
   // Investigator steps (from the engine, shown as they ran)
-  " · where the case stands now.": " · 案例当前的结论。", "· where the case stands now.": "· 案例当前的结论。",
+  " · where the case stands now.": " · 案例当前的结论。", " · the last investigation round; the case continued in the discussion (current state at the top).": " · 这是最后一轮排查；之后在讨论里继续（当前状态见页面顶部）。",
+  "Hazardous check: needs review by a qualified engineer before anyone runs it.": "有危险的检查：任何人动手之前，必须由有资质的工程师审核。", "· where the case stands now.": "· 案例当前的结论。",
   "supports": "支持", "weakens": "削弱", "against": "反对", "Looking for the earlier workspace?": "找旧版工作区？", "Open it": "打开",
   "(manual analysis, older engine).": "（手动分析，旧版引擎）。", "now leading": "变为最可能", "reopened": "重新待查",
   "How sure we are": "结论有多可靠", "Download quality record (CSV)": "下载质量记录（CSV）", "Reproduced": "已复现", "Verified": "已验证",
@@ -99,6 +100,7 @@ export const RULES: [RegExp, (...m: string[]) => string][] = [
   [/^Effects, not causes \((\d+)\)$/, (_, n) => `是结果，不是原因（${n}）`],
   [/^How Veyra investigated \((\d+) steps\)$/, (_, n) => `Veyra 的排查过程（${n} 步）`],
   [/^Your next action(?: · (.+))?$/, (_, w) => `你的下一步动作${w ? ` · ${WHERE[w] || w}` : ""}`],
+  [/^Next action proposed by this investigation round \(superseded: the current next check is at the top\)(?: · (.+))?$/, (_, w) => `这一轮排查提出的下一步（已被取代：当前的下一步见页面顶部）${w ? ` · ${WHERE[w] || w}` : ""}`],
   [/^(\d+) of (\d+) still possible$/, (_, a, b) => `${b} 个里还有 ${a} 个可能`],
   [/^· seen at: (.+)$/, (_, w) => `· 观测位置：${w}`],
   [/^Leading: (.+) · (\d+) of (\d+) still possible$/, (_, l, a, b) => `最可能：${l === "none" ? "无" : l} · ${b} 个里还有 ${a} 个可能`],

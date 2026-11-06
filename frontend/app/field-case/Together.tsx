@@ -187,6 +187,7 @@ export function DiscussionStatus({ data, onOpen }: { data: DiscussionData; onOpe
     <div className={t.since}>
       <span className={t.partsHead}>{`Since this investigation · ${rounds.length} round${rounds.length > 1 ? "s" : ""} of discussion with the AI investigator${rounds.some((r: Any) => r.recorded) ? " (recorded)" : ""}`}</span>
       <p><b>{`Latest next check (round ${rounds.length}):`}</b> {last.result.next_check?.action}</p>
+      {last.result.next_check?.safety?.hazardous && <p className={t.note}>Hazardous check: needs review by a qualified engineer before anyone runs it.</p>}
       {lead.length > 0 && <p><b>Leading now:</b> {lead.join(", ")}</p>}
       {open && <p><b>Still open:</b> {open}</p>}
       <button className={t.link} onClick={onOpen}>Open the discussion</button>

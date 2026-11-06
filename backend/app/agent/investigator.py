@@ -101,6 +101,10 @@ Rules:
 - Give each hypothesis that is not ruled out a role: main_cause (removing it removes the fault), trigger (a condition or
   event that lets the fault show, without being the fault), amplifier (makes it worse or decides where it shows first),
   or effect (a consequence of the fault). A failure often has one main cause and several triggers and amplifiers.
+- Safety: prefer a check on data already recorded, a simulation or a bench test. A check that touches high voltage, runs or
+  moves the machine, or reproduces the fault on purpose is hazardous: set needs_approval, say a qualified engineer must
+  review it, and name the safer check if one answers the same question.
+- An engineer's report is reported evidence: it can make an area leading, never a confirmed cause.
 Finish by calling submit_report exactly once."""
 
 SUBMIT_SPEC = {
@@ -249,14 +253,23 @@ class LogTools:
 
     def electrical_full(self) -> Dict[str, Any]:
         """Physics relations over a decoded CAN log, in full (for the case page)."""
+        from app.agent import experiment_safety
         from app.physics import electrical
-        return electrical.analyse(self.raw) or {"applies": False}
+        return experiment_safety.annotate_electrical(electrical.analyse(self.raw), hv_system=experiment_safety.has_hv(experiment_safety.system_voltage(self.raw))) or {"applies": False}
 
     def electrical(self) -> Dict[str, Any]:
         """What the agent is given: measured and model-derived findings with their assumptions, the mechanisms the recorded
         signals cannot separate, and the measurement plan."""
+        from app.agent import experiment_safety
         from app.physics import electrical
-        return electrical.agent_view(electrical.analyse(self.raw))
+        r = experiment_safety.annotate_electrical(electrical.analyse(self.raw), hv_system=experiment_safety.has_hv(experiment_safety.system_voltage(self.raw)))
+        out = electrical.agent_view(r)
+        if r and r.get("assessments"):
+            out["safety"] = {a["wheel"]: {**a["safety_plan"], "measurements": {m["id"]: {"hazard": m["safety"]["worst"], "requires_review": m["safety"]["requires_review"]}
+                                                                               for m in a["measurements"]}} for a in r["assessments"]}
+            out["how_to_use"] += (" Each measurement carries its hazard: prefer the safety plan's order; a hazardous one (high voltage, "
+                                  "the machine in operation, or reproducing the fault) must say it needs review by a qualified engineer.")
+        return out
 
     def _line(self, n: int) -> Dict[str, Any]:
         p = self.parsed.get(n)
@@ -519,6 +532,7 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
     problems += check_acquisition(cleaned, raw, outputs, ids)
     problems += check_physics(cleaned, outputs)
     problems += check_expected(cleaned, outputs)
+    problems += check_safety(cleaned, raw)
     ev = []
     for g in cleaned.get("events") or []:
         g["lines"] = [n for n in g.get("lines") or [] if isinstance(n, int) and 1 <= n <= len(raw)]
@@ -649,6 +663,20 @@ def check_physics(cleaned: Dict[str, Any], outputs: Dict[str, str], next_key: st
                     problems.append(f"the electrical check's lowest-cost discriminating measurement is: {m.get('what', rec)}. Use it as the next action "
                                     "(with what each candidate predicts), or list it under unobservable with how to observe it")
     return problems
+
+
+def check_safety(cleaned: Dict[str, Any], raw: List[str], next_key: str = "next_action") -> List[str]:
+    """A hazardous next check (high voltage, the machine in operation, or reproducing the fault) must say it needs an
+    engineer's approval, and must not be offered as a routine step."""
+    from app.agent import experiment_safety
+    na = cleaned.get(next_key)
+    if not isinstance(na, dict) or not na.get("action"):
+        return []
+    s = experiment_safety.classify(na, hv_system=experiment_safety.has_hv(experiment_safety.system_voltage(raw)))
+    if s["hazardous"] and not na.get("needs_approval"):
+        return [f"{next_key}: this check is {', '.join(c.replace('_', ' ') for c in s['classes'] if c in experiment_safety.HAZARDOUS)}; "
+                "set needs_approval true, and prefer an offline, simulation or bench check that answers the same question if one exists"]
+    return []
 
 
 def check_expected(cleaned: Dict[str, Any], outputs: Dict[str, str]) -> List[str]:
@@ -1053,36 +1081,51 @@ def record(store, case_id: str) -> Dict[str, Any]:
 LADDER = [
     {"level": "probable", "label": "Probable cause", "needs": "An investigation that points to one explanation, with the main alternatives weakened or ruled out by the data."},
     {"level": "reproduced", "label": "Reproduced", "needs": "The symptom reproduced on purpose under stated conditions (bench, field or simulation), recorded by an engineer."},
-    {"level": "verified", "label": "Verified", "needs": "Confirmed by inspection, by reproduction, or by data showing the fix removed the fault and it held."},
+    {"level": "verified", "label": "Verified", "needs": "A record linked to data: the fix removed the fault in data recorded after it, or a reproduction recorded with its data. "
+                                                         "An engineer's word alone (an inspection note, 'the fix held') is shown as reported, not verified."},
 ]
 
 
 def verification_ladder(store, case_id: str) -> Dict[str, Any]:
     """Where the case stands on the way from a probable cause to a verified one, from the append-only record. Veyra can
-    only reach 'probable' on its own; 'reproduced' and 'verified' need records an engineer writes (a reproduction attempt,
-    a closure confirmed by inspection, reproduction or a fix that held)."""
+    only reach 'probable' on its own; 'reproduced' and 'verified' need records an engineer writes. 'Verified' needs a
+    verified outcome (provenance.verified_outcomes: a record carrying data); a closure confirmed by an engineer's
+    inspection note or a fix that 'held' by their word is kept as engineer-reported and does not reach it."""
+    from app.agent import provenance as prov
     led = store.ledger(case_id)
     case = store.case(case_id)
     reached: Dict[str, Dict[str, Any]] = {}
+    reported: List[Dict[str, Any]] = []
     agent = [e for e in led if e["kind"] == "agent_report" and e["payload"].get("kind") == "autonomous_investigation" and e["payload"].get("mode") == "agent"]
     last = agent[-1] if agent else None
     if last and (last["payload"].get("result") or {}).get("status") == "cause_probable":
-        reached["probable"] = {"at": last["recorded_at"], "by": "Veyra", "evidence": (last["payload"].get("result") or {}).get("headline")}
+        reached["probable"] = {"at": last["recorded_at"], "by": "Veyra", "evidence": (last["payload"].get("result") or {}).get("headline"),
+                               "provenance": "model_inference"}
+    verified = prov.verified_outcomes(led)
     for e in led:
         p = e["payload"]
         if e["kind"] == "reproduction_attempt" and p.get("result") == "reproduced":
-            reached["reproduced"] = {"at": e["recorded_at"], "by": e["actor"], "evidence": f"{p.get('environment')}: {p.get('setup')} -> {p.get('observations')}"}
+            with_data = bool(p.get("evidence"))
+            reached["reproduced"] = {"at": e["recorded_at"], "by": e["actor"], "evidence": f"{p.get('environment')}: {p.get('setup')} -> {p.get('observations')}",
+                                     "provenance": "verified_outcome" if with_data else "engineer_reported",
+                                     **({} if with_data else {"note": "Reported by the engineer; no data is attached to the reproduction."})}
         if e["kind"] == "case_closure":
             if p.get("investigation_status") in ("cause_probable", "cause_confirmed") and "probable" not in reached:
-                reached["probable"] = {"at": e["recorded_at"], "by": e["actor"], "evidence": p.get("cause")}
+                reached["probable"] = {"at": e["recorded_at"], "by": e["actor"], "evidence": p.get("cause"), "provenance": "engineer_reported"}
             if p.get("investigation_status") == "cause_confirmed" or p.get("fix_held") == "held":
-                reached["verified"] = {"at": e["recorded_at"], "by": e["actor"],
-                                       "evidence": p.get("evidence_note") or p.get("cause") or "", "method": p.get("confirmed_by") or ("fix held" if p.get("fix_held") == "held" else None)}
+                reported.append({"at": e["recorded_at"], "by": e["actor"], "evidence": p.get("evidence_note") or p.get("cause") or "",
+                                 "method": p.get("confirmed_by") or ("fix held" if p.get("fix_held") == "held" else None), "provenance": "engineer_reported"})
+    for v in verified:
+        if v["kind"] == "fix_verified_by_data" or (v["kind"] == "mechanism_reproduced" and any(
+                e["kind"] == "case_closure" and e["payload"].get("investigation_status") == "cause_confirmed" and v["entry"] in (e["payload"].get("evidence_entries") or [])
+                for e in led)):
+            reached["verified"] = {"at": v["at"], "by": "record", "evidence": v["scope"], "method": v["kind"], "provenance": "verified_outcome", "entries": [v["entry"]]}
     level = next((r["level"] for r in reversed(LADDER) if r["level"] in reached), "open")
     nxt = next((r for r in LADDER if r["level"] not in reached), None)
     run = store.latest_run(case_id) or {}
     report = next((e["payload"].get("stated_reason") for e in led if e["kind"] == "intervention_report"), None)
     return {"level": level, "rungs": [{**r, "reached": reached.get(r["level"])} for r in LADDER],
+            "engineer_reported_confirmation": reported[-1] if reported and "verified" not in reached else None,
             "next": nxt, "run_id": run.get("id"),
             "case": {"title": case["title"], "machine_id": case["machine_id"], "created_at": case.get("created_at"), "reported": report,
                      "synthetic": bool(case.get("synthetic"))}}

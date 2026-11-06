@@ -9,6 +9,7 @@ import { CaseStatus, RoleTag } from "./CaseStatus";
 import { Electrical } from "./Electrical";
 import { DebugReplay } from "./DebugReplay";
 import { ExpectedBehavior } from "./ExpectedBehavior";
+import CaseStateBar, { SafetyNote } from "./CaseStateBar";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Call = (path: string, init?: RequestInit) => Promise<Any>;
@@ -30,12 +31,14 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
   { caseId: string; call: Call; actor: string; jobId?: string | null; onChanged: () => void; feedback?: Record<string, Any>; extra?: React.ReactNode; guard?: ((inv: Any) => Any) | null;
     ahead?: React.ReactNode }) {
   const [data, setData] = useState<Any>(null);
+  const [caseState, setCaseState] = useState<Any>(null);
   const [job, setJob] = useState<Any>(null);
   const [error, setError] = useState<string | null>(null);
   const polling = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try { setData(await call(`/engine/cases/${caseId}/investigation`)); } catch (e: Any) { setError(e.message); }
+    try { setCaseState(await call(`/engine/cases/${caseId}/state`)); } catch { setCaseState(null); }
   }, [caseId, call]);
 
   const follow = useCallback(async (id: string) => {
@@ -57,7 +60,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
     }
   }, [call, load, onChanged]);
 
-  useEffect(() => { setData(null); setJob(null); setError(null); load(); if (jobId && !jobId.startsWith("walkthrough")) follow(jobId); return () => { polling.current = null; }; }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setData(null); setCaseState(null); setJob(null); setError(null); load(); if (jobId && !jobId.startsWith("walkthrough")) follow(jobId); return () => { polling.current = null; }; }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function start(allowModel: boolean) {
     setError(null);
@@ -70,7 +73,11 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
   // Every investigation, recorded or live, is held to what its evidence could observe before it is shown.
   const lastResult = data.playback ? (data.playback.investigations[data.playback.investigations.length - 1] || {}).result : (data.investigation || {}).result;
   const standing = <>{data.ladder ? <CaseStatus ladder={data.ladder} metrics={data.metrics} result={lastResult} caseId={caseId} call={call} actor={actor} onChanged={() => { load(); onChanged(); }} /> : null}<ExpectedBehavior caseId={caseId} call={call} /><Electrical caseId={caseId} call={call} /><DebugReplay caseId={caseId} call={call} /></>;
-  if (data.playback) return <Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} ahead={ahead} standing={standing} />;
+  // The investigation result below is current only if no later assessment (a discussion round) superseded it.
+  const curFrom = caseState?.current?.from;
+  const superseded = !!curFrom && curFrom.source !== "investigation";
+  const stateBar = <CaseStateBar state={caseState} superseded={superseded} />;
+  if (data.playback) return <>{stateBar}<Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} ahead={ahead} standing={standing} superseded={superseded} /></>;
   const inv = guard && data.investigation ? guard(data.investigation) : data.investigation;
   const agent = data.agent || {};
   if (!inv) {
@@ -87,7 +94,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
       </section>
     );
   }
-  return (
+  return (<>{stateBar}
     <ResultView inv={inv} findings={data.findings || []} fb={feedback} extra={extra} ahead={ahead} standing={standing}
       banner={inv.mode !== "agent" ? (
         <div className={st.banner}>
@@ -96,13 +103,13 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
             : <span>Connect the AI investigator (Claude Code sign-in on this computer) to have Veyra run the checks for you.</span>}
         </div>) : null}
       prev={data.previous_hypotheses}
-      next={<NextAction caseId={caseId} call={call} next={(inv.result || {}).next_action} entry={inv.entry_id} closed={data.closed} onRecorded={(j) => j ? follow(j) : load()} hyps={(inv.result || {}).hypotheses} />}
+      next={<NextAction caseId={caseId} call={call} next={(inv.result || {}).next_action} entry={inv.entry_id} closed={data.closed} onRecorded={(j) => j ? follow(j) : load()} hyps={(inv.result || {}).hypotheses} superseded={superseded} />}
       footer={<>
         {!data.closed && <ReviewConfirm inv={inv} submit={async (a) => { await call(`/engine/cases/${caseId}/review`, { method: "POST", body: JSON.stringify(a) }); load(); onChanged(); }} />}
         {data.closed && <p className={st.fine}>This case is closed. Its lesson is used when a similar failure comes in.</p>}
         {error && <p className={st.err}>{error}</p>}
       </>} />
-  );
+  </>);
 }
 
 function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahead, standing }: { inv: Any; findings: Any[]; banner?: React.ReactNode; next: React.ReactNode; footer?: React.ReactNode; prev?: Any[] | null;
@@ -223,8 +230,8 @@ function Live({ job, subtitle }: { job: Any; subtitle?: string }) {
 type Demo = { recorded: (o: Any) => Any | null; recordedLabel: string | null; last: boolean; submit: (choice: Any) => void };
 const PROV_LABEL: Record<string, string> = { selected: "Result selected", veyra_description: "Veyra's own description of that result (proposed, not observed)",
   observed: "Engineer observed" };
-function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps = [] }:
-  { caseId: string; call: Call; next: Any; entry: string; closed: boolean; onRecorded: (jobId: string | null) => void; demo?: Demo; hyps?: Any[] }) {
+function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps = [], superseded = false }:
+  { caseId: string; call: Call; next: Any; entry: string; closed: boolean; onRecorded: (jobId: string | null) => void; demo?: Demo; hyps?: Any[]; superseded?: boolean }) {
   const area = (id: string) => (hyps.find((h: Any) => h.id === id) || {}).area || id;
   const [choice, setChoice] = useState<Any>(null);
   const [notes, setNotes] = useState("");
@@ -248,8 +255,9 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
   }
   return (
     <div className={st.next}>
-      <span className={st.nextLabel}>{`Your next action${next.where ? ` · ${({ remote: "remote", on_site: "on site", lab: "in the lab" } as Any)[next.where] || next.where}` : ""}`}</span>
+      <span className={st.nextLabel}>{`${superseded ? "Next action proposed by this investigation round (superseded: the current next check is at the top)" : "Your next action"}${next.where ? ` · ${({ remote: "remote", on_site: "on site", lab: "in the lab" } as Any)[next.where] || next.where}` : ""}`}</span>
       <h2 className={st.action}>{next.action}</h2>
+      <SafetyNote safety={next.safety} compact />
       {next.why && <p className={st.why}>{named(next.why, hyps)}</p>}
       <RetestSpec next={next} />
       {(next.how || []).length > 0 && (
@@ -312,7 +320,7 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
 const recordedFindings = (pb: Any, upto: number) => (pb.findings || []).slice(0, upto).map((f: Any, i: number) => ({ id: `rec-${i}`, recorded_at: f.recorded_at, action: f.action,
   result: f.result, outcome_selected: ((f.provenance || []).find((p: Any) => p.kind === "selected") || {}).text, observations: (f.provenance || []).filter((p: Any) => p.kind === "observed").map((p: Any) => p.text).join("; ") || f.observations }));
 
-function Playback({ pb, fb, extra, ahead, standing }: { pb: Any; fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode; standing?: React.ReactNode }) {
+function Playback({ pb, fb, extra, ahead, standing, superseded = false }: { pb: Any; fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode; standing?: React.ReactNode; superseded?: boolean }) {
   const invs: Any[] = pb.investigations;
   const lastStage = invs.length - 1;
   // Plays the recorded investigation from round 1 (the animation), and carries on by itself with the engineer's
@@ -345,7 +353,7 @@ function Playback({ pb, fb, extra, ahead, standing }: { pb: Any; fb?: Record<str
   const replay = () => { setStage(0); setShown(0); setMine([]); setAutoplay(true); setPhase("running"); top(); };
   const current = () => { setStage(lastStage); setShown((invs[lastStage].steps || []).length); setMine(recordedFindings(pb, lastStage)); setPhase("result"); top(); };
   const banner = invs.length > 1 ? (stage === lastStage ? (
-    <div className={st.roundBar}><span><b>{`Round ${stage + 1} of ${invs.length}`}</b>{" · where the case stands now."} {(pb.findings || []).length ? `Round ${stage}'s check was done; the engineer's result is under "What you found".` : ""}</span>
+    <div className={st.roundBar}><span><b>{`Round ${stage + 1} of ${invs.length}`}</b>{superseded ? " · the last investigation round; the case continued in the discussion (current state at the top)." : " · where the case stands now."} {(pb.findings || []).length ? `Round ${stage}'s check was done; the engineer's result is under "What you found".` : ""}</span>
       <button className={st.inline} onClick={replay}>Replay from round 1</button></div>
   ) : (
     <div className={st.roundBar}><span><b>{`Recorded investigation · round ${stage + 1} of ${invs.length}.`}</b> This check was already done in the recorded case.
@@ -378,7 +386,7 @@ function Playback({ pb, fb, extra, ahead, standing }: { pb: Any; fb?: Record<str
       <ul className={st.facts}>
         <li><i>Conclusion</i> {({ correct: "Accepted by the engineer", partly: "Accepted in part, with a correction", wrong: "Rejected by the engineer" } as Any)[answers.conclusion] || "—"}</li>
         <li><i>After the fix</i> {({ gone: "Symptom not seen (engineer's observation)", still_present: "Symptom still present", unknown: "Not checked yet", no_fix: "No fix applied yet" } as Any)[answers.symptom_after_fix] || "—"}</li>
-        <li><i>Root cause</i> Not verified: probable. It becomes verified only with an inspection, a reproduction or a fix confirmed by evidence.</li>
+        <li><i>Root cause</i> Not verified: probable. It becomes verified only with a record that carries data: the fix removing the fault in data recorded after it, or a reproduction recorded with its data. An inspection note or the engineer's word is kept as reported.</li>
         <li><i>Machine</i> {({ yes: "Back in service", no: "Not restored yet", unknown: "Not known" } as Any)[answers.machine_restored] || "—"}</li>
       </ul>
       <p className={st.lessonNote}><b>Cause:</b> {answers.correction || named(inv.result?.explanation, inv.result?.hypotheses) || close.cause}</p>
@@ -390,7 +398,7 @@ function Playback({ pb, fb, extra, ahead, standing }: { pb: Any; fb?: Record<str
   ) : null;
   return <ResultView inv={inv} findings={mine} fb={fb} extra={extra} ahead={stage === lastStage ? ahead : null} standing={stage === lastStage ? standing : null} banner={banner}
     prev={stage > 0 ? (invs[stage - 1].result || {}).hypotheses : null}
-    next={phase === "result" ? <NextAction caseId="" call={async () => null} next={inv.result?.next_action} entry="" closed={false} onRecorded={() => undefined} demo={demo} hyps={inv.result?.hypotheses} /> : null}
+    next={phase === "result" ? <NextAction caseId="" call={async () => null} next={inv.result?.next_action} entry="" closed={false} onRecorded={() => undefined} demo={demo} hyps={inv.result?.hypotheses} superseded={superseded && stage === lastStage} /> : null}
     footer={footer} />;
 }
 

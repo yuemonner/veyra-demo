@@ -1,0 +1,645 @@
+{
+ "micro-ROS on STM32H7: agent session opens and closes at once": {
+  "title": "micro-ROS on STM32H7: agent session opens and closes at once",
+  "synthetic": false,
+  "state": {
+   "state_version": "v7-67e81651b2",
+   "current_from": {
+    "source": "discussion",
+    "n": 4,
+    "entry": "led-agent-report-cddbf7c3a319",
+    "at": "2026-11-06T15:17:42.706216+00:00",
+    "recorded": true,
+    "of": 4
+   },
+   "status": "cause_unknown",
+   "counts": {
+    "total": 6,
+    "leading": 1,
+    "open": 1,
+    "weakened": 3,
+    "ruled_out": 1,
+    "standing": 2
+   },
+   "explanations": [
+    {
+     "id": "h1",
+     "area": "Board firmware / client buffers",
+     "status": "weakened",
+     "role": null,
+     "status_basis": "engineer_reported",
+     "standing": "weakened"
+    },
+    {
+     "id": "h2",
+     "area": "Board Ethernet / lwIP DMA",
+     "status": "leading",
+     "role": null,
+     "status_basis": "engineer_reported",
+     "standing": "leading_not_verified"
+    },
+    {
+     "id": "h6",
+     "area": "Board buffer / pool difference",
+     "status": "open",
+     "role": null,
+     "status_basis": "model_inference",
+     "standing": "open"
+    },
+    {
+     "id": "h3",
+     "area": "Network path",
+     "status": "weakened",
+     "role": null,
+     "status_basis": "telemetry_observation",
+     "standing": "weakened"
+    },
+    {
+     "id": "h4",
+     "area": "Host / agent side",
+     "status": "weakened",
+     "role": null,
+     "status_basis": "telemetry_observation",
+     "standing": "weakened"
+    },
+    {
+     "id": "h5",
+     "area": "Agent port configuration",
+     "status": "ruled_out",
+     "role": null,
+     "status_basis": "telemetry_observation",
+     "standing": "ruled_out"
+    }
+   ],
+   "next_action": "Log buffer address, length and memory region for both write callbacks and the ETH Tx descriptors.",
+   "next_action_safety": {
+    "classes": [
+     "low_risk_physical"
+    ],
+    "worst": "low_risk_physical",
+    "requires_review": false,
+    "review_by": [],
+    "safer_alternative": null
+   },
+   "history": [
+    {
+     "source": "investigation",
+     "n": 1,
+     "status": "cause_unknown",
+     "leading": [
+      "Board firmware / client buffers"
+     ],
+     "superseded_by": "investigation 2"
+    },
+    {
+     "source": "investigation",
+     "n": 2,
+     "status": "cause_probable",
+     "leading": [
+      "Board Ethernet / lwIP DMA"
+     ],
+     "superseded_by": "discussion 1"
+    },
+    {
+     "source": "discussion",
+     "n": 1,
+     "status": "cause_unknown",
+     "leading": [
+      "Board firmware / client buffers"
+     ],
+     "superseded_by": "discussion 2"
+    },
+    {
+     "source": "discussion",
+     "n": 2,
+     "status": "cause_probable",
+     "leading": [
+      "Board Ethernet / lwIP DMA"
+     ],
+     "superseded_by": "discussion 3"
+    },
+    {
+     "source": "discussion",
+     "n": 3,
+     "status": "cause_probable",
+     "leading": [
+      "Board Ethernet / lwIP DMA"
+     ],
+     "superseded_by": "discussion 4"
+    }
+   ],
+   "engineer_inputs": [
+    {
+     "kind": "observation",
+     "round": null,
+     "source": "engineer_finding",
+     "text": "Dump the board's transport write buffer at the 36-byte send: Buffer is valid at write, zeros on wire. Board Tx buffer inspected in the debugger at the sendto ca",
+     "verdict": "action_changed_with_evidence",
+     "genuine_change": true,
+     "action_similarity": 0.12,
+     "before": "Dump the board's transport write buffer at the 36-byte send",
+     "after": "Make the Tx buffer and lwIP pools non-cacheable (or clean D-cache before send), then retest",
+     "hazard": [
+      "low_risk_physical",
+      "low_risk_physical"
+     ],
+     "moved": [
+      "Board Ethernet / lwIP DMA: open -> leading",
+      "Board firmware / client buffers: leading -> weakened"
+     ],
+     "new": [],
+     "rests_on_engineer_report": [],
+     "remaining": [
+      "Board Ethernet / lwIP DMA"
+     ]
+    },
+    {
+     "kind": "claim",
+     "round": 1,
+     "source": "discussion",
+     "text": "I think the agent is the problem. Port 457879 is invalid, so the agent drops the session, and after that the board just retries forever.",
+     "verdict": "action_changed_with_evidence",
+     "genuine_change": true,
+     "action_similarity": 0.04,
+     "before": "Make the Tx buffer and lwIP pools non-cacheable (or clean D-cache before send), then retest",
+     "after": "Capture the board's UDP traffic with Wireshark at the switch port.",
+     "hazard": [
+      "low_risk_physical",
+      "low_risk_physical"
+     ],
+     "moved": [
+      "Board firmware / client buffers: weakened -> leading",
+      "Board Ethernet / lwIP DMA: leading -> open"
+     ],
+     "new": [],
+     "rests_on_engineer_report": [],
+     "remaining": [
+      "Board firmware / client buffers",
+      "Board Ethernet / lwIP DMA"
+     ]
+    },
+    {
+     "kind": "observation",
+     "round": 2,
+     "source": "discussion",
+     "text": "Breakpoint in the custom transport write callback on the board: on the second call the buffer is 36 bytes and holds what looks like a valid XRCE message, not ze",
+     "verdict": "action_changed_with_evidence",
+     "genuine_change": true,
+     "action_similarity": 0.05,
+     "before": "Capture the board's UDP traffic with Wireshark at the switch port.",
+     "after": "Make the Tx buffer cache-coherent and re-run the session.",
+     "hazard": [
+      "low_risk_physical",
+      "low_risk_physical"
+     ],
+     "moved": [
+      "Board firmware / client buffers: leading -> weakened",
+      "Board Ethernet / lwIP DMA: open -> leading"
+     ],
+     "new": [],
+     "rests_on_engineer_report": [],
+     "remaining": [
+      "Board Ethernet / lwIP DMA"
+     ]
+    },
+    {
+     "kind": "claim",
+     "round": 3,
+     "source": "discussion",
+     "text": "Then it has to be the cheap unmanaged switch between the board and the PC. It is corrupting the packet.",
+     "verdict": "action_changed_without_evidence",
+     "genuine_change": false,
+     "action_similarity": 0.11,
+     "before": "Make the Tx buffer cache-coherent and re-run the session.",
+     "after": "Mirror the board's switch port and capture frames at the switch.",
+     "hazard": [
+      "low_risk_physical",
+      "low_risk_physical"
+     ],
+     "moved": [],
+     "new": [],
+     "rests_on_engineer_report": [],
+     "remaining": [
+      "Board Ethernet / lwIP DMA"
+     ]
+    },
+    {
+     "kind": "claim",
+     "round": 4,
+     "source": "discussion",
+     "text": "Challenge: after round 2 points to H7 D-cache/DMA coherency, why did the first CREATE packet get through cleanly and only the second packet come out zeroed? If ",
+     "verdict": "action_changed_with_evidence",
+     "genuine_change": true,
+     "action_similarity": 0.09,
+     "before": "Mirror the board's switch port and capture frames at the switch.",
+     "after": "Log buffer address, length and memory region for both write callbacks and the ETH Tx descriptors.",
+     "hazard": [
+      "low_risk_physical",
+      "low_risk_physical"
+     ],
+     "moved": [],
+     "new": [
+      "Board buffer / pool difference"
+     ],
+     "rests_on_engineer_report": [],
+     "remaining": [
+      "Board Ethernet / lwIP DMA",
+      "Board buffer / pool difference"
+     ]
+    }
+   ],
+   "flags": [],
+   "verified_outcomes": [],
+   "safety": {
+    "version": "experiment-safety-v1",
+    "high_voltage_system": false,
+    "system_voltage_v": null,
+    "rule": "High voltage: above 60 V DC (ISO 6469-3 voltage class B)"
+   }
+  },
+  "all_checks": [
+   {
+    "round": 1,
+    "check": "Capture the board's UDP traffic with Wireshark at the switch port.",
+    "safety": [
+     "low_risk_physical"
+    ]
+   },
+   {
+    "round": 2,
+    "check": "Make the Tx buffer cache-coherent and re-run the session.",
+    "safety": [
+     "low_risk_physical"
+    ]
+   },
+   {
+    "round": 3,
+    "check": "Mirror the board's switch port and capture frames at the switch.",
+    "safety": [
+     "low_risk_physical"
+    ]
+   },
+   {
+    "round": 4,
+    "check": "Log buffer address, length and memory region for both write callbacks and the ETH Tx descriptors.",
+    "safety": [
+     "low_risk_physical"
+    ]
+   }
+  ],
+  "after_thread_outcome": {
+   "ladder_level": "probable",
+   "engineer_reported_confirmation": {
+    "at": "2026-11-06T15:17:44.109690+00:00",
+    "by": "Public thread (reported)",
+    "evidence": "Public thread (micro_ros_stm32cubemx_utils #139): the reporter wrote that it was indeed a cache coherence issue; a teammate's commit adds SCB_CleanDCache_by_Addr on the Tx buffers in low_level_output(); another user reported the patch works on a Nucleo F7.",
+    "method": "fix_resolved_it",
+    "provenance": "engineer_reported"
+   },
+   "status": "cause_unknown",
+   "verified_outcomes": [],
+   "flags": [
+    {
+     "text": "STM32H7 LwIP Ethernet port does not clean the D-cache before Ethernet DMA transmits a frame; the DMA sends stale (zero) bytes",
+     "provenance": "engineer_reported",
+     "source": "case_closure",
+     "issue": "an engineer's conclusion about the cause; show it as reported, not as the established cause (no verified outcome)"
+    }
+   ],
+   "leading_now": [
+    "Board Ethernet / lwIP DMA"
+   ]
+  }
+ },
+ "园区接驳车坡道起步急停，遥控器报 FR 电机故障（码 7）": {
+  "title": "园区接驳车坡道起步急停，遥控器报 FR 电机故障（码 7）",
+  "synthetic": true,
+  "state": {
+   "state_version": "v7-8dbcc6caf0",
+   "current_from": {
+    "source": "discussion",
+    "n": 5,
+    "entry": "led-agent-report-9a99b0ab5636",
+    "at": "2026-11-06T15:17:44.038501+00:00",
+    "recorded": true,
+    "of": 5
+   },
+   "status": "cause_unknown",
+   "counts": {
+    "total": 5,
+    "leading": 2,
+    "open": 1,
+    "weakened": 2,
+    "ruled_out": 0,
+    "standing": 3
+   },
+   "explanations": [
+    {
+     "id": "h1",
+     "area": "VCU HSA 前馈绕过限扭",
+     "status": "leading",
+     "role": "main_cause",
+     "status_basis": "telemetry_observation",
+     "standing": "leading_not_verified"
+    },
+    {
+     "id": "h2",
+     "area": "冷电池低 SOC 压降",
+     "status": "open",
+     "role": "trigger",
+     "status_basis": "telemetry_observation",
+     "standing": "open"
+    },
+    {
+     "id": "h3",
+     "area": "FR 端子接触电阻偏大",
+     "status": "leading",
+     "role": "amplifier",
+     "status_basis": "engineer_reported",
+     "standing": "leading_not_verified"
+    },
+    {
+     "id": "h4",
+     "area": "欠压阈值或测量配置",
+     "status": "weakened",
+     "role": "effect",
+     "status_basis": "telemetry_observation",
+     "standing": "weakened"
+    },
+    {
+     "id": "h5",
+     "area": "FR 电压采样偏差",
+     "status": "weakened",
+     "role": null,
+     "status_basis": "telemetry_observation",
+     "standing": "weakened"
+    }
+   ],
+   "next_action": "仅改软件(限扭到 TqLim_BMS 以内),冷车同坡道起步对比",
+   "next_action_safety": {
+    "classes": [
+     "hv_deenergised",
+     "machine_operation",
+     "fault_reproduction"
+    ],
+    "worst": "fault_reproduction",
+    "requires_review": true,
+    "review_by": [
+     "A qualified high-voltage technician (isolation, lock-out/tag-out, proving dead)",
+     "The test engineer responsible for the machine, with a cleared area and a safety driver or remote stop",
+     "The test engineer and the site safety lead: a written test plan with stop criteria, on a closed area"
+    ],
+    "safer_alternative": "Replay the logged commands through a model of the controller, or run the changed software on a hardware-in-the-loop bench, before any reproduction on the machine"
+   },
+   "history": [
+    {
+     "source": "investigation",
+     "n": 1,
+     "status": "cause_unknown",
+     "leading": [
+      "VCU HSA 前馈限流缺失",
+      "冷电池低 SOC 压降"
+     ],
+     "superseded_by": "discussion 1"
+    },
+    {
+     "source": "discussion",
+     "n": 1,
+     "status": "cause_unknown",
+     "leading": [
+      "VCU HSA 前馈限流缺失",
+      "冷电池低 SOC 压降",
+      "FR 支路线束/接插件压降"
+     ],
+     "superseded_by": "discussion 2"
+    },
+    {
+     "source": "discussion",
+     "n": 2,
+     "status": "cause_unknown",
+     "leading": [
+      "VCU HSA 前馈绕过限扭",
+      "冷电池低 SOC 压降"
+     ],
+     "superseded_by": "discussion 3"
+    },
+    {
+     "source": "discussion",
+     "n": 3,
+     "status": "cause_unknown",
+     "leading": [
+      "VCU HSA 前馈绕过限扭"
+     ],
+     "superseded_by": "discussion 4"
+    },
+    {
+     "source": "discussion",
+     "n": 4,
+     "status": "cause_unknown",
+     "leading": [
+      "VCU HSA 前馈绕过限扭",
+      "FR 端子接触电阻偏大"
+     ],
+     "superseded_by": "discussion 5"
+    }
+   ],
+   "engineer_inputs": [
+    {
+     "kind": "claim",
+     "round": 1,
+     "source": "discussion",
+     "text": "我们现场判断是 FR 电机控制器的问题：遥控器报的就是码 7（FR 电机故障）。10/21 已经换过一个控制器，可能新换的这个也有问题，再换一个应该就好了。",
+     "verdict": "action_changed_with_evidence",
+     "genuine_change": true,
+     "action_similarity": 0.19,
+     "before": "在冷电池条件下同坡道起步,HSA 开/关各一次并录波",
+     "after": "在同坡道起步时，用万用表实测 FR 与 FL 逆变器端子电压",
+     "hazard": [
+      "fault_reproduction",
+      "fault_reproduction"
+     ],
+     "moved": [
+      "FR 支路线束/接插件压降: open -> leading"
+     ],
+     "new": [
+      "FR 控制器电压采样偏差"
+     ],
+     "rests_on_engineer_report": [],
+     "remaining": [
+      "VCU HSA 前馈限流缺失",
+      "冷电池低 SOC 压降",
+      "FR 支路线束/接插件压降",
+      "FR 控制器电压采样偏差"
+     ]
+    },
+    {
+     "kind": "claim",
+     "round": 2,
+     "source": "discussion",
+     "text": "我不认为是 VCU 的问题。VCU 扭矩仲裁里，输出一定会被 BMS 限扭（TqLim_BMS）卡住，TqCmd_Out 不可能超过它。2.4.1 只是加了坡起辅助（HSA），不会让电池过放。请用数据说明。",
+     "verdict": "action_changed_with_evidence",
+     "genuine_change": true,
+     "action_similarity": 0.18,
+     "before": "在同坡道起步时，用万用表实测 FR 与 FL 逆变器端子电压",
+     "after": "冷电池同坡道起步，HSA 开/关各一次并录波",
+     "hazard": [
+      "fault_reproduction",
+      "fault_reproduction"
+     ],
+     "moved": [
+      "FR 支路线束/接插件压降: leading -> open"
+     ],
+     "new": [],
+     "rests_on_engineer_report": [],
+     "remaining": [
+      "VCU HSA 前馈绕过限扭",
+      "冷电池低 SOC 压降",
+      "FR 支路线束/接插件压降",
+      "FR 控制器电压采样偏差"
+     ]
+    },
+    {
+     "kind": "claim",
+     "round": 3,
+     "source": "discussion",
+     "text": "10/09 早上也是低温、同一个坡道，为什么那次没出问题？到底是电池、软件，还是 FR 这一路的问题？我需要知道还有哪些车可能会出同样的问题。",
+     "verdict": "explanations_moved_action_unchanged",
+     "genuine_change": false,
+     "action_similarity": 1.0,
+     "before": "冷电池同坡道起步，HSA 开/关各一次并录波",
+     "after": "冷电池同坡道起步,HSA 关/开各一次并录波",
+     "hazard": [
+      "fault_reproduction",
+      "fault_reproduction"
+     ],
+     "moved": [
+      "冷电池低 SOC 压降: leading -> open",
+      "FR 电压采样偏差: open -> weakened"
+     ],
+     "new": [],
+     "rests_on_engineer_report": [],
+     "remaining": [
+      "VCU HSA 前馈绕过限扭",
+      "冷电池低 SOC 压降",
+      "FR 支路线束压降"
+     ]
+    },
+    {
+     "kind": "observation",
+     "round": 4,
+     "source": "discussion",
+     "text": "我们按建议测了：FR 控制器高压输入端子在 150 A 负载下比 FL 多掉 0.9 V，端子有轻微氧化，紧固扭矩不够。电芯 13 交流内阻 1.9 mΩ，其他电芯平均 1.1 mΩ。",
+     "verdict": "action_changed_with_evidence",
+     "genuine_change": true,
+     "action_similarity": 0.58,
+     "before": "冷电池同坡道起步,HSA 关/开各一次并录波",
+     "after": "重紧清洁 FR 端子后,冷车同坡道 HSA 关/开各起步一次并录波",
+     "hazard": [
+      "fault_reproduction",
+      "fault_reproduction"
+     ],
+     "moved": [
+      "FR 端子接触电阻偏大: open -> leading"
+     ],
+     "new": [
+      "电芯 13 内阻偏高"
+     ],
+     "rests_on_engineer_report": [
+      "FR 高压输入端子压降比 FL 多约 0.9 V(氧化、扭矩不足),是 FR 先欠压的原因之一"
+     ],
+     "remaining": [
+      "VCU HSA 前馈绕过限扭",
+      "冷电池低 SOC 压降",
+      "FR 端子接触电阻偏大",
+      "电芯 13 内阻偏高"
+     ]
+    },
+    {
+     "kind": "claim",
+     "round": 5,
+     "source": "discussion",
+     "text": "那现在应该先改软件还是先换件？怎么验证是真的修好了，而不是过两周又偶发？",
+     "verdict": "action_changed_without_evidence",
+     "genuine_change": false,
+     "action_similarity": 0.19,
+     "before": "重紧清洁 FR 端子后,冷车同坡道 HSA 关/开各起步一次并录波",
+     "after": "仅改软件(限扭到 TqLim_BMS 以内),冷车同坡道起步对比",
+     "hazard": [
+      "fault_reproduction",
+      "fault_reproduction"
+     ],
+     "moved": [],
+     "new": [],
+     "rests_on_engineer_report": [],
+     "remaining": [
+      "VCU HSA 前馈绕过限扭",
+      "冷电池低 SOC 压降",
+      "FR 端子接触电阻偏大"
+     ]
+    }
+   ],
+   "flags": [
+    {
+     "text": "FR 高压接插件接触电阻偏大；冷电池加上坡起辅助的扭矩，把 FR 母线电压拉到欠压保护以下",
+     "provenance": "engineer_reported",
+     "source": "walkthrough_final_cause",
+     "issue": "an engineer's conclusion about the cause; show it as reported, not as the established cause (no verified outcome)"
+    }
+   ],
+   "verified_outcomes": [],
+   "safety": {
+    "version": "experiment-safety-v1",
+    "high_voltage_system": true,
+    "system_voltage_v": 74.43,
+    "rule": "High voltage: above 60 V DC (ISO 6469-3 voltage class B)"
+   }
+  },
+  "all_checks": [
+   {
+    "round": 1,
+    "check": "在同坡道起步时，用万用表实测 FR 与 FL 逆变器端子电压",
+    "safety": [
+     "machine_operation",
+     "live_hv",
+     "fault_reproduction"
+    ]
+   },
+   {
+    "round": 2,
+    "check": "冷电池同坡道起步，HSA 开/关各一次并录波",
+    "safety": [
+     "machine_operation",
+     "live_hv",
+     "fault_reproduction"
+    ]
+   },
+   {
+    "round": 3,
+    "check": "冷电池同坡道起步,HSA 关/开各一次并录波",
+    "safety": [
+     "machine_operation",
+     "live_hv",
+     "fault_reproduction"
+    ]
+   },
+   {
+    "round": 4,
+    "check": "重紧清洁 FR 端子后,冷车同坡道 HSA 关/开各起步一次并录波",
+    "safety": [
+     "machine_operation",
+     "live_hv",
+     "fault_reproduction"
+    ]
+   },
+   {
+    "round": 5,
+    "check": "仅改软件(限扭到 TqLim_BMS 以内),冷车同坡道起步对比",
+    "safety": [
+     "hv_deenergised",
+     "machine_operation",
+     "fault_reproduction"
+    ]
+   }
+  ]
+ }
+}

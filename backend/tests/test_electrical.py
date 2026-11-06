@@ -91,7 +91,8 @@ GOOD = {"headline": "FR's branch drop does not add up", "status": "cause_unknown
                        {"id": "h2", "area": "FR cable or fuse", "claim": "FR cable or fuse resistance", "status": "open", "because": "B_FR", "role": "main_cause"},
                        {"id": "h3", "area": "FR inverter draw", "claim": "FR inverter draws more DC current", "status": "open", "because": "B_FR", "role": "main_cause"}],
         "next_action": {"action": "Four-wire resistance of each FR segment, HV isolated, before reseating", "why": "separates contact, cable and inverter draw",
-                        "how": ["isolate HV"], "where": "depot", "outcomes": [{"label": "connector high", "means": "contact", "keeps": ["h1"]}]},
+                        "how": ["isolate HV"], "where": "depot", "needs_approval": True,  # high-voltage work: needs approval (experiment_safety)
+                        "outcomes": [{"label": "connector high", "means": "contact", "keeps": ["h1"]}]},
         "unknowns": ["branch current"], "events": []}
 
 

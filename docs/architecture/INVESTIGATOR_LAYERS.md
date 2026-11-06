@@ -127,3 +127,13 @@ cost of the recommended next check; false-certainty rate (confidence high, cause
 
 It counts as a success if B improves at least one of these without worse false certainty. A better-written report
 alone does not count. Thresholds are set before the run and not changed after.
+
+## Case-page correctness (2026-11-06)
+
+| Module | What it guarantees |
+|---|---|
+| `app/agent/provenance.py` | Every claim is a telemetry observation, an engineer report, a model inference or a verified outcome. Only a record carrying data (a fix shown in data recorded after it, or a reproduction with its data) is a verified outcome. An engineer's report or a consistent observation is never shown as a verified cause. The verification ladder's "verified" rung needs a verified outcome. |
+| `app/agent/case_state.py` | One versioned state per case (`GET /engine/cases/{id}/state`): the latest assessment (investigation or discussion round) is current; counts, status, next check and the latest discussion come from it; earlier conclusions are history, marked superseded. Also: what each explanation's status rests on, and for every engineer input whether it changed the next action, why, and what remains. |
+| `app/agent/experiment_safety.py` | Hazard class of every proposed check (offline, bench, low-risk physical, de-energised HV, machine in operation, live HV, fault reproduction; HV above 60 V DC from the case data). Hazardous checks need review by a named qualified role, carry a safer alternative, and are never approved by Veyra; the AI's report is rejected if a hazardous check lacks `needs_approval`. The electrical plan gets a safety-aware order next to its unchanged validated choice. |
+
+Results and limits: `backend/research/case_state_eval/RESULTS.md`.
