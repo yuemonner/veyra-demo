@@ -94,7 +94,7 @@ Still worse than the engineers:
 
 ### AI step judge with a live model
 
-See `../AI_JUDGE.md`.
+See `../AI_JUDGE.md`. On v2 states (with artifacts) a live model was accepted on 2 of 4 steps, rejected on 2; on v1 states, 1 of 4. The AI judge is not yet working; the reasons, including false rejections caused by the verifier, are listed there.
 
 ### What this does not show
 
