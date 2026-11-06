@@ -115,4 +115,7 @@ Rules:
 
 ## Changes after the first run
 
-None yet.
+- After run 1 (synthetic), a "where Veyra did better" list was added to the report. It is reported alongside the
+  "worse" list and never offsets it. No metric definition, threshold or tier rule changed.
+- Implementation detail made explicit (it does not change the rules): a prior step's result is shown to Veyra only from
+  the date it became known (`result_known`, or the latest date named in `decided_by`).

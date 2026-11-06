@@ -1,0 +1,151 @@
+{
+ "note": "Hypothesis space for the SYNTHETIC shuttle case, written by the Veyra team as an example. For real cases the machine's engineers write or approve it before Veyra runs.",
+ "hypotheses": [
+  {
+   "id": "contact",
+   "name": "FR HV connector or terminal contact resistance",
+   "keywords": [
+    "connector",
+    "terminal",
+    "contact",
+    "crimp",
+    "接插件",
+    "端子",
+    "接头",
+    "压接"
+   ],
+   "maps": {
+    "electrical": {
+     "wheel": "FR",
+     "candidate": "contact"
+    }
+   }
+  },
+  {
+   "id": "conductor",
+   "name": "FR HV cable, busbar or fuse resistance",
+   "keywords": [
+    "cable",
+    "busbar",
+    "fuse",
+    "harness",
+    "wiring",
+    "线缆",
+    "母排",
+    "保险丝",
+    "线束",
+    "线路"
+   ],
+   "maps": {
+    "electrical": {
+     "wheel": "FR",
+     "candidate": "conductor"
+    }
+   }
+  },
+  {
+   "id": "inverter",
+   "name": "FR inverter or motor drawing excess DC current, or an inverter fault",
+   "keywords": [
+    "inverter",
+    "MCU_FR",
+    "逆变器",
+    "电机控制器",
+    "motor fault",
+    "电机故障"
+   ],
+   "maps": {
+    "electrical": {
+     "wheel": "FR",
+     "candidate": "inverter_draw"
+    }
+   }
+  },
+  {
+   "id": "fr_sensor",
+   "name": "FR DC voltage sensor error",
+   "keywords": [
+    "voltage sensor",
+    "电压传感器",
+    "电压采样"
+   ],
+   "maps": {
+    "electrical": {
+     "wheel": "FR",
+     "candidate": "sensor_gain"
+    }
+   }
+  },
+  {
+   "id": "battery",
+   "name": "Battery pack limiting power (cold, low charge or weak cells)",
+   "keywords": [
+    "battery",
+    "pack",
+    "SOC",
+    "cell",
+    "BMS",
+    "电池",
+    "电芯",
+    "电量"
+   ],
+   "maps": {
+    "expected": {
+     "id": "current_within_dcl"
+    },
+    "electrical_pack": true
+   },
+   "observe": {
+    "what": "Pack voltage, current and cell temperatures during a cold launch",
+    "cost_tier": 0
+   }
+  },
+  {
+   "id": "hsa_control",
+   "name": "VCU 2.4.1 hill-start assist commanding torque above the BMS limit",
+   "keywords": [
+    "HSA",
+    "hill-start",
+    "坡起",
+    "VCU 2.4.1",
+    "扭矩限值",
+    "torque limit"
+   ],
+   "maps": {
+    "expected": {
+     "id": "cmd_within_limit",
+     "requires": {
+      "signal": "VCU_Status.HSA_Active",
+      "value": 1
+     }
+    }
+   },
+   "observe": {
+    "what": "Record a cold ramp launch with HSA on and off",
+    "cost_tier": 2
+   }
+  },
+  {
+   "id": "motor_mech",
+   "name": "FR motor or wheel mechanical drag",
+   "keywords": [
+    "bearing",
+    "drag",
+    "mechanical",
+    "轴承",
+    "机械",
+    "卡滞"
+   ],
+   "maps": {},
+   "observe": {
+    "what": "Lift the wheel and check free rotation and brake drag",
+    "cost_tier": 1
+   }
+  }
+ ],
+ "cost_tiers": {
+  "0": "data already logged (a log pull)",
+  "1": "parked vehicle at the depot",
+  "2": "instrumented driven launch"
+ }
+}
