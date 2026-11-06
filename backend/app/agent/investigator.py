@@ -378,7 +378,7 @@ def _case_context(store, case_id: str) -> Dict[str, Any]:
         from app.agent import replay as _rp
         rc = _rp.replay_case(store, case_id)
         if rc:
-            tried = [{"step": st["check"], "when": st.get("when"), "result": st["result"], "decided_by": st.get("decided_by"),
+            tried = [{"step": st["check"], "when": st.get("when"), "result": st["result"], "why": st.get("why"), "decided_by": st.get("decided_by"),
                       "data_before": r["before"]["verdict"], "data_after": (r.get("after") or {}).get("verdict")}
                      for st, r in zip(rc["walkthrough"]["steps"], rc["replay"]["steps"])]
     return {"machine": case["machine_id"], "title": case["title"], "reported": reports, "engineer_results": findings,

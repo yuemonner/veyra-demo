@@ -589,7 +589,8 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
             clean.append({"id": f"s{i + 1}", "check": _text(st, "check", limit=300), "part": _text(st, "part", required=False, limit=120),
                           "kind": _choice(st, "kind", ("check", "swap", "repair"), required=False) or "check",
                           "result": _choice(st, "result", ("fault_found", "not_the_issue", "inconclusive", "partly")),
-                          "decided_by": _text(st, "decided_by", required=False, limit=400), "when": when[:10] if when else None,
+                          "decided_by": _text(st, "decided_by", required=False, limit=400), "why": _text(st, "why", required=False, limit=400),
+                          "when": when[:10] if when else None,
                           "minutes": minutes, "cost": cost})
         out = {"system": _text(payload, "system", required=False, limit=120), "symptom": _text(payload, "symptom", required=False, limit=400),
                "architecture": _choice(payload, "architecture", ("modular", "integrated", "unknown"), required=False) or "unknown",

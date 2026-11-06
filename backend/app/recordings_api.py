@@ -365,6 +365,7 @@ class WalkthroughStepIn(BaseModel):
     kind: str = Field(default="check", pattern="^(check|swap|repair)$")
     result: str = Field(pattern="^(fault_found|not_the_issue|inconclusive|partly)$")
     decided_by: Optional[str] = Field(default=None, max_length=400)
+    why: Optional[str] = Field(default=None, max_length=400)
     when: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
     minutes: Optional[float] = Field(default=None, ge=0, le=100000)
     cost: Optional[float] = Field(default=None, ge=0, le=10000000)

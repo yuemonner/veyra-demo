@@ -1,25 +1,30 @@
 {
-  "actor": "Engineer (example)",
-  "source": "SYNTHETIC example walkthrough written for the demo case, not a real service history",
+  "actor": "工程师（示例）",
+  "source": "合成示例：为演示案例编写的排查过程，不是真实维修记录",
   "walkthrough": {
-    "system": "HV traction (battery, harness, inverters)",
-    "symptom": "Emergency stop on a cold morning ramp launch, remote code 7 (FR motor fault)",
+    "system": "高压驱动（电池、线束、逆变器）",
+    "symptom": "冷车早上坡道起步时急停，遥控器报码 7（FR 电机故障）",
     "architecture": "modular",
     "source": "example",
     "currency": "EUR",
-    "why_ambiguous": "Code 7 names the FR motor, but the FR inverter only reported DC bus under-voltage: the cause could sit upstream of it.",
+    "why_ambiguous": "码 7 指向 FR 电机，但 FR 逆变器只报了直流母线欠压，原因可能在它上游。",
     "steps": [
-      {"check": "Read the remote fault code and the FR inverter's DTC history", "part": "VCU and MCU_FR fault codes", "kind": "check", "result": "inconclusive",
-       "decided_by": "Code 7 points at the FR motor; the DTC is DC bus under-voltage, not a motor fault", "when": "2026-10-20", "minutes": 20},
-      {"check": "Replaced the FR motor inverter (MCU_FR)", "part": "FR inverter", "kind": "swap", "result": "not_the_issue",
-       "decided_by": "The emergency stop came back on 2026-10-28", "when": "2026-10-21", "minutes": 240, "cost": 1800},
-      {"check": "Checked battery SOC and cell voltages with the BMS service tool", "part": "Battery pack", "kind": "check", "result": "not_the_issue",
-       "decided_by": "SOC and cell voltages normal at the depot", "when": "2026-10-22", "minutes": 45},
-      {"check": "Reviewed the VCU 2.4.1 hill-start assist settings against the BMS torque limit", "part": "VCU HSA", "kind": "check", "result": "partly",
-       "decided_by": "HSA feed-forward can command torque above the BMS limit on a cold pack", "when": "2026-10-23", "minutes": 90},
-      {"check": "Inspected the FR high-voltage connector: discoloured terminal, re-crimped and re-torqued", "part": "FR HV connector", "kind": "repair", "result": "fault_found",
-       "decided_by": "Terminal discoloured; contact resistance high on the bench", "when": "2026-10-29", "minutes": 120, "cost": 60}
+      {"check": "读取遥控器故障码和 FR 逆变器的 DTC 历史", "part": "VCU 和 MCU_FR 故障码", "kind": "check", "result": "inconclusive",
+       "why": "先看报了什么码，这是每次都会做的第一步",
+       "decided_by": "码 7 指向 FR 电机，但 DTC 是母线欠压，不是电机本身的故障", "when": "2026-10-20", "minutes": 20},
+      {"check": "更换 FR 电机逆变器（MCU_FR）", "part": "FR 逆变器", "kind": "swap", "result": "not_the_issue",
+       "why": "码 7 说是 FR 电机故障，手上正好有备件，换掉最快",
+       "decided_by": "10 月 28 日又急停了一次", "when": "2026-10-21", "minutes": 240, "cost": 1800},
+      {"check": "用 BMS 诊断工具检查电池 SOC 和电芯电压", "part": "电池包", "kind": "check", "result": "not_the_issue",
+       "why": "换了逆变器还会坏，怀疑是电池没电或电芯有问题",
+       "decided_by": "在场站量的 SOC 和电芯电压都正常", "when": "2026-10-22", "minutes": 45},
+      {"check": "检查 VCU 2.4.1 的坡起辅助（HSA）设置，看会不会超过 BMS 扭矩限值", "part": "VCU 坡起辅助 HSA", "kind": "check", "result": "partly",
+       "why": "急停都发生在坡道起步，而且是在 VCU 升级到 2.4.1 之后",
+       "decided_by": "电池冷的时候，HSA 的前馈扭矩会超过 BMS 限值", "when": "2026-10-23", "minutes": 90},
+      {"check": "检查 FR 高压接插件：端子发黑，重新压接并紧固", "part": "FR 高压接插件", "kind": "repair", "result": "fault_found",
+       "why": "只有 FR 这一路电压掉得特别多，怀疑是线路或接头",
+       "decided_by": "端子发黑；台架上量到接触电阻偏大", "when": "2026-10-29", "minutes": 120, "cost": 60}
     ],
-    "final_cause": "FR HV connector contact resistance, with HSA torque on a cold pack pulling the FR bus below its under-voltage threshold"
+    "final_cause": "FR 高压接插件接触电阻偏大；冷电池加上坡起辅助的扭矩，把 FR 母线电压拉到欠压保护以下"
   }
 }
