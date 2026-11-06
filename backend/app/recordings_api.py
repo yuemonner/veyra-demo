@@ -343,6 +343,20 @@ def get_investigation(case_id: str, request: Request):
         store.close()
 
 
+@router.get("/cases/{case_id}/expected")
+def get_expected(case_id: str, request: Request):
+    """Expected against observed behaviour over the case's decoded log (deterministic), layer by layer."""
+    from app.agent import investigator
+    from app.engine_api import store_path
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(store_path(request))
+    try:
+        tools = investigator.LogTools(store, case_id)
+        return tools.expected_full() if tools.expected_applies() else {"applies": False}
+    finally:
+        store.close()
+
+
 @router.get("/cases/{case_id}/electrical")
 def get_electrical(case_id: str, request: Request):
     """Physics relations over the case's decoded CAN log (deterministic): branch and pack resistance with uncertainty, the

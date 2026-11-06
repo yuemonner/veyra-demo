@@ -59,6 +59,11 @@ How to work:
    (data_before: settled, answerable from signals, not separable, or not in the data; data_after: unchanged or resolved
    after the step). Do not propose repeating a step that was not the issue; when data_after is "unchanged" after a part
    was swapped, the swap did not touch the relation that does not add up: say so and use it as evidence.
+   An expected_behavior tool may be offered: it compares what the machine should have done with what it did, layer by
+   layer (intent, controller, physical, environment). Call it before reading error codes as causes. Cite the first
+   divergence (its expectation id, with its call id in checked); treat protections in its chain as the machine behaving
+   as designed, not as the fault; for anything it lists as cannot_determine, say it cannot be determined and what is
+   needed (put it under unobservable), never assume it happened. Its rules come from the spec's stated source.
    For a battery-electric machine an electrical tool may be offered. Call it; a relation that does not add up is evidence
    even when no alarm fired. Cite its findings in checked with its call id, by relation (e.g. B_FR, R_FR, P) and tier:
    a "measured" finding is read from the signals; a "model" finding holds only under the assumptions listed with it,
@@ -225,6 +230,23 @@ class LogTools:
         from app.physics import electrical
         return bool(self.raw) and electrical.detect(self.raw) is not None
 
+    def expected_applies(self) -> bool:
+        from app.physics import electrical, expected
+        if not self.raw:
+            return False
+        snaps = electrical.parse(self.raw)
+        return bool(snaps) and expected.pick_spec(snaps, self.raw) is not None
+
+    def expected_full(self) -> Dict[str, Any]:
+        from app.physics import expected
+        return expected.analyse(self.raw) or {"applies": False}
+
+    def expected_behavior(self) -> Dict[str, Any]:
+        """Expected against observed behaviour, layer by layer (intent, controller, physical, environment): the first
+        divergence, protections that fired, and what the recorded signals cannot determine."""
+        from app.physics import expected
+        return expected.agent_view(expected.analyse(self.raw))
+
     def electrical_full(self) -> Dict[str, Any]:
         """Physics relations over a decoded CAN log, in full (for the case page)."""
         from app.physics import electrical
@@ -349,11 +371,15 @@ ELECTRICAL_SPEC = {"name": "electrical", "description": "For a decoded CAN log o
                    "input_schema": {"type": "object", "properties": {}}}
 
 
+EXPECTED_SPEC = {"name": "expected_behavior", "description": "For a machine whose behaviour spec matches this log: checks what the machine should have done against what it did, layer by layer (intent, controller, physical, environment), over each episode where motion was requested. Returns the first divergence (earliest expectation broken, with its line), the chain of divergences, designed protections that fired and the symptom in time order, which expectations broke only in the faulty episode, and per layer what the data confirms and what it cannot determine (with the signal needed). Deterministic, computed from the file; the spec's source says where its rules come from.",
+                 "input_schema": {"type": "object", "properties": {}}}
+
+
 def tool_specs(tools: "LogTools") -> List[Dict[str, Any]]:
-    return TOOL_SPECS + ([ELECTRICAL_SPEC] if tools.electrical_applies() else [])
+    return TOOL_SPECS + ([ELECTRICAL_SPEC] if tools.electrical_applies() else []) + ([EXPECTED_SPEC] if tools.expected_applies() else [])
 
 
-STEP_LABEL = {"electrical": "Checked the electrical relations", "overview": "Read the whole log", "read_lines": "Read lines {start}–{end}", "search": "Searched for “{pattern}”",
+STEP_LABEL = {"electrical": "Checked the electrical relations", "expected_behavior": "Compared expected with observed behaviour", "overview": "Read the whole log", "read_lines": "Read lines {start}–{end}", "search": "Searched for “{pattern}”",
               "measure": "Measured “{pattern}”", "lessons": "Compared with earlier cases", "case_context": "Read the report and earlier results"}
 
 
@@ -417,6 +443,12 @@ def _summary(name: str, result: Any) -> str:
                 f"{len(result.get('restarts') or [])} restart(s)" if result.get("restarts") else "no failure line recognised"))
     if name == "lessons":
         return f"{len(result.get('lessons') or [])} earlier case(s) compared"
+    if name == "expected_behavior":
+        if result.get("applies") is False:
+            return "no behaviour spec for this log"
+        firsts = [e["first_divergence"]["id"] for e in result.get("episodes") or [] if e.get("first_divergence")]
+        blind = sum(len(v.get("cannot_determine") or []) for v in (result.get("layers") or {}).values())
+        return (f"first divergence: {', '.join(firsts)}" if firsts else "no divergence from the expected path") + (f"; {blind} thing{'s' if blind != 1 else ''} the data cannot determine" if blind else "")
     if name == "electrical":
         if result.get("applies") is False:
             return "not applicable to this log"
@@ -486,6 +518,7 @@ def verify(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]) -> D
             problems.append(f"next_action.outcomes[{i}]: unknown hypothesis id(s) {unknown}")
     problems += check_acquisition(cleaned, raw, outputs, ids)
     problems += check_physics(cleaned, outputs)
+    problems += check_expected(cleaned, outputs)
     ev = []
     for g in cleaned.get("events") or []:
         g["lines"] = [n for n in g.get("lines") or [] if isinstance(n, int) and 1 <= n <= len(raw)]
@@ -618,6 +651,31 @@ def check_physics(cleaned: Dict[str, Any], outputs: Dict[str, str], next_key: st
     return problems
 
 
+def check_expected(cleaned: Dict[str, Any], outputs: Dict[str, str]) -> List[str]:
+    """When the expected-behaviour check ran and found a divergence: the report cites it, and lists what the data
+    cannot determine instead of assuming it."""
+    problems: List[str] = []
+    for cid, text in outputs.items():
+        if '"version": "expected-behavior-v1"' not in text:
+            continue
+        try:
+            r = json.loads(text)
+        except ValueError:
+            continue
+        firsts = [e["first_divergence"] for e in r.get("episodes") or [] if e.get("first_divergence")]
+        if firsts and cid not in _calls(cleaned):
+            problems.append(f"the expected-behaviour check ({cid}) found where behaviour first left the expected path "
+                            f"({firsts[0]['id']}): cite it in checked with its call id")
+        blind = [b for v in (r.get("layers") or {}).values() for b in v.get("cannot_determine") or []]
+        if blind and firsts:
+            where = " ".join(_strings({k: cleaned.get(k) for k in ("unobservable", "unknowns", "data_requests")}))
+            missing = [b for b in blind if not any(w in where.lower() for w in re.findall(r"[a-z]{4,}", (b.get("needs") or "").lower())[:3])]
+            if missing:
+                problems.append("the expected-behaviour check says this data cannot determine: " + "; ".join(f"{b['text']} (needs {b['needs']})" for b in missing)
+                                + ". List it under unobservable with how to observe it, rather than assuming it")
+    return problems
+
+
 # ---------------------------------------------------------------- evidence integrity (also applied to stored outputs on read)
 INTEGRITY_VERSION = "evidence-integrity-v2"
 _NOT_DIRECT = ("Kept open: no direct exclusion was recorded for this area (the deciding evidence was observed elsewhere), "
@@ -717,6 +775,14 @@ def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str
     for x in q.get("questions") or []:
         if x.get("status") == "answered" and x["id"].startswith("log:check"):
             checked.append({"check": x["question"], "result": x["answer"], "verdict": "supports", "calls": []})
+    if raw and tools.expected_applies():
+        from app.physics import expected as _ex
+        er = _ex.analyse(raw) or {}
+        for i, sn in enumerate(er.get("snapshots") or []):
+            fd = sn.get("first_divergence")
+            if fd:
+                checked.append({"check": f"Expected vs observed, episode {i + 1}: first divergence ({fd['layer']})",
+                                "result": f"{fd['text']}: broken at +{fd['first']['rel_s']} s (line {fd['first'].get('line')})", "verdict": "supports", "calls": []})
     if raw and tools.electrical_applies():
         from app.physics import electrical as _el
         for f in (_el.analyse(raw) or {}).get("findings") or []:
@@ -854,6 +920,8 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
                             value = getattr(tools, name)(**args)
                         elif name == "electrical" and tools.electrical_applies():
                             value = tools.electrical()
+                        elif name == "expected_behavior" and tools.expected_applies():
+                            value = tools.expected_behavior()
                         else:
                             raise ValueError(f"Unknown tool {name}")
                         text, error = json.dumps(value, default=str)[:24000], None

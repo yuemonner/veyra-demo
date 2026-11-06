@@ -204,6 +204,7 @@ def verify_round(report: Dict[str, Any], raw: List[str], outputs: Dict[str, str]
             problems.append(f"next_check.outcomes[{i}]: unknown hypothesis id(s) {unknown}")
     problems += inv.check_acquisition(cleaned, raw, outputs, ids)
     problems += inv.check_physics(cleaned, outputs, next_key="next_check")
+    problems += inv.check_expected(cleaned, outputs)
     if inv._CONFIRMED.search(cleaned.get("reply") or ""):
         problems.append("Do not state a confirmed root cause in the reply")
     cleaned["hypotheses"] = inv.reviewed_hypotheses(cleaned.get("hypotheses"))[0]
@@ -244,7 +245,7 @@ def discuss(store, case_id: str, message: str, *, kind: str = "guess", model=Non
     try:
         for _ in range(max_turns):
             t0 = time.time()
-            reply = model.create(system=inv.prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=TOOLS + ([inv.ELECTRICAL_SPEC] if tools.electrical_applies() else []) + [SUBMIT_ROUND])
+            reply = model.create(system=inv.prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=TOOLS + ([inv.ELECTRICAL_SPEC] if tools.electrical_applies() else []) + ([inv.EXPECTED_SPEC] if tools.expected_applies() else []) + [SUBMIT_ROUND])
             calls_log.append(inv.model_call_record(len(calls_log) + 1, reply, int((time.time() - t0) * 1000), getattr(model, "model", None)))
             content = reply.get("content") or []
             messages.append({"role": "assistant", "content": content})
@@ -275,6 +276,8 @@ def discuss(store, case_id: str, message: str, *, kind: str = "guess", model=Non
                         value = getattr(tools, name)(**args)
                     elif name == "electrical" and tools.electrical_applies():
                         value = tools.electrical()
+                    elif name == "expected_behavior" and tools.expected_applies():
+                        value = tools.expected_behavior()
                     else:
                         raise ValueError(f"Unknown tool {name}")
                     text, error = json.dumps(value, default=str)[:24000], None

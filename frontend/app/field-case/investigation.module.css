@@ -297,3 +297,24 @@
 .replayDl dt { color: var(--sr-ink-3); font-weight: 600; }
 .replayDl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .replayDl { grid-template-columns: minmax(0, 1fr); } .replayDl dd { margin-bottom: 4px; } }
+/* Expected vs observed */
+.expEp { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--sr-edge); min-width: 0; }
+.expFirst { margin: 0; font-size: 14px; }
+.expChain { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 4px; border-left: 2px solid var(--sr-edge-strong); }
+.expChain li { display: grid; grid-template-columns: 64px max-content minmax(0, 1fr) max-content; gap: 8px; align-items: baseline; padding: 3px 0 3px 10px; font-size: 13.5px; position: relative; }
+.expChain li::before { content: ""; position: absolute; left: -6px; top: 9px; width: 10px; height: 10px; border-radius: 50%; background: var(--sr-edge-strong); }
+.exp_divergence::before { background: #d9a400 !important; }
+.exp_protection::before { background: #2f6fdf !important; }
+.exp_symptom::before { background: var(--sr-fault, #c0392b) !important; }
+.expT { font-family: var(--sr-font-data); font-size: 12px; color: var(--sr-ink-3); font-variant-numeric: tabular-nums; }
+.expKind { font-size: 11.5px; font-weight: 650; padding: 1px 8px; border-radius: 999px; background: var(--sr-glass-nested); border: 1px solid var(--sr-edge); }
+.exp_divergence .expKind { background: color-mix(in srgb, #d9a400 16%, transparent); }
+.exp_protection .expKind { background: color-mix(in srgb, #2f6fdf 14%, transparent); }
+.exp_symptom .expKind { background: color-mix(in srgb, #c0392b 14%, transparent); }
+.expLayers { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.expLayers > div { display: grid; gap: 4px; align-content: start; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--sr-edge); background: var(--sr-glass-strong); font-size: 13.5px; }
+.expLayers p { margin: 0; }
+.expOk { font-weight: 650; color: #2f8f5b; }
+.expBad { font-weight: 650; color: #a87a00; }
+.expBlind { font-weight: 650; color: var(--sr-ink-3); }
+@media (max-width: 640px) { .expChain li { grid-template-columns: 56px minmax(0, 1fr); } .expChain li > span:nth-child(3), .expChain li > code { grid-column: 2; } }

@@ -110,7 +110,7 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
                   {ws.why && <><dt>{T("Why this step", "为什么走这一步")}</dt><dd>{ws.why}</dd></>}
                   {ws.decided_by && <><dt>{T("What decided it", "靠什么判断的")}</dt><dd>{ws.decided_by}</dd></>}
                   <dt>{T("Before", "做之前")}</dt><dd>{zh ? L(BEFORE, s.before.verdict) : s.before.text}</dd>
-                  {s.after && <><dt>{T("After", "做之后")}</dt><dd>{zh ? `${L(AFTER, s.after.verdict)}（${s.after.values?.before_ratio}× → ${s.after.values?.after_ratio}×）` : s.after.text}</dd></>}
+                  {s.after && <><dt>{T("After", "做之后")}</dt><dd>{zh ? `${L(AFTER, s.after.verdict)}（${Number(s.after.values?.before_ratio).toFixed(2)}× → ${Number(s.after.values?.after_ratio).toFixed(2)}×）` : s.after.text}</dd></>}
                   {s.cheaper && <><dt>{T("Cheaper first", "更省的做法")}</dt><dd>{zh ? `${MEAS_ZH[s.cheaper.measurement] || s.cheaper.what}（${["看已有数据就行", "车停在场站就能做", "要装仪器实车起步"][s.cheaper.cost_tier] || ""}）` : `${s.cheaper.what} (${s.cheaper.cost_label})`}</dd></>}
                   {s.hindsight !== "not_decidable" && <><dt>{T("In hindsight", "回头看")}</dt><dd>{L(HINDSIGHT, s.hindsight)}</dd></>}
                   {s.evidence.length > 0 && <><dt>{T("Lines", "相关日志")}</dt><dd className={st.replayLines}>{s.evidence.slice(0, 2).map((e: Any) => <code key={e.line}>{`${e.line}  ${e.quote}`}</code>)}</dd></>}

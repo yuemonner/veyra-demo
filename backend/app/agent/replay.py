@@ -173,12 +173,12 @@ def replay_step(step: Dict[str, Any], lines: List[str], spans, elec_all: Optiona
                 out["evidence"] += [{"line": l, "quote": lines[l - 1].strip()[:200]} for l in lines_[:3]]
                 if abs(a_ - b_) / b_ <= 0.15 and b_ > 1.3:
                     out["after"] = {"verdict": "unchanged", "how": "electrical",
-                                    "text": f"After this step {w}'s drop per amp is still {a_:.1f}× the other wheels' (it was {b_:.1f}×): "
+                                    "text": f"After this step {w}'s drop per amp is still {a_:.2f}× the other wheels' (it was {b_:.2f}×): "
                                             f"what was {'changed' if step.get('kind') in ('swap', 'repair') else 'checked'} did not change the relation that did not add up.",
                                     "values": {"before_ratio": round(b_, 2), "after_ratio": round(a_, 2)}}
                 elif b_ > 1.3 and a_ <= 1.15:
                     out["after"] = {"verdict": "resolved", "how": "electrical",
-                                    "text": f"After this step {w}'s drop per amp matches the other wheels' again ({a_:.1f}×, was {b_:.1f}×): consistent with the fix holding.",
+                                    "text": f"After this step {w}'s drop per amp matches the other wheels' again ({a_:.2f}×, was {b_:.2f}×): consistent with the fix holding.",
                                     "values": {"before_ratio": round(b_, 2), "after_ratio": round(a_, 2)}}
 
     # 2. signals in the log that answer the step
