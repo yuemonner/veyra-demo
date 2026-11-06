@@ -93,6 +93,7 @@ def test_api_round_trip(tmp_path, monkeypatch):
     monkeypatch.setenv("VEYRA_ENABLE_RUNTIME", "true")
     monkeypatch.setenv("VEYRA_ENGINE_DB", str(tmp_path / "engine.db"))
     monkeypatch.setenv("VEYRA_PUBLIC_DEMO", "true")
+    monkeypatch.setenv("VEYRA_ALLOW_RECORDINGS", "true")
     monkeypatch.delenv("VEYRA_ACCESS_CODE", raising=False)
     monkeypatch.delenv("VEYRA_ENGINE_SEED", raising=False)
     main = importlib.import_module("app.main")

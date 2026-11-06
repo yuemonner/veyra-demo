@@ -463,7 +463,7 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
 
     elif kind == "model_authorization":
         # Written permission to send this case's (non-synthetic) data to a named model provider.
-        out = {"provider": _choice(payload, "provider", ("anthropic", "openai_compatible", "local")), "model": _text(payload, "model", required=False, limit=200),
+        out = {"provider": _choice(payload, "provider", ("anthropic", "openai", "openai_compatible", "local")), "model": _text(payload, "model", required=False, limit=200),
                "scope": _text(payload, "scope"), "authorized_by": _text(payload, "authorized_by", limit=300), "evidence": _text(payload, "evidence"),
                "boundary": "Covers only the provider and scope stated. Recorded by a person; not verified by Veyra."}
 

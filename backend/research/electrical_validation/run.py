@@ -300,6 +300,7 @@ def main() -> None:
     if a.engine_process:
         engine_main(a.engine_process[0], a.engine_process[1], a.engine)
         return
+    a.out = os.path.abspath(a.out)
     sys.path.insert(0, HERE)
     import generate
     logs, sealed_dir = os.path.join(a.out, "logs"), os.path.join(a.out, "sealed")
