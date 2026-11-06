@@ -26,6 +26,8 @@ const STANDING: Record<string, [string, string]> = {
   leading_not_verified: ["Leading, not verified", "最可能，未验证"], open: ["Open", "待确认"], weakened: ["Weakened", "被削弱"], ruled_out: ["Ruled out", "已排除"],
   verified_cause: ["Verified cause", "已验证的原因"], mechanism_reproduced: ["Mechanism reproduced with data", "机理已用数据复现"],
 };
+const HS: Record<string, [string, string]> = { leading: ["leading", "最可能"], open: ["open", "待确认"], weakened: ["weakened", "被削弱"], ruled_out: ["ruled out", "已排除"] };
+const hs = (zh: boolean, k: string) => (HS[k] ? HS[k][zh ? 1 : 0] : k);
 const SRC = (zh: boolean, s: Any) => s ? (s.source === "discussion" ? (zh ? `讨论第 ${s.n} 轮` : `discussion round ${s.n}`) : (zh ? `排查第 ${s.n} 轮` : `investigation round ${s.n}`)) : "";
 const VERDICT: Record<string, [string, string]> = {
   action_changed_with_evidence: ["Changed the next action: the explanations moved", "改变了下一步：可能的原因有变化"],
@@ -95,7 +97,7 @@ export default function CaseStateBar({ state, superseded }: { state: Any; supers
                 <span className={st.impactText}>{x.text}</span>
                 <b className={x.genuine_change ? st.impactYes : st.impactNo}>{(VERDICT[x.verdict] || [x.verdict, x.verdict])[zh ? 1 : 0]}</b>
                 {x.before && <span className={st.fine}>{T(`Before: ${x.before.next_action || "—"} → After: ${x.after.next_action || "—"}`, `之前：${x.before.next_action || "—"} → 之后：${x.after.next_action || "—"}`)}</span>}
-                {(x.moved || []).filter((m: Any) => m.from !== m.to).length > 0 && <span className={st.fine}>{T("Moved: ", "变化：")}{x.moved.filter((m: Any) => m.from !== m.to).map((m: Any) => `${m.area} ${m.from} → ${m.to}`).join("; ")}</span>}
+                {(x.moved || []).filter((m: Any) => m.from !== m.to).length > 0 && <span className={st.fine}>{T("Moved: ", "变化：")}{x.moved.filter((m: Any) => m.from !== m.to).map((m: Any) => `${m.area} ${hs(zh, m.from)} → ${hs(zh, m.to)}`).join(zh ? "；" : "; ")}</span>}
                 {(x.new || []).length > 0 && <span className={st.fine}>{T("New: ", "新增：")}{x.new.map((m: Any) => m.area).join("; ")}</span>}
                 {(x.rests_on_engineer_report || []).length > 0 && <span className={st.provReported}>{T("Rests on the engineer's report: ", "依据工程师的报告：")}{x.rests_on_engineer_report.join("; ")}</span>}
                 {(x.remaining || []).length > 0 && <span className={st.fine}>{T("Still competing: ", "仍在竞争的解释：")}{x.remaining.map((m: Any) => m.area).join("; ")}</span>}

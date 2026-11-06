@@ -54,7 +54,7 @@ export function ExpectedBehavior({ caseId, call }: { caseId: string; call: Call 
         const i = d.snapshots.indexOf(s);
         return (
           <div key={i} className={st.expEp}>
-            <b>{T(`Episode ${i + 1}: ${s.label.replace(/^snapshot \d+ of \d+:\s*/, "")}`, `第 ${i + 1} 次：${s.label.replace(/^snapshot \d+ of \d+:\s*/, "")}`)}</b>
+            <b>{T(`Episode ${i + 1}: ${s.label.replace(/^snapshot \d+ of \d+:\s*/, "")}`, `第 ${i + 1} 次：${labelZh(s.label.replace(/^snapshot \d+ of \d+:\s*/, ""))}`)}</b>
             <div className={st.signals}>{Object.entries(s.context || {}).map(([k, v]: [string, Any]) => <code key={k}>{`${zh ? CTX_ZH[k] || k : k} ${ctxVal(k, v.value)}${v.unit ? ` ${v.unit}` : ""}`}</code>)}</div>
             {!s.first_divergence && <p className={st.fine}>{T("Behaved as expected throughout.", "全程符合预期。")}</p>}
             {s.first_divergence && <>
@@ -95,4 +95,11 @@ export function ExpectedBehavior({ caseId, call }: { caseId: string; call: Call 
         </div>)}
     </div>
   );
+}
+
+/** Chinese wording for the episode labels in a decoded log's snapshot headers (plain words only; values stay as they are). */
+function labelZh(t: string): string {
+  return t.replace(/\bmorning launch on ([A-Z])-ramp\b/i, "早班在 $1 坡道起步").replace(/\bafternoon launch on ([A-Z])-ramp\b/i, "下午在 $1 坡道起步")
+    .replace(/\bbefore the (.+?) OTA\b/i, "$1 OTA 升级之前").replace(/field report: emergency stop, remote code (\d+)/i, "现场报告：急停，遥控器报码 $1")
+    .replace(/same vehicle, after the restart/i, "同一辆车，重启之后").replace(/\s*\(/g, "（").replace(/\)/g, "）");
 }
