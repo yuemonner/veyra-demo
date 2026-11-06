@@ -14,7 +14,7 @@ type Call = (path: string, init?: RequestInit) => Promise<Any>;
 
 const BEFORE: Record<string, [string, string]> = {
   not_separable: ["The data saw it but could not tell the candidates apart", "数据当时已经看到问题，但分不清是哪个部件"],
-  answerable: ["Answerable from signals already in the log", "日志里当时就有答案，不用去车上查"],
+  answerable: ["Signals that bear on it were already in the log (nobody has checked what they would have shown)", "日志里当时已经有相关的信号（还要有人去读，没核实过当时会读出什么）"],
   weakened: ["The data already argued against it", "数据当时已经说明，这个可能性不大"],
   no_anomaly: ["The data showed this branch normal", "数据显示这一路是正常的"],
   physical_only: ["No signal shows it: needs a person at the vehicle", "数据看不到，只能派人去车上查"],
@@ -105,7 +105,7 @@ export function DebugReplay({ caseId, call }: { caseId: string; call: Call }) {
       {m && (
         <div className={st.metrics}>
           <div><b>{m.steps}</b><span>{T("Steps", "一共几步")}</span></div>
-          <div><b>{m.not_the_issue}</b><span>{T("Were not the issue", "白做的步骤")}</span></div>
+          <div><b>{m.not_the_issue}</b><span>{T("Were not the issue", "不是问题所在的步骤")}</span></div>
           <div><b>{m.verified_avoidable ?? 0}</b><span>{T("Verified avoidable", "确认可以省掉")}</span></div>
           <div><b>{m.potentially_avoidable ?? 0}</b><span>{T("Potentially avoidable (estimate)", "可能可以省掉（估计）")}</span></div>
           <div><b>{m.insufficient_evidence ?? 0}</b><span>{T("Insufficient evidence", "证据不够，判断不了")}</span></div>
