@@ -253,3 +253,15 @@ def test_micro_ros_has_an_investigation_replay_from_the_public_thread(showcase):
     assert rc["replay"]["summary"]["verified_avoidable"] == 0 and rc["replay"]["summary"]["potentially_avoidable"] == 0
     s = CS.build(store, _id(by, "micro-ROS"))
     assert any(f["source"] == "walkthrough_final_cause" for f in s["provenance"]["flags"])   # the thread's conclusion is reported
+
+
+def test_case_page_reads_reuse_the_parsed_log_and_are_not_mutated(showcase):
+    store, by = showcase
+    import time
+    a = inv.LogTools(store, by[SHUTTLE])
+    t0 = time.time()
+    b = inv.LogTools(store, by[SHUTTLE])
+    assert b.parsed is a.parsed and time.time() - t0 < 0.5            # parsed once per log (sha256), not per request
+    e1 = b.electrical_full()
+    e1["assessments"][0]["safety_plan"]["recommended"] = "tampered"
+    assert inv.LogTools(store, by[SHUTTLE]).electrical_full()["assessments"][0]["safety_plan"]["recommended"] == "t_inv_trend"

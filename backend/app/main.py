@@ -178,6 +178,8 @@ def startup():
             warm = CaseStore(Path(os.getenv("VEYRA_ENGINE_DB") or DEFAULT_DB))
             try:
                 print(f"[veyra] read caches: {warm.warm_read_caches()}")
+                from app.agent.case_state import warm_showcase
+                print(f"[veyra] case-page caches: {warm_showcase(warm)}")
             except Exception as error:  # a cold cache only costs time; never stop the server for it
                 print(f"[veyra] read-cache warm-up skipped: {error}")
             finally:

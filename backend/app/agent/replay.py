@@ -360,8 +360,11 @@ def replay_case(store, case_id: str) -> Optional[Dict[str, Any]]:
     w = walkthrough_of(store, case_id)
     if not w:
         return None
-    raw = LogTools(store, case_id).raw or []
-    return {"walkthrough": w, "replay": replay(raw, w)}
+    from app.agent.investigator import cached
+    tools = LogTools(store, case_id)
+    raw = tools.raw or []
+    # the replay depends only on the log and this walkthrough entry: compute it once per pair
+    return {"walkthrough": w, "replay": cached(f"replay:{VERSION}:{w.get('entry_id')}", tools.sha, lambda: replay(raw, w))}
 
 
 def fleet(store) -> Dict[str, Any]:

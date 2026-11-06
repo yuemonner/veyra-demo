@@ -15,6 +15,7 @@ Boundaries enforced here, not left to the prompt:
 """
 from __future__ import annotations
 
+import copy
 import json
 import re
 import statistics
@@ -206,63 +207,106 @@ def _norm(s: str) -> str:
 
 
 # ---------------------------------------------------------------- tools over the original log
+# The original log is content-addressed (sha256), so its parse and the deterministic analyses over it can be reused
+# across requests: a case page opens several panels at once and each used to parse the whole log again.
+_CACHE: Dict[Tuple[str, str], Any] = {}
+_CACHE_MAX = 64
+
+
+def cached(kind: str, sha: Optional[str], compute: Callable[[], Any]) -> Any:
+    """compute() once per (kind, log sha256). Results are treated as read-only by callers: a deep copy is returned."""
+    if not sha:
+        return compute()
+    key = (kind, sha)
+    if key not in _CACHE:
+        if len(_CACHE) >= _CACHE_MAX:
+            _CACHE.pop(next(iter(_CACHE)))
+        _CACHE[key] = compute()
+    v = _CACHE[key]
+    return copy.deepcopy(v) if isinstance(v, (dict, list)) else v
+
+
+def _parsed_log(sha: Optional[str], raw: List[str]):
+    def go():
+        import tempfile
+        from pathlib import Path
+        from app.ingest import textlog
+        with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False) as fh:
+            fh.write("\n".join(raw))
+        log = textlog.read(Path(fh.name))
+        Path(fh.name).unlink(missing_ok=True)
+        return ({p.n: p for p in log.lines}, log.clock)
+    if not sha:
+        return go()
+    key = ("parsed", sha)
+    if key not in _CACHE:
+        if len(_CACHE) >= _CACHE_MAX:
+            _CACHE.pop(next(iter(_CACHE)))
+        _CACHE[key] = go()
+    return _CACHE[key]       # parsed lines are only read
+
+
 class LogTools:
     """Read-only tools over the original text log (raw lines, real line numbers)."""
 
     def __init__(self, store, case_id: str):
-        from app.ingest import rawstore, textlog
+        from app.ingest import rawstore
         self.store, self.case_id = store, case_id
         found = store.discovery(case_id) or {}
         self.found = found
         sha = (found.get("source") or {}).get("sha256")
+        self.sha = sha
         self.raw: List[str] = (rawstore.lines(store.path, sha) if sha else None) or []
         self.parsed = {}
+        self.clock = "line_order"
         if self.raw:
-            import tempfile
-            from pathlib import Path
-            with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False) as fh:
-                fh.write("\n".join(self.raw))
-            log = textlog.read(Path(fh.name))
-            Path(fh.name).unlink(missing_ok=True)
-            self.parsed = {p.n: p for p in log.lines}
-            self.clock = log.clock
+            self.parsed, self.clock = _parsed_log(sha, self.raw)
 
     def available(self) -> bool:
         return bool(self.raw)
 
     def electrical_applies(self) -> bool:
         from app.physics import electrical
-        return bool(self.raw) and electrical.detect(self.raw) is not None
+        return bool(self.raw) and cached("electrical_detect", self.sha, lambda: electrical.detect(self.raw) is not None)
+
+    def system_voltage(self) -> Optional[float]:
+        from app.agent import experiment_safety
+        return cached("system_voltage", self.sha, lambda: experiment_safety.system_voltage(self.raw))
 
     def expected_applies(self) -> bool:
         from app.physics import electrical, expected
         if not self.raw:
             return False
-        snaps = electrical.parse(self.raw)
-        return bool(snaps) and expected.pick_spec(snaps, self.raw) is not None
+        def go():
+            snaps = electrical.parse(self.raw)
+            return bool(snaps) and expected.pick_spec(snaps, self.raw) is not None
+        return cached("expected_applies", self.sha, go)
 
     def expected_full(self) -> Dict[str, Any]:
         from app.physics import expected
-        return expected.analyse(self.raw) or {"applies": False}
+        return cached("expected", self.sha, lambda: expected.analyse(self.raw)) or {"applies": False}
 
     def expected_behavior(self) -> Dict[str, Any]:
         """Expected against observed behaviour, layer by layer (intent, controller, physical, environment): the first
         divergence, protections that fired, and what the recorded signals cannot determine."""
         from app.physics import expected
-        return expected.agent_view(expected.analyse(self.raw))
+        r = cached("expected", self.sha, lambda: expected.analyse(self.raw))
+        return expected.agent_view(r)
 
     def electrical_full(self) -> Dict[str, Any]:
         """Physics relations over a decoded CAN log, in full (for the case page)."""
         from app.agent import experiment_safety
         from app.physics import electrical
-        return experiment_safety.annotate_electrical(electrical.analyse(self.raw), hv_system=experiment_safety.has_hv(experiment_safety.system_voltage(self.raw))) or {"applies": False}
+        return cached("electrical_full", self.sha, lambda: experiment_safety.annotate_electrical(
+            electrical.analyse(self.raw), hv_system=experiment_safety.has_hv(experiment_safety.system_voltage(self.raw)))) or {"applies": False}
 
     def electrical(self) -> Dict[str, Any]:
         """What the agent is given: measured and model-derived findings with their assumptions, the mechanisms the recorded
         signals cannot separate, and the measurement plan."""
         from app.agent import experiment_safety
         from app.physics import electrical
-        r = experiment_safety.annotate_electrical(electrical.analyse(self.raw), hv_system=experiment_safety.has_hv(experiment_safety.system_voltage(self.raw)))
+        r = self.electrical_full()
+        r = r if r.get("assessments") is not None or r.get("relations") else None
         out = electrical.agent_view(r)
         if r and r.get("assessments"):
             out["safety"] = {a["wheel"]: {**a["safety_plan"], "measurements": {m["id"]: {"hazard": m["safety"]["worst"], "requires_review": m["safety"]["requires_review"]}

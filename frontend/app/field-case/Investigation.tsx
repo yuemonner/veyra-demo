@@ -77,7 +77,9 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
   const curFrom = caseState?.current?.from;
   const superseded = !!curFrom && curFrom.source !== "investigation";
   const stateBar = <CaseStateBar state={caseState} superseded={superseded} />;
-  if (data.playback) return <>{stateBar}<Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} ahead={ahead} standing={standing} superseded={superseded} /></>;
+  // A recorded case plays from round 1 first; the current state appears above the result once the replay reaches it,
+  // so the animation is the first thing on screen and is never pushed below the fold by the summary.
+  if (data.playback) return <Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} ahead={ahead} standing={standing} superseded={superseded} stateBar={stateBar} />;
   const inv = guard && data.investigation ? guard(data.investigation) : data.investigation;
   const agent = data.agent || {};
   if (!inv) {
@@ -320,7 +322,7 @@ function NextAction({ caseId, call, next, entry, closed, onRecorded, demo, hyps 
 const recordedFindings = (pb: Any, upto: number) => (pb.findings || []).slice(0, upto).map((f: Any, i: number) => ({ id: `rec-${i}`, recorded_at: f.recorded_at, action: f.action,
   result: f.result, outcome_selected: ((f.provenance || []).find((p: Any) => p.kind === "selected") || {}).text, observations: (f.provenance || []).filter((p: Any) => p.kind === "observed").map((p: Any) => p.text).join("; ") || f.observations }));
 
-function Playback({ pb, fb, extra, ahead, standing, superseded = false }: { pb: Any; fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode; standing?: React.ReactNode; superseded?: boolean }) {
+function Playback({ pb, fb, extra, ahead, standing, superseded = false, stateBar = null }: { pb: Any; fb?: Record<string, Any>; extra?: React.ReactNode; ahead?: React.ReactNode; standing?: React.ReactNode; superseded?: boolean; stateBar?: React.ReactNode }) {
   const invs: Any[] = pb.investigations;
   const lastStage = invs.length - 1;
   // Plays the recorded investigation from round 1 (the animation), and carries on by itself with the engineer's
@@ -396,10 +398,10 @@ function Playback({ pb, fb, extra, ahead, standing, superseded = false }: { pb: 
       <div className={st.row}><button className={st.ghost} onClick={replay}>Replay from the start</button></div>
     </div>
   ) : null;
-  return <ResultView inv={inv} findings={mine} fb={fb} extra={extra} ahead={stage === lastStage ? ahead : null} standing={stage === lastStage ? standing : null} banner={banner}
+  return <>{stage === lastStage ? stateBar : null}<ResultView inv={inv} findings={mine} fb={fb} extra={extra} ahead={stage === lastStage ? ahead : null} standing={stage === lastStage ? standing : null} banner={banner}
     prev={stage > 0 ? (invs[stage - 1].result || {}).hypotheses : null}
     next={phase === "result" ? <NextAction caseId="" call={async () => null} next={inv.result?.next_action} entry="" closed={false} onRecorded={() => undefined} demo={demo} hyps={inv.result?.hypotheses} superseded={superseded && stage === lastStage} /> : null}
-    footer={footer} />;
+    footer={footer} /></>;
 }
 
 

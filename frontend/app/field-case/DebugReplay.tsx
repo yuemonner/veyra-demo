@@ -5,7 +5,7 @@
    recorded within a day before it showed nothing where it looked, and nothing later implicated it; only those count time
    and money. Potentially avoidable is an estimate with no time or money; insufficient evidence says the data cannot judge it. Engineers add a walkthrough by pasting a chat or service
    note (drafted into steps they correct) or by entering the steps. */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import st from "./investigation.module.css";
 import { useZh } from "./lang";
 
@@ -69,13 +69,23 @@ export function DebugReplay({ caseId, call, autoplay = true }: { caseId: string;
   const [err, setErr] = useState<string | null>(null);
   const [tick, setTick] = useState(autoplay ? 0 : 9999);
   const [paused, setPaused] = useState(false);
-  useEffect(() => { let live = true; setTick(autoplay ? 0 : 9999); call(`/engine/cases/${caseId}/walkthrough`).then((x) => live && setD(x)).catch(() => live && setD(null)); return () => { live = false; }; }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The replay starts when it scrolls into view, so it is never over before anyone sees it.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => { let live = true; setTick(autoplay ? 0 : 9999); setSeen(false); call(`/engine/cases/${caseId}/walkthrough`).then((x) => live && setD(x)).catch(() => live && setD(null)); return () => { live = false; }; }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
   const total = ((d?.replay?.steps || []).length) * 3;
   useEffect(() => {
-    if (!d?.replay || paused || tick >= total) return;
+    if (seen || !rootRef.current) return;
+    if (typeof IntersectionObserver === "undefined") { setSeen(true); return; }
+    const o = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setSeen(true); o.disconnect(); } }, { threshold: 0.15 });
+    o.observe(rootRef.current);
+    return () => o.disconnect();
+  }, [d, seen]);
+  useEffect(() => {
+    if (!d?.replay || !seen || paused || tick >= total) return;
     const t = setTimeout(() => setTick(tick + 1), tick === 0 ? START_MS : TICK_MS);
     return () => clearTimeout(t);
-  }, [d, tick, paused, total]);
+  }, [d, tick, paused, total, seen]);
   if (!d) return null;
   const done = tick >= total;
   const w = d.walkthrough, r = d.replay;
@@ -107,7 +117,7 @@ export function DebugReplay({ caseId, call, autoplay = true }: { caseId: string;
   const m = r?.summary;
   const cur = w?.currency ? ` ${w.currency}` : "";
   return (
-    <div className={st.block} data-no-zh>
+    <div className={st.block} data-no-zh ref={rootRef}>
       <div className={st.spaceHead}>
         <h2 className={st.h2}>{T("Replay of how engineers debugged it", "复盘排查过程")}</h2>
         {!edit && <button className={st.inline} onClick={start}>{w ? T("Record another walkthrough", "记录新的排查过程") : T("Add the engineers' walkthrough", "添加工程师的排查过程")}</button>}

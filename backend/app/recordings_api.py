@@ -317,7 +317,7 @@ def _with_safety(store, case_id: str, payloads, key: str):
     from app.agent import experiment_safety
     from app.agent.investigator import LogTools
     try:
-        hv = experiment_safety.has_hv(experiment_safety.system_voltage(LogTools(store, case_id).raw or []), (store.case(case_id) or {}).get("title", ""))
+        hv = experiment_safety.has_hv(LogTools(store, case_id).system_voltage(), (store.case(case_id) or {}).get("title", ""))
     except Exception:  # noqa: BLE001
         hv = False
     for p in payloads:

@@ -198,9 +198,11 @@ def _basis(assessments: List[Dict[str, Any]], inputs: List[Dict[str, Any]]) -> D
 def build(store, case_id: str, *, lines: Optional[List[str]] = None, walkthrough: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     ledger = store.ledger(case_id)
     case = store.case(case_id)
+    hv_v = None
     if lines is None:
         try:
-            lines = inv.LogTools(store, case_id).raw or []
+            tools = inv.LogTools(store, case_id)
+            lines, hv_v = tools.raw or [], tools.system_voltage()
         except Exception:  # noqa: BLE001
             lines = []
     if walkthrough is None:
@@ -209,7 +211,7 @@ def build(store, case_id: str, *, lines: Optional[List[str]] = None, walkthrough
             walkthrough = replay.walkthrough_of(store, case_id)
         except Exception:  # noqa: BLE001
             walkthrough = None
-    hv_v = S.system_voltage(lines or [])
+    hv_v = hv_v if hv_v is not None else S.system_voltage(lines or [])
     hv_system = S.has_hv(hv_v, f"{case.get('title', '')} {case.get('description', '') or ''}")
     assessments = _assessments(ledger)
     inputs = _inputs(ledger, assessments)
@@ -273,3 +275,26 @@ def build(store, case_id: str, *, lines: Optional[List[str]] = None, walkthrough
                    "rule": f"High voltage: above {S.HV_LIMIT_V_DC:g} V DC (ISO 6469-3 voltage class B)"},
         "boundary": "One state for the whole case page, rebuilt from the append-only record. Earlier conclusions stay in the history; none is current but the latest.",
     }
+
+
+def warm_showcase(store) -> Dict[str, Any]:
+    """Parse each showcase case's log and run the deterministic analyses once, so the first visitor's case page does not
+    wait for them (they are cached by the log's sha256)."""
+    import time
+    from app.agent import replay
+    from app.workflows.public_samples import SAMPLES
+    titles = {s["title"] for s in SAMPLES.values()}
+    done = {}
+    for c in store.cases():
+        if c["title"] not in titles:
+            continue
+        t0 = time.time()
+        tools = inv.LogTools(store, c["id"])
+        if tools.electrical_applies():
+            tools.electrical_full()
+        if tools.expected_applies():
+            tools.expected_full()
+        replay.replay_case(store, c["id"])
+        build(store, c["id"])
+        done[c["id"]] = round(time.time() - t0, 1)
+    return done
