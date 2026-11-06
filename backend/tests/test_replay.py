@@ -140,9 +140,13 @@ def test_fresh_no_anomaly_is_verified_and_stale_is_not():
 
 def test_live_replay_is_consistent_with_the_blind_benchmark():
     """Same synthetic case through the benchmark (frozen protocol v1) and the live replay: the replay never claims more."""
+    import importlib.util
     import sys
-    sys.path.insert(0, str(ROOT / "backend/research/investigation_benchmark"))
-    import run as H
+    spec = importlib.util.spec_from_file_location("bench_v1_run", ROOT / "backend/research/investigation_benchmark/run.py")
+    H = sys.modules.get("bench_v1_run") or importlib.util.module_from_spec(spec)
+    if "bench_v1_run" not in sys.modules:
+        sys.modules["bench_v1_run"] = H
+        spec.loader.exec_module(H)
     b = H.run_case(str(ROOT / "backend/research/investigation_benchmark/cases/shuttle-synthetic"))
     truth_causes = {b["truth"]["main_cause"], *b["truth"]["contributing"]}
     rp = {x["id"]: x for x in _replay()["steps"]}

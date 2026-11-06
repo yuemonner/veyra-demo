@@ -1,0 +1,5464 @@
+{
+ "case": "shuttle-synthetic-v2",
+ "protocol": "PROTOCOL_v2.md",
+ "version": "blind-replay-v2",
+ "synthetic": true,
+ "issues": [
+  {
+   "severity": "note",
+   "step": "s2",
+   "issue": "result became known on 2026-10-28 (from decided_by), after the step on 2026-10-21; it is hidden from decision points before then"
+  },
+  {
+   "severity": "warning",
+   "step": "s3",
+   "issue": "taken on 2026-10-22, before s2's result was known (2026-10-28); if its reason relies on s2 having failed, the walkthrough's dates are inconsistent. Ask the engineers."
+  },
+  {
+   "severity": "warning",
+   "step": "s4",
+   "issue": "taken on 2026-10-23, before s2's result was known (2026-10-28); if its reason relies on s2 having failed, the walkthrough's dates are inconsistent. Ask the engineers."
+  },
+  {
+   "severity": "note",
+   "issue": "synthetic case: tests the harness, not Veyra"
+  }
+ ],
+ "truth": {
+  "main_cause": "contact",
+  "contributing": [
+   "hsa_control",
+   "battery"
+  ],
+  "roles": {
+   "contact": "initiating",
+   "battery": "contributing",
+   "hsa_control": "contributing",
+   "fr_uv_protection": "consequence",
+   "conductor": "not_involved",
+   "inverter": "not_involved",
+   "fr_sensor": "not_involved",
+   "motor_mech": "not_involved"
+  },
+  "confidence": "engineer_reported_fix_unverified",
+  "load_only": false
+ },
+ "points": [
+  {
+   "cutoff": "2026-10-20",
+   "void": false,
+   "rows": 1091,
+   "artifact_audit": {
+    "cutoff": "2026-10-20",
+    "kept": [
+     "sw-vcu-238",
+     "sw-vcu-241",
+     "sw-bms-192",
+     "cfg-vcu-241",
+     "hw-fr-conn",
+     "iv-fl-bearing"
+    ],
+    "dropped": [
+     {
+      "artifact": "hw-mcu-fr-new",
+      "reason": "not available yet"
+     },
+     {
+      "artifact": "iv-mcu-fr",
+      "reason": "not available yet"
+     },
+     {
+      "artifact": "iv-fr-conn",
+      "reason": "not available yet"
+     },
+     {
+      "artifact": "bulletin-conn-b",
+      "reason": "not available yet"
+     }
+    ]
+   },
+   "leaks": [],
+   "withheld_rules": [
+    {
+     "hypothesis": "contact",
+     "rule": "hardware",
+     "available_from": "2026-11-02"
+    }
+   ],
+   "prior_visible": [],
+   "state": {
+    "version": "step-judge-v1",
+    "cutoff": "2026-10-20",
+    "latest_data": "2026-10-09",
+    "facts": [
+     {
+      "id": "f1",
+      "text": "FR's voltage drop grows 6.55 mV per amp of pack current against 2.11 for the other inverters (3.1×), in 1 of 1 snapshots.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f2",
+      "text": "If FR carries an equal share of current, its branch resistance is 26.2 mΩ against 8.5 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.7–32.4 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f3",
+      "text": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f4",
+      "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [
+       353
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f5",
+      "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection): held in all 1 recorded launches.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "expected"
+     },
+     {
+      "id": "a1",
+      "text": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+      "tier": "confirmed",
+      "as_of": "2026-10-14",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "cfg-vcu-241",
+      "source": "artifact",
+      "effect": "supports"
+     },
+     {
+      "id": "a2",
+      "text": "VCU runs 2.4.1 since 2026-10-14, before the first reported symptom (2026-10-20)",
+      "tier": "inferred",
+      "as_of": "2026-10-14",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "sw-vcu-241",
+      "source": "artifact",
+      "effect": "context"
+     }
+    ],
+    "hypotheses": {
+     "contact": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "conductor": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "inverter": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+      "observe": null
+     },
+     "fr_sensor": {
+      "status": "weakened",
+      "facts": [
+       "f1",
+       "f2",
+       "f3"
+      ],
+      "why": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "observe": null
+     },
+     "battery": {
+      "status": "supported",
+      "facts": [
+       "f4"
+      ],
+      "why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+      "observe": {
+       "what": "Pack voltage, current and cell temperatures during a cold launch",
+       "cost_tier": 0
+      }
+     },
+     "hsa_control": {
+      "status": "supported",
+      "facts": [
+       "a1",
+       "a2"
+      ],
+      "why": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+      "observe": {
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      }
+     },
+     "motor_mech": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "No recorded signal can show this.",
+      "observe": {
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     },
+     "fr_uv_protection": {
+      "status": "no_support",
+      "facts": [
+       "f5"
+      ],
+      "why": "The expectation held whenever it could be checked.",
+      "observe": {
+       "what": "Compare the trip moment with the FR DC voltage trace",
+       "cost_tier": 0
+      }
+     }
+    },
+    "plan": {
+     "recommended": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "data_requests": [
+      {
+       "hypothesis": "motor_mech",
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     ],
+     "measurements": [
+      {
+       "id": "t_inv_trend",
+       "what": "Pull a full shift of logs and compare FR's inverter temperature with the other inverters at the same torque",
+       "cost_tier": 0,
+       "strength": "weak",
+       "blind_spot": "Cooling, thermal mass and 1 °C resolution can hide the difference: a hotter inverter supports, a similar one only weakens.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "meter_v",
+       "what": "Reference voltmeter at the FR inverter DC input, key on, compared with the DC_V it reports on CAN",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "Shows the sensor error at one voltage; a gain error needs two voltages (e.g. before and after a short load).",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 0
+       }
+      },
+      {
+       "id": "segment_r",
+       "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      },
+      {
+       "id": "branch_i",
+       "what": "HV-rated DC clamp on the FR inverter input and on one healthy wheel during the same ramp launch",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Separates current from resistance, not connector from cable.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "segment_dv_loaded",
+       "what": "Voltage across each FR segment during a ramp launch, and the same on one healthy wheel",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Live high-voltage measurement on a driven vehicle: insulated probes, an engineer's approval.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      }
+     ]
+    },
+    "open": [
+     "contact",
+     "conductor",
+     "inverter",
+     "battery",
+     "hsa_control"
+    ],
+    "weakened": [
+     "fr_sensor"
+    ],
+    "evidence_model": "v2: telemetry + artifacts"
+   },
+   "state_telemetry": {
+    "version": "step-judge-v1",
+    "cutoff": "2026-10-20",
+    "latest_data": "2026-10-09",
+    "facts": [
+     {
+      "id": "f1",
+      "text": "FR's voltage drop grows 6.55 mV per amp of pack current against 2.11 for the other inverters (3.1×), in 1 of 1 snapshots.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f2",
+      "text": "If FR carries an equal share of current, its branch resistance is 26.2 mΩ against 8.5 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.7–32.4 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f3",
+      "text": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f4",
+      "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [
+       353
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f5",
+      "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection): held in all 1 recorded launches.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "expected"
+     }
+    ],
+    "hypotheses": {
+     "contact": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "conductor": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "inverter": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+      "observe": null
+     },
+     "fr_sensor": {
+      "status": "weakened",
+      "facts": [
+       "f1",
+       "f2",
+       "f3"
+      ],
+      "why": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "observe": null
+     },
+     "battery": {
+      "status": "supported",
+      "facts": [
+       "f4"
+      ],
+      "why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+      "observe": {
+       "what": "Pack voltage, current and cell temperatures during a cold launch",
+       "cost_tier": 0
+      }
+     },
+     "hsa_control": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "VCU_Status.HSA_Active was never 1 in the recorded data, so this cannot be checked yet.",
+      "observe": {
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      }
+     },
+     "motor_mech": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "No recorded signal can show this.",
+      "observe": {
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     },
+     "fr_uv_protection": {
+      "status": "no_support",
+      "facts": [
+       "f5"
+      ],
+      "why": "The expectation held whenever it could be checked.",
+      "observe": {
+       "what": "Compare the trip moment with the FR DC voltage trace",
+       "cost_tier": 0
+      }
+     }
+    },
+    "plan": {
+     "recommended": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "data_requests": [
+      {
+       "hypothesis": "hsa_control",
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      },
+      {
+       "hypothesis": "motor_mech",
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     ],
+     "measurements": [
+      {
+       "id": "t_inv_trend",
+       "what": "Pull a full shift of logs and compare FR's inverter temperature with the other inverters at the same torque",
+       "cost_tier": 0,
+       "strength": "weak",
+       "blind_spot": "Cooling, thermal mass and 1 °C resolution can hide the difference: a hotter inverter supports, a similar one only weakens.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "meter_v",
+       "what": "Reference voltmeter at the FR inverter DC input, key on, compared with the DC_V it reports on CAN",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "Shows the sensor error at one voltage; a gain error needs two voltages (e.g. before and after a short load).",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 0
+       }
+      },
+      {
+       "id": "segment_r",
+       "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      },
+      {
+       "id": "branch_i",
+       "what": "HV-rated DC clamp on the FR inverter input and on one healthy wheel during the same ramp launch",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Separates current from resistance, not connector from cable.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "segment_dv_loaded",
+       "what": "Voltage across each FR segment during a ramp launch, and the same on one healthy wheel",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Live high-voltage measurement on a driven vehicle: insulated probes, an engineer's approval.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      }
+     ]
+    },
+    "open": [
+     "contact",
+     "conductor",
+     "inverter",
+     "battery"
+    ],
+    "weakened": [
+     "fr_sensor"
+    ]
+   },
+   "judgments": [
+    {
+     "id": "s1",
+     "check": "读取遥控器故障码和 FR 逆变器的 DTC 历史",
+     "kind": "check",
+     "when": "2026-10-20",
+     "targets": [],
+     "information_gathering": true,
+     "engineer_expected": {
+      "text": "先看报了什么码，这是每次都会做的第一步",
+      "tier": "reported"
+     },
+     "known_before": [],
+     "data_before": {},
+     "result_established": {
+      "text": "inconclusive: 码 7 指向 FR 电机，但 DTC 是母线欠压，不是电机本身的故障",
+      "tier": "reported"
+     },
+     "alternatives_remaining": [
+      "contact",
+      "conductor",
+      "inverter",
+      "fr_sensor",
+      "battery",
+      "hsa_control",
+      "motor_mech",
+      "fr_uv_protection"
+     ],
+     "veyra_recommended_before": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "hindsight": {
+      "verified_avoidable": false,
+      "estimated": []
+     },
+     "knowledge_candidate": {
+      "status": "unapproved",
+      "symptom": "园区接驳车冷车早班坡道起步时急停，遥控器报码 7（FR 电机故障）。Emergency stop on a cold morning ramp launch; remote code 7 (FR motor fault).",
+      "machine": "SHUTTLE-03",
+      "applies_to": null,
+      "conditions_as_of": "2026-10-09",
+      "hypotheses_tested": [],
+      "check": "读取遥控器故障码和 FR 逆变器的 DTC 历史",
+      "kind": "check",
+      "outcome": "inconclusive",
+      "outcome_tier": "reported",
+      "cost": {
+       "minutes": 20,
+       "parts": null
+      },
+      "engineer_expected": "先看报了什么码，这是每次都会做的第一步",
+      "decided_by": "码 7 指向 FR 电机，但 DTC 是母线欠压，不是电机本身的故障",
+      "evidence_facts": [],
+      "approved_by": null
+     }
+    }
+   ]
+  },
+  {
+   "cutoff": "2026-10-21",
+   "void": false,
+   "rows": 1091,
+   "artifact_audit": {
+    "cutoff": "2026-10-21",
+    "kept": [
+     "sw-vcu-238",
+     "sw-vcu-241",
+     "sw-bms-192",
+     "cfg-vcu-241",
+     "hw-fr-conn",
+     "iv-fl-bearing"
+    ],
+    "dropped": [
+     {
+      "artifact": "hw-mcu-fr-new",
+      "reason": "not available yet"
+     },
+     {
+      "artifact": "iv-mcu-fr",
+      "reason": "not available yet"
+     },
+     {
+      "artifact": "iv-fr-conn",
+      "reason": "not available yet"
+     },
+     {
+      "artifact": "bulletin-conn-b",
+      "reason": "not available yet"
+     }
+    ]
+   },
+   "leaks": [],
+   "withheld_rules": [
+    {
+     "hypothesis": "contact",
+     "rule": "hardware",
+     "available_from": "2026-11-02"
+    }
+   ],
+   "prior_visible": [
+    {
+     "id": "s1",
+     "result": "inconclusive"
+    }
+   ],
+   "state": {
+    "version": "step-judge-v1",
+    "cutoff": "2026-10-21",
+    "latest_data": "2026-10-09",
+    "facts": [
+     {
+      "id": "f1",
+      "text": "FR's voltage drop grows 6.55 mV per amp of pack current against 2.11 for the other inverters (3.1×), in 1 of 1 snapshots.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f2",
+      "text": "If FR carries an equal share of current, its branch resistance is 26.2 mΩ against 8.5 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.7–32.4 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f3",
+      "text": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f4",
+      "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [
+       353
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f5",
+      "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection): held in all 1 recorded launches.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "expected"
+     },
+     {
+      "id": "a1",
+      "text": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+      "tier": "confirmed",
+      "as_of": "2026-10-14",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "cfg-vcu-241",
+      "source": "artifact",
+      "effect": "supports"
+     },
+     {
+      "id": "a2",
+      "text": "VCU runs 2.4.1 since 2026-10-14, before the first reported symptom (2026-10-20)",
+      "tier": "inferred",
+      "as_of": "2026-10-14",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "sw-vcu-241",
+      "source": "artifact",
+      "effect": "context"
+     }
+    ],
+    "hypotheses": {
+     "contact": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "conductor": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "inverter": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+      "observe": null
+     },
+     "fr_sensor": {
+      "status": "weakened",
+      "facts": [
+       "f1",
+       "f2",
+       "f3"
+      ],
+      "why": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "observe": null
+     },
+     "battery": {
+      "status": "supported",
+      "facts": [
+       "f4"
+      ],
+      "why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+      "observe": {
+       "what": "Pack voltage, current and cell temperatures during a cold launch",
+       "cost_tier": 0
+      }
+     },
+     "hsa_control": {
+      "status": "supported",
+      "facts": [
+       "a1",
+       "a2"
+      ],
+      "why": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+      "observe": {
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      }
+     },
+     "motor_mech": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "No recorded signal can show this.",
+      "observe": {
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     },
+     "fr_uv_protection": {
+      "status": "no_support",
+      "facts": [
+       "f5"
+      ],
+      "why": "The expectation held whenever it could be checked.",
+      "observe": {
+       "what": "Compare the trip moment with the FR DC voltage trace",
+       "cost_tier": 0
+      }
+     }
+    },
+    "plan": {
+     "recommended": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "data_requests": [
+      {
+       "hypothesis": "motor_mech",
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     ],
+     "measurements": [
+      {
+       "id": "t_inv_trend",
+       "what": "Pull a full shift of logs and compare FR's inverter temperature with the other inverters at the same torque",
+       "cost_tier": 0,
+       "strength": "weak",
+       "blind_spot": "Cooling, thermal mass and 1 °C resolution can hide the difference: a hotter inverter supports, a similar one only weakens.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "meter_v",
+       "what": "Reference voltmeter at the FR inverter DC input, key on, compared with the DC_V it reports on CAN",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "Shows the sensor error at one voltage; a gain error needs two voltages (e.g. before and after a short load).",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 0
+       }
+      },
+      {
+       "id": "segment_r",
+       "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      },
+      {
+       "id": "branch_i",
+       "what": "HV-rated DC clamp on the FR inverter input and on one healthy wheel during the same ramp launch",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Separates current from resistance, not connector from cable.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "segment_dv_loaded",
+       "what": "Voltage across each FR segment during a ramp launch, and the same on one healthy wheel",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Live high-voltage measurement on a driven vehicle: insulated probes, an engineer's approval.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      }
+     ]
+    },
+    "open": [
+     "contact",
+     "conductor",
+     "inverter",
+     "battery",
+     "hsa_control"
+    ],
+    "weakened": [
+     "fr_sensor"
+    ],
+    "evidence_model": "v2: telemetry + artifacts"
+   },
+   "state_telemetry": {
+    "version": "step-judge-v1",
+    "cutoff": "2026-10-21",
+    "latest_data": "2026-10-09",
+    "facts": [
+     {
+      "id": "f1",
+      "text": "FR's voltage drop grows 6.55 mV per amp of pack current against 2.11 for the other inverters (3.1×), in 1 of 1 snapshots.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f2",
+      "text": "If FR carries an equal share of current, its branch resistance is 26.2 mΩ against 8.5 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.7–32.4 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f3",
+      "text": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f4",
+      "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [
+       353
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f5",
+      "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection): held in all 1 recorded launches.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "expected"
+     }
+    ],
+    "hypotheses": {
+     "contact": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "conductor": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "inverter": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+      "observe": null
+     },
+     "fr_sensor": {
+      "status": "weakened",
+      "facts": [
+       "f1",
+       "f2",
+       "f3"
+      ],
+      "why": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "observe": null
+     },
+     "battery": {
+      "status": "supported",
+      "facts": [
+       "f4"
+      ],
+      "why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+      "observe": {
+       "what": "Pack voltage, current and cell temperatures during a cold launch",
+       "cost_tier": 0
+      }
+     },
+     "hsa_control": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "VCU_Status.HSA_Active was never 1 in the recorded data, so this cannot be checked yet.",
+      "observe": {
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      }
+     },
+     "motor_mech": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "No recorded signal can show this.",
+      "observe": {
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     },
+     "fr_uv_protection": {
+      "status": "no_support",
+      "facts": [
+       "f5"
+      ],
+      "why": "The expectation held whenever it could be checked.",
+      "observe": {
+       "what": "Compare the trip moment with the FR DC voltage trace",
+       "cost_tier": 0
+      }
+     }
+    },
+    "plan": {
+     "recommended": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "data_requests": [
+      {
+       "hypothesis": "hsa_control",
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      },
+      {
+       "hypothesis": "motor_mech",
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     ],
+     "measurements": [
+      {
+       "id": "t_inv_trend",
+       "what": "Pull a full shift of logs and compare FR's inverter temperature with the other inverters at the same torque",
+       "cost_tier": 0,
+       "strength": "weak",
+       "blind_spot": "Cooling, thermal mass and 1 °C resolution can hide the difference: a hotter inverter supports, a similar one only weakens.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "meter_v",
+       "what": "Reference voltmeter at the FR inverter DC input, key on, compared with the DC_V it reports on CAN",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "Shows the sensor error at one voltage; a gain error needs two voltages (e.g. before and after a short load).",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 0
+       }
+      },
+      {
+       "id": "segment_r",
+       "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      },
+      {
+       "id": "branch_i",
+       "what": "HV-rated DC clamp on the FR inverter input and on one healthy wheel during the same ramp launch",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Separates current from resistance, not connector from cable.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "segment_dv_loaded",
+       "what": "Voltage across each FR segment during a ramp launch, and the same on one healthy wheel",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Live high-voltage measurement on a driven vehicle: insulated probes, an engineer's approval.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      }
+     ]
+    },
+    "open": [
+     "contact",
+     "conductor",
+     "inverter",
+     "battery"
+    ],
+    "weakened": [
+     "fr_sensor"
+    ]
+   },
+   "judgments": [
+    {
+     "id": "s2",
+     "check": "更换 FR 电机逆变器（MCU_FR）",
+     "kind": "swap",
+     "when": "2026-10-21",
+     "targets": [
+      "inverter"
+     ],
+     "information_gathering": false,
+     "engineer_expected": {
+      "text": "码 7 说是 FR 电机故障，手上正好有备件，换掉最快",
+      "tier": "reported"
+     },
+     "known_before": [
+      {
+       "fact": "f1",
+       "text": "FR's voltage drop grows 6.55 mV per amp of pack current against 2.11 for the other inverters (3.1×), in 1 of 1 snapshots.",
+       "tier": "confirmed",
+       "as_of": "2026-10-09",
+       "lines": [],
+       "stale_days": 12,
+       "tier_for_now": "inferred"
+      },
+      {
+       "fact": "f2",
+       "text": "If FR carries an equal share of current, its branch resistance is 26.2 mΩ against 8.5 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.7–32.4 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+       "tier": "inferred",
+       "as_of": "2026-10-09",
+       "lines": [],
+       "stale_days": 12,
+       "tier_for_now": "inferred"
+      },
+      {
+       "fact": null,
+       "text": "Engineers reported: 读取遥控器故障码和 FR 逆变器的 DTC 历史 → inconclusive (码 7 指向 FR 电机，但 DTC 是母线欠压，不是电机本身的故障)",
+       "tier": "reported",
+       "as_of": "2026-10-20",
+       "lines": []
+      }
+     ],
+     "data_before": {
+      "inverter": {
+       "data_before": "pointed_to",
+       "tier": "inferred",
+       "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+       "not_separable_from": [
+        "contact",
+        "conductor"
+       ]
+      }
+     },
+     "result_established": {
+      "text": "not_the_issue: 10 月 28 日又急停了一次",
+      "tier": "reported"
+     },
+     "alternatives_remaining": [
+      "contact",
+      "conductor",
+      "fr_sensor",
+      "battery",
+      "hsa_control",
+      "motor_mech",
+      "fr_uv_protection"
+     ],
+     "veyra_recommended_before": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "hindsight": {
+      "verified_avoidable": false,
+      "estimated": [
+       {
+        "kind": "cheaper_discriminating_check_existed",
+        "check": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+        "cost_tier": 1,
+        "tier": "inferred"
+       }
+      ]
+     },
+     "knowledge_candidate": {
+      "status": "unapproved",
+      "symptom": "园区接驳车冷车早班坡道起步时急停，遥控器报码 7（FR 电机故障）。Emergency stop on a cold morning ramp launch; remote code 7 (FR motor fault).",
+      "machine": "SHUTTLE-03",
+      "applies_to": null,
+      "conditions_as_of": "2026-10-09",
+      "hypotheses_tested": [
+       "inverter"
+      ],
+      "check": "更换 FR 电机逆变器（MCU_FR）",
+      "kind": "swap",
+      "outcome": "not_the_issue",
+      "outcome_tier": "reported",
+      "cost": {
+       "minutes": 240,
+       "parts": 1800
+      },
+      "engineer_expected": "码 7 说是 FR 电机故障，手上正好有备件，换掉最快",
+      "decided_by": "10 月 28 日又急停了一次",
+      "evidence_facts": [
+       "f1",
+       "f2"
+      ],
+      "approved_by": null
+     }
+    }
+   ]
+  },
+  {
+   "cutoff": "2026-10-22",
+   "void": false,
+   "rows": 1091,
+   "artifact_audit": {
+    "cutoff": "2026-10-22",
+    "kept": [
+     "sw-vcu-238",
+     "sw-vcu-241",
+     "sw-bms-192",
+     "cfg-vcu-241",
+     "hw-fr-conn",
+     "hw-mcu-fr-new",
+     "iv-fl-bearing",
+     "iv-mcu-fr"
+    ],
+    "dropped": [
+     {
+      "artifact": "iv-fr-conn",
+      "reason": "not available yet"
+     },
+     {
+      "artifact": "bulletin-conn-b",
+      "reason": "not available yet"
+     }
+    ]
+   },
+   "leaks": [],
+   "withheld_rules": [
+    {
+     "hypothesis": "contact",
+     "rule": "hardware",
+     "available_from": "2026-11-02"
+    }
+   ],
+   "prior_visible": [
+    {
+     "id": "s1",
+     "result": "inconclusive"
+    },
+    {
+     "id": "s2",
+     "result": "pending"
+    }
+   ],
+   "state": {
+    "version": "step-judge-v1",
+    "cutoff": "2026-10-22",
+    "latest_data": "2026-10-09",
+    "facts": [
+     {
+      "id": "f1",
+      "text": "FR's voltage drop grows 6.55 mV per amp of pack current against 2.11 for the other inverters (3.1×), in 1 of 1 snapshots.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f2",
+      "text": "If FR carries an equal share of current, its branch resistance is 26.2 mΩ against 8.5 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.7–32.4 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f3",
+      "text": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f4",
+      "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [
+       353
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f5",
+      "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection): held in all 1 recorded launches.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "expected"
+     },
+     {
+      "id": "a1",
+      "text": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+      "tier": "confirmed",
+      "as_of": "2026-10-14",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "cfg-vcu-241",
+      "source": "artifact",
+      "effect": "supports"
+     },
+     {
+      "id": "a2",
+      "text": "VCU runs 2.4.1 since 2026-10-14, before the first reported symptom (2026-10-20)",
+      "tier": "inferred",
+      "as_of": "2026-10-14",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "sw-vcu-241",
+      "source": "artifact",
+      "effect": "context"
+     }
+    ],
+    "hypotheses": {
+     "contact": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "conductor": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "inverter": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+      "observe": null
+     },
+     "fr_sensor": {
+      "status": "weakened",
+      "facts": [
+       "f1",
+       "f2",
+       "f3"
+      ],
+      "why": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "observe": null
+     },
+     "battery": {
+      "status": "supported",
+      "facts": [
+       "f4"
+      ],
+      "why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+      "observe": {
+       "what": "Pack voltage, current and cell temperatures during a cold launch",
+       "cost_tier": 0
+      }
+     },
+     "hsa_control": {
+      "status": "supported",
+      "facts": [
+       "a1",
+       "a2"
+      ],
+      "why": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+      "observe": {
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      }
+     },
+     "motor_mech": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "No recorded signal can show this.",
+      "observe": {
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     },
+     "fr_uv_protection": {
+      "status": "no_support",
+      "facts": [
+       "f5"
+      ],
+      "why": "The expectation held whenever it could be checked.",
+      "observe": {
+       "what": "Compare the trip moment with the FR DC voltage trace",
+       "cost_tier": 0
+      }
+     }
+    },
+    "plan": {
+     "recommended": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "data_requests": [
+      {
+       "hypothesis": "motor_mech",
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     ],
+     "measurements": [
+      {
+       "id": "t_inv_trend",
+       "what": "Pull a full shift of logs and compare FR's inverter temperature with the other inverters at the same torque",
+       "cost_tier": 0,
+       "strength": "weak",
+       "blind_spot": "Cooling, thermal mass and 1 °C resolution can hide the difference: a hotter inverter supports, a similar one only weakens.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "meter_v",
+       "what": "Reference voltmeter at the FR inverter DC input, key on, compared with the DC_V it reports on CAN",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "Shows the sensor error at one voltage; a gain error needs two voltages (e.g. before and after a short load).",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 0
+       }
+      },
+      {
+       "id": "segment_r",
+       "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      },
+      {
+       "id": "branch_i",
+       "what": "HV-rated DC clamp on the FR inverter input and on one healthy wheel during the same ramp launch",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Separates current from resistance, not connector from cable.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "segment_dv_loaded",
+       "what": "Voltage across each FR segment during a ramp launch, and the same on one healthy wheel",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Live high-voltage measurement on a driven vehicle: insulated probes, an engineer's approval.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      }
+     ]
+    },
+    "open": [
+     "contact",
+     "conductor",
+     "inverter",
+     "battery",
+     "hsa_control"
+    ],
+    "weakened": [
+     "fr_sensor"
+    ],
+    "evidence_model": "v2: telemetry + artifacts"
+   },
+   "state_telemetry": {
+    "version": "step-judge-v1",
+    "cutoff": "2026-10-22",
+    "latest_data": "2026-10-09",
+    "facts": [
+     {
+      "id": "f1",
+      "text": "FR's voltage drop grows 6.55 mV per amp of pack current against 2.11 for the other inverters (3.1×), in 1 of 1 snapshots.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f2",
+      "text": "If FR carries an equal share of current, its branch resistance is 26.2 mΩ against 8.5 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.7–32.4 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f3",
+      "text": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f4",
+      "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [
+       353
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f5",
+      "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection): held in all 1 recorded launches.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "expected"
+     }
+    ],
+    "hypotheses": {
+     "contact": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "conductor": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "inverter": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+      "observe": null
+     },
+     "fr_sensor": {
+      "status": "weakened",
+      "facts": [
+       "f1",
+       "f2",
+       "f3"
+      ],
+      "why": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "observe": null
+     },
+     "battery": {
+      "status": "supported",
+      "facts": [
+       "f4"
+      ],
+      "why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+      "observe": {
+       "what": "Pack voltage, current and cell temperatures during a cold launch",
+       "cost_tier": 0
+      }
+     },
+     "hsa_control": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "VCU_Status.HSA_Active was never 1 in the recorded data, so this cannot be checked yet.",
+      "observe": {
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      }
+     },
+     "motor_mech": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "No recorded signal can show this.",
+      "observe": {
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     },
+     "fr_uv_protection": {
+      "status": "no_support",
+      "facts": [
+       "f5"
+      ],
+      "why": "The expectation held whenever it could be checked.",
+      "observe": {
+       "what": "Compare the trip moment with the FR DC voltage trace",
+       "cost_tier": 0
+      }
+     }
+    },
+    "plan": {
+     "recommended": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "data_requests": [
+      {
+       "hypothesis": "hsa_control",
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      },
+      {
+       "hypothesis": "motor_mech",
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     ],
+     "measurements": [
+      {
+       "id": "t_inv_trend",
+       "what": "Pull a full shift of logs and compare FR's inverter temperature with the other inverters at the same torque",
+       "cost_tier": 0,
+       "strength": "weak",
+       "blind_spot": "Cooling, thermal mass and 1 °C resolution can hide the difference: a hotter inverter supports, a similar one only weakens.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "meter_v",
+       "what": "Reference voltmeter at the FR inverter DC input, key on, compared with the DC_V it reports on CAN",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "Shows the sensor error at one voltage; a gain error needs two voltages (e.g. before and after a short load).",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 0
+       }
+      },
+      {
+       "id": "segment_r",
+       "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      },
+      {
+       "id": "branch_i",
+       "what": "HV-rated DC clamp on the FR inverter input and on one healthy wheel during the same ramp launch",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Separates current from resistance, not connector from cable.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "segment_dv_loaded",
+       "what": "Voltage across each FR segment during a ramp launch, and the same on one healthy wheel",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Live high-voltage measurement on a driven vehicle: insulated probes, an engineer's approval.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      }
+     ]
+    },
+    "open": [
+     "contact",
+     "conductor",
+     "inverter",
+     "battery"
+    ],
+    "weakened": [
+     "fr_sensor"
+    ]
+   },
+   "judgments": [
+    {
+     "id": "s3",
+     "check": "用 BMS 诊断工具检查电池 SOC 和电芯电压",
+     "kind": "check",
+     "when": "2026-10-22",
+     "targets": [
+      "battery"
+     ],
+     "information_gathering": false,
+     "engineer_expected": {
+      "text": "换了逆变器还会坏，怀疑是电池没电或电芯有问题",
+      "tier": "reported"
+     },
+     "known_before": [
+      {
+       "fact": "f4",
+       "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+       "tier": "confirmed",
+       "as_of": "2026-10-09",
+       "lines": [
+        353
+       ],
+       "stale_days": 13,
+       "tier_for_now": "inferred"
+      },
+      {
+       "fact": null,
+       "text": "Engineers reported: 读取遥控器故障码和 FR 逆变器的 DTC 历史 → inconclusive (码 7 指向 FR 电机，但 DTC 是母线欠压，不是电机本身的故障)",
+       "tier": "reported",
+       "as_of": "2026-10-20",
+       "lines": []
+      },
+      {
+       "fact": null,
+       "text": "Engineers reported: 更换 FR 电机逆变器（MCU_FR） → pending",
+       "tier": "reported",
+       "as_of": "2026-10-21",
+       "lines": []
+      }
+     ],
+     "data_before": {
+      "battery": {
+       "data_before": "pointed_to",
+       "tier": "inferred",
+       "why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+       "not_separable_from": []
+      }
+     },
+     "result_established": {
+      "text": "not_the_issue: 在场站量的 SOC 和电芯电压都正常",
+      "tier": "reported"
+     },
+     "alternatives_remaining": [
+      "contact",
+      "conductor",
+      "inverter",
+      "fr_sensor",
+      "hsa_control",
+      "motor_mech",
+      "fr_uv_protection"
+     ],
+     "veyra_recommended_before": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "hindsight": {
+      "verified_avoidable": false,
+      "estimated": []
+     },
+     "knowledge_candidate": {
+      "status": "unapproved",
+      "symptom": "园区接驳车冷车早班坡道起步时急停，遥控器报码 7（FR 电机故障）。Emergency stop on a cold morning ramp launch; remote code 7 (FR motor fault).",
+      "machine": "SHUTTLE-03",
+      "applies_to": null,
+      "conditions_as_of": "2026-10-09",
+      "hypotheses_tested": [
+       "battery"
+      ],
+      "check": "用 BMS 诊断工具检查电池 SOC 和电芯电压",
+      "kind": "check",
+      "outcome": "not_the_issue",
+      "outcome_tier": "reported",
+      "cost": {
+       "minutes": 45,
+       "parts": null
+      },
+      "engineer_expected": "换了逆变器还会坏，怀疑是电池没电或电芯有问题",
+      "decided_by": "在场站量的 SOC 和电芯电压都正常",
+      "evidence_facts": [
+       "f4"
+      ],
+      "approved_by": null
+     }
+    }
+   ]
+  },
+  {
+   "cutoff": "2026-10-23",
+   "void": false,
+   "rows": 1091,
+   "artifact_audit": {
+    "cutoff": "2026-10-23",
+    "kept": [
+     "sw-vcu-238",
+     "sw-vcu-241",
+     "sw-bms-192",
+     "cfg-vcu-241",
+     "hw-fr-conn",
+     "hw-mcu-fr-new",
+     "iv-fl-bearing",
+     "iv-mcu-fr"
+    ],
+    "dropped": [
+     {
+      "artifact": "iv-fr-conn",
+      "reason": "not available yet"
+     },
+     {
+      "artifact": "bulletin-conn-b",
+      "reason": "not available yet"
+     }
+    ]
+   },
+   "leaks": [],
+   "withheld_rules": [
+    {
+     "hypothesis": "contact",
+     "rule": "hardware",
+     "available_from": "2026-11-02"
+    }
+   ],
+   "prior_visible": [
+    {
+     "id": "s1",
+     "result": "inconclusive"
+    },
+    {
+     "id": "s2",
+     "result": "pending"
+    },
+    {
+     "id": "s3",
+     "result": "not_the_issue"
+    }
+   ],
+   "state": {
+    "version": "step-judge-v1",
+    "cutoff": "2026-10-23",
+    "latest_data": "2026-10-09",
+    "facts": [
+     {
+      "id": "f1",
+      "text": "FR's voltage drop grows 6.55 mV per amp of pack current against 2.11 for the other inverters (3.1×), in 1 of 1 snapshots.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f2",
+      "text": "If FR carries an equal share of current, its branch resistance is 26.2 mΩ against 8.5 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.7–32.4 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f3",
+      "text": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f4",
+      "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [
+       353
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f5",
+      "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection): held in all 1 recorded launches.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "expected"
+     },
+     {
+      "id": "a1",
+      "text": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+      "tier": "confirmed",
+      "as_of": "2026-10-14",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "cfg-vcu-241",
+      "source": "artifact",
+      "effect": "supports"
+     },
+     {
+      "id": "a2",
+      "text": "VCU runs 2.4.1 since 2026-10-14, before the first reported symptom (2026-10-20)",
+      "tier": "inferred",
+      "as_of": "2026-10-14",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "sw-vcu-241",
+      "source": "artifact",
+      "effect": "context"
+     }
+    ],
+    "hypotheses": {
+     "contact": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "conductor": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "inverter": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+      "observe": null
+     },
+     "fr_sensor": {
+      "status": "weakened",
+      "facts": [
+       "f1",
+       "f2",
+       "f3"
+      ],
+      "why": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "observe": null
+     },
+     "battery": {
+      "status": "supported",
+      "facts": [
+       "f4"
+      ],
+      "why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+      "observe": {
+       "what": "Pack voltage, current and cell temperatures during a cold launch",
+       "cost_tier": 0
+      }
+     },
+     "hsa_control": {
+      "status": "supported",
+      "facts": [
+       "a1",
+       "a2"
+      ],
+      "why": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+      "observe": {
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      }
+     },
+     "motor_mech": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "No recorded signal can show this.",
+      "observe": {
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     },
+     "fr_uv_protection": {
+      "status": "no_support",
+      "facts": [
+       "f5"
+      ],
+      "why": "The expectation held whenever it could be checked.",
+      "observe": {
+       "what": "Compare the trip moment with the FR DC voltage trace",
+       "cost_tier": 0
+      }
+     }
+    },
+    "plan": {
+     "recommended": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "data_requests": [
+      {
+       "hypothesis": "motor_mech",
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     ],
+     "measurements": [
+      {
+       "id": "t_inv_trend",
+       "what": "Pull a full shift of logs and compare FR's inverter temperature with the other inverters at the same torque",
+       "cost_tier": 0,
+       "strength": "weak",
+       "blind_spot": "Cooling, thermal mass and 1 °C resolution can hide the difference: a hotter inverter supports, a similar one only weakens.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "meter_v",
+       "what": "Reference voltmeter at the FR inverter DC input, key on, compared with the DC_V it reports on CAN",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "Shows the sensor error at one voltage; a gain error needs two voltages (e.g. before and after a short load).",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 0
+       }
+      },
+      {
+       "id": "segment_r",
+       "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      },
+      {
+       "id": "branch_i",
+       "what": "HV-rated DC clamp on the FR inverter input and on one healthy wheel during the same ramp launch",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Separates current from resistance, not connector from cable.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "segment_dv_loaded",
+       "what": "Voltage across each FR segment during a ramp launch, and the same on one healthy wheel",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Live high-voltage measurement on a driven vehicle: insulated probes, an engineer's approval.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      }
+     ]
+    },
+    "open": [
+     "contact",
+     "conductor",
+     "inverter",
+     "battery",
+     "hsa_control"
+    ],
+    "weakened": [
+     "fr_sensor"
+    ],
+    "evidence_model": "v2: telemetry + artifacts"
+   },
+   "state_telemetry": {
+    "version": "step-judge-v1",
+    "cutoff": "2026-10-23",
+    "latest_data": "2026-10-09",
+    "facts": [
+     {
+      "id": "f1",
+      "text": "FR's voltage drop grows 6.55 mV per amp of pack current against 2.11 for the other inverters (3.1×), in 1 of 1 snapshots.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f2",
+      "text": "If FR carries an equal share of current, its branch resistance is 26.2 mΩ against 8.5 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.7–32.4 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f3",
+      "text": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "tier": "inferred",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f4",
+      "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [
+       353
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f5",
+      "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection): held in all 1 recorded launches.",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ]
+      ],
+      "source": "expected"
+     }
+    ],
+    "hypotheses": {
+     "contact": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "conductor": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "inverter": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+      "observe": null
+     },
+     "fr_sensor": {
+      "status": "weakened",
+      "facts": [
+       "f1",
+       "f2",
+       "f3"
+      ],
+      "why": "A gain error large enough for this slope (+6.5%) would also show about -4.69 V at rest; FR reads +0.00 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "observe": null
+     },
+     "battery": {
+      "status": "supported",
+      "facts": [
+       "f4"
+      ],
+      "why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+      "observe": {
+       "what": "Pack voltage, current and cell temperatures during a cold launch",
+       "cost_tier": 0
+      }
+     },
+     "hsa_control": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "VCU_Status.HSA_Active was never 1 in the recorded data, so this cannot be checked yet.",
+      "observe": {
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      }
+     },
+     "motor_mech": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "No recorded signal can show this.",
+      "observe": {
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     },
+     "fr_uv_protection": {
+      "status": "no_support",
+      "facts": [
+       "f5"
+      ],
+      "why": "The expectation held whenever it could be checked.",
+      "observe": {
+       "what": "Compare the trip moment with the FR DC voltage trace",
+       "cost_tier": 0
+      }
+     }
+    },
+    "plan": {
+     "recommended": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "data_requests": [
+      {
+       "hypothesis": "hsa_control",
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      },
+      {
+       "hypothesis": "motor_mech",
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     ],
+     "measurements": [
+      {
+       "id": "t_inv_trend",
+       "what": "Pull a full shift of logs and compare FR's inverter temperature with the other inverters at the same torque",
+       "cost_tier": 0,
+       "strength": "weak",
+       "blind_spot": "Cooling, thermal mass and 1 °C resolution can hide the difference: a hotter inverter supports, a similar one only weakens.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "meter_v",
+       "what": "Reference voltmeter at the FR inverter DC input, key on, compared with the DC_V it reports on CAN",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "Shows the sensor error at one voltage; a gain error needs two voltages (e.g. before and after a short load).",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 0
+       }
+      },
+      {
+       "id": "segment_r",
+       "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      },
+      {
+       "id": "branch_i",
+       "what": "HV-rated DC clamp on the FR inverter input and on one healthy wheel during the same ramp launch",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Separates current from resistance, not connector from cable.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "segment_dv_loaded",
+       "what": "Voltage across each FR segment during a ramp launch, and the same on one healthy wheel",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Live high-voltage measurement on a driven vehicle: insulated probes, an engineer's approval.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      }
+     ]
+    },
+    "open": [
+     "contact",
+     "conductor",
+     "inverter",
+     "battery"
+    ],
+    "weakened": [
+     "fr_sensor"
+    ]
+   },
+   "judgments": [
+    {
+     "id": "s4",
+     "check": "检查 VCU 2.4.1 的坡起辅助（HSA）设置，看会不会超过 BMS 扭矩限值",
+     "kind": "check",
+     "when": "2026-10-23",
+     "targets": [
+      "battery",
+      "hsa_control"
+     ],
+     "information_gathering": false,
+     "engineer_expected": {
+      "text": "急停都发生在坡道起步，而且是在 VCU 升级到 2.4.1 之后",
+      "tier": "reported"
+     },
+     "known_before": [
+      {
+       "fact": "f4",
+       "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+       "tier": "confirmed",
+       "as_of": "2026-10-09",
+       "lines": [
+        353
+       ],
+       "stale_days": 14,
+       "tier_for_now": "inferred"
+      },
+      {
+       "fact": "a1",
+       "text": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+       "tier": "confirmed",
+       "as_of": "2026-10-14",
+       "lines": [],
+       "stale_days": 9,
+       "tier_for_now": "inferred"
+      },
+      {
+       "fact": "a2",
+       "text": "VCU runs 2.4.1 since 2026-10-14, before the first reported symptom (2026-10-20)",
+       "tier": "inferred",
+       "as_of": "2026-10-14",
+       "lines": [],
+       "stale_days": 9,
+       "tier_for_now": "inferred"
+      },
+      {
+       "fact": null,
+       "text": "Engineers reported: 读取遥控器故障码和 FR 逆变器的 DTC 历史 → inconclusive (码 7 指向 FR 电机，但 DTC 是母线欠压，不是电机本身的故障)",
+       "tier": "reported",
+       "as_of": "2026-10-20",
+       "lines": []
+      },
+      {
+       "fact": null,
+       "text": "Engineers reported: 更换 FR 电机逆变器（MCU_FR） → pending",
+       "tier": "reported",
+       "as_of": "2026-10-21",
+       "lines": []
+      },
+      {
+       "fact": null,
+       "text": "Engineers reported: 用 BMS 诊断工具检查电池 SOC 和电芯电压 → not_the_issue (在场站量的 SOC 和电芯电压都正常)",
+       "tier": "reported",
+       "as_of": "2026-10-22",
+       "lines": []
+      }
+     ],
+     "data_before": {
+      "battery": {
+       "data_before": "pointed_to",
+       "tier": "inferred",
+       "why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+       "not_separable_from": []
+      },
+      "hsa_control": {
+       "data_before": "pointed_to",
+       "tier": "inferred",
+       "why": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+       "not_separable_from": []
+      }
+     },
+     "result_established": {
+      "text": "partly: 电池冷的时候，HSA 的前馈扭矩会超过 BMS 限值",
+      "tier": "reported"
+     },
+     "alternatives_remaining": [
+      "contact",
+      "conductor",
+      "inverter",
+      "fr_sensor",
+      "hsa_control",
+      "motor_mech",
+      "fr_uv_protection"
+     ],
+     "veyra_recommended_before": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "hindsight": {
+      "verified_avoidable": false,
+      "estimated": []
+     },
+     "knowledge_candidate": {
+      "status": "unapproved",
+      "symptom": "园区接驳车冷车早班坡道起步时急停，遥控器报码 7（FR 电机故障）。Emergency stop on a cold morning ramp launch; remote code 7 (FR motor fault).",
+      "machine": "SHUTTLE-03",
+      "applies_to": null,
+      "conditions_as_of": "2026-10-09",
+      "hypotheses_tested": [
+       "battery",
+       "hsa_control"
+      ],
+      "check": "检查 VCU 2.4.1 的坡起辅助（HSA）设置，看会不会超过 BMS 扭矩限值",
+      "kind": "check",
+      "outcome": "partly",
+      "outcome_tier": "reported",
+      "cost": {
+       "minutes": 90,
+       "parts": null
+      },
+      "engineer_expected": "急停都发生在坡道起步，而且是在 VCU 升级到 2.4.1 之后",
+      "decided_by": "电池冷的时候，HSA 的前馈扭矩会超过 BMS 限值",
+      "evidence_facts": [
+       "f4",
+       "a1",
+       "a2"
+      ],
+      "approved_by": null
+     }
+    }
+   ]
+  },
+  {
+   "cutoff": "2026-10-29",
+   "void": false,
+   "rows": 3277,
+   "artifact_audit": {
+    "cutoff": "2026-10-29",
+    "kept": [
+     "sw-vcu-238",
+     "sw-vcu-241",
+     "sw-bms-192",
+     "cfg-vcu-241",
+     "hw-fr-conn",
+     "hw-mcu-fr-new",
+     "iv-fl-bearing",
+     "iv-mcu-fr"
+    ],
+    "dropped": [
+     {
+      "artifact": "iv-fr-conn",
+      "reason": "not available yet"
+     },
+     {
+      "artifact": "bulletin-conn-b",
+      "reason": "not available yet"
+     }
+    ]
+   },
+   "leaks": [],
+   "withheld_rules": [
+    {
+     "hypothesis": "contact",
+     "rule": "hardware",
+     "available_from": "2026-11-02"
+    }
+   ],
+   "prior_visible": [
+    {
+     "id": "s1",
+     "result": "inconclusive"
+    },
+    {
+     "id": "s2",
+     "result": "not_the_issue"
+    },
+    {
+     "id": "s3",
+     "result": "not_the_issue"
+    },
+    {
+     "id": "s4",
+     "result": "partly"
+    }
+   ],
+   "state": {
+    "version": "step-judge-v1",
+    "cutoff": "2026-10-29",
+    "latest_data": "2026-10-28",
+    "facts": [
+     {
+      "id": "f1",
+      "text": "FR's voltage drop grows 6.54 mV per amp of pack current against 2.07 for the other inverters (3.2×), in 3 of 3 snapshots.",
+      "tier": "confirmed",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ],
+       [
+        1102,
+        2196
+       ],
+       [
+        2199,
+        3289
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f2",
+      "text": "If FR carries an equal share of current, its branch resistance is 26.1 mΩ against 8.3 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.9–32.0 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+      "tier": "inferred",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ],
+       [
+        1102,
+        2196
+       ],
+       [
+        2199,
+        3289
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f3",
+      "text": "A gain error large enough for this slope (+6.6%) would also show about -4.78 V at rest; FR reads +0.01 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "tier": "inferred",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ],
+       [
+        1102,
+        2196
+       ],
+       [
+        2199,
+        3289
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f4",
+      "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [
+       353
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f5",
+      "text": "Apparent pack resistance over the launch: 72 mΩ at 2 °C against 32 mΩ at 18 °C. Other conditions differ too: state of charge also differs (38% vs 61%); launch length differs (1.0 s vs 8.6 s), which changes the polarisation included. This data cannot attribute the difference to temperature alone.",
+      "tier": "confirmed",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ],
+       [
+        1102,
+        2196
+       ],
+       [
+        2199,
+        3289
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f6",
+      "text": "The torque command stays within the BMS torque limit: broken at +0.25 s (93.0 against 80.2)",
+      "tier": "confirmed",
+      "as_of": "2026-10-28",
+      "lines": [
+       1385
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f7",
+      "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection): held in all 3 recorded launches.",
+      "tier": "confirmed",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ],
+       [
+        1102,
+        2196
+       ],
+       [
+        2199,
+        3289
+       ]
+      ],
+      "source": "expected"
+     },
+     {
+      "id": "a1",
+      "text": "Intervention on it reported not the issue: replaced FR motor inverter (MCU_FR) MCU_FR (2026-10-21): emergency stop again on 2026-10-28",
+      "tier": "reported",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "iv-mcu-fr",
+      "source": "artifact",
+      "effect": "reported_not_the_issue"
+     },
+     {
+      "id": "a2",
+      "text": "VCU configuration 2.4.1 calibration: HSA_FF_Torque_max_Nm = 95.0 is > BMS_TqLim_cold_Nm = 80.0",
+      "tier": "confirmed",
+      "as_of": "2026-10-14",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "cfg-vcu-241",
+      "source": "artifact",
+      "effect": "supports"
+     },
+     {
+      "id": "a3",
+      "text": "VCU runs 2.4.1 since 2026-10-14, before the first reported symptom (2026-10-20)",
+      "tier": "inferred",
+      "as_of": "2026-10-14",
+      "lines": [],
+      "line_ranges": [],
+      "artifact": "sw-vcu-241",
+      "source": "artifact",
+      "effect": "context"
+     }
+    ],
+    "hypotheses": {
+     "contact": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "conductor": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "inverter": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2",
+       "a1"
+      ],
+      "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+      "observe": null
+     },
+     "fr_sensor": {
+      "status": "weakened",
+      "facts": [
+       "f1",
+       "f2",
+       "f3"
+      ],
+      "why": "A gain error large enough for this slope (+6.6%) would also show about -4.78 V at rest; FR reads +0.01 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "observe": null
+     },
+     "battery": {
+      "status": "supported",
+      "facts": [
+       "f4",
+       "f5"
+      ],
+      "why": "Pack current stays within the BMS discharge limit did not hold in 2 of 3 recorded launches.",
+      "observe": {
+       "what": "Pack voltage, current and cell temperatures during a cold launch",
+       "cost_tier": 0
+      }
+     },
+     "hsa_control": {
+      "status": "supported",
+      "facts": [
+       "f6",
+       "a2",
+       "a3"
+      ],
+      "why": "The torque command stays within the BMS torque limit did not hold in 1 of 3 recorded launches.",
+      "observe": {
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      }
+     },
+     "motor_mech": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "No recorded signal can show this.",
+      "observe": {
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     },
+     "fr_uv_protection": {
+      "status": "no_support",
+      "facts": [
+       "f7"
+      ],
+      "why": "The expectation held whenever it could be checked.",
+      "observe": {
+       "what": "Compare the trip moment with the FR DC voltage trace",
+       "cost_tier": 0
+      }
+     }
+    },
+    "plan": {
+     "recommended": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "data_requests": [
+      {
+       "hypothesis": "motor_mech",
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     ],
+     "measurements": [
+      {
+       "id": "t_inv_trend",
+       "what": "Pull a full shift of logs and compare FR's inverter temperature with the other inverters at the same torque",
+       "cost_tier": 0,
+       "strength": "weak",
+       "blind_spot": "Cooling, thermal mass and 1 °C resolution can hide the difference: a hotter inverter supports, a similar one only weakens.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "meter_v",
+       "what": "Reference voltmeter at the FR inverter DC input, key on, compared with the DC_V it reports on CAN",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "Shows the sensor error at one voltage; a gain error needs two voltages (e.g. before and after a short load).",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 0
+       }
+      },
+      {
+       "id": "segment_r",
+       "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      },
+      {
+       "id": "branch_i",
+       "what": "HV-rated DC clamp on the FR inverter input and on one healthy wheel during the same ramp launch",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Separates current from resistance, not connector from cable.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "segment_dv_loaded",
+       "what": "Voltage across each FR segment during a ramp launch, and the same on one healthy wheel",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Live high-voltage measurement on a driven vehicle: insulated probes, an engineer's approval.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      }
+     ]
+    },
+    "open": [
+     "contact",
+     "conductor",
+     "inverter",
+     "battery",
+     "hsa_control"
+    ],
+    "weakened": [
+     "fr_sensor"
+    ],
+    "evidence_model": "v2: telemetry + artifacts"
+   },
+   "state_telemetry": {
+    "version": "step-judge-v1",
+    "cutoff": "2026-10-29",
+    "latest_data": "2026-10-28",
+    "facts": [
+     {
+      "id": "f1",
+      "text": "FR's voltage drop grows 6.54 mV per amp of pack current against 2.07 for the other inverters (3.2×), in 3 of 3 snapshots.",
+      "tier": "confirmed",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ],
+       [
+        1102,
+        2196
+       ],
+       [
+        2199,
+        3289
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f2",
+      "text": "If FR carries an equal share of current, its branch resistance is 26.1 mΩ against 8.3 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.9–32.0 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+      "tier": "inferred",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ],
+       [
+        1102,
+        2196
+       ],
+       [
+        2199,
+        3289
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f3",
+      "text": "A gain error large enough for this slope (+6.6%) would also show about -4.78 V at rest; FR reads +0.01 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "tier": "inferred",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ],
+       [
+        1102,
+        2196
+       ],
+       [
+        2199,
+        3289
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f4",
+      "text": "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)",
+      "tier": "confirmed",
+      "as_of": "2026-10-09",
+      "lines": [
+       353
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f5",
+      "text": "Apparent pack resistance over the launch: 72 mΩ at 2 °C against 32 mΩ at 18 °C. Other conditions differ too: state of charge also differs (38% vs 61%); launch length differs (1.0 s vs 8.6 s), which changes the polarisation included. This data cannot attribute the difference to temperature alone.",
+      "tier": "confirmed",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ],
+       [
+        1102,
+        2196
+       ],
+       [
+        2199,
+        3289
+       ]
+      ],
+      "source": "electrical"
+     },
+     {
+      "id": "f6",
+      "text": "The torque command stays within the BMS torque limit: broken at +0.25 s (93.0 against 80.2)",
+      "tier": "confirmed",
+      "as_of": "2026-10-28",
+      "lines": [
+       1385
+      ],
+      "line_ranges": [],
+      "source": "expected"
+     },
+     {
+      "id": "f7",
+      "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection): held in all 3 recorded launches.",
+      "tier": "confirmed",
+      "as_of": "2026-10-28",
+      "lines": [],
+      "line_ranges": [
+       [
+        9,
+        1099
+       ],
+       [
+        1102,
+        2196
+       ],
+       [
+        2199,
+        3289
+       ]
+      ],
+      "source": "expected"
+     }
+    ],
+    "hypotheses": {
+     "contact": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "conductor": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+      "observe": null
+     },
+     "inverter": {
+      "status": "supported",
+      "facts": [
+       "f1",
+       "f2"
+      ],
+      "why": "With a normal branch resistance, FR would carry about 51% of the traction current, above the 21%–29% healthy operation allows. Recorded torque does not show DC current or losses, so this stays open.",
+      "observe": null
+     },
+     "fr_sensor": {
+      "status": "weakened",
+      "facts": [
+       "f1",
+       "f2",
+       "f3"
+      ],
+      "why": "A gain error large enough for this slope (+6.6%) would also show about -4.78 V at rest; FR reads +0.01 V from the others at rest. Weakened, not excluded: an offset could partly cancel it.",
+      "observe": null
+     },
+     "battery": {
+      "status": "supported",
+      "facts": [
+       "f4",
+       "f5"
+      ],
+      "why": "Pack current stays within the BMS discharge limit did not hold in 2 of 3 recorded launches.",
+      "observe": {
+       "what": "Pack voltage, current and cell temperatures during a cold launch",
+       "cost_tier": 0
+      }
+     },
+     "hsa_control": {
+      "status": "supported",
+      "facts": [
+       "f6"
+      ],
+      "why": "The torque command stays within the BMS torque limit did not hold in 1 of 3 recorded launches.",
+      "observe": {
+       "what": "Record a cold ramp launch with HSA on and off",
+       "cost_tier": 2
+      }
+     },
+     "motor_mech": {
+      "status": "not_identifiable",
+      "facts": [],
+      "why": "No recorded signal can show this.",
+      "observe": {
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     },
+     "fr_uv_protection": {
+      "status": "no_support",
+      "facts": [
+       "f7"
+      ],
+      "why": "The expectation held whenever it could be checked.",
+      "observe": {
+       "what": "Compare the trip moment with the FR DC voltage trace",
+       "cost_tier": 0
+      }
+     }
+    },
+    "plan": {
+     "recommended": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "data_requests": [
+      {
+       "hypothesis": "motor_mech",
+       "what": "Lift the wheel and check free rotation and brake drag",
+       "cost_tier": 1
+      }
+     ],
+     "measurements": [
+      {
+       "id": "t_inv_trend",
+       "what": "Pull a full shift of logs and compare FR's inverter temperature with the other inverters at the same torque",
+       "cost_tier": 0,
+       "strength": "weak",
+       "blind_spot": "Cooling, thermal mass and 1 °C resolution can hide the difference: a hotter inverter supports, a similar one only weakens.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "meter_v",
+       "what": "Reference voltmeter at the FR inverter DC input, key on, compared with the DC_V it reports on CAN",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "Shows the sensor error at one voltage; a gain error needs two voltages (e.g. before and after a short load).",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 0
+       }
+      },
+      {
+       "id": "segment_r",
+       "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+       "cost_tier": 1,
+       "strength": "strong",
+       "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      },
+      {
+       "id": "branch_i",
+       "what": "HV-rated DC clamp on the FR inverter input and on one healthy wheel during the same ramp launch",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Separates current from resistance, not connector from cable.",
+       "predicts": {
+        "conductor": 0,
+        "contact": 0,
+        "inverter": 1
+       }
+      },
+      {
+       "id": "segment_dv_loaded",
+       "what": "Voltage across each FR segment during a ramp launch, and the same on one healthy wheel",
+       "cost_tier": 2,
+       "strength": "strong",
+       "blind_spot": "Live high-voltage measurement on a driven vehicle: insulated probes, an engineer's approval.",
+       "predicts": {
+        "contact": 0,
+        "conductor": 1,
+        "inverter": 2
+       }
+      }
+     ]
+    },
+    "open": [
+     "contact",
+     "conductor",
+     "inverter",
+     "battery",
+     "hsa_control"
+    ],
+    "weakened": [
+     "fr_sensor"
+    ]
+   },
+   "judgments": [
+    {
+     "id": "s5",
+     "check": "检查 FR 高压接插件：端子发黑，重新压接并紧固",
+     "kind": "repair",
+     "when": "2026-10-29",
+     "targets": [
+      "contact"
+     ],
+     "information_gathering": false,
+     "engineer_expected": {
+      "text": "只有 FR 这一路电压掉得特别多，怀疑是线路或接头",
+      "tier": "reported"
+     },
+     "known_before": [
+      {
+       "fact": "f1",
+       "text": "FR's voltage drop grows 6.54 mV per amp of pack current against 2.07 for the other inverters (3.2×), in 3 of 3 snapshots.",
+       "tier": "confirmed",
+       "as_of": "2026-10-28",
+       "lines": [],
+       "stale_days": null,
+       "tier_for_now": "confirmed"
+      },
+      {
+       "fact": "f2",
+       "text": "If FR carries an equal share of current, its branch resistance is 26.1 mΩ against 8.3 mΩ for the others; over the 21%–29% share the recorded torques allow, 21.9–32.0 mΩ. Its resistance would match the others' only if it carried about 51% of the traction current.",
+       "tier": "inferred",
+       "as_of": "2026-10-28",
+       "lines": [],
+       "stale_days": null,
+       "tier_for_now": "inferred"
+      },
+      {
+       "fact": null,
+       "text": "Engineers reported: 读取遥控器故障码和 FR 逆变器的 DTC 历史 → inconclusive (码 7 指向 FR 电机，但 DTC 是母线欠压，不是电机本身的故障)",
+       "tier": "reported",
+       "as_of": "2026-10-20",
+       "lines": []
+      },
+      {
+       "fact": null,
+       "text": "Engineers reported: 更换 FR 电机逆变器（MCU_FR） → not_the_issue (10 月 28 日又急停了一次)",
+       "tier": "reported",
+       "as_of": "2026-10-21",
+       "lines": []
+      },
+      {
+       "fact": null,
+       "text": "Engineers reported: 用 BMS 诊断工具检查电池 SOC 和电芯电压 → not_the_issue (在场站量的 SOC 和电芯电压都正常)",
+       "tier": "reported",
+       "as_of": "2026-10-22",
+       "lines": []
+      },
+      {
+       "fact": null,
+       "text": "Engineers reported: 检查 VCU 2.4.1 的坡起辅助（HSA）设置，看会不会超过 BMS 扭矩限值 → partly (电池冷的时候，HSA 的前馈扭矩会超过 BMS 限值)",
+       "tier": "reported",
+       "as_of": "2026-10-23",
+       "lines": []
+      }
+     ],
+     "data_before": {
+      "contact": {
+       "data_before": "pointed_to",
+       "tier": "inferred",
+       "why": "Extra resistance in the branch gives this drop at a normal current share (21%–29%).",
+       "not_separable_from": [
+        "conductor",
+        "inverter"
+       ]
+      }
+     },
+     "result_established": {
+      "text": "fault_found: 端子发黑；台架上量到接触电阻偏大",
+      "tier": "reported"
+     },
+     "alternatives_remaining": [
+      "contact",
+      "conductor",
+      "fr_sensor",
+      "hsa_control",
+      "motor_mech",
+      "fr_uv_protection"
+     ],
+     "veyra_recommended_before": {
+      "id": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "cost_label": "parked vehicle at the depot",
+      "strength": "strong",
+      "blind_spot": "A contact that only opens under load, heat or vibration can read normal at rest; a normal reading weakens a contact fault, it does not exclude it.",
+      "then": {
+       "if": "every segment reads normal",
+       "do": "segment_dv_loaded",
+       "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+      },
+      "wheel": "FR",
+      "predicts": {
+       "contact": 0,
+       "conductor": 1,
+       "inverter": 2
+      }
+     },
+     "hindsight": {
+      "verified_avoidable": false,
+      "estimated": []
+     },
+     "knowledge_candidate": {
+      "status": "unapproved",
+      "symptom": "园区接驳车冷车早班坡道起步时急停，遥控器报码 7（FR 电机故障）。Emergency stop on a cold morning ramp launch; remote code 7 (FR motor fault).",
+      "machine": "SHUTTLE-03",
+      "applies_to": null,
+      "conditions_as_of": "2026-10-28",
+      "hypotheses_tested": [
+       "contact"
+      ],
+      "check": "检查 FR 高压接插件：端子发黑，重新压接并紧固",
+      "kind": "repair",
+      "outcome": "fault_found",
+      "outcome_tier": "reported",
+      "cost": {
+       "minutes": 120,
+       "parts": 60
+      },
+      "engineer_expected": "只有 FR 这一路电压掉得特别多，怀疑是线路或接头",
+      "decided_by": "端子发黑；台架上量到接触电阻偏大",
+      "evidence_facts": [
+       "f1",
+       "f2"
+      ],
+      "approved_by": null
+     }
+    }
+   ]
+  }
+ ],
+ "void_points": [],
+ "scores": {
+  "telemetry_only": {
+   "M1": {
+    "veyra": null,
+    "engineers": {
+     "step": "s5",
+     "when": "2026-10-29",
+     "days": 9
+    },
+    "veyra_not_met": [
+     {
+      "cutoff": "2026-10-20",
+      "why_not": [
+       "4 hypotheses open (contact, conductor, inverter, battery)",
+       "the recommended check cannot separate battery"
+      ]
+     },
+     {
+      "cutoff": "2026-10-21",
+      "why_not": [
+       "4 hypotheses open (contact, conductor, inverter, battery)",
+       "the recommended check cannot separate battery"
+      ]
+     },
+     {
+      "cutoff": "2026-10-22",
+      "why_not": [
+       "4 hypotheses open (contact, conductor, inverter, battery)",
+       "the recommended check cannot separate battery"
+      ]
+     },
+     {
+      "cutoff": "2026-10-23",
+      "why_not": [
+       "4 hypotheses open (contact, conductor, inverter, battery)",
+       "the recommended check cannot separate battery"
+      ]
+     },
+     {
+      "cutoff": "2026-10-29",
+      "why_not": [
+       "5 hypotheses open (contact, conductor, inverter, battery, hsa_control)",
+       "the recommended check cannot separate battery, hsa_control"
+      ]
+     }
+    ]
+   },
+   "M2": {
+    "engineers": [
+     {
+      "step": "s2",
+      "hypothesis": "inverter",
+      "correct": true,
+      "truth_role": "not involved",
+      "evidence_tier": "reported",
+      "decided_by": "10 月 28 日又急停了一次"
+     },
+     {
+      "step": "s3",
+      "hypothesis": "battery",
+      "correct": false,
+      "truth_role": "contributing",
+      "evidence_tier": "reported",
+      "decided_by": "在场站量的 SOC 和电芯电压都正常"
+     }
+    ],
+    "veyra": [
+     {
+      "hypothesis": "fr_sensor",
+      "from": "2026-10-20",
+      "correct": true,
+      "truth_role": "not involved",
+      "evidence_tier": "inferred (tool: weakened)"
+     }
+    ]
+   },
+   "M3": {
+    "engineers": {
+     "steps": 5,
+     "hypothesis_tests": 4,
+     "minutes": 515,
+     "parts_cost": 1860,
+     "currency": "EUR",
+     "found_by": "s5",
+     "tier": "reported (engineers' records)"
+    },
+    "veyra": [
+     {
+      "cutoff": "2026-10-20",
+      "checks": [
+       {
+        "check": "segment_r",
+        "cost_tier": 1,
+        "eliminates": [
+         "conductor",
+         "inverter"
+        ],
+        "remaining": [
+         "contact",
+         "battery"
+        ],
+        "misleading": false
+       }
+      ],
+      "remaining": [
+       "contact",
+       "battery"
+      ],
+      "single_candidate": false,
+      "main_kept": true,
+      "unsimulated": [
+       {
+        "check": "Record a cold ramp launch with HSA on and off",
+        "hypothesis": "hsa_control",
+        "cost_tier": 2,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       },
+       {
+        "check": "Lift the wheel and check free rotation and brake drag",
+        "hypothesis": "motor_mech",
+        "cost_tier": 1,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       }
+      ]
+     },
+     {
+      "cutoff": "2026-10-21",
+      "checks": [
+       {
+        "check": "segment_r",
+        "cost_tier": 1,
+        "eliminates": [
+         "conductor",
+         "inverter"
+        ],
+        "remaining": [
+         "contact",
+         "battery"
+        ],
+        "misleading": false
+       }
+      ],
+      "remaining": [
+       "contact",
+       "battery"
+      ],
+      "single_candidate": false,
+      "main_kept": true,
+      "unsimulated": [
+       {
+        "check": "Record a cold ramp launch with HSA on and off",
+        "hypothesis": "hsa_control",
+        "cost_tier": 2,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       },
+       {
+        "check": "Lift the wheel and check free rotation and brake drag",
+        "hypothesis": "motor_mech",
+        "cost_tier": 1,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       }
+      ]
+     },
+     {
+      "cutoff": "2026-10-22",
+      "checks": [
+       {
+        "check": "segment_r",
+        "cost_tier": 1,
+        "eliminates": [
+         "conductor",
+         "inverter"
+        ],
+        "remaining": [
+         "contact",
+         "battery"
+        ],
+        "misleading": false
+       }
+      ],
+      "remaining": [
+       "contact",
+       "battery"
+      ],
+      "single_candidate": false,
+      "main_kept": true,
+      "unsimulated": [
+       {
+        "check": "Record a cold ramp launch with HSA on and off",
+        "hypothesis": "hsa_control",
+        "cost_tier": 2,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       },
+       {
+        "check": "Lift the wheel and check free rotation and brake drag",
+        "hypothesis": "motor_mech",
+        "cost_tier": 1,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       }
+      ]
+     },
+     {
+      "cutoff": "2026-10-23",
+      "checks": [
+       {
+        "check": "segment_r",
+        "cost_tier": 1,
+        "eliminates": [
+         "conductor",
+         "inverter"
+        ],
+        "remaining": [
+         "contact",
+         "battery"
+        ],
+        "misleading": false
+       }
+      ],
+      "remaining": [
+       "contact",
+       "battery"
+      ],
+      "single_candidate": false,
+      "main_kept": true,
+      "unsimulated": [
+       {
+        "check": "Record a cold ramp launch with HSA on and off",
+        "hypothesis": "hsa_control",
+        "cost_tier": 2,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       },
+       {
+        "check": "Lift the wheel and check free rotation and brake drag",
+        "hypothesis": "motor_mech",
+        "cost_tier": 1,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       }
+      ]
+     },
+     {
+      "cutoff": "2026-10-29",
+      "checks": [
+       {
+        "check": "segment_r",
+        "cost_tier": 1,
+        "eliminates": [
+         "conductor",
+         "inverter"
+        ],
+        "remaining": [
+         "contact",
+         "battery",
+         "hsa_control"
+        ],
+        "misleading": false
+       }
+      ],
+      "remaining": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "single_candidate": false,
+      "main_kept": true,
+      "unsimulated": [
+       {
+        "check": "Lift the wheel and check free rotation and brake drag",
+        "hypothesis": "motor_mech",
+        "cost_tier": 1,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       }
+      ]
+     }
+    ]
+   },
+   "M4": [
+    {
+     "cutoff": "2026-10-20",
+     "main_open": true,
+     "contributing": {
+      "battery": "supported",
+      "hsa_control": "not_identifiable"
+     }
+    },
+    {
+     "cutoff": "2026-10-21",
+     "main_open": true,
+     "contributing": {
+      "battery": "supported",
+      "hsa_control": "not_identifiable"
+     }
+    },
+    {
+     "cutoff": "2026-10-22",
+     "main_open": true,
+     "contributing": {
+      "battery": "supported",
+      "hsa_control": "not_identifiable"
+     }
+    },
+    {
+     "cutoff": "2026-10-23",
+     "main_open": true,
+     "contributing": {
+      "battery": "supported",
+      "hsa_control": "not_identifiable"
+     }
+    },
+    {
+     "cutoff": "2026-10-29",
+     "main_open": true,
+     "contributing": {
+      "battery": "supported",
+      "hsa_control": "supported"
+     }
+    }
+   ],
+   "M5": [
+    {
+     "cutoff": "2026-10-20",
+     "check": "segment_r",
+     "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+     "cost_tier": 1,
+     "simulated": true,
+     "keeps_main": true,
+     "eliminates_wrong": [
+      "conductor",
+      "inverter"
+     ],
+     "expected_remaining": 2.0,
+     "unpredicted_open": [
+      "battery"
+     ],
+     "misleading": false,
+     "then": {
+      "if": "every segment reads normal",
+      "do": "segment_dv_loaded",
+      "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+     }
+    },
+    {
+     "cutoff": "2026-10-21",
+     "check": "segment_r",
+     "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+     "cost_tier": 1,
+     "simulated": true,
+     "keeps_main": true,
+     "eliminates_wrong": [
+      "conductor",
+      "inverter"
+     ],
+     "expected_remaining": 2.0,
+     "unpredicted_open": [
+      "battery"
+     ],
+     "misleading": false,
+     "then": {
+      "if": "every segment reads normal",
+      "do": "segment_dv_loaded",
+      "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+     }
+    },
+    {
+     "cutoff": "2026-10-22",
+     "check": "segment_r",
+     "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+     "cost_tier": 1,
+     "simulated": true,
+     "keeps_main": true,
+     "eliminates_wrong": [
+      "conductor",
+      "inverter"
+     ],
+     "expected_remaining": 2.0,
+     "unpredicted_open": [
+      "battery"
+     ],
+     "misleading": false,
+     "then": {
+      "if": "every segment reads normal",
+      "do": "segment_dv_loaded",
+      "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+     }
+    },
+    {
+     "cutoff": "2026-10-23",
+     "check": "segment_r",
+     "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+     "cost_tier": 1,
+     "simulated": true,
+     "keeps_main": true,
+     "eliminates_wrong": [
+      "conductor",
+      "inverter"
+     ],
+     "expected_remaining": 2.0,
+     "unpredicted_open": [
+      "battery"
+     ],
+     "misleading": false,
+     "then": {
+      "if": "every segment reads normal",
+      "do": "segment_dv_loaded",
+      "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+     }
+    },
+    {
+     "cutoff": "2026-10-29",
+     "check": "segment_r",
+     "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+     "cost_tier": 1,
+     "simulated": true,
+     "keeps_main": true,
+     "eliminates_wrong": [
+      "conductor",
+      "inverter"
+     ],
+     "expected_remaining": 3.0,
+     "unpredicted_open": [
+      "battery",
+      "hsa_control"
+     ],
+     "misleading": false,
+     "then": {
+      "if": "every segment reads normal",
+      "do": "segment_dv_loaded",
+      "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+     }
+    }
+   ],
+   "avoidable": {
+    "verified": [],
+    "estimated": [
+     {
+      "step": "s2",
+      "check": "更换 FR 电机逆变器（MCU_FR）",
+      "items": [
+       {
+        "kind": "cheaper_discriminating_check_existed",
+        "check": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+        "cost_tier": 1,
+        "tier": "inferred"
+       }
+      ],
+      "recorded_minutes": 240,
+      "recorded_cost": 1800,
+      "note": "estimate only: no time or money is claimed"
+     }
+    ]
+   },
+   "wrong_eliminations": [
+    {
+     "step": "s3",
+     "hypothesis": "battery",
+     "correct": false,
+     "truth_role": "contributing",
+     "evidence_tier": "reported",
+     "decided_by": "在场站量的 SOC 和电芯电压都正常",
+     "side": "engineers"
+    }
+   ],
+   "unsupported": [],
+   "worse_than_engineers": [
+    {
+     "kind": "engineers found a cause Veyra could not identify then",
+     "step": "s4",
+     "hypothesis": "hsa_control",
+     "role": "contributing",
+     "veyra_status": "not_identifiable",
+     "why": "VCU_Status.HSA_Active was never 1 in the recorded data, so this cannot be checked yet."
+    },
+    {
+     "kind": "no useful hypothesis by the frozen M1 rule at any decision point, while the engineers reached one",
+     "engineers": {
+      "step": "s5",
+      "when": "2026-10-29",
+      "days": 9
+     }
+    },
+    {
+     "kind": "Veyra's simulated path does not narrow to the main cause alone",
+     "cutoff": "2026-10-20",
+     "remaining": [
+      "contact",
+      "battery"
+     ]
+    }
+   ],
+   "better_than_engineers": [
+    {
+     "kind": "engineers eliminated a true factor that Veyra's data still supported",
+     "step": "s3",
+     "hypothesis": "battery",
+     "veyra_why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+     "facts": [
+      "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)"
+     ],
+     "as_of": [
+      "2026-10-09"
+     ],
+     "tiers": [
+      "confirmed"
+     ]
+    },
+    {
+     "kind": "main cause open and the discriminating check recommended before the engineers targeted it (not the M1 rule)",
+     "veyra_from": "2026-10-20",
+     "check": "segment_r",
+     "engineers": {
+      "step": "s5",
+      "when": "2026-10-29",
+      "days": 9
+     }
+    }
+   ],
+   "M1_v2_post_hoc": {
+    "veyra": {
+     "point": 0,
+     "cutoff": "2026-10-20",
+     "days": 0
+    },
+    "engineers": {
+     "step": "s5",
+     "when": "2026-10-29",
+     "days": 9
+    }
+   },
+   "DQ": {
+    "veyra_checks": [
+     {
+      "cutoff": "2026-10-20",
+      "side": "veyra",
+      "check": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "open_before": 4,
+      "expected_bits": 1.0,
+      "max_bits": 2.0,
+      "unpredicted_open": [
+       "battery"
+      ],
+      "simulated": true,
+      "open_after": 2,
+      "bits": 1.0,
+      "removed": [
+       "conductor",
+       "inverter"
+      ],
+      "unsafe": false,
+      "removed_true_causes": []
+     },
+     {
+      "cutoff": "2026-10-21",
+      "side": "veyra",
+      "check": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "open_before": 4,
+      "expected_bits": 1.0,
+      "max_bits": 2.0,
+      "unpredicted_open": [
+       "battery"
+      ],
+      "simulated": true,
+      "open_after": 2,
+      "bits": 1.0,
+      "removed": [
+       "conductor",
+       "inverter"
+      ],
+      "unsafe": false,
+      "removed_true_causes": []
+     },
+     {
+      "cutoff": "2026-10-22",
+      "side": "veyra",
+      "check": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "open_before": 4,
+      "expected_bits": 1.0,
+      "max_bits": 2.0,
+      "unpredicted_open": [
+       "battery"
+      ],
+      "simulated": true,
+      "open_after": 2,
+      "bits": 1.0,
+      "removed": [
+       "conductor",
+       "inverter"
+      ],
+      "unsafe": false,
+      "removed_true_causes": []
+     },
+     {
+      "cutoff": "2026-10-23",
+      "side": "veyra",
+      "check": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "open_before": 4,
+      "expected_bits": 1.0,
+      "max_bits": 2.0,
+      "unpredicted_open": [
+       "battery"
+      ],
+      "simulated": true,
+      "open_after": 2,
+      "bits": 1.0,
+      "removed": [
+       "conductor",
+       "inverter"
+      ],
+      "unsafe": false,
+      "removed_true_causes": []
+     },
+     {
+      "cutoff": "2026-10-29",
+      "side": "veyra",
+      "check": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "open_before": 5,
+      "expected_bits": 0.737,
+      "max_bits": 2.322,
+      "unpredicted_open": [
+       "battery",
+       "hsa_control"
+      ],
+      "simulated": true,
+      "open_after": 3,
+      "bits": 0.737,
+      "removed": [
+       "conductor",
+       "inverter"
+      ],
+      "unsafe": false,
+      "removed_true_causes": []
+     }
+    ],
+    "roles": [
+     {
+      "cutoff": "2026-10-20",
+      "by_hypothesis": {
+       "contact": {
+        "role": "initiating",
+        "status": "supported"
+       },
+       "battery": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "hsa_control": {
+        "role": "contributing",
+        "status": "not_identifiable"
+       },
+       "fr_uv_protection": {
+        "role": "consequence",
+        "status": "no_support"
+       }
+      },
+      "true_causes_open": [
+       "contact",
+       "battery"
+      ],
+      "true_causes_weakened": [],
+      "true_causes_not_identifiable": [
+       "hsa_control"
+      ],
+      "consequences_held_as_causes": []
+     },
+     {
+      "cutoff": "2026-10-21",
+      "by_hypothesis": {
+       "contact": {
+        "role": "initiating",
+        "status": "supported"
+       },
+       "battery": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "hsa_control": {
+        "role": "contributing",
+        "status": "not_identifiable"
+       },
+       "fr_uv_protection": {
+        "role": "consequence",
+        "status": "no_support"
+       }
+      },
+      "true_causes_open": [
+       "contact",
+       "battery"
+      ],
+      "true_causes_weakened": [],
+      "true_causes_not_identifiable": [
+       "hsa_control"
+      ],
+      "consequences_held_as_causes": []
+     },
+     {
+      "cutoff": "2026-10-22",
+      "by_hypothesis": {
+       "contact": {
+        "role": "initiating",
+        "status": "supported"
+       },
+       "battery": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "hsa_control": {
+        "role": "contributing",
+        "status": "not_identifiable"
+       },
+       "fr_uv_protection": {
+        "role": "consequence",
+        "status": "no_support"
+       }
+      },
+      "true_causes_open": [
+       "contact",
+       "battery"
+      ],
+      "true_causes_weakened": [],
+      "true_causes_not_identifiable": [
+       "hsa_control"
+      ],
+      "consequences_held_as_causes": []
+     },
+     {
+      "cutoff": "2026-10-23",
+      "by_hypothesis": {
+       "contact": {
+        "role": "initiating",
+        "status": "supported"
+       },
+       "battery": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "hsa_control": {
+        "role": "contributing",
+        "status": "not_identifiable"
+       },
+       "fr_uv_protection": {
+        "role": "consequence",
+        "status": "no_support"
+       }
+      },
+      "true_causes_open": [
+       "contact",
+       "battery"
+      ],
+      "true_causes_weakened": [],
+      "true_causes_not_identifiable": [
+       "hsa_control"
+      ],
+      "consequences_held_as_causes": []
+     },
+     {
+      "cutoff": "2026-10-29",
+      "by_hypothesis": {
+       "contact": {
+        "role": "initiating",
+        "status": "supported"
+       },
+       "battery": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "hsa_control": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "fr_uv_protection": {
+        "role": "consequence",
+        "status": "no_support"
+       }
+      },
+      "true_causes_open": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "true_causes_weakened": [],
+      "true_causes_not_identifiable": [],
+      "consequences_held_as_causes": []
+     }
+    ]
+   }
+  },
+  "telemetry_and_artifacts": {
+   "M1": {
+    "veyra": null,
+    "engineers": {
+     "step": "s5",
+     "when": "2026-10-29",
+     "days": 9
+    },
+    "veyra_not_met": [
+     {
+      "cutoff": "2026-10-20",
+      "why_not": [
+       "5 hypotheses open (contact, conductor, inverter, battery, hsa_control)",
+       "the recommended check cannot separate battery, hsa_control"
+      ]
+     },
+     {
+      "cutoff": "2026-10-21",
+      "why_not": [
+       "5 hypotheses open (contact, conductor, inverter, battery, hsa_control)",
+       "the recommended check cannot separate battery, hsa_control"
+      ]
+     },
+     {
+      "cutoff": "2026-10-22",
+      "why_not": [
+       "5 hypotheses open (contact, conductor, inverter, battery, hsa_control)",
+       "the recommended check cannot separate battery, hsa_control"
+      ]
+     },
+     {
+      "cutoff": "2026-10-23",
+      "why_not": [
+       "5 hypotheses open (contact, conductor, inverter, battery, hsa_control)",
+       "the recommended check cannot separate battery, hsa_control"
+      ]
+     },
+     {
+      "cutoff": "2026-10-29",
+      "why_not": [
+       "5 hypotheses open (contact, conductor, inverter, battery, hsa_control)",
+       "the recommended check cannot separate battery, hsa_control"
+      ]
+     }
+    ]
+   },
+   "M2": {
+    "engineers": [
+     {
+      "step": "s2",
+      "hypothesis": "inverter",
+      "correct": true,
+      "truth_role": "not involved",
+      "evidence_tier": "reported",
+      "decided_by": "10 月 28 日又急停了一次"
+     },
+     {
+      "step": "s3",
+      "hypothesis": "battery",
+      "correct": false,
+      "truth_role": "contributing",
+      "evidence_tier": "reported",
+      "decided_by": "在场站量的 SOC 和电芯电压都正常"
+     }
+    ],
+    "veyra": [
+     {
+      "hypothesis": "fr_sensor",
+      "from": "2026-10-20",
+      "correct": true,
+      "truth_role": "not involved",
+      "evidence_tier": "inferred (tool: weakened)"
+     }
+    ]
+   },
+   "M3": {
+    "engineers": {
+     "steps": 5,
+     "hypothesis_tests": 4,
+     "minutes": 515,
+     "parts_cost": 1860,
+     "currency": "EUR",
+     "found_by": "s5",
+     "tier": "reported (engineers' records)"
+    },
+    "veyra": [
+     {
+      "cutoff": "2026-10-20",
+      "checks": [
+       {
+        "check": "segment_r",
+        "cost_tier": 1,
+        "eliminates": [
+         "conductor",
+         "inverter"
+        ],
+        "remaining": [
+         "contact",
+         "battery",
+         "hsa_control"
+        ],
+        "misleading": false
+       }
+      ],
+      "remaining": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "single_candidate": false,
+      "main_kept": true,
+      "unsimulated": [
+       {
+        "check": "Lift the wheel and check free rotation and brake drag",
+        "hypothesis": "motor_mech",
+        "cost_tier": 1,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       }
+      ]
+     },
+     {
+      "cutoff": "2026-10-21",
+      "checks": [
+       {
+        "check": "segment_r",
+        "cost_tier": 1,
+        "eliminates": [
+         "conductor",
+         "inverter"
+        ],
+        "remaining": [
+         "contact",
+         "battery",
+         "hsa_control"
+        ],
+        "misleading": false
+       }
+      ],
+      "remaining": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "single_candidate": false,
+      "main_kept": true,
+      "unsimulated": [
+       {
+        "check": "Lift the wheel and check free rotation and brake drag",
+        "hypothesis": "motor_mech",
+        "cost_tier": 1,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       }
+      ]
+     },
+     {
+      "cutoff": "2026-10-22",
+      "checks": [
+       {
+        "check": "segment_r",
+        "cost_tier": 1,
+        "eliminates": [
+         "conductor",
+         "inverter"
+        ],
+        "remaining": [
+         "contact",
+         "battery",
+         "hsa_control"
+        ],
+        "misleading": false
+       }
+      ],
+      "remaining": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "single_candidate": false,
+      "main_kept": true,
+      "unsimulated": [
+       {
+        "check": "Lift the wheel and check free rotation and brake drag",
+        "hypothesis": "motor_mech",
+        "cost_tier": 1,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       }
+      ]
+     },
+     {
+      "cutoff": "2026-10-23",
+      "checks": [
+       {
+        "check": "segment_r",
+        "cost_tier": 1,
+        "eliminates": [
+         "conductor",
+         "inverter"
+        ],
+        "remaining": [
+         "contact",
+         "battery",
+         "hsa_control"
+        ],
+        "misleading": false
+       }
+      ],
+      "remaining": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "single_candidate": false,
+      "main_kept": true,
+      "unsimulated": [
+       {
+        "check": "Lift the wheel and check free rotation and brake drag",
+        "hypothesis": "motor_mech",
+        "cost_tier": 1,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       }
+      ]
+     },
+     {
+      "cutoff": "2026-10-29",
+      "checks": [
+       {
+        "check": "segment_r",
+        "cost_tier": 1,
+        "eliminates": [
+         "conductor",
+         "inverter"
+        ],
+        "remaining": [
+         "contact",
+         "battery",
+         "hsa_control"
+        ],
+        "misleading": false
+       }
+      ],
+      "remaining": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "single_candidate": false,
+      "main_kept": true,
+      "unsimulated": [
+       {
+        "check": "Lift the wheel and check free rotation and brake drag",
+        "hypothesis": "motor_mech",
+        "cost_tier": 1,
+        "why": "data request for a hypothesis the data cannot show; outcome not predicted"
+       }
+      ]
+     }
+    ]
+   },
+   "M4": [
+    {
+     "cutoff": "2026-10-20",
+     "main_open": true,
+     "contributing": {
+      "battery": "supported",
+      "hsa_control": "supported"
+     }
+    },
+    {
+     "cutoff": "2026-10-21",
+     "main_open": true,
+     "contributing": {
+      "battery": "supported",
+      "hsa_control": "supported"
+     }
+    },
+    {
+     "cutoff": "2026-10-22",
+     "main_open": true,
+     "contributing": {
+      "battery": "supported",
+      "hsa_control": "supported"
+     }
+    },
+    {
+     "cutoff": "2026-10-23",
+     "main_open": true,
+     "contributing": {
+      "battery": "supported",
+      "hsa_control": "supported"
+     }
+    },
+    {
+     "cutoff": "2026-10-29",
+     "main_open": true,
+     "contributing": {
+      "battery": "supported",
+      "hsa_control": "supported"
+     }
+    }
+   ],
+   "M5": [
+    {
+     "cutoff": "2026-10-20",
+     "check": "segment_r",
+     "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+     "cost_tier": 1,
+     "simulated": true,
+     "keeps_main": true,
+     "eliminates_wrong": [
+      "conductor",
+      "inverter"
+     ],
+     "expected_remaining": 3.0,
+     "unpredicted_open": [
+      "battery",
+      "hsa_control"
+     ],
+     "misleading": false,
+     "then": {
+      "if": "every segment reads normal",
+      "do": "segment_dv_loaded",
+      "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+     }
+    },
+    {
+     "cutoff": "2026-10-21",
+     "check": "segment_r",
+     "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+     "cost_tier": 1,
+     "simulated": true,
+     "keeps_main": true,
+     "eliminates_wrong": [
+      "conductor",
+      "inverter"
+     ],
+     "expected_remaining": 3.0,
+     "unpredicted_open": [
+      "battery",
+      "hsa_control"
+     ],
+     "misleading": false,
+     "then": {
+      "if": "every segment reads normal",
+      "do": "segment_dv_loaded",
+      "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+     }
+    },
+    {
+     "cutoff": "2026-10-22",
+     "check": "segment_r",
+     "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+     "cost_tier": 1,
+     "simulated": true,
+     "keeps_main": true,
+     "eliminates_wrong": [
+      "conductor",
+      "inverter"
+     ],
+     "expected_remaining": 3.0,
+     "unpredicted_open": [
+      "battery",
+      "hsa_control"
+     ],
+     "misleading": false,
+     "then": {
+      "if": "every segment reads normal",
+      "do": "segment_dv_loaded",
+      "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+     }
+    },
+    {
+     "cutoff": "2026-10-23",
+     "check": "segment_r",
+     "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+     "cost_tier": 1,
+     "simulated": true,
+     "keeps_main": true,
+     "eliminates_wrong": [
+      "conductor",
+      "inverter"
+     ],
+     "expected_remaining": 3.0,
+     "unpredicted_open": [
+      "battery",
+      "hsa_control"
+     ],
+     "misleading": false,
+     "then": {
+      "if": "every segment reads normal",
+      "do": "segment_dv_loaded",
+      "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+     }
+    },
+    {
+     "cutoff": "2026-10-29",
+     "check": "segment_r",
+     "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+     "cost_tier": 1,
+     "simulated": true,
+     "keeps_main": true,
+     "eliminates_wrong": [
+      "conductor",
+      "inverter"
+     ],
+     "expected_remaining": 3.0,
+     "unpredicted_open": [
+      "battery",
+      "hsa_control"
+     ],
+     "misleading": false,
+     "then": {
+      "if": "every segment reads normal",
+      "do": "segment_dv_loaded",
+      "why": "a contact that opens only under load reads normal at rest; measure under load before treating the contact as weakened"
+     }
+    }
+   ],
+   "avoidable": {
+    "verified": [],
+    "estimated": [
+     {
+      "step": "s2",
+      "check": "更换 FR 电机逆变器（MCU_FR）",
+      "items": [
+       {
+        "kind": "cheaper_discriminating_check_existed",
+        "check": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+        "cost_tier": 1,
+        "tier": "inferred"
+       }
+      ],
+      "recorded_minutes": 240,
+      "recorded_cost": 1800,
+      "note": "estimate only: no time or money is claimed"
+     }
+    ]
+   },
+   "wrong_eliminations": [
+    {
+     "step": "s3",
+     "hypothesis": "battery",
+     "correct": false,
+     "truth_role": "contributing",
+     "evidence_tier": "reported",
+     "decided_by": "在场站量的 SOC 和电芯电压都正常",
+     "side": "engineers"
+    }
+   ],
+   "unsupported": [],
+   "worse_than_engineers": [
+    {
+     "kind": "no useful hypothesis by the frozen M1 rule at any decision point, while the engineers reached one",
+     "engineers": {
+      "step": "s5",
+      "when": "2026-10-29",
+      "days": 9
+     }
+    },
+    {
+     "kind": "Veyra's simulated path does not narrow to the main cause alone",
+     "cutoff": "2026-10-20",
+     "remaining": [
+      "contact",
+      "battery",
+      "hsa_control"
+     ]
+    }
+   ],
+   "better_than_engineers": [
+    {
+     "kind": "engineers eliminated a true factor that Veyra's data still supported",
+     "step": "s3",
+     "hypothesis": "battery",
+     "veyra_why": "Pack current stays within the BMS discharge limit did not hold in 1 of 1 recorded launches.",
+     "facts": [
+      "Pack current stays within the BMS discharge limit: broken at +0.55 s (151.7 against 150.0)"
+     ],
+     "as_of": [
+      "2026-10-09"
+     ],
+     "tiers": [
+      "confirmed"
+     ]
+    },
+    {
+     "kind": "main cause open and the discriminating check recommended before the engineers targeted it (not the M1 rule)",
+     "veyra_from": "2026-10-20",
+     "check": "segment_r",
+     "engineers": {
+      "step": "s5",
+      "when": "2026-10-29",
+      "days": 9
+     }
+    }
+   ],
+   "M1_v2_post_hoc": {
+    "veyra": {
+     "point": 0,
+     "cutoff": "2026-10-20",
+     "days": 0
+    },
+    "engineers": {
+     "step": "s5",
+     "when": "2026-10-29",
+     "days": 9
+    }
+   },
+   "DQ": {
+    "veyra_checks": [
+     {
+      "cutoff": "2026-10-20",
+      "side": "veyra",
+      "check": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "open_before": 5,
+      "expected_bits": 0.737,
+      "max_bits": 2.322,
+      "unpredicted_open": [
+       "battery",
+       "hsa_control"
+      ],
+      "simulated": true,
+      "open_after": 3,
+      "bits": 0.737,
+      "removed": [
+       "conductor",
+       "inverter"
+      ],
+      "unsafe": false,
+      "removed_true_causes": []
+     },
+     {
+      "cutoff": "2026-10-21",
+      "side": "veyra",
+      "check": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "open_before": 5,
+      "expected_bits": 0.737,
+      "max_bits": 2.322,
+      "unpredicted_open": [
+       "battery",
+       "hsa_control"
+      ],
+      "simulated": true,
+      "open_after": 3,
+      "bits": 0.737,
+      "removed": [
+       "conductor",
+       "inverter"
+      ],
+      "unsafe": false,
+      "removed_true_causes": []
+     },
+     {
+      "cutoff": "2026-10-22",
+      "side": "veyra",
+      "check": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "open_before": 5,
+      "expected_bits": 0.737,
+      "max_bits": 2.322,
+      "unpredicted_open": [
+       "battery",
+       "hsa_control"
+      ],
+      "simulated": true,
+      "open_after": 3,
+      "bits": 0.737,
+      "removed": [
+       "conductor",
+       "inverter"
+      ],
+      "unsafe": false,
+      "removed_true_causes": []
+     },
+     {
+      "cutoff": "2026-10-23",
+      "side": "veyra",
+      "check": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "open_before": 5,
+      "expected_bits": 0.737,
+      "max_bits": 2.322,
+      "unpredicted_open": [
+       "battery",
+       "hsa_control"
+      ],
+      "simulated": true,
+      "open_after": 3,
+      "bits": 0.737,
+      "removed": [
+       "conductor",
+       "inverter"
+      ],
+      "unsafe": false,
+      "removed_true_causes": []
+     },
+     {
+      "cutoff": "2026-10-29",
+      "side": "veyra",
+      "check": "segment_r",
+      "what": "With high voltage isolated, and before anyone unplugs or reseats it: four-wire resistance of each FR segment (pack-side connector, cable, fuse, inverter-side connector), and the same on one healthy wheel",
+      "cost_tier": 1,
+      "open_before": 5,
+      "expected_bits": 0.737,
+      "max_bits": 2.322,
+      "unpredicted_open": [
+       "battery",
+       "hsa_control"
+      ],
+      "simulated": true,
+      "open_after": 3,
+      "bits": 0.737,
+      "removed": [
+       "conductor",
+       "inverter"
+      ],
+      "unsafe": false,
+      "removed_true_causes": []
+     }
+    ],
+    "roles": [
+     {
+      "cutoff": "2026-10-20",
+      "by_hypothesis": {
+       "contact": {
+        "role": "initiating",
+        "status": "supported"
+       },
+       "battery": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "hsa_control": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "fr_uv_protection": {
+        "role": "consequence",
+        "status": "no_support"
+       }
+      },
+      "true_causes_open": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "true_causes_weakened": [],
+      "true_causes_not_identifiable": [],
+      "consequences_held_as_causes": []
+     },
+     {
+      "cutoff": "2026-10-21",
+      "by_hypothesis": {
+       "contact": {
+        "role": "initiating",
+        "status": "supported"
+       },
+       "battery": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "hsa_control": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "fr_uv_protection": {
+        "role": "consequence",
+        "status": "no_support"
+       }
+      },
+      "true_causes_open": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "true_causes_weakened": [],
+      "true_causes_not_identifiable": [],
+      "consequences_held_as_causes": []
+     },
+     {
+      "cutoff": "2026-10-22",
+      "by_hypothesis": {
+       "contact": {
+        "role": "initiating",
+        "status": "supported"
+       },
+       "battery": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "hsa_control": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "fr_uv_protection": {
+        "role": "consequence",
+        "status": "no_support"
+       }
+      },
+      "true_causes_open": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "true_causes_weakened": [],
+      "true_causes_not_identifiable": [],
+      "consequences_held_as_causes": []
+     },
+     {
+      "cutoff": "2026-10-23",
+      "by_hypothesis": {
+       "contact": {
+        "role": "initiating",
+        "status": "supported"
+       },
+       "battery": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "hsa_control": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "fr_uv_protection": {
+        "role": "consequence",
+        "status": "no_support"
+       }
+      },
+      "true_causes_open": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "true_causes_weakened": [],
+      "true_causes_not_identifiable": [],
+      "consequences_held_as_causes": []
+     },
+     {
+      "cutoff": "2026-10-29",
+      "by_hypothesis": {
+       "contact": {
+        "role": "initiating",
+        "status": "supported"
+       },
+       "battery": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "hsa_control": {
+        "role": "contributing",
+        "status": "supported"
+       },
+       "fr_uv_protection": {
+        "role": "consequence",
+        "status": "no_support"
+       }
+      },
+      "true_causes_open": [
+       "contact",
+       "battery",
+       "hsa_control"
+      ],
+      "true_causes_weakened": [],
+      "true_causes_not_identifiable": [],
+      "consequences_held_as_causes": []
+     }
+    ]
+   }
+  }
+ },
+ "DQ_engineers": [
+  {
+   "side": "engineers",
+   "step": "s1",
+   "check": "读取遥控器故障码和 FR 逆变器的 DTC 历史",
+   "targets": [],
+   "result": "inconclusive",
+   "open_before": 8,
+   "open_after": 8,
+   "bits": 0.0,
+   "removed": [],
+   "unsafe": false,
+   "removed_true_causes": [],
+   "found": [],
+   "consequence_as_cause": [],
+   "minutes": 20,
+   "cost": null,
+   "information_gathering": true
+  },
+  {
+   "side": "engineers",
+   "step": "s2",
+   "check": "更换 FR 电机逆变器（MCU_FR）",
+   "targets": [
+    "inverter"
+   ],
+   "result": "not_the_issue",
+   "open_before": 8,
+   "open_after": 7,
+   "bits": 0.193,
+   "removed": [
+    "inverter"
+   ],
+   "unsafe": false,
+   "removed_true_causes": [],
+   "found": [],
+   "consequence_as_cause": [],
+   "minutes": 240,
+   "cost": 1800,
+   "information_gathering": false
+  },
+  {
+   "side": "engineers",
+   "step": "s3",
+   "check": "用 BMS 诊断工具检查电池 SOC 和电芯电压",
+   "targets": [
+    "battery"
+   ],
+   "result": "not_the_issue",
+   "open_before": 7,
+   "open_after": 6,
+   "bits": 0.222,
+   "removed": [
+    "battery"
+   ],
+   "unsafe": true,
+   "removed_true_causes": [
+    {
+     "hypothesis": "battery",
+     "role": "contributing"
+    }
+   ],
+   "found": [],
+   "consequence_as_cause": [],
+   "minutes": 45,
+   "cost": null,
+   "information_gathering": false
+  },
+  {
+   "side": "engineers",
+   "step": "s4",
+   "check": "检查 VCU 2.4.1 的坡起辅助（HSA）设置，看会不会超过 BMS 扭矩限值",
+   "targets": [
+    "battery",
+    "hsa_control"
+   ],
+   "result": "partly",
+   "open_before": 6,
+   "open_after": 6,
+   "bits": 0.0,
+   "removed": [],
+   "unsafe": false,
+   "removed_true_causes": [],
+   "found": [
+    {
+     "hypothesis": "battery",
+     "role": "contributing"
+    },
+    {
+     "hypothesis": "hsa_control",
+     "role": "contributing"
+    }
+   ],
+   "consequence_as_cause": [],
+   "minutes": 90,
+   "cost": null,
+   "information_gathering": false
+  },
+  {
+   "side": "engineers",
+   "step": "s5",
+   "check": "检查 FR 高压接插件：端子发黑，重新压接并紧固",
+   "targets": [
+    "contact"
+   ],
+   "result": "fault_found",
+   "open_before": 6,
+   "open_after": 1,
+   "bits": 2.585,
+   "removed": [],
+   "unsafe": false,
+   "removed_true_causes": [],
+   "found": [
+    {
+     "hypothesis": "contact",
+     "role": "initiating"
+    }
+   ],
+   "consequence_as_cause": [],
+   "minutes": 120,
+   "cost": 60,
+   "information_gathering": false
+  }
+ ],
+ "leak_selftest": [
+  {
+   "test": "row after the cutoff",
+   "removed_by_freeze": true,
+   "audit_flags_unfrozen": true,
+   "audit_flags_pack": false,
+   "pass": true
+  },
+  {
+   "test": "header with a later date",
+   "removed_by_freeze": true,
+   "audit_flags_unfrozen": true,
+   "audit_flags_pack": false,
+   "pass": true
+  },
+  {
+   "test": "header with an outcome word",
+   "removed_by_freeze": true,
+   "audit_flags_unfrozen": true,
+   "audit_flags_pack": false,
+   "pass": true
+  },
+  {
+   "test": "sealed phrase in a kept header",
+   "removed_by_freeze": false,
+   "audit_flags_unfrozen": true,
+   "audit_flags_pack": true,
+   "pass": true
+  }
+ ],
+ "artifact_leak_selftest": [
+  {
+   "test": "artifact available after the cutoff",
+   "neutralised_by_freeze": true,
+   "audit_flags_unfrozen": true,
+   "audit_flags_pack": false,
+   "pass": true
+  },
+  {
+   "test": "artifact text names a later date",
+   "neutralised_by_freeze": true,
+   "audit_flags_unfrozen": true,
+   "audit_flags_pack": false,
+   "pass": true
+  },
+  {
+   "test": "intervention result before it was known",
+   "neutralised_by_freeze": true,
+   "audit_flags_unfrozen": true,
+   "audit_flags_pack": false,
+   "pass": true
+  },
+  {
+   "test": "undated note with an outcome word",
+   "neutralised_by_freeze": true,
+   "audit_flags_unfrozen": true,
+   "audit_flags_pack": false,
+   "pass": true
+  },
+  {
+   "test": "sealed phrase in an available artifact",
+   "neutralised_by_freeze": false,
+   "audit_flags_unfrozen": true,
+   "audit_flags_pack": true,
+   "pass": true
+  },
+  {
+   "test": "artifact without available_from is rejected",
+   "pass": true
+  }
+ ]
+}

@@ -14,8 +14,16 @@ from app.agent import timeline as T
 HERE = os.path.dirname(os.path.abspath(__file__))
 BENCH = os.path.join(HERE, "..", "research", "investigation_benchmark")
 CASE = os.path.join(BENCH, "cases", "shuttle-synthetic")
-sys.path.insert(0, BENCH)
-import run as H  # noqa: E402
+def _load(name, path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+H = _load("bench_v1_run", os.path.join(BENCH, "run.py"))   # by path: other test modules also have a "run" module
 
 
 def _lines():
