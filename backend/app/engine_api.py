@@ -97,7 +97,7 @@ class RunIn(Strict):
 class LedgerIn(Strict):
     kind: Literal["check_review", "check_execution", "decision", "dispatch_preparation", "action", "outcome", "outcome_review", "recurrence_check",
                   "support_milestone", "intervention_report", "intervention_review", "reference_declared", "triage", "hypothesis_status",
-                  "reproduction_attempt", "case_closure", "normal_proposal", "normal_review", "decision_proposal", "request_sent"]
+                  "reproduction_attempt", "case_closure", "normal_proposal", "normal_review", "decision_proposal", "request_sent", "debug_walkthrough"]
     actor: str = Field(min_length=1, max_length=150)
     source: str = Field(min_length=1, max_length=2000)
     payload: Dict[str, Any]

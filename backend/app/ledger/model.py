@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -567,6 +568,36 @@ def validate(kind: str, payload: Dict[str, Any], actor: str, entries: Sequence[D
         out = {"proposal_id": proposal["id"], "verdict": _choice(payload, "verdict", ("approved", "rejected")), "reason": _text(payload, "reason"),
                "boundary": "Second-person review; identities are not authenticated in the local tool"}
         links = [proposal["id"]]
+
+    elif kind == "debug_walkthrough":
+        # How engineers actually debugged this case, step by step, as they describe it (interview, chat or service
+        # record). Veyra replays each step against the data; the walkthrough itself is the engineers' account.
+        steps = payload.get("steps")
+        if not isinstance(steps, list) or not 1 <= len(steps) <= 30:
+            raise LedgerError("'steps' must list 1 to 30 steps")
+        clean = []
+        for i, st in enumerate(steps):
+            if not isinstance(st, dict):
+                raise LedgerError(f"steps[{i}] must be an object")
+            minutes, cost = st.get("minutes"), st.get("cost")
+            for k, v in (("minutes", minutes), ("cost", cost)):
+                if v is not None and (not isinstance(v, (int, float)) or v < 0 or v > 1e7):
+                    raise LedgerError(f"steps[{i}].{k} must be a non-negative number")
+            when = st.get("when")
+            if when is not None and (not isinstance(when, str) or not re.match(r"^\d{4}-\d{2}-\d{2}", when)):
+                raise LedgerError(f"steps[{i}].when must be a date (YYYY-MM-DD)")
+            clean.append({"id": f"s{i + 1}", "check": _text(st, "check", limit=300), "part": _text(st, "part", required=False, limit=120),
+                          "kind": _choice(st, "kind", ("check", "swap", "repair"), required=False) or "check",
+                          "result": _choice(st, "result", ("fault_found", "not_the_issue", "inconclusive", "partly")),
+                          "decided_by": _text(st, "decided_by", required=False, limit=400), "when": when[:10] if when else None,
+                          "minutes": minutes, "cost": cost})
+        out = {"system": _text(payload, "system", required=False, limit=120), "symptom": _text(payload, "symptom", required=False, limit=400),
+               "architecture": _choice(payload, "architecture", ("modular", "integrated", "unknown"), required=False) or "unknown",
+               "source": _choice(payload, "source", ("interview", "chat", "service_record", "example"), required=False) or "interview",
+               "currency": _text(payload, "currency", required=False, limit=8), "steps": clean,
+               "final_cause": _text(payload, "final_cause", required=False, limit=300),
+               "why_ambiguous": _text(payload, "why_ambiguous", required=False, limit=600),
+               "verification_grade": "engineer_reported_not_independently_reviewed"}
 
     elif kind == "support_milestone":
         out = {"milestone": _choice(payload, "milestone", MILESTONES), "observed_at": _time(payload, "observed_at", now),

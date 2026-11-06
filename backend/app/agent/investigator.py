@@ -55,6 +55,10 @@ How to work:
    hypotheses. Machine data that exists elsewhere (another time window, a normal run under the same conditions, another
    vehicle, a freeze-frame) is a data_request to the engineering team, not a question for the customer. Physical facts no signal in this data can show (a connector's seating, a terminal's torque, a harness
    under tension) go in unobservable, with how a person could observe them. Stop guessing where the data ends: ask.
+   The case context may list what engineers already tried (engineers_already_tried), each step replayed against the data
+   (data_before: settled, answerable from signals, not separable, or not in the data; data_after: unchanged or resolved
+   after the step). Do not propose repeating a step that was not the issue; when data_after is "unchanged" after a part
+   was swapped, the swap did not touch the relation that does not add up: say so and use it as evidence.
    For a battery-electric machine an electrical tool may be offered. Call it; a relation that does not add up is evidence
    even when no alarm fired. Cite its findings in checked with its call id, by relation (e.g. B_FR, R_FR, P) and tier:
    a "measured" finding is read from the signals; a "model" finding holds only under the assumptions listed with it,
@@ -369,7 +373,16 @@ def _case_context(store, case_id: str) -> Dict[str, Any]:
     for e in [x for x in led if x["kind"] == "event_note"] + _machine_notes(store, case["machine_id"], case_id):
         if e["payload"].get("scope") == "machine":
             baselines[e["payload"]["pattern"]] = e["payload"]
+    tried = None
+    if any(e["kind"] == "debug_walkthrough" for e in led):
+        from app.agent import replay as _rp
+        rc = _rp.replay_case(store, case_id)
+        if rc:
+            tried = [{"step": st["check"], "when": st.get("when"), "result": st["result"], "decided_by": st.get("decided_by"),
+                      "data_before": r["before"]["verdict"], "data_after": (r.get("after") or {}).get("verdict")}
+                     for st, r in zip(rc["walkthrough"]["steps"], rc["replay"]["steps"])]
     return {"machine": case["machine_id"], "title": case["title"], "reported": reports, "engineer_results": findings,
+            "engineers_already_tried": tried,
             "previous_hypotheses": reviewed_hypotheses(prev)[0] if prev else prev,
             "dismissed_in_this_case": [n["pattern"] for n in here.values() if n["verdict"] == "normal"],
             "machine_baselines": [{k: n.get(k) for k in ("pattern", "evidence", "applies_when")} for n in baselines.values() if n["verdict"] == "normal"]}

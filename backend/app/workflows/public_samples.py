@@ -90,8 +90,17 @@ def seed_showcase(store, version: Optional[str] = None) -> List[str]:
                 p = {k: v for k, v in e["payload"].items() if k in ("action", "outcome_selected", "result", "observations")}
                 store.append(cid, "engineer_finding", p, actor=e["actor"], source="recorded investigation (replayed)")
         seed_discussion(store, cid, s["dir"])
+        seed_walkthrough(store, cid, s["dir"])
         ids.append(cid)
     return ids
+
+
+def seed_walkthrough(store, cid: str, sample_dir: Path) -> None:
+    """An example of how engineers debugged the case (walkthrough.json), when the sample has one. Labelled as an example."""
+    f = sample_dir / "walkthrough.json"
+    if f.exists():
+        w = json.loads(f.read_text())
+        store.append(cid, "debug_walkthrough", w["walkthrough"], actor=w.get("actor", "Engineer (example)"), source=w.get("source", "example walkthrough"))
 
 
 def discussion_recording(sample_dir: Path) -> Optional[Path]:

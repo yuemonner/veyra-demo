@@ -147,7 +147,8 @@ def _state(store, case_id: str) -> Dict[str, Any]:
                                    "veyra": {"reply": (x.get("result") or {}).get("reply"), "next_check": ((x.get("result") or {}).get("next_check") or {}).get("action"),
                                              "parts": [{k: p.get(k) for k in ("claim", "verdict")} for p in (x.get("result") or {}).get("parts") or []]}}
                                   for x in rounds],
-            "current_hypotheses": current_hypotheses(store, case_id)}
+            "current_hypotheses": current_hypotheses(store, case_id),
+            "engineers_already_tried": inv._case_context(store, case_id).get("engineers_already_tried")}
 
 
 def rounds_of(store, case_id: str) -> List[Dict[str, Any]]:

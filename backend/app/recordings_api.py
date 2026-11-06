@@ -358,6 +358,88 @@ def get_electrical(case_id: str, request: Request):
         store.close()
 
 
+class WalkthroughStepIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    check: str = Field(min_length=1, max_length=300)
+    part: Optional[str] = Field(default=None, max_length=120)
+    kind: str = Field(default="check", pattern="^(check|swap|repair)$")
+    result: str = Field(pattern="^(fault_found|not_the_issue|inconclusive|partly)$")
+    decided_by: Optional[str] = Field(default=None, max_length=400)
+    when: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    minutes: Optional[float] = Field(default=None, ge=0, le=100000)
+    cost: Optional[float] = Field(default=None, ge=0, le=10000000)
+
+
+class WalkthroughIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    system: Optional[str] = Field(default=None, max_length=120)
+    symptom: Optional[str] = Field(default=None, max_length=400)
+    architecture: str = Field(default="unknown", pattern="^(modular|integrated|unknown)$")
+    source: str = Field(default="interview", pattern="^(interview|chat|service_record)$")
+    currency: Optional[str] = Field(default=None, max_length=8)
+    why_ambiguous: Optional[str] = Field(default=None, max_length=600)
+    final_cause: Optional[str] = Field(default=None, max_length=300)
+    steps: list[WalkthroughStepIn] = Field(min_length=1, max_length=30)
+
+
+class WalkthroughTextIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    text: str = Field(min_length=1, max_length=8000)
+
+
+@router.get("/cases/{case_id}/walkthrough")
+def get_walkthrough(case_id: str, request: Request):
+    """How engineers debugged the case, each step replayed against the data (deterministic)."""
+    from app.agent import replay
+    from app.engine_api import store_path
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(store_path(request))
+    try:
+        store.case(case_id)
+        return replay.replay_case(store, case_id) or {"walkthrough": None}
+    finally:
+        store.close()
+
+
+@router.post("/cases/{case_id}/walkthrough")
+def post_walkthrough(case_id: str, body: WalkthroughIn, request: Request):
+    """Record the engineers' walkthrough (a ledger entry; the newest one counts) and return its replay."""
+    from app.agent import replay
+    from app.engine_api import store_path
+    from app.ledger.model import LedgerError
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(store_path(request))
+    try:
+        payload = body.model_dump(exclude_none=True)
+        try:
+            store.append(case_id, "debug_walkthrough", payload, actor=actor_for(request, "Engineer"), source="debug walkthrough")
+        except (LedgerError, ValueError) as e:
+            raise HTTPException(422, str(e))
+        return replay.replay_case(store, case_id)
+    finally:
+        store.close()
+
+
+@router.post("/walkthrough/parse")
+def parse_walkthrough(body: WalkthroughTextIn):
+    """A first structuring of a pasted chat or service note into steps, for the engineer to correct (heuristic, no model)."""
+    from app.agent import replay
+    return replay.parse_text(body.text)
+
+
+@router.get("/feasibility")
+def get_feasibility(request: Request):
+    """Across cases with walkthroughs: how much of the engineers' debugging the data could have answered, per system."""
+    from app.agent import replay
+    from app.engine_api import store_path
+    from app.store.sqlite_store import CaseStore
+    store = CaseStore(store_path(request))
+    try:
+        return replay.fleet(store)
+    finally:
+        store.close()
+
+
 class FindingIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     action: str = Field(min_length=1, max_length=500)

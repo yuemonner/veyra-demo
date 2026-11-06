@@ -53,7 +53,9 @@ async def access_code_gate(request: Request, call_next):
     VEYRA_PUBLIC_DEMO=true and no code set, every write is refused (the demo is read-only rather than open).
     Reads stay open so visitors can view the demo cases. Signed webhooks keep their own HMAC check."""
     code = os.getenv("VEYRA_ACCESS_CODE", "")
-    writing = request.method not in _READ_METHODS and not request.url.path.startswith("/engine/webhooks/")
+    # /engine/walkthrough/parse only structures pasted text (nothing is stored), so a visitor may use it.
+    writing = (request.method not in _READ_METHODS and not request.url.path.startswith("/engine/webhooks/")
+               and request.url.path != "/engine/walkthrough/parse")
     if writing and not code and _public_demo():
         # Fail closed: a public demo whose access code was never set is read-only, not open to anyone.
         return JSONResponse({"detail": "This public demo is read-only. Uploading and recording are switched off.", "code": "read_only_demo"}, status_code=403)

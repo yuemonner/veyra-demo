@@ -1,0 +1,25 @@
+{
+  "actor": "Engineer (example)",
+  "source": "SYNTHETIC example walkthrough written for the demo case, not a real service history",
+  "walkthrough": {
+    "system": "HV traction (battery, harness, inverters)",
+    "symptom": "Emergency stop on a cold morning ramp launch, remote code 7 (FR motor fault)",
+    "architecture": "modular",
+    "source": "example",
+    "currency": "EUR",
+    "why_ambiguous": "Code 7 names the FR motor, but the FR inverter only reported DC bus under-voltage: the cause could sit upstream of it.",
+    "steps": [
+      {"check": "Read the remote fault code and the FR inverter's DTC history", "part": "VCU and MCU_FR fault codes", "kind": "check", "result": "inconclusive",
+       "decided_by": "Code 7 points at the FR motor; the DTC is DC bus under-voltage, not a motor fault", "when": "2026-10-20", "minutes": 20},
+      {"check": "Replaced the FR motor inverter (MCU_FR)", "part": "FR inverter", "kind": "swap", "result": "not_the_issue",
+       "decided_by": "The emergency stop came back on 2026-10-28", "when": "2026-10-21", "minutes": 240, "cost": 1800},
+      {"check": "Checked battery SOC and cell voltages with the BMS service tool", "part": "Battery pack", "kind": "check", "result": "not_the_issue",
+       "decided_by": "SOC and cell voltages normal at the depot", "when": "2026-10-22", "minutes": 45},
+      {"check": "Reviewed the VCU 2.4.1 hill-start assist settings against the BMS torque limit", "part": "VCU HSA", "kind": "check", "result": "partly",
+       "decided_by": "HSA feed-forward can command torque above the BMS limit on a cold pack", "when": "2026-10-23", "minutes": 90},
+      {"check": "Inspected the FR high-voltage connector: discoloured terminal, re-crimped and re-torqued", "part": "FR HV connector", "kind": "repair", "result": "fault_found",
+       "decided_by": "Terminal discoloured; contact resistance high on the bench", "when": "2026-10-29", "minutes": 120, "cost": 60}
+    ],
+    "final_cause": "FR HV connector contact resistance, with HSA torque on a cold pack pulling the FR bus below its under-voltage threshold"
+  }
+}
