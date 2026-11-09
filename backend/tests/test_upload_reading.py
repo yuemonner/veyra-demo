@@ -22,3 +22,14 @@ def test_upload_job_has_a_steps_list():
     src = (Path(__file__).resolve().parents[1] / "app/recordings_api.py").read_text()
     debrief = src[src.index("def start_debrief"):src.index("def _run_job")]
     assert '"steps": []' in debrief
+
+
+def test_a_ros_launch_on_the_bench_is_not_a_driven_launch():
+    from app.agent import experiment_safety as S
+    lidar = {"action": "Compare the new driver's port and baud defaults with the old package's, offline first.",
+             "how": ["Launch rplidar_with_args.launch.py with the baud value the old package uses, a few times.",
+                     "Run the old rplidar_ros launch right after and confirm it still reads S/N."],
+             "where": "lab", "conditions": "Same Jetson and lidar on the bench. Cold start and warm start."}
+    assert not S.classify(lidar, hv_system=False)["hazardous"]
+    shuttle = {"action": "Launch the shuttle on the same ramp at a cold start", "where": "on_site"}
+    assert S.classify(shuttle, hv_system=True)["worst"] == "fault_reproduction"

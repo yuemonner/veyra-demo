@@ -65,6 +65,9 @@ _P = {
                     r"\bHSA (on|off)\b|\bwith and without\b|复现|同坡道|冷车|冷电池|开/关|关/开|故意",
 }
 _R = {k: re.compile(v, re.I) for k, v in _P.items()}
+_SOFTWARE_LAUNCH = re.compile(r"\b(ros2 launch|roslaunch)\b\s*\S*|\blaunch\s+[\w./-]+\.launch(\.py|\.xml|\.yaml)?\b|\b[\w./-]+\.launch(\.py|\.xml|\.yaml)?\b|"
+                              r"\b[\w-]+_(ros|ros2|driver|node|bringup|launch)\s+launch\b|\blaunch (file|script|config(uration)?)s?\b|"
+                              r"\blaunch(es|ing|ed)? (the |a )?(node|driver|process|program|container|stack|package)\b", re.I)
 
 # The electrical module's measurements (app/physics/electrical.py), classified by what they physically involve.
 MEASUREMENT_CLASS = {
@@ -108,6 +111,8 @@ def classify(check: Dict[str, Any], *, hv_system: bool) -> Dict[str, Any]:
         found[MEASUREMENT_CLASS[mid]] = f"electrical measurement '{mid}'"
         for c in MEASUREMENT_ALSO.get(mid, []):
             found[c] = f"electrical measurement '{mid}' is taken during a launch"
+    # A software launch (a ROS launch file, "ros2 launch ...") starts a program, not the machine: it is not a driven launch
+    text = _SOFTWARE_LAUNCH.sub(" ", text)
     hv_words = bool(_R["hv_work"].search(text))
     if hv_system and hv_words:
         if _R["deenergised"].search(text) and not _R["under_load"].search(text):
