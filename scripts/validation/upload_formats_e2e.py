@@ -44,6 +44,7 @@ def main(workspace: Path, out_dir: Path) -> int:
     os.environ.pop("VEYRA_ENGINE_SEED", None)
     os.environ.pop("VEYRA_PRIVATE", None)
     os.environ.setdefault("VEYRA_AGENT_BACKEND", "claude-code")
+    os.environ["VEYRA_ALLOW_RECORDINGS"] = "true"
     from fastapi.testclient import TestClient
     import importlib
     main_mod = importlib.import_module("app.main")
@@ -78,7 +79,7 @@ def main(workspace: Path, out_dir: Path) -> int:
                     raise RuntimeError(f"upload {up.status_code}: {up.text[:200]}")
                 rec = up.json()
                 row["detected_as"] = rec["inspection"]["format"]
-                body = {"mapping": rec["suggested"] or {}, "machine_id": "E2E-" + fmt.split()[0].upper(), "title": f"{report} ({'SYNTHETIC' if synthetic else 'real data'})",
+                body = {"mapping": rec["suggested"] or {}, "machine_id": "E2E-" + fmt.split()[0].upper() + "-" + path.stem[:12], "title": f"{report} ({'SYNTHETIC' if synthetic else 'real data'})",
                         "synthetic": synthetic, "allow_model": True, "report": {"stated_reason": report}}
                 job = c.post(f"/engine/recordings/{rec['id']}/debrief", json=body).json()
                 row.update(_follow(c, job["job_id"]))
@@ -95,7 +96,7 @@ def main(workspace: Path, out_dir: Path) -> int:
         try:
             data = alfa_canonical_csv(alfa)
             prof = next(p for p in c.get("/engine/profiles").json()["profiles"] if p["id"] == "veyra-canonical-csv")["profile"]
-            cid = c.post("/engine/cases", json={"machine_id": "E2E-CSV", "title": "Aircraft rolled and lost control in flight (real data)", "actor": "E2E"}).json()["id"]
+            cid = c.post("/engine/cases", json={"machine_id": "carbonZ", "title": "Aircraft rolled and lost control in flight (real data)", "actor": "E2E"}).json()["id"]
             imp = c.post(f"/engine/cases/{cid}/imports", json={"actor": "E2E", "filename": row["file"], "content_base64": base64.b64encode(data).decode(), "profile": prof})
             row["parsed"] = imp.status_code == 200
             if not row["parsed"]:

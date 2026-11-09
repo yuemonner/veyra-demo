@@ -131,6 +131,18 @@ def _canonical_profile(fmt: str) -> Dict[str, Any]:
             "notes": "Veyra canonical format: one row per reading; signal names are catalog ids (e.g. network.rtt, actuator.output)."}
 
 
+@router.get("/mode")
+def instance_mode():
+    """What an upload on this instance gets. A live AI investigation runs only where an AI model is configured (and it
+    reads text logs only today); anywhere else an upload gets the rule-based reading. Recorded cases are replays. Open to
+    every visitor, so the public demo can say plainly which mode it is in."""
+    from app.recordings_api import _investigator_model
+    model = _investigator_model()
+    live = bool(model and model.available())
+    return {"mode": "live_ai" if live else "rules_only", "live_ai": live, "model": getattr(model, "model", None) if live else None,
+            "ai_reads": ["text_log"] if live else []}
+
+
 @router.get("/profiles")
 def import_profiles():
     """Profiles an upload can use: the canonical format, plus the built-in synthetic demo profiles."""

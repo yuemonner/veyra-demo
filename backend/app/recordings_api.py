@@ -199,15 +199,6 @@ def access_check():
     return {"ok": True}
 
 
-@router.get("/mode")
-def instance_mode():
-    """What an upload on this instance gets. A live AI investigation runs only where an AI model is configured; anywhere
-    else an upload gets the rule-based reading, and the recorded cases are replays of investigations already run."""
-    model = _investigator_model()
-    live = bool(model and model.available())
-    return {"mode": "live_ai" if live else "rules_only", "live_ai": live, "model": getattr(model, "model", None) if live else None}
-
-
 @router.get("/samples")
 def list_samples():
     from app.workflows import public_samples
