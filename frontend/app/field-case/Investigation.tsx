@@ -150,7 +150,9 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahea
       {(r.evidence || []).length > 0 && (
         <div className={st.block}>
           <h2 className={st.h2}>Why Veyra thinks so</h2>
-          <p className={st.fine}>Each line is quoted from the data and verified against the file. The note beside it says whether it is observed in that line or inferred from it.</p>
+          <p className={st.fine}>{inv.source?.kind === "recording_sheet"
+            ? "Each line is quoted from Veyra's evidence sheet for this recording: lines computed from the recorded signals, reproducible from them, and verified. The note beside it says what it shows."
+            : "Each line is quoted from the data and verified against the file. The note beside it says whether it is observed in that line or inferred from it."}</p>
           <ul className={st.lines}>
             {r.evidence.map((e: Any, i: number) => (
               <li key={i}><code className={st.ln}>{e.line}</code><div><code className={st.raw}>{e.quote}</code><span className={st.shows}>{e.kind && <Tag k={e.kind} />}{named(e.shows, r.hypotheses)}</span></div></li>))}
@@ -528,7 +530,8 @@ export function LogEvidence({ caseId, call, guard }: { caseId: string; call: Cal
     catch (x: Any) { setErr(x.message); }
   }
   const groups = ["root_cause_candidate", "anomaly", "effect", "routine"].map((c) => [c, events.filter((e) => cls(e) === c)] as const).filter(([, l]) => l.length);
-  const raw = (n: number) => log[n - 1] ?? "";
+  const sheet: string[] | undefined = inv?.source?.kind === "recording_sheet" ? inv.source.sheet : undefined;
+  const raw = (n: number) => (sheet || log)[n - 1] ?? "";
   return (
     <section className={st.surface}>
       <header className={st.head}>

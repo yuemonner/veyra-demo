@@ -140,7 +140,7 @@ def instance_mode():
     model = _investigator_model()
     live = bool(model and model.available())
     return {"mode": "live_ai" if live else "rules_only", "live_ai": live, "model": getattr(model, "model", None) if live else None,
-            "ai_reads": ["text_log"] if live else [], "hosted_demo": _hosted_demo()}
+            "ai_reads": ["text_log", "recording", "table"] if live else [], "hosted_demo": _hosted_demo()}
 
 
 def _hosted_demo() -> bool:

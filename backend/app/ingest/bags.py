@@ -363,12 +363,31 @@ def suggest(inspection: Dict[str, Any]) -> Dict[str, Any]:
                         {"kind": "attitude", "field": "pose.pose.orientation", "signal": "vehicle.attitude"}]
         elif kind == "sensor_msgs/Imu" and not has_odom:
             entries.append({"kind": "attitude", "field": "orientation", "signal": "vehicle.attitude"})
+        elif kind == "mavros_msgs/NavDataPair":  # MAVROS (PX4 / ArduPilot over ROS): commanded and measured pairs
+            axis = name.rstrip("/").rsplit("/", 1)[-1]
+            if axis in ("roll", "pitch", "yaw"):
+                entries.append({"kind": "series", "field": "commanded", "scope": axis, "signal": "control.attitude_setpoint", "unit": "deg"})
+                if not has_odom:
+                    entries.append({"kind": "series", "field": "measured", "scope": axis, "signal": "vehicle.attitude", "unit": "deg"})
+            elif axis == "airspeed":
+                entries.append({"kind": "series", "field": "measured", "signal": "vehicle.airspeed", "unit": "m/s"})
+        elif kind == "mavros_msgs/RCOut":
+            entries.append({"kind": "series", "field": "channels", "scope": "ch", "signal": "actuator.output", "unit": "us"})
+        elif kind == "mavros_msgs/State":
+            entries += [{"kind": "event", "field": "mode", "scope": "mode", "signal": "controller.event"},
+                        {"kind": "event", "field": "armed", "scope": "armed", "signal": "controller.event"}]
+        elif kind == "mavros_msgs/VFR_HUD":
+            entries.append({"kind": "series", "field": "throttle", "signal": "propulsion.throttle", "unit": "%", "scale": 100.0})
+        elif kind == "std_msgs/Float64" and name.rstrip("/").endswith("rel_alt"):
+            entries.append({"kind": "series", "field": "data", "scope": "relative", "signal": "vehicle.altitude", "unit": "m"})
         elif kind == "diagnostic_msgs/DiagnosticArray":
             names = " ".join(str(f.get("sample", "")) for f in t["fields"] if f["path"].endswith(".name"))
             drive = bool(re.search(r"(drive|motor|joint|actuator|servo|esc)", names, re.I))
             entries.append({"kind": "diagnostics", "signal": "actuator.status" if drive else "controller.event"})
         if entries:
             topics.append({"topic": name, "time": "receive", "entries": entries, "why": f"standard message type {kind}" + (" on a command topic" if commanded else "")})
+        elif t["count"] and re.search(r"failure_status|fault_injection|ground_truth", name, re.I):
+            notes.append(f"{name} ({kind}) not mapped: it looks like a dataset's fault label (ground truth), which an investigation must not read")
         elif t["count"]:
             notes.append(f"{name} ({kind}) not mapped: not a standard type Veyra knows; map its fields by hand if it matters")
     return {"mapping_id": "suggested", "version": MAPPING_VERSION, "max_hz": DEFAULT_MAX_HZ, "clock_domain": "robot_clock", "topics": topics,

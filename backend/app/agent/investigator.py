@@ -432,7 +432,24 @@ EXPECTED_SPEC = {"name": "expected_behavior", "description": "For a machine whos
                  "input_schema": {"type": "object", "properties": {}}}
 
 
+def tools_for(store, case_id: str):
+    """The original text log when the case has one; otherwise the recording's evidence sheet and its tools."""
+    tools = LogTools(store, case_id)
+    if tools.available():
+        return tools
+    from app.agent.recording_tools import RecordingTools
+    rec = RecordingTools(store, case_id)
+    return rec if rec.available() else tools
+
+
+def is_recording(tools) -> bool:
+    return getattr(tools, "kind", None) == "recording"
+
+
 def tool_specs(tools: "LogTools") -> List[Dict[str, Any]]:
+    if is_recording(tools):
+        from app.agent.recording_tools import RECORDING_TOOL_SPECS
+        return RECORDING_TOOL_SPECS
     return TOOL_SPECS + ([ELECTRICAL_SPEC] if tools.electrical_applies() else []) + ([EXPECTED_SPEC] if tools.expected_applies() else [])
 
 
@@ -818,7 +835,9 @@ def finding_provenance(payload: Dict[str, Any]) -> List[Dict[str, str]]:
 # ---------------------------------------------------------------- deterministic investigation (no model)
 def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str, Any]:
     """The engine's own reading in the same shape, for when no model is configured. Labelled; never presented as AI."""
-    tools = LogTools(store, case_id)
+    tools = tools_for(store, case_id)
+    if is_recording(tools):
+        return _deterministic_recording(store, case_id, tools, reason)
     q = store.questions(case_id)
     log = (store.discovery(case_id) or {}).get("log") or {}
     inc, restarts = log.get("incident"), log.get("restarts") or []
@@ -894,12 +913,41 @@ def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str
             "unknowns": [f"{reason or 'No model configured'}: this is Veyra's rule-based reading only, without an investigation."], "lesson": ""}
 
 
+def _deterministic_recording(store, case_id: str, tools, reason: Optional[str]) -> Dict[str, Any]:
+    """Rules only, on a recording: the evidence sheet's strongest anomaly candidates, quoted from the sheet. Never a cause."""
+    raw = tools.raw
+    cands = []
+    for n, text in enumerate(raw, 1):
+        m = re.match(r"ANOMALY a\d+ t=([-\d.]+) s: (.*) \(see line (\d+); strength ([\d.]+)\)$", text)
+        if m:
+            cands.append((float(m.group(4)), float(m.group(1)), n, m.group(2), int(m.group(3))))
+    cands.sort(key=lambda c: (-c[0], c[1]))
+    evidence = []
+    for _s, _t, n, _what, detail in cands[:3]:
+        evidence.append({"line": n, "quote": raw[n - 1][:200], "shows": "anomaly candidate (where to look, not a cause)", "calls": []})
+        evidence.append({"line": detail, "quote": raw[detail - 1][:200], "shows": "the detail behind it", "calls": []})
+    if cands:
+        s0 = cands[0]
+        headline = f"Strongest anomaly candidate at t={s0[1]:g} s: {s0[3]}"[:160]
+    else:
+        headline = "Veyra's rule checks on these signals found no gap, step change or tracking divergence that stands out"
+    q = store.questions(case_id)
+    nxt = q.get("next") or {}
+    events = [{"lines": [n], "what": raw[n - 1][:90], "class": "anomaly", "why": "ranked anomaly candidate on the evidence sheet"} for _s, _t, n, _w, _d in sorted(cands, key=lambda c: c[1])[:8]]
+    return {"events": events, "hypotheses": [], "headline": headline, "status": "cause_unknown", "explanation": "", "confidence": "low",
+            "evidence": evidence[:6], "checked": [], "effects": [],
+            "next_action": {"action": nxt.get("question") or "Look at the recording around the strongest anomaly candidate", "why": nxt.get("needs") or "",
+                            "how": [], "where": "remote", "outcomes": [{"label": "Found it", "means": "Record what you found"},
+                                                                      {"label": "Nothing found", "means": "Record what you checked"}]},
+            "unknowns": [f"{reason or 'No model configured'}: this is Veyra's rule-based reading of the recording only, without an investigation. "
+                         "An anomaly candidate is where to look, never a cause."], "lesson": ""}
+
+
 def no_log_reason(store, case_id: str) -> str:
     """Why the AI investigator cannot read this case, in the words a visitor needs: it reads text logs only today."""
     if any(str(i.get("clock_domain") or "").startswith("text_log") for i in store.imports(case_id, include_rows=False)):
         return "The original text log is not stored for this case (uploaded before this version)"
-    return ("Veyra's AI investigator reads text logs (console, ROS, system logs) today; this data got Veyra's rule checks on its "
-            "signals only. AI investigation of robot recordings and tables is not available yet")
+    return "No original text log and no recorded signals are stored for this case, so there is nothing for the investigator to read"
 
 
 def run_summary(store, case_id: str) -> Optional[str]:
@@ -951,6 +999,17 @@ def language_reminder(lang: Optional[str]) -> str:
     return LANGUAGE_REMINDER.get(lang or "", "")
 
 
+def _label(template: str, args: Dict[str, Any]) -> str:
+    class _Blank(dict):
+        def __missing__(self, key):
+            return ""
+    shown = {k: (", ".join(map(str, v[:3])) if isinstance(v, list) else v) for k, v in args.items()}
+    try:
+        return template.format_map(_Blank(shown))
+    except (ValueError, IndexError):
+        return template
+
+
 def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investigator", on_step: Callable[[Dict[str, Any]], None] = lambda s: None,
                 max_turns: int = MAX_TURNS, lang: Optional[str] = None) -> Dict[str, Any]:
     from app.agent.runner import egress_allowed
@@ -958,7 +1017,12 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
     run = store.latest_run(case_id)
     if run is None:
         raise ValueError("Investigate the case first")
-    tools = LogTools(store, case_id)
+    tools = tools_for(store, case_id)
+    recording = is_recording(tools)
+    system = SYSTEM_PROMPT
+    if recording:
+        from app.agent import recording_tools as _rt
+        system = SYSTEM_PROMPT + "\n" + _rt.RECORDING_PROMPT
     steps: List[Dict[str, Any]] = []
     mode, usage, report, dropped = "deterministic", {"input_tokens": 0, "output_tokens": 0}, None, []
     model_calls: List[Dict[str, Any]] = []
@@ -978,10 +1042,10 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
             for _ in range(max_turns):
                 t_call = time.time()
                 try:
-                    reply = model.create(system=prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=tool_specs(tools) + [SUBMIT_SPEC])
+                    reply = model.create(system=prompt_for(system, lang), messages=messages, tools=tool_specs(tools) + [SUBMIT_SPEC])
                 except Exception:  # noqa: BLE001  one retry: a transient CLI / network failure is not a verdict
                     time.sleep(2)
-                    reply = model.create(system=prompt_for(SYSTEM_PROMPT, lang), messages=messages, tools=tool_specs(tools) + [SUBMIT_SPEC])
+                    reply = model.create(system=prompt_for(system, lang), messages=messages, tools=tool_specs(tools) + [SUBMIT_SPEC])
                 call = model_call_record(len(model_calls) + 1, reply, int((time.time() - t_call) * 1000), getattr(model, "model", None))
                 model_calls.append(call)
                 usage["input_tokens"] += call["input_tokens"] + call["cache_read_input_tokens"]  # comparable with earlier records
@@ -1011,7 +1075,9 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
                             value = (store.questions(case_id).get("lessons") or {"lessons": []})
                         elif name == "case_context":
                             value = _case_context(store, case_id)
-                        elif name in ("overview", "read_lines", "search", "measure"):
+                        elif recording and name in _rt.RECORDING_TOOLS:
+                            value = getattr(tools, name)(**args)
+                        elif not recording and name in ("overview", "read_lines", "search", "measure"):
                             value = getattr(tools, name)(**args)
                         elif name == "electrical" and tools.electrical_applies():
                             value = tools.electrical()
@@ -1023,8 +1089,9 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
                     except Exception as exc:  # noqa: BLE001  a tool error goes back to the model
                         value, text, error = None, f"{type(exc).__name__}: {exc}", True
                     outputs[call["id"]] = text
-                    step = {"id": call["id"], "tool": name, "input": args, "label": STEP_LABEL.get(name, name).format(**{"start": "", "end": "", "pattern": "", **args}),
-                            "summary": "error: " + text[:120] if error else _summary(name, value), "ms": int((time.time() - t0) * 1000)}
+                    labels, summarise = (_rt.STEP_LABEL, _rt.summary) if recording else (STEP_LABEL, _summary)
+                    step = {"id": call["id"], "tool": name, "input": args, "label": _label(labels.get(name, name), args),
+                            "summary": "error: " + text[:120] if error else summarise(name, value), "ms": int((time.time() - t0) * 1000)}
                     steps.append(step)
                     on_step(step)
                     results.append({"type": "tool_result", "tool_use_id": call["id"], "content": text, **({"is_error": True} if error else {})})
@@ -1037,7 +1104,9 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
             mode, why_deterministic = "deterministic", f"The model step failed: {exc}"[:300]
     if mode == "deterministic":
         report = deterministic(store, case_id, why_deterministic)
-    result = {"kind": "autonomous_investigation", "version": INVESTIGATOR_VERSION, "run_id": run["id"], "mode": mode,
+    source = ({"kind": "recording_sheet", "version": tools.sheet["version"], "sha256": tools.sheet["sha256"], "sheet": tools.raw}
+              if recording else {"kind": "text_log", "sha256": getattr(tools, "sha", None)})
+    result = {"kind": "autonomous_investigation", "version": INVESTIGATOR_VERSION, "run_id": run["id"], "mode": mode, "source": source,
               "model": getattr(model, "model", None) if mode == "agent" else None, "fallback_reason": why_deterministic,
               "steps": steps, "result": report, "dropped": dropped, "usage": {**usage, **usage_totals(model_calls)}, "model_calls": model_calls,
               "seconds": round(time.time() - started, 1),

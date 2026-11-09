@@ -70,5 +70,6 @@ def test_a_px4_log_without_gps_time_imports(tmp_path):
     store = CaseStore(tmp_path / "e.db")
     out = debrief_recording(store, _write(tmp_path / "flight.ulg", logger_line=False), {}, machine_id="UAV1", title="t", actor="a")
     assert out["case_id"] and store.latest_run(out["case_id"])
-    assert "reads text logs" in investigator.no_log_reason(store, out["case_id"])   # said plainly, never 'uploaded before this version'
+    tools = investigator.tools_for(store, out["case_id"])                            # the AI reads it through the evidence sheet
+    assert investigator.is_recording(tools) and tools.raw[0].startswith("RECORDING")
     store.close()
