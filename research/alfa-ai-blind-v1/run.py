@@ -39,7 +39,8 @@ def labels(bag: Path, t0: float) -> dict:
     out = {}
     with AnyReader([bag]) as r:
         cons = [c for c in r.connections if c.topic in LABEL_TOPICS]
-        for c, t, raw in r.messages(connections=cons):
+        # rosbags reads EVERY topic when given an empty list: a flight without label topics has none to read
+        for c, t, raw in (r.messages(connections=cons) if cons else []):
             v = r.deserialize(raw, c.msgtype).data
             if v and c.topic not in out:
                 out[c.topic] = {"first_nonzero_s": round(t / 1e9 - t0, 3), "value": int(v)}
@@ -87,7 +88,7 @@ def run_one(folder: Path, alias: str, out: Path) -> dict:
     return rec
 
 
-def main(processed: Path, worker: int, workers: int) -> int:
+def main(processed: Path, worker: int, workers: int, only=None) -> int:
     if not frozen_ok():
         print(f"Refusing to run: the evaluated files differ from {FROZEN}")
         return 2
@@ -97,6 +98,8 @@ def main(processed: Path, worker: int, workers: int) -> int:
     for i, folder in enumerate(folders):
         alias = f"flight-{i + 1:02d}"
         if i % workers != worker or (out / f"{alias}.json").exists():
+            continue
+        if only and alias not in only:
             continue
         try:
             rec = run_one(folder, alias, out)
@@ -110,4 +113,4 @@ def main(processed: Path, worker: int, workers: int) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])))
+    sys.exit(main(Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), set(sys.argv[4].split(",")) if len(sys.argv) > 4 else None))
