@@ -33,3 +33,29 @@ def test_a_ros_launch_on_the_bench_is_not_a_driven_launch():
     assert not S.classify(lidar, hv_system=False)["hazardous"]
     shuttle = {"action": "Launch the shuttle on the same ramp at a cold start", "where": "on_site"}
     assert S.classify(shuttle, hv_system=True)["worst"] == "fault_reproduction"
+
+
+def test_the_instance_says_whether_uploads_get_live_ai(tmp_path, monkeypatch):
+    """The public demo must not let a visitor think any upload gets a full AI investigation."""
+    import importlib
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("VEYRA_ENABLE_RUNTIME", "true")
+    monkeypatch.setenv("VEYRA_ENGINE_DB", str(tmp_path / "engine.db"))
+    monkeypatch.delenv("VEYRA_ENGINE_SEED", raising=False)
+    monkeypatch.setenv("VEYRA_INVESTIGATOR", "rules")
+    main = importlib.import_module("app.main")
+    with TestClient(main.app) as c:
+        r = c.get("/engine/mode")
+        assert r.status_code == 200 and r.json() == {"mode": "rules_only", "live_ai": False, "model": None}
+
+
+def test_every_investigation_view_names_its_mode():
+    from pathlib import Path
+    fe = Path(__file__).resolve().parents[2] / "frontend" / "app" / "field-case"
+    inv = (fe / "Investigation.tsx").read_text()
+    assert 'current="replay"' in inv and inv.count("<ModeStrip") >= 3
+    page = (fe / "page.tsx").read_text()
+    assert "<UploadModeNote" in page and "Run rules-only analysis" in page
+    mode = (fe / "Mode.tsx").read_text()
+    for name in ("Interactive replay", "Rules-only analysis", "Live AI investigation", "scheduled technical demo"):
+        assert name in mode

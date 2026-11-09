@@ -13,6 +13,7 @@ import { CanPanel } from "./CanPanel";
 import { LangContext, langOf } from "./lang";
 import { ZhText } from "./ZhText";
 import { looksLikeCanLog } from "../../lib/can-log";
+import { UploadModeNote, useLiveAi } from "./Mode";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "/local-api";
 const STORY_TITLE = "EX1 boom kept moving after joystick release (SYNTHETIC)";
@@ -2258,6 +2259,7 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
   const [f, setF] = useState<Any>({ machine_id: "", machine_class: "", title: "", stated_reason: "", symptom: "", affected: "",
     problem_from: "", problem_to: "", normal_from: "", normal_to: "", normal_basis: "", synthetic: false, allow_model: true });
   const [busy, setBusy] = useState("");
+  const liveAi = useLiveAi(call);
   const [error, setError] = useState("");
   const set = (k: string) => (e: Any) => setF({ ...f, [k]: e.target.value });
 
@@ -2328,6 +2330,7 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
           <div>
             <h2 id="rec-title" style={{ margin: 0 }}>Upload data</h2>
             <p className={s.lede} style={{ margin: "4px 0 0" }}>Robot recordings (.bag, .mcap, zipped ROS 2, PX4 .ulg), console or system logs (.log, .txt), or tables (.csv, .json). Stays in your workspace.</p>
+            <UploadModeNote liveAi={liveAi} />
           </div>
           <button className={s.quiet} onClick={onClose} aria-label="Close" disabled={!!busy && !rec}>Close</button>
         </div>
@@ -2372,12 +2375,12 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
           </div>
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, fontSize: 13 }}>
             <input type="checkbox" checked={f.synthetic} onChange={(e) => setF({ ...f, synthetic: e.target.checked })} /> Test or simulated data</label>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, fontSize: 13 }}>
-            <input type="checkbox" checked={!!f.allow_model} onChange={(e) => setF({ ...f, allow_model: e.target.checked })} /> Let Veyra's AI investigator read this data (sent to the AI model configured on this instance)</label>
+          {liveAi !== false && <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, fontSize: 13 }}>
+            <input type="checkbox" checked={!!f.allow_model} onChange={(e) => setF({ ...f, allow_model: e.target.checked })} /> Let Veyra's AI investigator read this data (sent to the AI model configured on this instance)</label>}
           {error && <p className={s.warning} role="alert">{error}</p>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
             {busy && <span className={s.note} style={{ margin: 0 }} aria-live="polite">{busy}…</span>}
-            <button className={s.button} onClick={debrief} disabled={!!busy}>Investigate</button>
+            <button className={s.button} onClick={debrief} disabled={!!busy}>{liveAi === false ? "Run rules-only analysis" : "Investigate"}</button>
           </div>
         </>}
 
@@ -2434,8 +2437,8 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
           <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, fontSize: 13 }}>
             <input type="checkbox" checked={f.synthetic} onChange={(e) => setF({ ...f, synthetic: e.target.checked })} />
             Test or simulated data{/synthetic|simulat|\bsim\b|fake|test/i.test(file?.name || "") ? <span className={s.dim}> (ticked because of the file name)</span> : null}</label>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, fontSize: 13 }}>
-            <input type="checkbox" checked={!!f.allow_model} onChange={(e) => setF({ ...f, allow_model: e.target.checked })} /> Let Veyra's AI investigator read this data (sent to the AI model configured on this instance)</label>
+          {liveAi !== false && <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, fontSize: 13 }}>
+            <input type="checkbox" checked={!!f.allow_model} onChange={(e) => setF({ ...f, allow_model: e.target.checked })} /> Let Veyra's AI investigator read this data (sent to the AI model configured on this instance)</label>}
           <p className={s.note}>Times from the start of the recording, 0:00 to {clock(duration)}.</p>
           {error && <p className={s.warning} role="alert">{error}</p>}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>

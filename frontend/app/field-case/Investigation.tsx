@@ -10,6 +10,7 @@ import { Electrical } from "./Electrical";
 import { DebugReplay } from "./DebugReplay";
 import { ExpectedBehavior } from "./ExpectedBehavior";
 import CaseStateBar, { SafetyNote } from "./CaseStateBar";
+import { ModeStrip, useLiveAi } from "./Mode";
 
 type Any = any; // eslint-disable-line @typescript-eslint/no-explicit-any
 type Call = (path: string, init?: RequestInit) => Promise<Any>;
@@ -34,6 +35,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
   const [caseState, setCaseState] = useState<Any>(null);
   const [job, setJob] = useState<Any>(null);
   const [error, setError] = useState<string | null>(null);
+  const liveAi = useLiveAi(call);
   const polling = useRef<string | null>(null);
 
   const load = useCallback(async () => {
@@ -68,7 +70,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
     catch (e: Any) { setError(e.message); }
   }
 
-  if (job) return <Live job={job} />;
+  if (job) return <><ModeStrip current={job.step === "Veyra is investigating" ? "live" : "rules"} liveAi={liveAi} compact /><Live job={job} /></>;
   if (!data) return <section className={st.surface}><p className={st.dim}>Loading…</p></section>;
   // Every investigation, recorded or live, is held to what its evidence could observe before it is shown.
   const lastResult = data.playback ? (data.playback.investigations[data.playback.investigations.length - 1] || {}).result : (data.investigation || {}).result;
@@ -79,7 +81,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
   const stateBar = <CaseStateBar state={caseState} superseded={superseded} />;
   // A recorded case plays from round 1 first; the current state appears above the result once the replay reaches it,
   // so the animation is the first thing on screen and is never pushed below the fold by the summary.
-  if (data.playback) return <Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} ahead={ahead} standing={standing} superseded={superseded} stateBar={stateBar} />;
+  if (data.playback) return <><ModeStrip current="replay" liveAi={liveAi} /><Playback pb={guard ? { ...data.playback, investigations: data.playback.investigations.map(guard) } : data.playback} fb={feedback} extra={extra} ahead={ahead} standing={standing} superseded={superseded} stateBar={stateBar} /></>;
   const inv = guard && data.investigation ? guard(data.investigation) : data.investigation;
   const agent = data.agent || {};
   if (!inv) {
@@ -96,13 +98,13 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
       </section>
     );
   }
-  return (<>{stateBar}
+  return (<><ModeStrip current={inv.recorded ? "replay" : inv.mode === "agent" ? "live" : "rules"} liveAi={liveAi} />{stateBar}
     <ResultView inv={inv} findings={data.findings || []} fb={feedback} extra={extra} ahead={ahead} standing={standing}
       banner={inv.mode !== "agent" ? (
         <div className={st.banner}>
-          <b>Rule-based reading only.</b> {inv.fallback_reason}.{" "}
+          <b>Rules-only analysis: no AI model read this log.</b> {inv.fallback_reason}.{" "}
           {agent.configured ? <button className={st.inline} onClick={() => start(true)}>Let Veyra investigate with AI</button>
-            : <span>Connect the AI investigator (Claude Code sign-in on this computer) to have Veyra run the checks for you.</span>}
+            : <span>Live AI investigation is not available on this public demo; it is offered in a scheduled technical demo.</span>}
         </div>) : null}
       prev={data.previous_hypotheses}
       next={<NextAction caseId={caseId} call={call} next={(inv.result || {}).next_action} entry={inv.entry_id} closed={data.closed} onRecorded={(j) => j ? follow(j) : load()} hyps={(inv.result || {}).hypotheses} superseded={superseded} />}
