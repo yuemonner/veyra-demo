@@ -28,7 +28,13 @@ def names_signal(text: str, comps) -> bool:
 
 
 def times(text: str):
-    return [float(x) for x in re.findall(r"t=(-?[\d.]+)", text)]
+    # "t=12.5", "from t=12.5 to 20", and a series' span "t=0.134..205.066" (both ends)
+    out = []
+    for a, b in re.findall(r"t=(-?\d+(?:\.\d+)?)(?:\.\.(-?\d+(?:\.\d+)?))?", text):
+        out.append(float(a))
+        if b:
+            out.append(float(b))
+    return out
 
 
 def concerns(line: str, comps, onset: float) -> bool:

@@ -1,0 +1,900 @@
+{
+ "alias": "flight-26",
+ "folder": "carbonZ_2018-09-11-15-06-34_3_rudder_left_failure",
+ "input_sha256": "faa271193b435e4162ae8caf6898c1398fd8f947b6042fc2a10e6605195918bc",
+ "frozen_commit": "e9bc6ce",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.321 (Claude Code)",
+ "mapping": {
+  "mapping_id": "suggested",
+  "version": "recording-mapping-v1",
+  "max_hz": 20.0,
+  "clock_domain": "robot_clock",
+  "topics": [
+   {
+    "topic": "/diagnostics",
+    "time": "receive",
+    "entries": [
+     {
+      "kind": "diagnostics",
+      "signal": "controller.event"
+     }
+    ],
+    "why": "standard message type diagnostic_msgs/DiagnosticArray"
+   },
+   {
+    "topic": "/mavros/global_position/local",
+    "time": "receive",
+    "entries": [
+     {
+      "kind": "series",
+      "field": "twist.twist.linear.x",
+      "scope": "x",
+      "signal": "vehicle.velocity",
+      "unit": "m/s"
+     },
+     {
+      "kind": "series",
+      "field": "twist.twist.linear.y",
+      "scope": "y",
+      "signal": "vehicle.velocity",
+      "unit": "m/s"
+     },
+     {
+      "kind": "series",
+      "field": "twist.twist.angular.z",
+      "scope": "yaw",
+      "signal": "vehicle.yaw_rate",
+      "unit": "rad/s"
+     },
+     {
+      "kind": "attitude",
+      "field": "pose.pose.orientation",
+      "signal": "vehicle.attitude"
+     }
+    ],
+    "why": "standard message type nav_msgs/Odometry"
+   },
+   {
+    "topic": "/mavros/global_position/rel_alt",
+    "time": "receive",
+    "entries": [
+     {
+      "kind": "series",
+      "field": "data",
+      "scope": "relative",
+      "signal": "vehicle.altitude",
+      "unit": "m"
+     }
+    ],
+    "why": "standard message type std_msgs/Float64"
+   },
+   {
+    "topic": "/mavros/nav_info/airspeed",
+    "time": "receive",
+    "entries": [
+     {
+      "kind": "series",
+      "field": "measured",
+      "signal": "vehicle.airspeed",
+      "unit": "m/s"
+     }
+    ],
+    "why": "standard message type mavros_msgs/NavDataPair"
+   },
+   {
+    "topic": "/mavros/nav_info/pitch",
+    "time": "receive",
+    "entries": [
+     {
+      "kind": "series",
+      "field": "commanded",
+      "scope": "pitch",
+      "signal": "control.attitude_setpoint",
+      "unit": "deg"
+     }
+    ],
+    "why": "standard message type mavros_msgs/NavDataPair"
+   },
+   {
+    "topic": "/mavros/nav_info/roll",
+    "time": "receive",
+    "entries": [
+     {
+      "kind": "series",
+      "field": "commanded",
+      "scope": "roll",
+      "signal": "control.attitude_setpoint",
+      "unit": "deg"
+     }
+    ],
+    "why": "standard message type mavros_msgs/NavDataPair"
+   },
+   {
+    "topic": "/mavros/nav_info/yaw",
+    "time": "receive",
+    "entries": [
+     {
+      "kind": "series",
+      "field": "commanded",
+      "scope": "yaw",
+      "signal": "control.attitude_setpoint",
+      "unit": "deg"
+     }
+    ],
+    "why": "standard message type mavros_msgs/NavDataPair"
+   },
+   {
+    "topic": "/mavros/rc/out",
+    "time": "receive",
+    "entries": [
+     {
+      "kind": "series",
+      "field": "channels",
+      "scope": "ch",
+      "signal": "actuator.output",
+      "unit": "us"
+     }
+    ],
+    "why": "standard message type mavros_msgs/RCOut"
+   },
+   {
+    "topic": "/mavros/state",
+    "time": "receive",
+    "entries": [
+     {
+      "kind": "event",
+      "field": "mode",
+      "scope": "mode",
+      "signal": "controller.event"
+     },
+     {
+      "kind": "event",
+      "field": "armed",
+      "scope": "armed",
+      "signal": "controller.event"
+     }
+    ],
+    "why": "standard message type mavros_msgs/State"
+   },
+   {
+    "topic": "/mavros/vfr_hud",
+    "time": "receive",
+    "entries": [
+     {
+      "kind": "series",
+      "field": "throttle",
+      "signal": "propulsion.throttle",
+      "unit": "%",
+      "scale": 100.0
+     }
+    ],
+    "why": "standard message type mavros_msgs/VFR_HUD"
+   }
+  ],
+  "not_mapped": [
+   "/failure_status/rudder (std_msgs/Int8) not mapped: it looks like a dataset's fault label (ground truth), which an investigation must not read",
+   "/mavlink/from (mavros_msgs/Mavlink) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/battery (sensor_msgs/BatteryState) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/global_position/compass_hdg (std_msgs/Float64) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/global_position/global (sensor_msgs/NavSatFix) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/global_position/raw/fix (sensor_msgs/NavSatFix) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/global_position/raw/gps_vel: vehicle.velocity[x] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/global_position/raw/gps_vel: vehicle.velocity[y] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/global_position/raw/gps_vel: vehicle.yaw_rate[yaw] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/global_position/raw/gps_vel (geometry_msgs/TwistStamped) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/imu/atm_pressure (sensor_msgs/FluidPressure) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/imu/data (sensor_msgs/Imu) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/imu/data_raw (sensor_msgs/Imu) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/imu/mag (sensor_msgs/MagneticField) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/imu/temperature (sensor_msgs/Temperature) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/local_position/odom: vehicle.velocity[x] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/local_position/odom: vehicle.velocity[y] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/local_position/odom: vehicle.yaw_rate[yaw] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/local_position/odom: vehicle.attitude already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/local_position/odom (nav_msgs/Odometry) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/local_position/pose (geometry_msgs/PoseStamped) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/local_position/velocity: vehicle.velocity[x] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/local_position/velocity: vehicle.velocity[y] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/local_position/velocity: vehicle.yaw_rate[yaw] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/local_position/velocity (geometry_msgs/TwistStamped) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/nav_info/errors (mavros_msgs/NavErrors) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/nav_info/velocity (mavros_msgs/NavVector3) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/rc/in (mavros_msgs/RCIn) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/setpoint_raw/target_global (mavros_msgs/GlobalPositionTarget) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/time_reference (sensor_msgs/TimeReference) not mapped: not a standard type Veyra knows; map its fields by hand if it matters",
+   "/mavros/wind_estimation: vehicle.velocity[x] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/wind_estimation: vehicle.velocity[y] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/wind_estimation: vehicle.yaw_rate[yaw] already comes from /mavros/global_position/local; not mapped twice",
+   "/mavros/wind_estimation (geometry_msgs/TwistStamped) not mapped: not a standard type Veyra knows; map its fields by hand if it matters"
+  ]
+ },
+ "sheet": {
+  "version": "veyra-recording-sheet-v1",
+  "sha256": "b1087cf7661fb687685a820fe28c2c7fcfd5ac3f11fd7d0f07018d70f82338ff",
+  "lines": [
+   "RECORDING 7267 rows, 20 series, span 69.334 s from t=0 at 2018-09-11T19:21:31.419639Z (clock robot_clock). Times below are seconds from t=0.",
+   "SERIES actuator.output[ch[0]] unit=us samples=211 t=0.167..69.183 s min=1500 max=1500 median=1500 usual_interval=0.328 s",
+   "SERIES actuator.output[ch[1]] unit=us samples=211 t=0.167..69.183 s min=1418 max=1561 median=1503 usual_interval=0.328 s",
+   "SERIES actuator.output[ch[2]] unit=us samples=211 t=0.167..69.183 s min=1412 max=1700 median=1540 usual_interval=0.328 s",
+   "SERIES actuator.output[ch[3]] unit=us samples=211 t=0.167..69.183 s min=1100 max=1536 median=1500 usual_interval=0.328 s",
+   "SERIES actuator.output[ch[4]] unit=us samples=211 t=0.167..69.183 s min=1451 max=1600 median=1501 usual_interval=0.328 s",
+   "SERIES actuator.output[ch[5]] unit=us samples=211 t=0.167..69.183 s min=1451 max=1600 median=1501 usual_interval=0.328 s",
+   "SERIES actuator.output[ch[6]] unit=us samples=211 t=0.167..69.183 s min=1500 max=1500 median=1500 usual_interval=0.328 s",
+   "SERIES actuator.output[ch[7]] unit=us samples=211 t=0.167..69.183 s min=1926 max=1926 median=1926 usual_interval=0.328 s",
+   "SERIES control.attitude_setpoint[pitch] unit=deg samples=846 t=0.097..69.324 s min=-6.61 max=17.88 median=-0.435 usual_interval=0.079 s",
+   "SERIES control.attitude_setpoint[roll] unit=deg samples=844 t=0.097..69.319 s min=13.98 max=44.77 median=43.515 usual_interval=0.079 s",
+   "SERIES control.attitude_setpoint[yaw] unit=deg samples=847 t=0.097..69.324 s min=105 max=1383 median=746 usual_interval=0.079 s (unwrapped across +-180, so a wrap is not a step)",
+   "SERIES propulsion.throttle unit=% samples=181 t=0..69.334 s min=39 max=75 median=56 usual_interval=0.383 s",
+   "SERIES vehicle.airspeed unit=m/s samples=843 t=0.1..69.332 s min=0 max=0 median=0 usual_interval=0.079 s",
+   "SERIES vehicle.altitude[relative] unit=m samples=288 t=0.116..69.227 s min=35.928 max=46.772 median=44.398 usual_interval=0.241 s",
+   "SERIES vehicle.attitude[pitch] unit=deg samples=288 t=0.115..69.227 s min=-15.001 max=9.347 median=-0.465 usual_interval=0.241 s",
+   "SERIES vehicle.attitude[roll] unit=deg samples=288 t=0.115..69.227 s min=9.605 max=48.276 median=41.349 usual_interval=0.241 s",
+   "SERIES vehicle.attitude[yaw] unit=deg samples=288 t=0.115..69.227 s min=-1126.765 max=160.866 median=-564.554 usual_interval=0.241 s (unwrapped across +-180, so a wrap is not a step)",
+   "SERIES vehicle.velocity[x] unit=m/s samples=288 t=0.115..69.227 s min=-20.86 max=19.37 median=-1.735 usual_interval=0.241 s",
+   "SERIES vehicle.velocity[y] unit=m/s samples=288 t=0.115..69.227 s min=-20.2 max=19.38 median=5.215 usual_interval=0.241 s",
+   "SERIES vehicle.yaw_rate[yaw] unit=deg/s samples=288 t=0.115..69.227 s min=0 max=0 median=0 usual_interval=0.241 s",
+   "EVENT t=0.654 s controller.event[mavros: Battery] mavros: Battery: WARN: Low voltage",
+   "EVENT t=0.654 s controller.event[mavros: System] mavros: System: ERROR: Sensor helth",
+   "CONSTANT actuator.output[ch[0]] = 1500 for the whole recording (211 samples)",
+   "CONSTANT actuator.output[ch[6]] = 1500 for the whole recording (211 samples)",
+   "CONSTANT actuator.output[ch[7]] = 1926 for the whole recording (211 samples)",
+   "CONSTANT vehicle.airspeed = 0 for the whole recording (843 samples)",
+   "CONSTANT vehicle.yaw_rate[yaw] = 0 for the whole recording (288 samples)",
+   "CHANGE actuator.output[ch[1]] at t=1.72 s: 1518 -> 1488 us (step -30, 12x its usual variation)",
+   "CHANGE actuator.output[ch[1]] at t=12.659 s: 1556 -> 1501 us (step -55, 22x its usual variation)",
+   "CHANGE actuator.output[ch[1]] at t=61.874 s: 1505 -> 1421 us (step -84, 33.6x its usual variation)",
+   "CHANGE actuator.output[ch[2]] at t=1.72 s: 1516 -> 1612 us (step 96, 12x its usual variation)",
+   "CHANGE actuator.output[ch[2]] at t=10.479 s: 1540 -> 1412 us (step -128, 16x its usual variation)",
+   "CHANGE actuator.output[ch[2]] at t=62.625 s: 1524 -> 1700 us (step 176, 22x its usual variation)",
+   "CHANGE actuator.output[ch[3]] at t=1.72 s: 1527 -> 1500 us (step -27, 27x its usual variation)",
+   "CHANGE actuator.output[ch[3]] at t=10.808 s: 1478 -> 1506 us (step 28, 28x its usual variation)",
+   "CHANGE actuator.output[ch[3]] at t=60.08 s: 1503 -> 1100 us (step -403, 403x its usual variation)",
+   "CHANGE actuator.output[ch[4]] at t=1.72 s: 1554 -> 1501 us (step -53, 26.5x its usual variation)",
+   "CHANGE actuator.output[ch[4]] at t=11.201 s: 1455 -> 1513 us (step 58, 29x its usual variation)",
+   "CHANGE actuator.output[ch[4]] at t=61.305 s: 1507 -> 1583 us (step 76, 38x its usual variation)",
+   "CHANGE actuator.output[ch[5]] at t=1.72 s: 1554 -> 1501 us (step -53, 26.5x its usual variation)",
+   "CHANGE actuator.output[ch[5]] at t=11.201 s: 1455 -> 1513 us (step 58, 29x its usual variation)",
+   "CHANGE actuator.output[ch[5]] at t=61.305 s: 1507 -> 1583 us (step 76, 38x its usual variation)",
+   "CHANGE control.attitude_setpoint[pitch] at t=13.089 s: -6.04 -> 0.84 deg (step 6.88, 76.4x its usual variation)",
+   "CHANGE control.attitude_setpoint[pitch] at t=62.162 s: 0.95 -> 15.75 deg (step 14.8, 164.4x its usual variation)",
+   "CHANGE control.attitude_setpoint[pitch] at t=67.526 s: 17.84 -> 8.96 deg (step -8.88, 98.7x its usual variation)",
+   "CHANGE control.attitude_setpoint[roll] at t=9.336 s: 43.84 -> 15.93 deg (step -27.91, 930.4x its usual variation)",
+   "CHANGE control.attitude_setpoint[roll] at t=12.821 s: 31.41 -> 43.9 deg (step 12.49, 416.4x its usual variation)",
+   "CHANGE control.attitude_setpoint[roll] at t=17.183 s: 44.27 -> 35.51 deg (step -8.76, 292x its usual variation)",
+   "CHANGE propulsion.throttle at t=1.617 s: 49.5 -> 64 % (step 14.5, 14.5x its usual variation)",
+   "CHANGE propulsion.throttle at t=13.314 s: 40.5 -> 55.5 % (step 15, 15x its usual variation)",
+   "CHANGE propulsion.throttle at t=62.547 s: 55 -> 74.5 % (step 19.5, 19.5x its usual variation)",
+   "CHANGE vehicle.altitude[relative] at t=13.385 s: 46.546 -> 43.696 m (step -2.85, 25x its usual variation)",
+   "CHANGE vehicle.altitude[relative] at t=62.416 s: 43.908 -> 37.875 m (step -6.033, 52.9x its usual variation)",
+   "CHANGE vehicle.altitude[relative] at t=67.75 s: 38.52 -> 43.193 m (step 4.673, 41x its usual variation)",
+   "CHANGE vehicle.attitude[pitch] at t=5.798 s: -3.976 -> 2.063 deg (step 6.039, 22.4x its usual variation)",
+   "CHANGE vehicle.attitude[pitch] at t=12.12 s: -2.761 -> 4.963 deg (step 7.724, 28.7x its usual variation)",
+   "CHANGE vehicle.attitude[pitch] at t=63.906 s: 6.537 -> -3.737 deg (step -10.274, 38.2x its usual variation)",
+   "CHANGE vehicle.attitude[roll] at t=1.984 s: 29.626 -> 44.606 deg (step 14.98, 51.5x its usual variation)",
+   "CHANGE vehicle.attitude[roll] at t=10.175 s: 43.863 -> 21.543 deg (step -22.321, 76.7x its usual variation)",
+   "CHANGE vehicle.attitude[roll] at t=61.187 s: 42.828 -> 26.362 deg (step -16.466, 56.6x its usual variation)",
+   "CHANGE vehicle.attitude[yaw] at t=3.173 s: 134.741 -> 82.703 deg (step -52.038, 10.3x its usual variation)",
+   "CHANGE vehicle.attitude[yaw] at t=16.252 s: -133.545 -> -181.823 deg (step -48.278, 9.6x its usual variation)",
+   "CHANGE vehicle.attitude[yaw] at t=31.167 s: -454.962 -> -503.967 deg (step -49.005, 9.7x its usual variation)",
+   "CHANGE vehicle.velocity[x] at t=7.994 s: 1.33 -> -12.97 m/s (step -14.3, 14x its usual variation)",
+   "CHANGE vehicle.velocity[x] at t=16.719 s: -9.86 -> 4.27 m/s (step 14.13, 13.9x its usual variation)",
+   "CHANGE vehicle.velocity[x] at t=42.231 s: 4.42 -> -9.04 m/s (step -13.46, 13.2x its usual variation)",
+   "CHANGE vehicle.velocity[y] at t=3.899 s: -5.37 -> 9.3 m/s (step 14.67, 15.1x its usual variation)",
+   "CHANGE vehicle.velocity[y] at t=29.939 s: 5.26 -> -9.42 m/s (step -14.68, 15.1x its usual variation)",
+   "CHANGE vehicle.velocity[y] at t=45.86 s: 6.77 -> -6.7 m/s (step -13.47, 13.9x its usual variation)",
+   "TRACKING control.attitude_setpoint[pitch] vs vehicle.attitude[pitch]: typical |error| 2.142 deg, worst 31.63 at t=66.712 s; 5 window(s) above 6.425",
+   "TRACKING vehicle.attitude[pitch] typical |error| by stretch: 0.097-7.02 s 3.638, 7.02-13.943 s 1.936, 13.943-20.865 s 3.544, 20.865-27.788 s 0.891, 27.788-34.711 s 2.642, 34.711-41.633 s 1.911, 41.633-48.556 s 1.359, 48.556-55.479 s 2.053, 55.479-62.401 s 0.987, 62.401-69.324 s 22.856 deg",
+   "TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=3.072 to 3.419 s (peak |error| 7.09 deg)",
+   "TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=3.595 to 3.948 s (peak |error| 7.52 deg)",
+   "TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=11.789 to 13.494 s (peak |error| 8.763 deg)",
+   "TRACKING control.attitude_setpoint[roll] vs vehicle.attitude[roll]: typical |error| 2.035 deg, worst 29.105 at t=0.514 s; 6 window(s) above 6.105",
+   "TRACKING vehicle.attitude[roll] typical |error| by stretch: 0.097-7.019 s 1.837, 7.019-13.942 s 7.589, 13.942-20.864 s 2.381, 20.864-27.786 s 1.408, 27.786-34.708 s 0.907, 34.708-41.63 s 3.211, 41.63-48.553 s 1.415, 48.553-55.475 s 1.848, 55.475-62.397 s 1.623, 62.397-69.319 s 11.166 deg",
+   "TRACKING vehicle.attitude[roll] diverged from its setpoint from t=0.097 to 1.642 s (peak |error| 29.105 deg)",
+   "TRACKING vehicle.attitude[roll] diverged from its setpoint from t=8.922 to 10.716 s (peak |error| 20.249 deg)",
+   "TRACKING vehicle.attitude[roll] diverged from its setpoint from t=11.414 to 12.44 s (peak |error| 11.863 deg)",
+   "TRACKING control.attitude_setpoint[yaw] vs vehicle.attitude[yaw]: typical |error| 75.475 deg, worst 179.8 at t=33.668 s; 0 window(s) above 226.424",
+   "TRACKING vehicle.attitude[yaw] typical |error| by stretch: 0.097-7.02 s 54.866, 7.02-13.943 s 68.858, 13.943-20.865 s 101.083, 20.865-27.788 s 104.598, 27.788-34.711 s 89.171, 34.711-41.634 s 76.496, 41.634-48.556 s 79.412, 48.556-55.479 s 82.697, 55.479-62.402 s 104.309, 62.402-69.324 s 34.224 deg",
+   "ANOMALY a1 t=0.097 s: vehicle.attitude[roll] did not follow control.attitude_setpoint[roll] (peak |error| 29.105) (see line 78; strength 3.554)",
+   "ANOMALY a2 t=1.984 s: vehicle.attitude[roll] stepped 29.626 -> 44.606 deg (see line 59; strength 2.58)",
+   "ANOMALY a3 t=8.922 s: vehicle.attitude[roll] did not follow control.attitude_setpoint[roll] (peak |error| 20.249) (see line 79; strength 3.118)",
+   "ANOMALY a4 t=9.336 s: control.attitude_setpoint[roll] stepped 43.84 -> 15.93 deg (see line 47; strength 2.969)",
+   "ANOMALY a5 t=10.175 s: vehicle.attitude[roll] stepped 43.863 -> 21.543 deg (see line 60; strength 2.836)",
+   "ANOMALY a6 t=11.414 s: vehicle.attitude[roll] did not follow control.attitude_setpoint[roll] (peak |error| 11.863) (see line 80; strength 2.503)",
+   "ANOMALY a7 t=12.821 s: 2 channels of control.attitude_setpoint stepped up together (see line 48; strength 2.621)",
+   "ANOMALY a8 t=17.183 s: control.attitude_setpoint[roll] stepped 44.27 -> 35.51 deg (see line 49; strength 2.467)",
+   "ANOMALY a9 t=60.08 s: actuator.output[ch[3]] stepped 1503 -> 1100 us (see line 37; strength 2.606)",
+   "ANOMALY a10 t=61.187 s: vehicle.attitude[roll] stepped 42.828 -> 26.362 deg (see line 61; strength 2.641)",
+   "ANOMALY a11 t=62.416 s: vehicle.altitude[relative] stepped 43.908 -> 37.875 m (see line 54; strength 2.597)",
+   "ANOMALY a12 t=67.75 s: vehicle.altitude[relative] stepped 38.52 -> 43.193 m (see line 55; strength 2.435)"
+  ]
+ },
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 77.6
+  }
+ ],
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [
+   {
+    "id": "cc_1",
+    "tool": "overview",
+    "input": {},
+    "label": "Read the evidence sheet",
+    "summary": "20 series, 2 events, 12 anomaly candidates",
+    "ms": 0
+   },
+   {
+    "id": "cc_2",
+    "tool": "case_context",
+    "input": {},
+    "label": "case_context",
+    "summary": "",
+    "ms": 0
+   },
+   {
+    "id": "cc_3",
+    "tool": "events",
+    "input": {},
+    "label": "Listed the events",
+    "summary": "2 event(s)",
+    "ms": 0
+   },
+   {
+    "id": "cc_4",
+    "tool": "lessons",
+    "input": {},
+    "label": "lessons",
+    "summary": "",
+    "ms": 46
+   },
+   {
+    "id": "cc_5",
+    "tool": "read_lines",
+    "input": {
+     "start": 22,
+     "end": 82
+    },
+    "label": "Read sheet lines 22\u201382",
+    "summary": "61 lines",
+    "ms": 0
+   },
+   {
+    "id": "cc_6",
+    "tool": "sequence",
+    "input": {
+     "start_s": 55,
+     "end_s": 69.3,
+     "baseline_s": 20
+    },
+    "label": "Ordered what moved first, 55\u201369.3 s",
+    "summary": "first to move: actuator.output[ch[3]] at 60.369 s, vehicle.attitude[pitch] at 60.455 s, actuator.output[ch[1]] at 60.617 s",
+    "ms": 0
+   },
+   {
+    "id": "cc_7",
+    "tool": "window",
+    "input": {
+     "series": [
+      "actuator.output[ch[3]]",
+      "actuator.output[ch[2]]",
+      "vehicle.attitude[pitch]",
+      "control.attitude_setpoint[pitch]",
+      "vehicle.attitude[roll]",
+      "propulsion.throttle"
+     ],
+     "start_s": 59,
+     "end_s": 69.3,
+     "samples": 12
+    },
+    "label": "Looked at actuator.output[ch[3]], actuator.output[ch[2]], vehicle.attitude[pitch] from 59 to 69.3 s",
+    "summary": "actuator.output[ch[3]]: 1100.0\u20131503.0 us; actuator.output[ch[2]]: 1500.0\u20131700.0 us; vehicle.attitude[pitch]: -15.001\u20139.347 deg; control.attitude_setpoint[pitch]",
+    "ms": 1
+   },
+   {
+    "id": "cc_8",
+    "tool": "read_lines",
+    "input": {
+     "start": 2,
+     "end": 21
+    },
+    "label": "Read sheet lines 2\u201321",
+    "summary": "20 lines",
+    "ms": 0
+   },
+   {
+    "id": "cc_9",
+    "tool": "relation",
+    "input": {
+     "a": "control.attitude_setpoint[pitch]",
+     "b": "vehicle.attitude[pitch]",
+     "start_s": 60,
+     "end_s": 69.3,
+     "max_lag_s": 2
+    },
+    "label": "Related control.attitude_setpoint[pitch] and vehicle.attitude[pitch]",
+    "summary": "correlation -0.108, strongest at lag 1.929 s",
+    "ms": 2
+   },
+   {
+    "id": "cc_10",
+    "tool": "changes",
+    "input": {
+     "series": "actuator.output[ch[3]]",
+     "top": 5
+    },
+    "label": "Found the changes in actuator.output[ch[3]]",
+    "summary": "5 step change(s) in actuator.output[ch[3]]",
+    "ms": 0
+   }
+  ],
+  "result": {
+   "headline": "Control fault at t\u224860 s: actuator ch[3] output dropped to 1100 us and stayed there; pitch lost tracking.",
+   "status": "cause_unknown",
+   "explanation": "Channel 3 stepped from about 1500 to 1100 us and held it. Pitch then moved against its setpoint. The data does not show whether the cause is a ch[3] actuator fault or a controller/mixer output fault.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 37,
+     "quote": "CHANGE actuator.output[ch[3]] at t=60.08 s: 1503 -> 1100 us (step -403, 403x its usual variation)",
+     "shows": "A 403 us step on a single channel; the largest actuator step in the recording. It stays at 1100 us to the end (min 1100, median 1100 in the 59\u201369.3 s window).",
+     "calls": [
+      "cc_7",
+      "cc_10"
+     ]
+    },
+    {
+     "line": 71,
+     "quote": "TRACKING control.attitude_setpoint[pitch] vs vehicle.attitude[pitch]: typical |error| 2.142 deg, worst 31.63 at t=66.712 s; 5 window(s) above 6.425",
+     "shows": "The worst pitch tracking error comes after the ch[3] drop. Pitch error is 22.856 deg in the last stretch against 0.987\u20133.638 deg earlier.",
+     "calls": [
+      "cc_5",
+      "cc_9"
+     ]
+    },
+    {
+     "line": 45,
+     "quote": "CHANGE control.attitude_setpoint[pitch] at t=62.162 s: 0.95 -> 15.75 deg (step 14.8, 164.4x its usual variation)",
+     "shows": "The pitch setpoint rose after ch[3] had already dropped. The estimated pitch went to -14.655 deg while the setpoint was about 17.75 deg.",
+     "calls": [
+      "cc_5",
+      "cc_7"
+     ]
+    }
+   ],
+   "checked": [
+    {
+     "check": "Order of departure from baseline, 55\u201369.3 s",
+     "result": "ch[3] left baseline first, at 60.369 s (1500 to 1100). Pitch followed at 60.455 s, then ch[1], ch[4] and ch[5] at 60.617 s, roll at 61.187 s, the pitch setpoint at 61.689 s, ch[2] at 63.005 s and throttle at 63.069 s.",
+     "verdict": "supports",
+     "about": "Actuator ch[3] fault as the earliest sign",
+     "calls": [
+      "cc_6"
+     ]
+    },
+    {
+     "check": "Pitch setpoint vs pitch estimate, 60\u201369.3 s",
+     "result": "Correlation is -0.108 at zero lag and -0.927 at a 1.929 s lag. Typical difference is 18.489 deg. The estimated pitch moves opposite to the demand.",
+     "verdict": "supports",
+     "about": "Loss of pitch control authority after the ch[3] drop",
+     "calls": [
+      "cc_9"
+     ]
+    },
+    {
+     "check": "Other channels and throttle after the drop",
+     "result": "ch[2] reaches 1700 us (its maximum) from t=63.266 s. Throttle reaches 75% (its maximum). ch[4] and ch[5] move together. This looks like the controller compensating.",
+     "verdict": "supports",
+     "about": "Controller reacting to the loss, not the origin",
+     "calls": [
+      "cc_7",
+      "cc_5"
+     ]
+    },
+    {
+     "check": "History of ch[3]",
+     "result": "Earlier steps are 10\u201328 us only. The 403 us step at 60.08 s is unique. ch[0], ch[6] and ch[7] are constant.",
+     "verdict": "supports",
+     "about": "New event at t\u224860 s, not a long-standing offset",
+     "calls": [
+      "cc_10",
+      "cc_5"
+     ]
+    },
+    {
+     "check": "Events and lessons",
+     "result": "Two events, both at t=0.654 s (battery low-voltage warning, sensor health error), long before the ch[3] step at 60.08 s. No earlier cases are available.",
+     "verdict": "weakens",
+     "about": "Power or sensor-health cause",
+     "calls": [
+      "cc_3",
+      "cc_4",
+      "cc_10"
+     ]
+    }
+   ],
+   "effects": [
+    {
+     "line": 61,
+     "quote": "CHANGE vehicle.attitude[roll] at t=61.187 s: 42.828 -> 26.362 deg (step -16.466, 56.6x its usual variation)",
+     "why": "Roll step about 0.8 s after ch[3] left baseline."
+    },
+    {
+     "line": 54,
+     "quote": "CHANGE vehicle.altitude[relative] at t=62.416 s: 43.908 -> 37.875 m (step -6.033, 52.9x its usual variation)",
+     "why": "Altitude loss after the control upset."
+    },
+    {
+     "line": 52,
+     "quote": "CHANGE propulsion.throttle at t=62.547 s: 55 -> 74.5 % (step 19.5, 19.5x its usual variation)",
+     "why": "Controller adds throttle to compensate; it ends at its 75% ceiling."
+    }
+   ],
+   "next_action": {
+    "action": "Bench-test ch[3] servo and linkage against commanded PWM, props off.",
+    "why": "Separates a ch[3] actuator or linkage fault from a controller or mixer output fault.",
+    "how": [
+     "With props removed and the vehicle safe, command ch[3] from 1100 to 1900 us from the ground station.",
+     "Watch whether the surface or motor follows, and whether it is jammed, slow or unresponsive.",
+     "Record ch[3] PWM at the autopilot output and any servo rail voltage.",
+     "Inspect the connector, linkage and horn for ch[3]."
+    ],
+    "where": "on_site",
+    "conditions": "On the ground, powered, props off, battery fully charged and no flight state; sweep the PWM slowly.",
+    "baseline": "Compare with ch[2] or ch[4] (same sweep), and with this flight's ch[3] range of 1100\u20131536 us.",
+    "record": [
+     "actuator.output[ch[3]]",
+     "servo position or rail voltage"
+    ],
+    "needs_approval": true,
+    "outcomes": [
+     {
+      "label": "ch[3] does not follow the commanded sweep",
+      "means": "The actuator, servo, linkage or wiring on ch[3] is faulty.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h2"
+      ],
+      "then": "Inspect the harness and servo; check the flight log for the recorded failure."
+     },
+     {
+      "label": "ch[3] follows PWM normally on the bench",
+      "means": "The fault is upstream or flight-condition dependent. A controller, mixer, failsafe or injected command is possible.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h1"
+      ],
+      "then": "Request the controller's raw outputs and mixer inputs near the step."
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether the 1100 us value is a commanded output that the actuator followed, or only what the controller logged. The signal is the controller's output, not the surface position.",
+    "Which surface or motor ch[3] drives. Pitch, roll and altitude all moved, and the series names are generic."
+   ],
+   "already_answered": [
+    {
+     "question": "When did the control fault occur?",
+     "answer": "About t=60.08\u201360.6 s. ch[3] is the first signal to leave baseline, at 60.369 s.",
+     "line": 37,
+     "quote": "CHANGE actuator.output[ch[3]] at t=60.08 s: 1503 -> 1100 us (step -403, 403x its usual variation)",
+     "calls": [
+      "cc_6",
+      "cc_10"
+     ]
+    },
+    {
+     "question": "Where on the aircraft did it occur?",
+     "answer": "On actuator output channel ch[3]. The other output channels did not show a comparable step, and ch[0], ch[6] and ch[7] stayed constant.",
+     "line": 5,
+     "quote": "SERIES actuator.output[ch[3]] unit=us samples=211 t=0.167..69.183 s min=1100 max=1536 median=1500 usual_interval=0.328 s",
+     "calls": [
+      "cc_8",
+      "cc_10"
+     ]
+    },
+    {
+     "question": "Was there a low-battery or sensor-health warning, and when?",
+     "answer": "Both warnings appear once, at t=0.654 s, long before the fault. Nothing in the recording shows an event near the ch[3] step.",
+     "line": 22,
+     "quote": "EVENT t=0.654 s controller.event[mavros: Battery] mavros: Battery: WARN: Low voltage",
+     "calls": [
+      "cc_3",
+      "cc_5"
+     ]
+    }
+   ],
+   "field_questions": [
+    {
+     "question": "Which physical surface or motor is wired to actuator output ch[3]?",
+     "ask": "field_engineer",
+     "why_needed": "Gives the physical place of the fault and tells whether pitch, roll and altitude effects fit that part.",
+     "not_in_data": "Series names are generic (actuator.output[ch[3]]); no mixer or airframe map appears in the sheet or case context.",
+     "searched_calls": [
+      "cc_8",
+      "cc_2"
+     ],
+     "if_answers": [
+      {
+       "answer": "Elevator or pitch-affecting surface",
+       "means": "Matches the pitch inversion; supports the ch[3] actuator hypothesis.",
+       "keeps": [
+        "h1"
+       ]
+      },
+      {
+       "answer": "Aileron, rudder or a motor",
+       "means": "Cross-axis effects need another explanation; check the controller mixer.",
+       "keeps": [
+        "h2"
+       ]
+      }
+     ]
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "Real position of the ch[3] surface or servo after the step",
+     "why_it_matters": "The logged value is a command; only a physical check separates an actuator fault from a controller output fault.",
+     "how_to_observe": "Bench sweep of ch[3] with a visual or servo-feedback check."
+    }
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Actuator ch[3] / servo",
+     "claim": "The ch[3] actuator, servo or linkage failed or stuck at 1100 us, causing the control loss.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "ch[3] was first off baseline at 60.369 s with a 403 us step. Pitch tracking inverted afterwards. Observed only as the controller's output, not the part.",
+     "basis": "indirect",
+     "observed_at": "controller actuator output log",
+     "lines": [
+      37,
+      71
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Controller / mixer output",
+     "claim": "The controller, mixer or a failsafe drove ch[3] to its minimum.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "The step is a clean jump to one value and held. The pitch setpoint was near 0 deg at the time, so a stable-loop response is unlikely.",
+     "basis": "indirect",
+     "observed_at": "controller output log",
+     "lines": [
+      37,
+      45
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Attitude estimator / sensors",
+     "claim": "A wrong attitude estimate or sensor fault caused the apparent loss of control.",
+     "status": "weakened",
+     "role": "effect",
+     "because": "Altitude dropped 6.033 m and the other channels compensated, which fits real motion. Airspeed and yaw rate are constant 0 (not logged or missing).",
+     "basis": "indirect",
+     "observed_at": "estimated state",
+     "lines": [
+      54,
+      27,
+      28
+     ]
+    },
+    {
+     "id": "h4",
+     "area": "Power / battery",
+     "claim": "Low battery voltage or a power issue degraded the actuator.",
+     "status": "weakened",
+     "role": "trigger",
+     "because": "The only battery warning is at t=0.654 s, long before the step at 60.08 s; no event, change or other channel shows a fault near the step.",
+     "basis": "indirect",
+     "observed_at": "controller event log",
+     "lines": [
+      22
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      37
+     ],
+     "what": "ch[3] drops 1503 to 1100 us and stays there",
+     "class": "root_cause_candidate",
+     "why": "First signal off baseline in the late window."
+    },
+    {
+     "lines": [
+      71,
+      72,
+      61
+     ],
+     "what": "Pitch and roll lose tracking after the drop",
+     "class": "effect",
+     "why": "They follow the ch[3] step in sequence."
+    },
+    {
+     "lines": [
+      34,
+      52
+     ],
+     "what": "ch[2] to 1700 and throttle to 75% compensation",
+     "class": "effect",
+     "why": "Saturated controller response after the loss."
+    },
+    {
+     "lines": [
+      22,
+      23
+     ],
+     "what": "Low-voltage warning and sensor-health error at t=0.654 s",
+     "class": "anomaly",
+     "why": "Long before the fault; no link to it is visible."
+    },
+    {
+     "lines": [
+      24,
+      25,
+      26,
+      27,
+      28
+     ],
+     "what": "Constant channels and zero airspeed and yaw rate",
+     "class": "routine",
+     "why": "Unused outputs or signals not logged."
+    },
+    {
+     "lines": [
+      78,
+      79,
+      80
+     ],
+     "what": "Early roll tracking divergences (early in recording)",
+     "class": "anomaly",
+     "why": "Happen before the ch[3] step; not explained here."
+    }
+   ],
+   "lesson": "No earlier cases are available, so there is no lead to reuse.",
+   "reuse_when": "A fixed-wing or multirotor with a single output channel stepping to a limit (1100 us) while the loop saturates elsewhere; compare the mixer map and servo health first.",
+   "data_requests": []
+  },
+  "dropped": [],
+  "usage": {
+   "input_tokens": 328130,
+   "output_tokens": 11142,
+   "uncached_input_tokens": 10,
+   "cache_read_input_tokens": 328120,
+   "cache_creation_input_tokens": 44870,
+   "model_calls": 5,
+   "model_ms": 77351,
+   "cost_usd": 0.323732,
+   "model_ids": [
+    "claude-sonnet-5-5"
+   ]
+  },
+  "model_calls": [
+   {
+    "call": 1,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 65624,
+    "cache_creation_input_tokens": 1388,
+    "output_tokens": 63,
+    "cost_usd": 0.0127484,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 2224,
+    "api_ms": 1203,
+    "requested": [
+     "overview",
+     "case_context"
+    ]
+   },
+   {
+    "call": 2,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 65624,
+    "cache_creation_input_tokens": 3471,
+    "output_tokens": 144,
+    "cost_usd": 0.0218904,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 2658,
+    "api_ms": 1657,
+    "requested": [
+     "events",
+     "lessons",
+     "read_lines",
+     "sequence"
+    ]
+   },
+   {
+    "call": 3,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 65624,
+    "cache_creation_input_tokens": 9096,
+    "output_tokens": 590,
+    "cost_usd": 0.0488504,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 5641,
+    "api_ms": 4623,
+    "requested": [
+     "window",
+     "read_lines",
+     "relation",
+     "changes"
+    ]
+   },
+   {
+    "call": 4,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 65624,
+    "cache_creation_input_tokens": 13213,
+    "output_tokens": 5673,
+    "cost_usd": 0.11614840000000001,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 42852,
+    "api_ms": 41864,
+    "requested": [
+     "submit_report"
+    ]
+   },
+   {
+    "call": 5,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 65624,
+    "cache_creation_input_tokens": 17702,
+    "output_tokens": 4672,
+    "cost_usd": 0.1240944,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 23976,
+    "api_ms": 23174,
+    "requested": [
+     "submit_report"
+    ]
+   }
+  ],
+  "seconds": 77.5,
+  "tool_outputs": {
+   "cc_1": "{\"kind\": \"recording evidence sheet\", \"sheet_lines\": 94, \"header\": {\"line\": 1, \"text\": \"RECORDING 7267 rows, 20 series, span 69.334 s from t=0 at 2018-09-11T19:21:31.419639Z (clock robot_clock). Times below are seconds from t=0.\"}, \"series\": [{\"series\": \"actuator.output[ch[0]]\", \"line\": 2}, {\"series\": \"actuator.output[ch[1]]\", \"line\": 3}, {\"series\": \"actuator.output[ch[2]]\", \"line\": 4}, {\"series\": \"actuator.output[ch[3]]\", \"line\": 5}, {\"series\": \"actuator.output[ch[4]]\", \"line\": 6}, {\"series\": \"actuator.output[ch[5]]\", \"line\": 7}, {\"series\": \"actuator.output[ch[6]]\", \"line\": 8}, {\"series\": \"actuator.output[ch[7]]\", \"line\": 9}, {\"series\": \"control.attitude_setpoint[pitch]\", \"line\": 10}, {\"series\": \"control.attitude_setpoint[roll]\", \"line\": 11}, {\"series\": \"control.attitude_setpoint[yaw]\", \"line\": 12}, {\"series\": \"propulsion.throttle\", \"line\": 13}, {\"series\": \"vehicle.airspeed\", \"line\": 14}, {\"series\": \"vehicle.altitude[relative]\", \"line\": 15}, {\"series\": \"vehicle.attitude[pitch]\", \"line\": 16}, {\"series\": \"vehicle.attitude[roll]\", \"line\": 17}, {\"series\": \"vehicle.attitude[yaw]\", \"line\": 18}, {\"series\": \"vehicle.velocity[x]\", \"line\": 19}, {\"series\": \"vehicle.velocity[y]\", \"line\": 20}, {\"series\": \"vehicle.yaw_rate[yaw]\", \"line\": 21}], \"events\": 2, \"anomaly_candidates\": [{\"line\": 83, \"text\": \"ANOMALY a1 t=0.097 s: vehicle.attitude[roll] did not follow control.attitude_setpoint[roll] (peak |error| 29.105) (see line 78; strength 3.554)\"}, {\"line\": 84, \"text\": \"ANOMALY a2 t=1.984 s: vehicle.attitude[roll] stepped 29.626 -> 44.606 deg (see line 59; strength 2.58)\"}, {\"line\": 85, \"text\": \"ANOMALY a3 t=8.922 s: vehicle.attitude[roll] did not follow control.attitude_setpoint[roll] (peak |error| 20.249) (see line 79; strength 3.118)\"}, {\"line\": 86, \"text\": \"ANOMALY a4 t=9.336 s: control.attitude_setpoint[roll] stepped 43.84 -> 15.93 deg (see line 47; strength 2.969)\"}, {\"line\": 87, \"text\": \"ANOMALY a5 t=10.175 s: vehicle.attitude[roll] stepped 43.863 -> 21.543 deg (see line 60; strength 2.836)\"}, {\"line\": 88, \"text\": \"ANOMALY a6 t=11.414 s: vehicle.attitude[roll] did not follow control.attitude_setpoint[roll] (peak |error| 11.863) (see line 80; strength 2.503)\"}, {\"line\": 89, \"text\": \"ANOMALY a7 t=12.821 s: 2 channels of control.attitude_setpoint stepped up together (see line 48; strength 2.621)\"}, {\"line\": 90, \"text\": \"ANOMALY a8 t=17.183 s: control.attitude_setpoint[roll] stepped 44.27 -> 35.51 deg (see line 49; strength 2.467)\"}, {\"line\": 91, \"text\": \"ANOMALY a9 t=60.08 s: actuator.output[ch[3]] stepped 1503 -> 1100 us (see line 37; strength 2.606)\"}, {\"line\": 92, \"text\": \"ANOMALY a10 t=61.187 s: vehicle.attitude[roll] stepped 42.828 -> 26.362 deg (see line 61; strength 2.641)\"}, {\"line\": 93, \"text\": \"ANOMALY a11 t=62.416 s: vehicle.altitude[relative] stepped 43.908 -> 37.875 m (see line 54; strength 2.597)\"}, {\"line\": 94, \"text\": \"ANOMALY a12 t=67.75 s: vehicle.altitude[relative] stepped 38.52 -> 43.193 m (see line 55; strength 2.435)\"}], \"tracking\": [{\"line\": 71, \"text\": \"TRACKING control.attitude_setpoint[pitch] vs vehicle.attitude[pitch]: typical |error| 2.142 deg, worst 31.63 at t=66.712 s; 5 window(s) above 6.425\"}, {\"line\": 76, \"text\": \"TRACKING control.attitude_setpoint[roll] vs vehicle.attitude[roll]: typical |error| 2.035 deg, worst 29.105 at t=0.514 s; 6 window(s) above 6.105\"}, {\"line\": 81, \"text\": \"TRACKING control.attitude_setpoint[yaw] vs vehicle.attitude[yaw]: typical |error| 75.475 deg, worst 179.8 at t=33.668 s; 0 window(s) above 226.424\"}], \"note\": \"The sheet lines are computed from the recorded rows; quote them exactly with their line numbers. Use window, changes, relation, sequence and events to test each hypothesis, and cite their call ids for every number.\"}",
+   "cc_2": "{\"machine\": \"UAV-26\", \"title\": \"flight-26: control fault check\", \"reported\": [\"Check this flight: did a control fault occur, when, and where on the aircraft?\"], \"engineer_results\": [], \"engineers_already_tried\": null, \"previous_hypotheses\": null, \"dismissed_in_this_case\": [], \"machine_baselines\": []}",
+   "cc_3": "{\"count\": 2, \"events\": [{\"t\": 0.654, \"series\": \"controller.event[mavros: Battery]\", \"event\": \"mavros: Battery: WARN: Low voltage\", \"code\": null, \"desc\": null}, {\"t\": 0.654, \"series\": \"controller.event[mavros: System]\", \"event\": \"mavros: System: ERROR: Sensor helth\", \"code\": null, \"desc\": null}]}",
+   "cc_4": "{\"version\": \"lessons-v1\", \"signature\": [], \"lessons\": [], \"lessons_in_workspace\": 0, \"rule\": \"Specific signature tokens weigh 3, general 1; 'applies' needs every specific token of the lesson here and no context difference.\", \"boundary\": \"Earlier cases are leads with their conditions, not answers. A lesson never changes this case's own findings.\"}",
+   "cc_5": "{\"lines\": [{\"line\": 22, \"text\": \"EVENT t=0.654 s controller.event[mavros: Battery] mavros: Battery: WARN: Low voltage\"}, {\"line\": 23, \"text\": \"EVENT t=0.654 s controller.event[mavros: System] mavros: System: ERROR: Sensor helth\"}, {\"line\": 24, \"text\": \"CONSTANT actuator.output[ch[0]] = 1500 for the whole recording (211 samples)\"}, {\"line\": 25, \"text\": \"CONSTANT actuator.output[ch[6]] = 1500 for the whole recording (211 samples)\"}, {\"line\": 26, \"text\": \"CONSTANT actuator.output[ch[7]] = 1926 for the whole recording (211 samples)\"}, {\"line\": 27, \"text\": \"CONSTANT vehicle.airspeed = 0 for the whole recording (843 samples)\"}, {\"line\": 28, \"text\": \"CONSTANT vehicle.yaw_rate[yaw] = 0 for the whole recording (288 samples)\"}, {\"line\": 29, \"text\": \"CHANGE actuator.output[ch[1]] at t=1.72 s: 1518 -> 1488 us (step -30, 12x its usual variation)\"}, {\"line\": 30, \"text\": \"CHANGE actuator.output[ch[1]] at t=12.659 s: 1556 -> 1501 us (step -55, 22x its usual variation)\"}, {\"line\": 31, \"text\": \"CHANGE actuator.output[ch[1]] at t=61.874 s: 1505 -> 1421 us (step -84, 33.6x its usual variation)\"}, {\"line\": 32, \"text\": \"CHANGE actuator.output[ch[2]] at t=1.72 s: 1516 -> 1612 us (step 96, 12x its usual variation)\"}, {\"line\": 33, \"text\": \"CHANGE actuator.output[ch[2]] at t=10.479 s: 1540 -> 1412 us (step -128, 16x its usual variation)\"}, {\"line\": 34, \"text\": \"CHANGE actuator.output[ch[2]] at t=62.625 s: 1524 -> 1700 us (step 176, 22x its usual variation)\"}, {\"line\": 35, \"text\": \"CHANGE actuator.output[ch[3]] at t=1.72 s: 1527 -> 1500 us (step -27, 27x its usual variation)\"}, {\"line\": 36, \"text\": \"CHANGE actuator.output[ch[3]] at t=10.808 s: 1478 -> 1506 us (step 28, 28x its usual variation)\"}, {\"line\": 37, \"text\": \"CHANGE actuator.output[ch[3]] at t=60.08 s: 1503 -> 1100 us (step -403, 403x its usual variation)\"}, {\"line\": 38, \"text\": \"CHANGE actuator.output[ch[4]] at t=1.72 s: 1554 -> 1501 us (step -53, 26.5x its usual variation)\"}, {\"line\": 39, \"text\": \"CHANGE actuator.output[ch[4]] at t=11.201 s: 1455 -> 1513 us (step 58, 29x its usual variation)\"}, {\"line\": 40, \"text\": \"CHANGE actuator.output[ch[4]] at t=61.305 s: 1507 -> 1583 us (step 76, 38x its usual variation)\"}, {\"line\": 41, \"text\": \"CHANGE actuator.output[ch[5]] at t=1.72 s: 1554 -> 1501 us (step -53, 26.5x its usual variation)\"}, {\"line\": 42, \"text\": \"CHANGE actuator.output[ch[5]] at t=11.201 s: 1455 -> 1513 us (step 58, 29x its usual variation)\"}, {\"line\": 43, \"text\": \"CHANGE actuator.output[ch[5]] at t=61.305 s: 1507 -> 1583 us (step 76, 38x its usual variation)\"}, {\"line\": 44, \"text\": \"CHANGE control.attitude_setpoint[pitch] at t=13.089 s: -6.04 -> 0.84 deg (step 6.88, 76.4x its usual variation)\"}, {\"line\": 45, \"text\": \"CHANGE control.attitude_setpoint[pitch] at t=62.162 s: 0.95 -> 15.75 deg (step 14.8, 164.4x its usual variation)\"}, {\"line\": 46, \"text\": \"CHANGE control.attitude_setpoint[pitch] at t=67.526 s: 17.84 -> 8.96 deg (step -8.88, 98.7x its usual variation)\"}, {\"line\": 47, \"text\": \"CHANGE control.attitude_setpoint[roll] at t=9.336 s: 43.84 -> 15.93 deg (step -27.91, 930.4x its usual variation)\"}, {\"line\": 48, \"text\": \"CHANGE control.attitude_setpoint[roll] at t=12.821 s: 31.41 -> 43.9 deg (step 12.49, 416.4x its usual variation)\"}, {\"line\": 49, \"text\": \"CHANGE control.attitude_setpoint[roll] at t=17.183 s: 44.27 -> 35.51 deg (step -8.76, 292x its usual variation)\"}, {\"line\": 50, \"text\": \"CHANGE propulsion.throttle at t=1.617 s: 49.5 -> 64 % (step 14.5, 14.5x its usual variation)\"}, {\"line\": 51, \"text\": \"CHANGE propulsion.throttle at t=13.314 s: 40.5 -> 55.5 % (step 15, 15x its usual variation)\"}, {\"line\": 52, \"text\": \"CHANGE propulsion.throttle at t=62.547 s: 55 -> 74.5 % (step 19.5, 19.5x its usual variation)\"}, {\"line\": 53, \"text\": \"CHANGE vehicle.altitude[relative] at t=13.385 s: 46.546 -> 43.696 m (step -2.85, 25x its usual variation)\"}, {\"line\": 54, \"text\": \"CHANGE vehicle.altitude[relative] at t=62.416 s: 43.908 -> 37.875 m (step -6.033, 52.9x its usual variation)\"}, {\"line\": 55, \"text\": \"CHANGE vehicle.altitude[relative] at t=67.75 s: 38.52 -> 43.193 m (step 4.673, 41x its usual variation)\"}, {\"line\": 56, \"text\": \"CHANGE vehicle.attitude[pitch] at t=5.798 s: -3.976 -> 2.063 deg (step 6.039, 22.4x its usual variation)\"}, {\"line\": 57, \"text\": \"CHANGE vehicle.attitude[pitch] at t=12.12 s: -2.761 -> 4.963 deg (step 7.724, 28.7x its usual variation)\"}, {\"line\": 58, \"text\": \"CHANGE vehicle.attitude[pitch] at t=63.906 s: 6.537 -> -3.737 deg (step -10.274, 38.2x its usual variation)\"}, {\"line\": 59, \"text\": \"CHANGE vehicle.attitude[roll] at t=1.984 s: 29.626 -> 44.606 deg (step 14.98, 51.5x its usual variation)\"}, {\"line\": 60, \"text\": \"CHANGE vehicle.attitude[roll] at t=10.175 s: 43.863 -> 21.543 deg (step -22.321, 76.7x its usual variation)\"}, {\"line\": 61, \"text\": \"CHANGE vehicle.attitude[roll] at t=61.187 s: 42.828 -> 26.362 deg (step -16.466, 56.6x its usual variation)\"}, {\"line\": 62, \"text\": \"CHANGE vehicle.attitude[yaw] at t=3.173 s: 134.741 -> 82.703 deg (step -52.038, 10.3x its usual variation)\"}, {\"line\": 63, \"text\": \"CHANGE vehicle.attitude[yaw] at t=16.252 s: -133.545 -> -181.823 deg (step -48.278, 9.6x its usual variation)\"}, {\"line\": 64, \"text\": \"CHANGE vehicle.attitude[yaw] at t=31.167 s: -454.962 -> -503.967 deg (step -49.005, 9.7x its usual variation)\"}, {\"line\": 65, \"text\": \"CHANGE vehicle.velocity[x] at t=7.994 s: 1.33 -> -12.97 m/s (step -14.3, 14x its usual variation)\"}, {\"line\": 66, \"text\": \"CHANGE vehicle.velocity[x] at t=16.719 s: -9.86 -> 4.27 m/s (step 14.13, 13.9x its usual variation)\"}, {\"line\": 67, \"text\": \"CHANGE vehicle.velocity[x] at t=42.231 s: 4.42 -> -9.04 m/s (step -13.46, 13.2x its usual variation)\"}, {\"line\": 68, \"text\": \"CHANGE vehicle.velocity[y] at t=3.899 s: -5.37 -> 9.3 m/s (step 14.67, 15.1x its usual variation)\"}, {\"line\": 69, \"text\": \"CHANGE vehicle.velocity[y] at t=29.939 s: 5.26 -> -9.42 m/s (step -14.68, 15.1x its usual variation)\"}, {\"line\": 70, \"text\": \"CHANGE vehicle.velocity[y] at t=45.86 s: 6.77 -> -6.7 m/s (step -13.47, 13.9x its usual variation)\"}, {\"line\": 71, \"text\": \"TRACKING control.attitude_setpoint[pitch] vs vehicle.attitude[pitch]: typical |error| 2.142 deg, worst 31.63 at t=66.712 s; 5 window(s) above 6.425\"}, {\"line\": 72, \"text\": \"TRACKING vehicle.attitude[pitch] typical |error| by stretch: 0.097-7.02 s 3.638, 7.02-13.943 s 1.936, 13.943-20.865 s 3.544, 20.865-27.788 s 0.891, 27.788-34.711 s 2.642, 34.711-41.633 s 1.911, 41.633-48.556 s 1.359, 48.556-55.479 s 2.053, 55.479-62.401 s 0.987, 62.401-69.324 s 22.856 deg\"}, {\"line\": 73, \"text\": \"TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=3.072 to 3.419 s (peak |error| 7.09 deg)\"}, {\"line\": 74, \"text\": \"TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=3.595 to 3.948 s (peak |error| 7.52 deg)\"}, {\"line\": 75, \"text\": \"TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=11.789 to 13.494 s (peak |error| 8.763 deg)\"}, {\"line\": 76, \"text\": \"TRACKING control.attitude_setpoint[roll] vs vehicle.attitude[roll]: typical |error| 2.035 deg, worst 29.105 at t=0.514 s; 6 window(s) above 6.105\"}, {\"line\": 77, \"text\": \"TRACKING vehicle.attitude[roll] typical |error| by stretch: 0.097-7.019 s 1.837, 7.019-13.942 s 7.589, 13.942-20.864 s 2.381, 20.864-27.786 s 1.408, 27.786-34.708 s 0.907, 34.708-41.63 s 3.211, 41.63-48.553 s 1.415, 48.553-55.475 s 1.848, 55.475-62.397 s 1.623, 62.397-69.319 s 11.166 deg\"}, {\"line\": 78, \"text\": \"TRACKING vehicle.attitude[roll] diverged from its setpoint from t=0.097 to 1.642 s (peak |error| 29.105 deg)\"}, {\"line\": 79, \"text\": \"TRACKING vehicle.attitude[roll] diverged from its setpoint from t=8.922 to 10.716 s (peak |error| 20.249 deg)\"}, {\"line\": 80, \"text\": \"TRACKING vehicle.attitude[roll] diverged from its setpoint from t=11.414 to 12.44 s (peak |error| 11.863 deg)\"}, {\"line\": 81, \"text\": \"TRACKING control.attitude_setpoint[yaw] vs vehicle.attitude[yaw]: typical |error| 75.475 deg, worst 179.8 at t=33.668 s; 0 window(s) above 226.424\"}, {\"line\": 82, \"text\": \"TRACKING vehicle.attitude[yaw] typical |error| by stretch: 0.097-7.02 s 54.866, 7.02-13.943 s 68.858, 13.943-20.865 s 101.083, 20.865-27.788 s 104.598, 27.788-34.711 s 89.171, 34.711-41.634 s 76.496, 41.634-48.556 s 79.412, 48.556-55.479 s 82.697, 55.479-62.402 s 104.309, 62.402-69.324 s 34.224 deg\"}], \"total_lines\": 94}",
+   "cc_6": "{\"window_s\": [55.0, 69.3], \"baseline_s\": 20.0, \"left_baseline_in_order\": [{\"series\": \"actuator.output[ch[3]]\", \"left_baseline_at\": 60.369, \"baseline\": 1500.0, \"value\": 1100.0, \"unit\": \"us\"}, {\"series\": \"vehicle.attitude[pitch]\", \"left_baseline_at\": 60.455, \"baseline\": -0.52, \"value\": -6.5, \"unit\": \"deg\"}, {\"series\": \"actuator.output[ch[1]]\", \"left_baseline_at\": 60.617, \"baseline\": 1505.0, \"value\": 1549.0, \"unit\": \"us\"}, {\"series\": \"actuator.output[ch[4]]\", \"left_baseline_at\": 60.617, \"baseline\": 1500.0, \"value\": 1535.0, \"unit\": \"us\"}, {\"series\": \"actuator.output[ch[5]]\", \"left_baseline_at\": 60.617, \"baseline\": 1500.0, \"value\": 1535.0, \"unit\": \"us\"}, {\"series\": \"vehicle.attitude[roll]\", \"left_baseline_at\": 61.187, \"baseline\": 41.703, \"value\": 25.768, \"unit\": \"deg\"}, {\"series\": \"control.attitude_setpoint[pitch]\", \"left_baseline_at\": 61.689, \"baseline\": -1.16, \"value\": 4.59, \"unit\": \"deg\"}, {\"series\": \"vehicle.altitude[relative]\", \"left_baseline_at\": 61.702, \"baseline\": 44.782, \"value\": 42.937, \"unit\": \"m\"}, {\"series\": \"actuator.output[ch[2]]\", \"left_baseline_at\": 63.005, \"baseline\": 1532.0, \"value\": 1692.0, \"unit\": \"us\"}, {\"series\": \"propulsion.throttle\", \"left_baseline_at\": 63.069, \"baseline\": 54.5, \"value\": 74.0, \"unit\": \"%\"}], \"events\": []}",
+   "cc_7": "{\"window_s\": [59.0, 69.3], \"series\": [{\"series\": \"actuator.output[ch[3]]\", \"unit\": \"us\", \"samples\": 31, \"min\": 1100.0, \"max\": 1503.0, \"median\": 1100.0, \"first\": [59.339, 1503.0], \"last\": [69.183, 1100.0], \"median_outside_window\": 1500.0, \"values\": [[59.339, 1503.0], [60.08, 1503.0], [60.617, 1100.0], [61.305, 1100.0], [61.874, 1100.0], [62.625, 1100.0], [63.266, 1100.0], [63.863, 1100.0], [64.504, 1100.0], [65.182, 1100.0], [65.867, 1100.0], [66.462, 1100.0], [67.173, 1100.0], [67.932, 1100.0], [68.526, 1100.0], [69.183, 1100.0]]}, {\"series\": \"actuator.output[ch[2]]\", \"unit\": \"us\", \"samples\": 31, \"min\": 1500.0, \"max\": 1700.0, \"median\": 1660.0, \"first\": [59.339, 1556.0], \"last\": [69.183, 1604.0], \"median_outside_window\": 1540.0, \"values\": [[59.339, 1556.0], [60.08, 1564.0], [60.617, 1540.0], [61.305, 1508.0], [61.874, 1564.0], [62.625, 1652.0], [63.266, 1700.0], [63.863, 1700.0], [64.504, 1700.0], [65.182, 1700.0], [65.867, 1700.0], [66.462, 1700.0], [67.173, 1700.0], [67.932, 1660.0], [68.526, 1628.0], [69.183, 1604.0]]}, {\"series\": \"vehicle.attitude[pitch]\", \"unit\": \"deg\", \"samples\": 43, \"min\": -15.001, \"max\": 9.347, \"median\": -4.681, \"first\": [59.025, 0.147], \"last\": [69.227, -10.592], \"median_outside_window\": -0.176, \"values\": [[59.025, 0.147], [59.749, -0.112], [60.455, -6.5], [61.187, 1.219], [61.907, 6.537], [62.669, 7.359], [63.412, 1.663], [64.136, -0.799], [64.803, -4.681], [65.582, -8.309], [66.331, -11.361], [67.032, -13.75], [67.75, -14.655], [68.486, -14.081], [69.227, -10.592]]}, {\"series\": \"control.attitude_setpoint[pitch]\", \"unit\": \"deg\", \"samples\": 122, \"min\": -0.58, \"max\": 17.88, \"median\": 12.46, \"first\": [59.057, 0.0], \"last\": [69.179, 6.05], \"median_outside_window\": -0.76, \"values\": [[59.057, 0.0], [59.944, 0.93], [60.856, -0.35], [61.629, 3.66], [62.351, 10.11], [63.064, 16.48], [63.894, 17.69], [64.795, 17.75], [65.716, 17.84], [66.62, 17.86], [67.374, 13.93], [68.142, 9.89], [69.118, 6.35]]}, {\"series\": \"vehicle.attitude[roll]\", \"unit\": \"deg\", \"samples\": 43, \"min\": 24.629, \"max\": 43.412, \"median\": 32.804, \"first\": [59.025, 42.041], \"last\": [69.227, 35.685], \"median_outside_window\": 41.972, \"values\": [[59.025, 42.041], [59.749, 43.147], [60.455, 42.828], [61.187, 25.768], [61.907, 27.44], [62.669, 26.362], [63.412, 24.629], [64.136, 25.662], [64.803, 28.054], [65.582, 31.57], [66.331, 32.958], [67.032, 34.612], [67.75, 36.581], [68.486, 35.905], [69.227, 35.685]]}, {\"series\": \"propulsion.throttle\", \"unit\": \"%\", \"samples\": 27, \"min\": 50.0, \"max\": 75.0, \"median\": 72.0, \"first\": [59.295, 57.0], \"last\": [68.998, 64.0], \"median_outside_window\": 55.0, \"values\": [[59.295, 57.0], [60.108, 59.0], [60.775, 51.0], [61.431, 52.0], [62.219, 63.0], [63.069, 74.0], [63.599, 75.0], [64.384, 75.0], [65.012, 75.0], [65.75, 75.0], [66.413, 75.0], [67.314, 75.0], [68.145, 68.0], [68.998, 64.0]]}]}",
+   "cc_8": "{\"lines\": [{\"line\": 2, \"text\": \"SERIES actuator.output[ch[0]] unit=us samples=211 t=0.167..69.183 s min=1500 max=1500 median=1500 usual_interval=0.328 s\"}, {\"line\": 3, \"text\": \"SERIES actuator.output[ch[1]] unit=us samples=211 t=0.167..69.183 s min=1418 max=1561 median=1503 usual_interval=0.328 s\"}, {\"line\": 4, \"text\": \"SERIES actuator.output[ch[2]] unit=us samples=211 t=0.167..69.183 s min=1412 max=1700 median=1540 usual_interval=0.328 s\"}, {\"line\": 5, \"text\": \"SERIES actuator.output[ch[3]] unit=us samples=211 t=0.167..69.183 s min=1100 max=1536 median=1500 usual_interval=0.328 s\"}, {\"line\": 6, \"text\": \"SERIES actuator.output[ch[4]] unit=us samples=211 t=0.167..69.183 s min=1451 max=1600 median=1501 usual_interval=0.328 s\"}, {\"line\": 7, \"text\": \"SERIES actuator.output[ch[5]] unit=us samples=211 t=0.167..69.183 s min=1451 max=1600 median=1501 usual_interval=0.328 s\"}, {\"line\": 8, \"text\": \"SERIES actuator.output[ch[6]] unit=us samples=211 t=0.167..69.183 s min=1500 max=1500 median=1500 usual_interval=0.328 s\"}, {\"line\": 9, \"text\": \"SERIES actuator.output[ch[7]] unit=us samples=211 t=0.167..69.183 s min=1926 max=1926 median=1926 usual_interval=0.328 s\"}, {\"line\": 10, \"text\": \"SERIES control.attitude_setpoint[pitch] unit=deg samples=846 t=0.097..69.324 s min=-6.61 max=17.88 median=-0.435 usual_interval=0.079 s\"}, {\"line\": 11, \"text\": \"SERIES control.attitude_setpoint[roll] unit=deg samples=844 t=0.097..69.319 s min=13.98 max=44.77 median=43.515 usual_interval=0.079 s\"}, {\"line\": 12, \"text\": \"SERIES control.attitude_setpoint[yaw] unit=deg samples=847 t=0.097..69.324 s min=105 max=1383 median=746 usual_interval=0.079 s (unwrapped across +-180, so a wrap is not a step)\"}, {\"line\": 13, \"text\": \"SERIES propulsion.throttle unit=% samples=181 t=0..69.334 s min=39 max=75 median=56 usual_interval=0.383 s\"}, {\"line\": 14, \"text\": \"SERIES vehicle.airspeed unit=m/s samples=843 t=0.1..69.332 s min=0 max=0 median=0 usual_interval=0.079 s\"}, {\"line\": 15, \"text\": \"SERIES vehicle.altitude[relative] unit=m samples=288 t=0.116..69.227 s min=35.928 max=46.772 median=44.398 usual_interval=0.241 s\"}, {\"line\": 16, \"text\": \"SERIES vehicle.attitude[pitch] unit=deg samples=288 t=0.115..69.227 s min=-15.001 max=9.347 median=-0.465 usual_interval=0.241 s\"}, {\"line\": 17, \"text\": \"SERIES vehicle.attitude[roll] unit=deg samples=288 t=0.115..69.227 s min=9.605 max=48.276 median=41.349 usual_interval=0.241 s\"}, {\"line\": 18, \"text\": \"SERIES vehicle.attitude[yaw] unit=deg samples=288 t=0.115..69.227 s min=-1126.765 max=160.866 median=-564.554 usual_interval=0.241 s (unwrapped across +-180, so a wrap is not a step)\"}, {\"line\": 19, \"text\": \"SERIES vehicle.velocity[x] unit=m/s samples=288 t=0.115..69.227 s min=-20.86 max=19.37 median=-1.735 usual_interval=0.241 s\"}, {\"line\": 20, \"text\": \"SERIES vehicle.velocity[y] unit=m/s samples=288 t=0.115..69.227 s min=-20.2 max=19.38 median=5.215 usual_interval=0.241 s\"}, {\"line\": 21, \"text\": \"SERIES vehicle.yaw_rate[yaw] unit=deg/s samples=288 t=0.115..69.227 s min=0 max=0 median=0 usual_interval=0.241 s\"}], \"total_lines\": 94}",
+   "cc_9": "{\"a\": \"control.attitude_setpoint[pitch]\", \"b\": \"vehicle.attitude[pitch]\", \"samples\": 111, \"window_s\": [60.065, 69.179], \"correlation\": -0.108, \"best_lag_s\": 1.929, \"correlation_at_best_lag\": -0.927, \"difference\": {\"unit\": \"deg\", \"typical\": 18.489, \"worst\": 31.63, \"worst_at\": 66.712}}",
+   "cc_10": "{\"series\": \"actuator.output[ch[3]]\", \"unit\": \"us\", \"usual_variation\": 1.0, \"changes\": [{\"series\": \"actuator.output[ch[3]]\", \"t\": 1.72, \"before\": 1527.0, \"after\": 1500.0, \"step\": -27.0, \"z\": 27.0, \"unit\": \"us\"}, {\"series\": \"actuator.output[ch[3]]\", \"t\": 10.808, \"before\": 1478.0, \"after\": 1506.0, \"step\": 28.0, \"z\": 28.0, \"unit\": \"us\"}, {\"series\": \"actuator.output[ch[3]]\", \"t\": 14.434, \"before\": 1511.0, \"after\": 1500.0, \"step\": -11.0, \"z\": 11.0, \"unit\": \"us\"}, {\"series\": \"actuator.output[ch[3]]\", \"t\": 38.447, \"before\": 1494.0, \"after\": 1504.0, \"step\": 10.0, \"z\": 10.0, \"unit\": \"us\"}, {\"series\": \"actuator.output[ch[3]]\", \"t\": 60.08, \"before\": 1503.0, \"after\": 1100.0, \"step\": -403.0, \"z\": 403.0, \"unit\": \"us\"}], \"note\": \"z = step size in units of the signal's usual sample-to-sample variation (median absolute difference).\"}"
+  },
+  "version": "veyra-investigator-v1"
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/rudder"
+  ],
+  "nonzero": {
+   "/failure_status/rudder": {
+    "first_nonzero_s": 60.115,
+    "value": 2
+   }
+  },
+  "onset_s": 60.115
+ }
+}
