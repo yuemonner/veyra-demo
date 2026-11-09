@@ -839,7 +839,7 @@ def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str
         effects = [{"line": x["line"], "quote": raw[x["line"] - 1][:200] if raw else x["text"], "why": "after the first failure"} for x in (inc.get("after") or [])[:4]]
     elif not raw:  # a recording, not a text log: the engine's own established facts
         est = q.get("established") or []
-        headline = (est[0] if est else (run_summary(store, case_id) or "Veyra's engine reading of this recording"))[:160]
+        headline = (est[0] if est else (run_summary(store, case_id) or "Veyra's rule checks on these signals established no fault; this is not an AI investigation"))[:160]
         for a in est[1:4]:
             checked.append({"check": "Engine finding", "result": a, "verdict": "supports", "calls": []})
     else:
@@ -852,8 +852,13 @@ def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str
             before = sorted(n for n, p in tools.parsed.items() if p.level == "WARNING" and n < n0)[-3:]
             evidence += [ev(n, "warning before the first error") for n in before]
         else:
-            headline = "No failure, restart or stop message recognised in this log"
-    log_errors = bool(raw) and any(p.level in ("ERROR", "FATAL") for p in tools.parsed.values())
+            warns = sorted(n for n, p in tools.parsed.items() if p.level == "WARNING") if raw else []
+            if warns:  # no error line, but the log warns: lead with the first warning, never "no failure"
+                headline = f"No error line; first warning at line {warns[0]}: {_norm(raw[warns[0] - 1])[:90]}"
+                evidence = [ev(n, "warning reported by the log") for n in warns[:3]]
+            else:
+                headline = "No failure, restart or stop message recognised in this log"
+    log_errors = bool(raw) and any(p.level in ("ERROR", "FATAL", "WARNING") for p in tools.parsed.values())
     for x in q.get("questions") or []:
         if x.get("status") == "answered" and x["id"].startswith("log:check"):
             checked.append({"check": x["question"], "result": x["answer"], "verdict": "supports", "calls": []})

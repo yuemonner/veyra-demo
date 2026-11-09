@@ -18,6 +18,16 @@ def test_rule_based_reading_leads_with_the_first_error(tmp_path):
     assert out["evidence"][0]["line"] == 32 and "Health error" in out["evidence"][0]["quote"]
 
 
+def test_a_log_that_only_warns_is_not_reported_as_no_failure(tmp_path):
+    """Found 2026-11-09: the real micro-ROS log (session closed right after it opened, 'invalid client key' warning) read as
+    'no failure found'. A log that warns now leads with its first warning and stays cause_unknown."""
+    store = CaseStore(tmp_path / "t.db")
+    log = LOG.parents[1] / "microros-stm32-session-drops/log.txt"
+    case = debrief_recording(store, path=log, mapping={}, machine_id="STM32H7", title="Session drops", actor="test", source_name="agent.log")["case_id"]
+    out = investigator.deterministic(store, case, "no model")
+    assert out["status"] == "cause_unknown" and out["headline"].startswith("No error line; first warning at line 15")
+
+
 def test_upload_job_has_a_steps_list():
     src = (Path(__file__).resolve().parents[1] / "app/recordings_api.py").read_text()
     debrief = src[src.index("def start_debrief"):src.index("def _run_job")]
