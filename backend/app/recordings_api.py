@@ -158,7 +158,8 @@ def start_debrief(rid: str, body: DebriefIn, request: Request):
         from app.machines import profiles
         if body.machine_class not in profiles.load_all():
             raise HTTPException(422, f"Unknown machine type '{body.machine_class}'")
-    job = {"id": "job-" + secrets.token_hex(8), "recording": rid, "state": "running", "step": "Starting", "started_at": time.time(),
+    # "steps" is where the investigator streams each check it runs; without it the first agent step fails
+    job = {"id": "job-" + secrets.token_hex(8), "recording": rid, "state": "running", "step": "Starting", "started_at": time.time(), "steps": [],
            "owner": (getattr(request.state, "user", None) or {}).get("workspace_id")}
     with _lock:
         _jobs[job["id"]] = job
@@ -279,7 +280,7 @@ def _investigate_into(job: Dict[str, Any], store, case_id: str, *, allow_model: 
                                                       "authorized_by": actor, "evidence": "Allowed by the uploader in the upload form"},
                      actor=actor, source="upload form")
     job.update(step="Veyra is investigating" if model is not None and model.available() else "Reading the log")
-    out = investigator.investigate(store, case_id, model=model, on_step=lambda st: job["steps"].append(st))
+    out = investigator.investigate(store, case_id, model=model, on_step=lambda st: job.setdefault("steps", []).append(st))
     job.update(investigation={"mode": out["mode"], "fallback_reason": out["fallback_reason"], "seconds": out["seconds"]})
     return out
 

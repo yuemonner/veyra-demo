@@ -843,7 +843,17 @@ def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str
         for a in est[1:4]:
             checked.append({"check": "Engine finding", "result": a, "verdict": "supports", "calls": []})
     else:
-        headline = "No failure, restart or stop message recognised in this log"
+        # No restart or recognised stop, but the log may still report errors: the first one is the lead, never "no failure"
+        errs = sorted((n, p) for n, p in tools.parsed.items() if p.level in ("ERROR", "FATAL")) if raw else []
+        if errs:
+            n0 = errs[0][0]
+            headline = f"First error at line {n0}: {_norm(raw[n0 - 1])[:90]}"
+            evidence = [ev(n, "error reported by the log") for n, _p in errs[:3]]
+            before = sorted(n for n, p in tools.parsed.items() if p.level == "WARNING" and n < n0)[-3:]
+            evidence += [ev(n, "warning before the first error") for n in before]
+        else:
+            headline = "No failure, restart or stop message recognised in this log"
+    log_errors = bool(raw) and any(p.level in ("ERROR", "FATAL") for p in tools.parsed.values())
     for x in q.get("questions") or []:
         if x.get("status") == "answered" and x["id"].startswith("log:check"):
             checked.append({"check": x["question"], "result": x["answer"], "verdict": "supports", "calls": []})
@@ -871,7 +881,7 @@ def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str
             p = tools.parsed[ns[0]]
             events.append({"lines": ns[:50], "what": raw[ns[0] - 1][:90], "class": "anomaly" if p.level in ("ERROR", "FATAL") or p.kind else "routine",
                            "why": f"{len(ns)} line{'s' if len(ns) > 1 else ''} with this message"})
-    return {"events": events, "hypotheses": [], "headline": headline, "status": "cause_unknown" if (restarts or inc or not raw) else "no_failure_found", "explanation": "", "confidence": "low",
+    return {"events": events, "hypotheses": [], "headline": headline, "status": "cause_unknown" if (restarts or inc or not raw or log_errors) else "no_failure_found", "explanation": "", "confidence": "low",
             "evidence": evidence[:4], "checked": checked, "effects": effects,
             "next_action": {"action": nxt.get("question") or "Capture the full log up to the next failure", "why": nxt.get("needs") or "",
                             "how": [], "where": "remote", "outcomes": [{"label": "Found it", "means": "Record what you found"},
