@@ -140,7 +140,12 @@ def instance_mode():
     model = _investigator_model()
     live = bool(model and model.available())
     return {"mode": "live_ai" if live else "rules_only", "live_ai": live, "model": getattr(model, "model", None) if live else None,
-            "ai_reads": ["text_log"] if live else []}
+            "ai_reads": ["text_log"] if live else [], "hosted_demo": _hosted_demo()}
+
+
+def _hosted_demo() -> bool:
+    from app.main import _public_demo
+    return _public_demo()
 
 
 @router.get("/profiles")
@@ -167,8 +172,14 @@ def create_case(body: CaseIn, request: Request, store: CaseStore = Depends(get_s
 
 
 @router.get("/cases")
-def list_cases(store: CaseStore = Depends(get_store)):
-    return store.cases()
+def list_cases(request: Request, store: CaseStore = Depends(get_store)):
+    cases = store.cases()
+    if os.getenv("VEYRA_ACCESS_CODE"):
+        from app.main import _public_demo, has_access_code
+        if _public_demo() and not has_access_code(request):  # uploads on the hosted demo are listed only with the code
+            from app.engine_seed import DEMO_CASE_IDS
+            cases = [c for c in cases if c["id"] in DEMO_CASE_IDS]
+    return cases
 
 
 def _rerun_allowed(case_id: str) -> bool:

@@ -38,6 +38,27 @@ from fastapi.responses import JSONResponse
 _READ_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
+def has_access_code(request) -> bool:
+    code = os.getenv("VEYRA_ACCESS_CODE", "")
+    return bool(code) and _hmac.compare_digest(request.headers.get("x-veyra-access", "").encode(), code.encode())
+
+
+import re as _re
+
+_CASE_PATH = _re.compile(r"^/engine/cases/(case-[A-Za-z0-9_-]+)")
+
+
+def _visitor_may_read(path: str) -> bool:
+    """A visitor without the access code may read the demo cases, never an upload or its job."""
+    if path.startswith("/engine/recordings/") or path.startswith("/engine/jobs/"):
+        return False
+    m = _CASE_PATH.match(path)
+    if m:
+        from app.engine_seed import DEMO_CASE_IDS
+        return m.group(1) in DEMO_CASE_IDS
+    return True
+
+
 def _public_demo() -> bool:
     """A hosted, non-private server is the public demo unless VEYRA_PUBLIC_DEMO=false says otherwise. Render sets
     RENDER=true on its servers, so the rule holds even if render.yaml's variables were never applied to the service."""
@@ -63,6 +84,9 @@ async def access_code_gate(request: Request, call_next):
         given = request.headers.get("x-veyra-access", "")
         if not _hmac.compare_digest(given.encode(), code.encode()):
             return JSONResponse({"detail": "An access code is needed to upload or record anything here.", "code": "access_required"}, status_code=401)
+    if code and not writing and _public_demo() and not has_access_code(request) and not _visitor_may_read(request.url.path):
+        # Uploaded data on the hosted demo is readable only with the access code; visitors see the demo cases.
+        return JSONResponse({"detail": "Not found"}, status_code=404)
     response = await call_next(request)
     if request.method not in _READ_METHODS:  # investigations, imports and ledger writes parse whole files
         from app.memory import release

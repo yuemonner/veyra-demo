@@ -56,7 +56,7 @@ def test_the_instance_says_whether_uploads_get_live_ai(tmp_path, monkeypatch):
     main = importlib.import_module("app.main")
     with TestClient(main.app) as c:
         r = c.get("/engine/mode")
-        assert r.status_code == 200 and r.json() == {"mode": "rules_only", "live_ai": False, "model": None, "ai_reads": []}
+        assert r.status_code == 200 and r.json() == {"mode": "rules_only", "live_ai": False, "model": None, "ai_reads": [], "hosted_demo": False}
 
 
 def test_every_investigation_view_names_its_mode():

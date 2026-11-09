@@ -9,6 +9,8 @@ Only runs when the engine database holds no cases, so it never touches recorded 
 from __future__ import annotations
 
 import gzip
+import json
+import os
 import shutil
 import sqlite3
 import tempfile
@@ -19,6 +21,28 @@ SEED_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "seed"
 # Real-data cases this process loaded from the seed. On the small hosted demo instance their recorded investigations
 # are shown as they are; re-running them is refused (it needs more memory than the free instance has).
 SEEDED_IDS: set = set()
+# Every case the seed created. On the hosted demo these are the cases any visitor may read; anything made later (an
+# upload, a new case) is readable only with the access code. Kept beside the engine database so a restart keeps it.
+DEMO_CASE_IDS: set = set()
+
+
+def _demo_ids_file(store) -> Path:
+    return Path(str(getattr(store, "path", "") or os.getenv("VEYRA_ENGINE_DB", "/tmp/veyra-engine.db")) + ".demo-cases.json")
+
+
+def load_demo_ids(store) -> None:
+    try:
+        DEMO_CASE_IDS.update(json.loads(_demo_ids_file(store).read_text()))
+    except (OSError, ValueError):
+        pass
+
+
+def _remember_demo_ids(store) -> None:
+    DEMO_CASE_IDS.update(c["id"] for c in store.cases())
+    try:
+        _demo_ids_file(store).write_text(json.dumps(sorted(DEMO_CASE_IDS)))
+    except OSError:
+        pass
 
 
 def _copy_cases(store, seed_file: Path) -> List[str]:
@@ -49,6 +73,7 @@ def _copy_cases(store, seed_file: Path) -> List[str]:
 
 def seed_if_empty(store) -> Dict[str, object]:
     if store.db.execute("SELECT COUNT(*) FROM cases").fetchone()[0]:
+        load_demo_ids(store)
         return {"seeded": False, "reason": "engine database already holds cases"}
     from app.workflows.demo import build_field_case_story
     from app.memory import release
@@ -70,6 +95,7 @@ def seed_if_empty(store) -> Dict[str, object]:
     showcase = seed_showcase(store)  # a real public log with the investigation recorded with the live model
     SEEDED_IDS.update(showcase)
     advanced = _advance_all(store)
+    _remember_demo_ids(store)
     return {"seeded": True, "real_cases": real, "story": story.get("case_id") if isinstance(story, dict) else None, "case_memory": memory,
             **extra, "showcase": showcase, "autopilot": advanced}
 

@@ -2330,7 +2330,7 @@ function RecordingDialog({ onClose, onDone, onTabular }: { onClose: () => void; 
           <div>
             <h2 id="rec-title" style={{ margin: 0 }}>Upload data</h2>
             <p className={s.lede} style={{ margin: "4px 0 0" }}>Robot recordings (.bag, .mcap, zipped ROS 2, PX4 .ulg), console or system logs (.log, .txt), or tables (.csv, .json). Stays in your workspace.</p>
-            <UploadModeNote liveAi={liveAi} />
+            <UploadModeNote liveAi={liveAi} call={call} />
           </div>
           <button className={s.quiet} onClick={onClose} aria-label="Close" disabled={!!busy && !rec}>Close</button>
         </div>
