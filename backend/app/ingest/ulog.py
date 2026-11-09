@@ -15,8 +15,9 @@ rows, the same shape bags.extract produces. Nothing is inferred beyond unit conv
   vehicle_status nav_state, arming_state, failsafe changes -> controller.event
   logged text messages (all but debug)   -> controller.event (scope "log")
 Time: microseconds since boot, placed on UTC with the first GPS fix's time_utc_usec when there is one; otherwise with
-the wall-clock time in the logger's own file name (clock "logger_file_name", companion clock, 1 s resolution); otherwise
-left on the boot clock (clock "px4_boot", not wall-clock time).
+the wall-clock time in the logger's own file name (clock "logger_file_name", companion clock, 1 s resolution); otherwise,
+for an upload (place_boot_clock=True), with PX4's file name (clock "px4_file_name") or, failing that, at the file's own time (clock
+"px4_boot_anchored": durations exact, calendar date not).
 """
 from __future__ import annotations
 
@@ -212,11 +213,34 @@ def utc_offset(log: Dict[str, Any]) -> Tuple[int, str]:
     return offset_us, clock
 
 
-def extract(path: Path, *, asset: str, max_hz: float = 10.0, progress: Optional[Callable[[int], None]] = None) -> Tuple[Extraction, Dict[str, Any]]:
+def _place_boot_clock(log: Dict[str, Any], path: Path, source_name: Optional[str]) -> Tuple[int, str]:
+    """A log with no GPS time and no logger message still has to sit on a calendar, or every reading is dated 1970 and
+    the import refuses it. First choice: PX4's own file name (yyyy-mm-dd_hh_mm_ss.ulg, written in local time, shifted by
+    SDLOG_UTC_OFFSET minutes) as the upload kept it (clock "px4_file_name"). Otherwise the boot clock is placed at the
+    file's own time (clock "px4_boot_anchored"): durations and order are exact, the calendar date is not."""
+    import re
+    from datetime import datetime, timezone
+    first = log.get("first_us") or log.get("start_us") or 0
+    m = re.search(r"(\d{4}-\d{2}-\d{2})[_/ T](\d{2})[_:-](\d{2})[_:-](\d{2})", source_name or path.name)
+    if m:
+        try:
+            local = datetime.strptime(f"{m.group(1)} {m.group(2)}:{m.group(3)}:{m.group(4)}", "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+            if 1990 <= local.year <= 2100:
+                shift_min = int((log.get("params") or {}).get("SDLOG_UTC_OFFSET") or 0)
+                return int(local.timestamp() * 1e6) - shift_min * 60_000_000 - first, "px4_file_name"
+        except ValueError:
+            pass
+    return int(path.stat().st_mtime * 1e6) - first, "px4_boot_anchored"
+
+
+def extract(path: Path, *, asset: str, max_hz: float = 10.0, progress: Optional[Callable[[int], None]] = None,
+            source_name: Optional[str] = None, place_boot_clock: bool = False) -> Tuple[Extraction, Dict[str, Any]]:
     log = read(path, TOPICS)
     data, lay = log["data"], log["layouts"]
     period = 1e6 / max_hz
     offset_us, clock = utc_offset(log)
+    if clock == "px4_boot" and place_boot_clock:  # uploads only; research runs keep refusing undated logs
+        offset_us, clock = _place_boot_clock(log, Path(path), source_name)
     rows: List[Dict[str, Any]] = []
     counts: Dict[str, int] = {}
     skipped: Dict[str, int] = {}

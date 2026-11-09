@@ -889,6 +889,14 @@ def deterministic(store, case_id: str, reason: Optional[str] = None) -> Dict[str
             "unknowns": [f"{reason or 'No model configured'}: this is Veyra's rule-based reading only, without an investigation."], "lesson": ""}
 
 
+def no_log_reason(store, case_id: str) -> str:
+    """Why the AI investigator cannot read this case, in the words a visitor needs: it reads text logs only today."""
+    if any(str(i.get("clock_domain") or "").startswith("text_log") for i in store.imports(case_id, include_rows=False)):
+        return "The original text log is not stored for this case (uploaded before this version)"
+    return ("Veyra's AI investigator reads text logs (console, ROS, system logs) today; this data got Veyra's rule checks on its "
+            "signals only. AI investigation of robot recordings and tables is not available yet")
+
+
 def run_summary(store, case_id: str) -> Optional[str]:
     run = store.latest_run(case_id) or {}
     rc = run.get("root_cause") or {}
@@ -953,7 +961,7 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
     if model is None or not model.available():
         why_deterministic = "No model is configured on this instance"
     elif not tools.available():
-        why_deterministic = "The original log is not stored for this case (uploaded before this version), or it is not a text log"
+        why_deterministic = no_log_reason(store, case_id)
     elif not egress_allowed(store, case_id, model.provider):
         why_deterministic = f"No permission recorded to send this case's data to {model.provider}"
     if why_deterministic is None:

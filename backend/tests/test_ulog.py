@@ -44,6 +44,31 @@ def test_reads_formats_attitude_events_params_and_wall_clock(tmp_path):
     assert first == int(datetime(2026, 3, 20, 16, 45, 5, tzinfo=timezone.utc).timestamp()) * 1_000_000_000  # file-name time at boot 1.0 s
 
 
-def test_without_any_wall_clock_the_boot_clock_is_kept_and_labelled(tmp_path):
-    ex, meta = ulog.extract(_write(tmp_path / "y.ulg", logger_line=False), asset="UAV1")
-    assert meta["clock"] == "px4_boot" and ex.start_ns < 10_000_000_000
+def test_without_any_wall_clock_the_boot_clock_is_placed_and_labelled(tmp_path):
+    """Found 2026-11-09 on a real UAV-SEAD flight: with no GPS time every reading was dated 1970 and the import refused
+    the whole log. The boot clock now sits at the file's own time, labelled; durations and order are unchanged."""
+    p = _write(tmp_path / "y.ulg", logger_line=False)
+    ex, meta = ulog.extract(p, asset="UAV1")
+    assert meta["clock"] == "px4_boot" and ex.start_ns < 10_000_000_000   # research runs: left undated, and skipped
+    ex, meta = ulog.extract(p, asset="UAV1", place_boot_clock=True)
+    assert meta["clock"] == "px4_boot_anchored" and abs(ex.start_ns / 1e9 - p.stat().st_mtime) < 1
+    assert ex.end_ns - ex.start_ns == 2_900_000_000
+
+
+def test_px4_file_name_gives_the_wall_clock(tmp_path):
+    p = _write(tmp_path / "y.ulg", logger_line=False)
+    ex, meta = ulog.extract(p, asset="UAV1", source_name="2019-02-06_07_57_05.ulg", place_boot_clock=True)
+    from datetime import datetime, timezone
+    assert meta["clock"] == "px4_file_name"
+    assert ex.start_ns == int(datetime(2019, 2, 6, 7, 57, 5, tzinfo=timezone.utc).timestamp()) * 1_000_000_000
+
+
+def test_a_px4_log_without_gps_time_imports(tmp_path):
+    from app.store.sqlite_store import CaseStore
+    from app.workflows.debrief import debrief_recording
+    from app.agent import investigator
+    store = CaseStore(tmp_path / "e.db")
+    out = debrief_recording(store, _write(tmp_path / "flight.ulg", logger_line=False), {}, machine_id="UAV1", title="t", actor="a")
+    assert out["case_id"] and store.latest_run(out["case_id"])
+    assert "reads text logs" in investigator.no_log_reason(store, out["case_id"])   # said plainly, never 'uploaded before this version'
+    store.close()

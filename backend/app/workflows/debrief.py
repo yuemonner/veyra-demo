@@ -36,7 +36,7 @@ def debrief_recording(store, path: Path, mapping: Dict[str, Any], *, machine_id:
     progress("Reading the recording")
     text_log = None
     if ulog.is_ulog(path):  # PX4 flight log: a fixed, documented topic mapping (app/ingest/ulog.py)
-        extraction, meta = ulog.extract(path, asset=machine_id)
+        extraction, meta = ulog.extract(path, asset=machine_id, source_name=source_name, place_boot_clock=True)
         clean = ulog.mapping(clock_domain="px4_clock" if meta["clock"] == "gps_utc" else "px4_boot_clock")
     elif is_text_log(path):  # console / syslog / rosout text (app/ingest/textlog.py): no mapping needed
         text_log = textlog.read(path)
