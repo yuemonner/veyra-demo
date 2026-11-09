@@ -332,14 +332,24 @@ def _short(msgtype: str) -> str:
     return msgtype.replace("/msg/", "/")
 
 
+def _label_topic(name: str) -> bool:
+    from app.discovery.roles import LABEL_GUARD
+    return bool(LABEL_GUARD.search(name))
+
+
 def suggest(inspection: Dict[str, Any]) -> Dict[str, Any]:
     """A first mapping from standard ROS message types. A person reviews it; nothing unknown is guessed."""
     topics, notes = [], []
     has_odom = any(_short(t["type"]) == "nav_msgs/Odometry" for t in inspection["topics"])
+    used: Dict[Tuple[Any, ...], str] = {}
     for t in inspection["topics"]:
         kind, name = _short(t["type"]), t["topic"]
         commanded = bool(_CMD.search(name))
         entries: List[Dict[str, Any]] = []
+        if _label_topic(name):
+            if t["count"]:
+                notes.append(f"{name} ({kind}) not mapped: it looks like a dataset's fault label (ground truth), which an investigation must not read")
+            continue
         if kind == "sensor_msgs/JointState":
             if commanded:
                 entries.append({"kind": "series", "field": "position", "scope_from": "name", "signal": "joint.position_command", "unit": "rad"})
@@ -384,9 +394,21 @@ def suggest(inspection: Dict[str, Any]) -> Dict[str, Any]:
             names = " ".join(str(f.get("sample", "")) for f in t["fields"] if f["path"].endswith(".name"))
             drive = bool(re.search(r"(drive|motor|joint|actuator|servo|esc)", names, re.I))
             entries.append({"kind": "diagnostics", "signal": "actuator.status" if drive else "controller.event"})
+        # one source per signal: two topics feeding the same signal (two odometry estimates, say) would interleave their
+        # values in one series and read as steps that never happened
+        kept = []
+        for e in entries:
+            key = (e["signal"], e.get("scope"), e.get("kind") == "attitude")
+            if e["kind"] in ("series", "attitude") and key in used:
+                notes.append(f"{name}: {e['signal']}{'[' + e['scope'] + ']' if e.get('scope') else ''} already comes from {used[key]}; not mapped twice")
+                continue
+            if e["kind"] in ("series", "attitude"):
+                used[key] = name
+            kept.append(e)
+        entries = kept
         if entries:
             topics.append({"topic": name, "time": "receive", "entries": entries, "why": f"standard message type {kind}" + (" on a command topic" if commanded else "")})
-        elif t["count"] and re.search(r"failure_status|fault_injection|ground_truth", name, re.I):
+        elif t["count"] and _label_topic(name):
             notes.append(f"{name} ({kind}) not mapped: it looks like a dataset's fault label (ground truth), which an investigation must not read")
         elif t["count"]:
             notes.append(f"{name} ({kind}) not mapped: not a standard type Veyra knows; map its fields by hand if it matters")

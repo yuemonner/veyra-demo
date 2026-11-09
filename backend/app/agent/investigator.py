@@ -1011,7 +1011,8 @@ def _label(template: str, args: Dict[str, Any]) -> str:
 
 
 def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investigator", on_step: Callable[[Dict[str, Any]], None] = lambda s: None,
-                max_turns: int = MAX_TURNS, lang: Optional[str] = None) -> Dict[str, Any]:
+                max_turns: int = MAX_TURNS, lang: Optional[str] = None, keep_outputs: bool = False, first_message: Optional[str] = None) -> Dict[str, Any]:
+    """keep_outputs: put every tool output in the result (a reproducible demo re-executes the tools and compares)."""
     from app.agent.runner import egress_allowed
     started = time.time()
     run = store.latest_run(case_id)
@@ -1036,7 +1037,7 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
     if why_deterministic is None:
         mode = "agent"
         outputs: Dict[str, str] = {}
-        messages: List[Dict[str, Any]] = [{"role": "user", "content": f"Investigate case {case_id}. Start with overview and case_context.{language_reminder(lang)}"}]
+        messages: List[Dict[str, Any]] = [{"role": "user", "content": (first_message or f"Investigate case {case_id}. Start with overview and case_context.") + language_reminder(lang)}]
         attempts = 0
         try:
             for _ in range(max_turns):
@@ -1111,6 +1112,8 @@ def investigate(store, case_id: str, *, model=None, actor: str = "Veyra investig
               "steps": steps, "result": report, "dropped": dropped, "usage": {**usage, **usage_totals(model_calls)}, "model_calls": model_calls,
               "seconds": round(time.time() - started, 1),
               "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it."}
+    if keep_outputs and mode == "agent":
+        result["tool_outputs"] = outputs
     store.append_trusted(case_id, "agent_report", result, actor=actor, source=INVESTIGATOR_VERSION)
     return result
 

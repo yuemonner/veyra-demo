@@ -213,6 +213,8 @@ function ResultView({ inv, findings, banner, next, footer, prev, fb, extra, ahea
         </details>
       )}
 
+      {inv.recorded?.demo_pack && <DemoConclusion d={inv.recorded.demo_pack} />}
+
       {footer}
     </section>
   );
@@ -406,6 +408,37 @@ function Playback({ pb, fb, extra, ahead, standing, superseded = false, stateBar
     prev={stage > 0 ? (invs[stage - 1].result || {}).hypotheses : null}
     next={phase === "result" ? <NextAction caseId="" call={async () => null} next={inv.result?.next_action} entry="" closed={false} onRecorded={() => undefined} demo={demo} hyps={inv.result?.hypotheses} superseded={superseded && stage === lastStage} /> : null}
     footer={footer} /></>;
+}
+
+
+/** A reproducible technical demo: what the dataset itself recorded about the fault (read only after the investigation,
+ *  never shown to the model), the plain comparison, and how anyone can re-verify the run from the input file. */
+function DemoConclusion({ d }: { d: Any }) {
+  const t = d.ground_truth || {}, c = d.comparison || {};
+  return (
+    <div className={st.lesson}>
+      <h2 className={st.h2}>What the dataset recorded about this fault</h2>
+      <p className={st.fine}>Revealed only after the investigation. Veyra never mapped or read this label; the model never saw it.</p>
+      <ul className={st.facts}>
+        <li><i>Fault</i> {d.input?.fault}</li>
+        <li><i>Onset</i> {t.onset_s != null ? `t = ${t.onset_s} s (${t.topic}, value ${t.first_nonzero_value})` : "not found in the label"}</li>
+        <li><i>Veyra's result</i> {c.status === "cause_probable" ? "Cause probable" : "Cause not established"}{(c.leading_hypotheses || []).length ? `; leading: ${c.leading_hypotheses.map((h: Any) => h.area).join(", ")}` : ""}</li>
+        <li><i>Pointed at roll</i> {c.mentions_roll ? "yes" : "no"} · <i style={{ minWidth: 0 }}>aileron</i> {c.mentions_aileron ? "yes" : "no"}</li>
+        <li><i>Evidence times</i> {(c.evidence_times_s || []).length ? `${c.evidence_times_s.join(", ")} s` : "none cited"}{c.evidence_at_or_after_onset ? " (includes the fault period)" : " (none in the fault period)"}</li>
+      </ul>
+      <p className={st.fine}>Facts for you to judge, not a score. Veyra never claims a confirmed root cause.</p>
+      <details>
+        <summary className={st.fine}>Reproduce this run</summary>
+        <ul className={st.facts}>
+          <li><i>Input</i> {d.input?.file} · {d.input?.dataset} · {d.input?.licence}</li>
+          <li><i>Input sha256</i> <code>{d.input?.sha256}</code></li>
+          <li><i>Sheet sha256</i> <code>{d.sheet_sha256}</code></li>
+          <li><i>Verify</i> <code>{d.verify}</code></li>
+        </ul>
+        <p className={st.fine}>{d.how_to_verify}</p>
+      </details>
+    </div>
+  );
 }
 
 
