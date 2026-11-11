@@ -8,6 +8,15 @@ export const DICT: Record<string, string> = {
   "Investigation": "排查", "Log": "日志", "Record": "记录",
   "Loading the field case…": "正在加载案例…", "After a quiet period the first visit can take up to a minute.": "服务空闲后首次打开可能需要一分钟。",
   "Loading…": "加载中…",
+  // Mode line
+  "Replay of a recorded investigation": "录制排查的回放", "Rules-only analysis, no AI model": "仅规则分析，未使用 AI 模型", "Live AI investigation": "实时 AI 排查",
+  "What is this?": "这是什么？", "Interactive replay": "交互式回放", "Rules-only analysis": "仅规则分析",
+  "An investigation Veyra already ran, recorded and played back step by step. Nothing is re-run.": "Veyra 之前完成并录制的一次排查，逐步回放，不会重新运行。",
+  "Fixed checks with no AI model: on a text log, the first error, the warnings before it, restarts; on a recording or table, Veyra's signal rules.":
+    "不使用 AI 模型的固定检查：文本日志看第一条 error、它之前的 warning 和重启；录制数据或表格用 Veyra 的信号规则。",
+  "Veyra's AI investigator decides and runs checks on the original text log, and every quoted line is verified. Text logs today.":
+    "Veyra 的 AI 排查员自己决定并在原始文本日志上执行检查，每一条引用都经过核对。目前支持文本日志。",
+  "Not on this public demo. Offered in a scheduled technical demo.": "公开演示不提供，可预约技术演示。",
   // Investigation view
   "Probable cause": "可能原因", "Cause not established": "原因未确定", "No failure found in the data": "数据里没有发现故障",
   "Why Veyra thinks so": "Veyra 的依据", "Already checked": "已经查过的",

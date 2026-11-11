@@ -70,7 +70,7 @@ export default function Investigation({ caseId, call, actor, jobId, onChanged, f
     catch (e: Any) { setError(e.message); }
   }
 
-  if (job) return <><ModeStrip current={job.step === "Veyra is investigating" ? "live" : "rules"} liveAi={liveAi} compact /><Live job={job} /></>;
+  if (job) return <><ModeStrip current={job.step === "Veyra is investigating" ? "live" : "rules"} liveAi={liveAi} /><Live job={job} /></>;
   if (!data) return <section className={st.surface}><p className={st.dim}>Loading…</p></section>;
   // Every investigation, recorded or live, is held to what its evidence could observe before it is shown.
   const lastResult = data.playback ? (data.playback.investigations[data.playback.investigations.length - 1] || {}).result : (data.investigation || {}).result;
