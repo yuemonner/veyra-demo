@@ -39,12 +39,10 @@ def score(rec: dict) -> dict:
         row.update(kind="healthy", false_alarm=res.get("status") == "cause_probable", clean=res.get("status") == "no_failure_found")
         return row
     lead = [f"{h.get('area', '')}: {h.get('claim', '')}" for h in res.get("hypotheses") or [] if h.get("status") == "leading"]
-    # statements: each sentence of the headline, explanation and leading hypotheses; each evidence line with its note; each event
+    # statements: each sentence of the headline, the explanation and the leading hypotheses (what the report itself claims)
     statements = []
     for chunk in [res.get("headline") or "", res.get("explanation") or ""] + lead:
         statements += [x for x in re.split(r"(?<=[a-z\)\]])[.;](?:\s|$)|\n", chunk) if x.strip()]
-    statements += [f"{e.get('quote', '')} {e.get('shows', '')}" for e in res.get("evidence") or []]
-    statements += [str(e.get("what", "")) + " " + str(e.get("why", "")) for e in res.get("events") or []]
     on = lab["onset_s"]
 
     def hit(rx_for) -> bool:

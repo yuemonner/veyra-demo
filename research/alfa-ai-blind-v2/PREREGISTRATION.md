@@ -27,7 +27,7 @@ aircraft and these four fault types is not supported by this evaluation.
 ## Measure (v1's rubric flaws fixed; applied identically to all three arms)
 
 From the report only. A **statement** is one sentence of the headline, the explanation or a *leading* hypothesis
-(area + claim); or one evidence line with its note; or one listed event. Onset and failed components come from
+(area + claim): what the report itself claims, not the evidence it quotes. Onset and failed components come from
 `/failure_status/*`, read after each run.
 
 - **FOUND** = status is not `no_failure_found` AND at least one statement contains BOTH
@@ -41,7 +41,8 @@ From the report only. A **statement** is one sentence of the headline, the expla
 
 Disclosure: a first draft of this measure (time and name anywhere in the report, not in one statement) was applied to the
 stored v1 results before this file was committed and gave 20/36; it was tightened to the one-statement rule because it
-passed reports that mention the axis in passing. No v2 or model-alone run existed when this was fixed.
+passed reports that mention the axis in passing; a second draft that also counted quoted evidence lines gave 21/36 and was
+dropped for the same reason (a quoted sheet line is not a claim). The rule above gives the number in results.md and is final. No v2 or model-alone run existed when this was fixed.
 - Healthy flights: **false alarm** = status `cause_probable`; **clean** = status `no_failure_found`.
 - Per arm: FOUND / FOUND-strict on development, validation and all faulty flights; false alarms and clean on healthy
   flights (all development); tool calls, seconds, tokens.
