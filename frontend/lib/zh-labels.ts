@@ -18,6 +18,9 @@ export const DICT: Record<string, string> = {
     "Veyra 的 AI 排查员自己决定并在原始文本日志上执行检查，每一条引用都经过核对。目前支持文本日志。",
   "Not on this public demo. Offered in a scheduled technical demo.": "公开演示不提供，可预约技术演示。",
   // Investigation view
+  "Read the evidence sheet": "读取证据表", "Listed the events": "列出事件", "Listed the anomaly candidates": "列出异常候选",
+  "Each line is quoted from Veyra's evidence sheet for this recording: lines computed from the recorded signals, reproducible from them, and verified. The note beside it says what it shows.":
+    "每一条都引用 Veyra 为这份录制数据生成的证据表：由记录的信号计算得出，可以从原始数据重现，并经过核对。旁边的标签说明它表示什么。",
   "Probable cause": "可能原因", "Cause not established": "原因未确定", "No failure found in the data": "数据里没有发现故障",
   "Why Veyra thinks so": "Veyra 的依据", "Already checked": "已经查过的",
   "Each line is quoted from the data and verified against the file. The note beside it says whether it is observed in that line or inferred from it.":
@@ -134,6 +137,14 @@ export const RULES: [RegExp, (...m: string[]) => string][] = [
   [/^Recorded investigation · round (\d+) of (\d+)\.$/, (_, a, b) => `录制的排查 · 第 ${a} 轮，共 ${b} 轮。`],
   [/^Round (\d+): the engineer replies$/, (_, a) => `第 ${a} 轮：工程师回复`],
   [/^Read lines (\d+)\s*[–-]\s*(\d+)$/, (_, a, b) => `读取第 ${a}–${b} 行`],
+  // Recording investigations (evidence sheet and its tools)
+  [/^Read sheet lines (\d*)\s*[–-]\s*(\d*)$/, (_, a, b) => `读取证据表第 ${a}–${b} 行`],
+  [/^Searched the sheet for (“.*”)$/, (_, q) => `在证据表中搜索 ${q}`],
+  [/^Looked at (.+) from ([\d.]+) to ([\d.]+) s$/, (_, x, a, b) => `查看 ${x}，${a}–${b} 秒`],
+  [/^Found the changes in (.+)$/, (_, x) => `查找 ${x} 的变化`],
+  [/^Compared before and after ([\d.]+) s$/, (_, a) => `对比 ${a} 秒前后`],
+  [/^Related (.+) and (.+)$/, (_, a, b) => `分析 ${a} 与 ${b} 的关系`],
+  [/^Ordered what moved first, ([\d.]+)[–-]([\d.]+) s$/, (_, a, b) => `排出 ${a}–${b} 秒内最先变化的信号`],
   [/^Searched for (“.*”)$/, (_, q) => `搜索 ${q}`],
   [/^Measured (“.*”)$/, (_, q) => `统计 ${q}`],
   [/^(\d[\d,]*) matching lines?$/, (_, n) => `${n} 行匹配`],
