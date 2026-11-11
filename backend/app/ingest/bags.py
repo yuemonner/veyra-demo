@@ -342,6 +342,9 @@ def suggest(inspection: Dict[str, Any]) -> Dict[str, Any]:
     topics, notes = [], []
     has_odom = any(_short(t["type"]) == "nav_msgs/Odometry" for t in inspection["topics"])
     used: Dict[Tuple[Any, ...], str] = {}
+    # A commanded/measured pair from one topic shares one sign and frame convention; an attitude derived from odometry
+    # may not (ALFA blind v1: pitch read as inverted on most flights). Where pairs exist, they are the attitude source.
+    has_nav = any(_short(t["type"]) == "mavros_msgs/NavDataPair" and t["count"] for t in inspection["topics"])
     for t in inspection["topics"]:
         kind, name = _short(t["type"]), t["topic"]
         commanded = bool(_CMD.search(name))
@@ -371,14 +374,15 @@ def suggest(inspection: Dict[str, Any]) -> Dict[str, Any]:
                         {"kind": "series", "field": "twist.twist.linear.y", "scope": "y", "signal": "vehicle.velocity", "unit": "m/s"},
                         {"kind": "series", "field": "twist.twist.angular.z", "scope": "yaw", "signal": "vehicle.yaw_rate", "unit": "rad/s"},
                         {"kind": "attitude", "field": "pose.pose.orientation", "signal": "vehicle.attitude"}]
-        elif kind == "sensor_msgs/Imu" and not has_odom:
+            if has_nav:
+                entries.pop()
+        elif kind == "sensor_msgs/Imu" and not has_odom and not has_nav:
             entries.append({"kind": "attitude", "field": "orientation", "signal": "vehicle.attitude"})
         elif kind == "mavros_msgs/NavDataPair":  # MAVROS (PX4 / ArduPilot over ROS): commanded and measured pairs
             axis = name.rstrip("/").rsplit("/", 1)[-1]
             if axis in ("roll", "pitch", "yaw"):
                 entries.append({"kind": "series", "field": "commanded", "scope": axis, "signal": "control.attitude_setpoint", "unit": "deg"})
-                if not has_odom:
-                    entries.append({"kind": "series", "field": "measured", "scope": axis, "signal": "vehicle.attitude", "unit": "deg"})
+                entries.append({"kind": "series", "field": "measured", "scope": axis, "signal": "vehicle.attitude", "unit": "deg"})
             elif axis == "airspeed":
                 entries.append({"kind": "series", "field": "measured", "signal": "vehicle.airspeed", "unit": "m/s"})
         elif kind == "mavros_msgs/RCOut":

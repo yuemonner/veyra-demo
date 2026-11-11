@@ -25,7 +25,7 @@ import re
 import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
-SHEET_VERSION = "veyra-recording-sheet-v1"
+SHEET_VERSION = "veyra-recording-sheet-v2"
 MAX_SERIES = 80
 MAX_EVENTS = 150
 MAX_CHANGES_PER_SERIES = 3
@@ -188,6 +188,24 @@ def longest_constant(s: Series) -> Optional[Dict[str, Any]]:
     return None
 
 
+def held_to_end(s: Series) -> Optional[Dict[str, Any]]:
+    """A signal that was varying and then holds exactly one value until the recording ends (at least 5 s and 20 samples)."""
+    v, t = s["v"], s["t"]
+    if len(v) < 40:
+        return None
+    i = len(v) - 1
+    while i > 0 and v[i - 1] == v[-1]:
+        i -= 1
+    if i == 0 or len(v) - i < 20 or t[-1] - t[i] < 5.0 or len(set(v[:i])) < 5:
+        return None
+    return {"series": s["key"], "value": _r(v[-1]), "from": _r(t[i]), "to": _r(t[-1]), "seconds": _r(t[-1] - t[i]), "samples": len(v) - i}
+
+
+def _circular(s: Series) -> bool:
+    """A heading-like angle: its level has no meaning (it wraps), so level steps and shifts are not reported for it."""
+    return bool(s.get("unwrapped")) or ((s["unit"] or "").lower() in ("deg", "degree", "degrees", "rad") and bool(re.search(r"yaw|heading|course", s["key"], re.I)))
+
+
 def _align(a: Series, b: Series, start: Optional[float], end: Optional[float], lag: float = 0.0) -> Tuple[List[float], List[float], List[float]]:
     """b's value nearest to each of a's sample times (shifted by lag), when within 2 of b's usual intervals."""
     ta, va = Recording.window(a, start, end)
@@ -217,10 +235,25 @@ def _corr(x: List[float], y: List[float]) -> Optional[float]:
     return sum((a - mx) * (b - my) for a, b in zip(x, y)) / (sx * sy)
 
 
-def tracking(sp: Series, meas: Series, start: Optional[float] = None, end: Optional[float] = None) -> Optional[Dict[str, Any]]:
-    """Setpoint against measured value: typical and worst absolute error, and the windows where the error stayed above
-    three times its typical size (and above 1% of the setpoint's range) for at least 3 samples."""
-    t, a, b = _align(sp, meas, start, end)
+def steady_lag(sp: Series, meas: Series, max_lag_s: float = 2.5) -> Tuple[float, Optional[float]]:
+    """The delay at which the measured value follows its setpoint best over the whole recording (0..max_lag_s). A response
+    that is late by a constant amount is the recording's normal, not a fault: errors are measured after removing it."""
+    step = max(meas.get("dt") or 0.05, 0.02)
+    n = int(max_lag_s / step)
+    best = (None, 0.0)
+    for k in range(0, n + 1, max(1, n // 50)):
+        _t, x, y = _align(sp, meas, None, None, k * step)
+        c = _corr(x, y)
+        if c is not None and (best[0] is None or c > best[0] + 1e-9):
+            best = (c, k * step)
+    return (best[1] if best[0] is not None and best[0] > 0.3 else 0.0), best[0]
+
+
+def tracking(sp: Series, meas: Series, start: Optional[float] = None, end: Optional[float] = None, use_lag: bool = True) -> Optional[Dict[str, Any]]:
+    """Setpoint against measured value, after removing the steady response lag: typical and worst absolute error, and
+    the windows where the error stayed above three times its typical size (and above 1% of the setpoint's range)."""
+    lag, lag_corr = steady_lag(sp, meas) if use_lag else (0.0, None)
+    t, a, b = _align(sp, meas, start, end, lag)
     if len(t) < 10:
         return None
     angular = (meas["unit"] or "").lower() in ("deg", "degree", "degrees")
@@ -263,11 +296,72 @@ def tracking(sp: Series, meas: Series, start: Optional[float] = None, end: Optio
                 rise = list(run)
         else:
             run = []
-    comparable = typical <= 0.25 * rng
-    return {"setpoint": sp["key"], "measured": meas["key"], "unit": meas["unit"], "samples": len(t), "typical_error": _r(typical),
+    comparable = typical <= 0.25 * rng and not (lag_corr is not None and lag_corr < 0)
+    return {"lag_s": _r(lag), "lag_correlation": _r(lag_corr), "t": t, "err": err, "setpoint": sp["key"], "measured": meas["key"], "unit": meas["unit"], "samples": len(t), "typical_error": _r(typical),
             "worst_error": _r(err[i_max]), "worst_at": _r(t[i_max]), "limit": _r(lim), "diverged": windows[:6], "comparable": comparable,
             "by_window": trend, "sustained_rise": ({"from": rise[0]["from"], "to": rise[-1]["to"], "typical_error": max(w["typical_error"] for w in rise)}
                                                    if rise else None)}
+
+
+def sustained_shift(t: List[float], v: List[float], min_z: float = 4.0) -> Optional[Dict[str, Any]]:
+    """The time after which a signal sits at a different level FOR GOOD: the split T (each side at least 8% of the span
+    and 5 s) where the median after T differs most from the median before T, in units of the usual variation before T,
+    and the difference also holds over the last third after T. A manoeuvre that comes back is not a shift."""
+    n = len(v)
+    if n < 40 or t[-1] - t[0] < 20:
+        return None
+    span = t[-1] - t[0]
+    margin = max(5.0, 0.08 * span)
+    best = None
+    for k in range(1, 60):
+        T = t[0] + span * k / 60
+        if T - t[0] < margin or t[-1] - T < margin:
+            continue
+        i = bisect.bisect_left(t, T)
+        before, after = v[:i], v[i:]
+        if len(before) < 15 or len(after) < 15:
+            continue
+        mb, ma = statistics.median(before), statistics.median(after)
+        spread = _mad(before) or (max(before) - min(before)) / 20 or 0.0
+        if spread == 0:
+            spread = max(abs(mb) * 0.01, 1e-6)
+        z = abs(ma - mb) / spread
+        tail = statistics.median(after[len(after) * 2 // 3:])
+        if z >= min_z and abs(tail - mb) >= 0.5 * abs(ma - mb) and (best is None or z > best["z"]):
+            best = {"t": _r(T), "before": _r(mb), "after": _r(ma), "z": _r(z, 1)}
+    if best is None:
+        return None
+    # sharpen: the first sample after which the signal stays on the far side of the midpoint
+    mid = (best["before"] + best["after"]) / 2
+    up = best["after"] > best["before"]
+    i = bisect.bisect_left(t, best["t"])
+    while i > 1 and ((v[i - 1] > mid) == up):
+        i -= 1
+    best["t"] = _r(t[min(i, n - 1)])
+    return best
+
+
+def output_roles(rec: Recording) -> Dict[str, Tuple[str, float]]:
+    """What each actuator output follows: the setpoint or throttle series it correlates with most (|r| >= 0.6). The data
+    names channels by number; this says which loop a channel serves, from the recording itself."""
+    drivers = [s for k, s in rec.series.items() if k.startswith("control.") or k.startswith("propulsion.")]
+    roles = {}
+    for k, s in rec.series.items():
+        if not k.startswith("actuator."):
+            continue
+        best = None
+        for d in drivers:
+            _t, x, y = _align(d, s, None, None)
+            c = _corr(x, y)
+            if c is not None and abs(c) >= 0.6 and (best is None or abs(c) > abs(best[1])):
+                best = (d["key"], c)
+        if best:
+            roles[k] = best
+    return roles
+
+
+def startup_s(rec: Recording) -> float:
+    return max(5.0, 0.03 * rec.span)
 
 
 def tracking_pairs(rec: Recording) -> List[Tuple[Series, Series]]:
@@ -342,10 +436,32 @@ def build_sheet(rec: Recording) -> Dict[str, Any]:
         if c and c["whole"] and len(rec.series) > 1:
             add(f"CONSTANT {s['key']} = {_fmt(c['value'])} for the whole recording ({c['samples']} samples)")
         elif c:
-            add(f"CONSTANT {s['key']} held {_fmt(c['value'])} from t={_fmt(c['from'])} to {_fmt(c['to'])} s ({c['samples']} samples)")
-    groups: Dict[Tuple[str, float], List[Tuple[Dict[str, Any], int]]] = {}
+            n = add(f"CONSTANT {s['key']} held {_fmt(c['value'])} from t={_fmt(c['from'])} to {_fmt(c['to'])} s ({c['samples']} samples)")
+            if s["key"].startswith("actuator.") and c["from"] > s["t"][0] + 1:
+                # an output that was moving and then holds one value: a frozen output is a candidate in its own right
+                anomalies.append((2.5 * math.log10(1 + c["seconds"]), c["from"], f"{s['key']} was moving, then held {_fmt(c['value'])} for {_fmt(c['seconds'])} s", n))
+        h = held_to_end(s)
+        if h and s["key"].startswith(("actuator.", "propulsion.", "control.", "command.")) and not (c and not c["whole"] and abs(c["from"] - h["from"]) < 1):
+            n = add(f"CONSTANT {s['key']} was varying, then held {_fmt(h['value'])} from t={_fmt(h['from'])} s to the end of the recording ({_fmt(h['seconds'])} s, {h['samples']} samples)")
+            anomalies.append((2.5 * math.log10(1 + h["seconds"]) + 1.0, h["from"], f"{s['key']} was varying, then held {_fmt(h['value'])} to the end", n))
+    roles = output_roles(rec)
+    for k, (driver, c) in roles.items():
+        add(f"ROLE {k} follows {driver} (correlation {_fmt(c)} over the recording): it serves that loop")
     for s in rec.series.values():
-        for c in change_points(s):
+        sh = None if _circular(s) else sustained_shift(s["t"], s["v"])
+        if sh:
+            n = add(f"SHIFT {s['key']} changed level for good at t={_fmt(sh['t'])} s: median {_fmt(sh['before'])} before, {_fmt(sh['after'])} after "
+                    f"{s['unit']} ({_fmt(sh['z'])}x its variation before)".replace("  ", " "))
+            anomalies.append((2.2 * math.log10(1 + sh["z"]), sh["t"], f"{s['key']} changed level for good ({_fmt(sh['before'])} -> {_fmt(sh['after'])} {s['unit']})".strip(), n))
+    groups: Dict[Tuple[str, float], List[Tuple[Dict[str, Any], int]]] = {}
+    routine: Dict[str, int] = {}
+    for s in rec.series.values():
+        if _circular(s):
+            continue
+        cps = change_points(s, top=10)
+        # a signal that steps this much again and again is manoeuvring, not failing: each such step counts for less
+        routine[s["key"]] = len(cps)
+        for c in sorted(cps, key=lambda c: -c["z"])[:MAX_CHANGES_PER_SERIES]:
             n = add(f"CHANGE {s['key']} at t={_fmt(c['t'])} s: {_fmt(c['before'])} -> {_fmt(c['after'])} {s['unit']} "
                     f"(step {_fmt(c['step'])}, {_fmt(c['z'])}x its usual variation)".replace("  ", " "))
             # channels of one signal that step together are one candidate (all motors spinning up is one event)
@@ -354,6 +470,7 @@ def build_sheet(rec: Recording) -> Dict[str, Any]:
         kind = 1.0 if base.startswith(("control.", "actuator.", "command.")) else 1.5
         z = max(c["z"] for c, _n in items)
         c0, n0 = min(items, key=lambda x: x[0]["t"])
+        kind = kind / max(1, min(routine.get(c["series"], 1) for c, _n in items))
         what = (f"{len(items)} channels of {base} stepped {'up' if up else 'down'} together" if len(items) > 1
                 else f"{c0['series']} stepped {_fmt(c0['before'])} -> {_fmt(c0['after'])} {c0['unit']}".strip())
         anomalies.append((kind * math.log10(1 + z), c0["t"], what, n0))
@@ -365,8 +482,14 @@ def build_sheet(rec: Recording) -> Dict[str, Any]:
             add(f"TRACKING {sp['key']} vs {meas['key']}: not comparable (typical |error| {_fmt(tr['typical_error'])} {tr['unit']} is a quarter of the "
                 f"setpoint's range or more: the two are probably in different frames or conventions)".replace("  ", " "))
             continue
-        n = add(f"TRACKING {sp['key']} vs {meas['key']}: typical |error| {_fmt(tr['typical_error'])} {tr['unit']}, worst {_fmt(tr['worst_error'])} "
+        n = add(f"TRACKING {sp['key']} vs {meas['key']}: steady lag {_fmt(tr['lag_s'])} s removed (a constant lag is this recording's normal, not a fault); "
+                f"typical |error| {_fmt(tr['typical_error'])} {tr['unit']}, worst {_fmt(tr['worst_error'])} "
                 f"at t={_fmt(tr['worst_at'])} s; {len(tr['diverged'])} window(s) above {_fmt(tr['limit'])}".replace("  ", " "), f"tracking:{meas['key']}")
+        sh = sustained_shift(tr["t"], tr["err"])
+        if sh and sh["after"] > sh["before"]:
+            m = add(f"SHIFT {meas['key']} followed its setpoint worse for good from t={_fmt(sh['t'])} s: typical |error| {_fmt(sh['before'])} before, "
+                    f"{_fmt(sh['after'])} after {tr['unit']} ({_fmt(sh['z'])}x its variation before)".replace("  ", " "))
+            anomalies.append((3.0 * math.log10(1 + sh["z"]), sh["t"], f"{meas['key']} followed {sp['key']} worse for good (typical |error| {_fmt(sh['before'])} -> {_fmt(sh['after'])})", m))
         add(f"TRACKING {meas['key']} typical |error| by stretch: " + ", ".join(f"{_fmt(w['from'])}-{_fmt(w['to'])} s {_fmt(w['typical_error'])}" for w in tr["by_window"])
             + f" {tr['unit']}".rstrip())
         if tr["sustained_rise"]:
@@ -379,6 +502,10 @@ def build_sheet(rec: Recording) -> Dict[str, Any]:
             m = add(f"TRACKING {meas['key']} diverged from its setpoint from t={_fmt(w['from'])} to {_fmt(w['to'])} s (peak |error| {_fmt(w['peak_error'])} {tr['unit']})".replace("  ", " "))
             ratio = w["peak_error"] / max(tr["typical_error"], 1e-6)
             anomalies.append((3.0 * math.log10(1 + ratio), w["from"], f"{meas['key']} did not follow {sp['key']} (peak |error| {_fmt(w['peak_error'])})", m))
+    # the first seconds of any run hold start-up transients (first samples, arming, boot warnings): kept, but weighted
+    # at half, and labelled, so they do not crowd out what changed during operation
+    su = startup_s(rec)
+    anomalies = [((sc * 0.5, t, text + " [start-up]", line) if t < su else (sc, t, text, line)) for sc, t, text, line in anomalies]
     ranked = sorted(anomalies, key=lambda a: (-a[0], a[1]))[:12]
     for i, (score, t, text, line) in enumerate(sorted(ranked, key=lambda a: a[1]), 1):
         add(f"ANOMALY a{i} t={_fmt(t)} s: {text} (see line {line}; strength {_fmt(score)})", f"anomaly:a{i}")
@@ -503,6 +630,41 @@ class RecordingTools:
         return {"window_s": [_r(start_s), _r(end_s)], "baseline_s": _r(baseline_s), "left_baseline_in_order": dep[:30],
                 "events": [{"t": _r(e["t"]), "series": e["key"], "event": e["event"], "code": e["code"]} for e in ev]}
 
+    def compare(self, t_s: float, window_s: float = 15.0, series: Optional[List[str]] = None) -> Dict[str, Any]:
+        """What changed at t_s: each series' level and spread in the window_s before against the window_s after, each
+        setpoint-tracking error (steady lag removed) before against after, ranked by how large the change is against the
+        variation before. Use it on every candidate time: a fault changes something; a constant lag does not."""
+        t_s, window_s = float(t_s), max(2.0, float(window_s))
+        out = []
+        keys = [self.rec.find(n)["key"] for n in series] if series else list(self.rec.series)
+        for k in keys:
+            s = self.rec.series[k]
+            _tb, vb = Recording.window(s, t_s - window_s, t_s)
+            _ta, va = Recording.window(s, t_s, t_s + window_s)
+            if len(vb) < 5 or len(va) < 5:
+                continue
+            mb, ma = statistics.median(vb), statistics.median(va)
+            sb, sa = _mad(vb), _mad(va)
+            base = sb or s["spread"] or max(abs(mb) * 0.01, 1e-6)
+            out.append({"series": k, "unit": s["unit"], "median_before": _r(mb), "median_after": _r(ma), "spread_before": _r(sb), "spread_after": _r(sa),
+                        "level_change_z": _r(abs(ma - mb) / base, 1), "frozen_after": len(set(va)) == 1 and len(set(vb)) > 1})
+        track = []
+        for sp, meas in tracking_pairs(self.rec):
+            if series and meas["key"] not in keys and sp["key"] not in keys:
+                continue
+            tr = tracking(sp, meas)
+            if not tr or not tr["comparable"]:
+                continue
+            eb = [e for tt, e in zip(tr["t"], tr["err"]) if t_s - window_s <= tt < t_s]
+            ea = [e for tt, e in zip(tr["t"], tr["err"]) if t_s <= tt <= t_s + window_s]
+            if len(eb) >= 5 and len(ea) >= 5:
+                b_, a_ = statistics.median(eb), statistics.median(ea)
+                track.append({"measured": meas["key"], "setpoint": sp["key"], "unit": tr["unit"], "typical_error_before": _r(b_), "typical_error_after": _r(a_),
+                              "ratio": _r(a_ / max(b_, 1e-6), 2), "steady_lag_removed_s": tr["lag_s"]})
+        out.sort(key=lambda r: (-(r["level_change_z"] or 0) - (100 if r["frozen_after"] else 0), r["series"]))
+        return {"t_s": _r(t_s), "window_s": _r(window_s), "series_ranked_by_change": out[:14], "tracking": sorted(track, key=lambda r: -(r["ratio"] or 0)),
+                "events_within": [{"t": _r(e["t"]), "series": e["key"], "event": e["event"]} for e in self.rec.events if abs(e["t"] - t_s) <= window_s][:10]}
+
     def events(self, start_s: Optional[float] = None, end_s: Optional[float] = None) -> Dict[str, Any]:
         ev = [e for e in self.rec.events if (start_s is None or e["t"] >= float(start_s)) and (end_s is None or e["t"] <= float(end_s))]
         return {"count": len(ev), "events": [{"t": _r(e["t"]), "series": e["key"], "event": e["event"], "code": e["code"], "desc": e.get("desc")} for e in ev[:80]]}
@@ -523,6 +685,8 @@ RECORDING_TOOL_SPECS = [
      "input_schema": {"type": "object", "properties": {"series": {"type": "array", "items": {"type": "string"}}, "start_s": {"type": "number"}, "end_s": {"type": "number"}, "samples": {"type": "integer"}}, "required": ["series", "start_s", "end_s"]}},
     {"name": "changes", "description": "Signal changes: the largest level steps of one series (optionally inside a window), each with time, level before and after, and its size against the signal's usual variation.",
      "input_schema": {"type": "object", "properties": {"series": {"type": "string"}, "start_s": {"type": "number"}, "end_s": {"type": "number"}, "top": {"type": "integer"}}, "required": ["series"]}},
+    {"name": "compare", "description": "Before against after one time t_s: every series' level and spread in the window before vs after, and each setpoint-tracking error before vs after (steady lag removed), ranked by change; flags outputs that froze. Run it on every candidate time: a fault changes something at its onset, a constant lag does not.",
+     "input_schema": {"type": "object", "properties": {"t_s": {"type": "number"}, "window_s": {"type": "number"}, "series": {"type": "array", "items": {"type": "string"}}}, "required": ["t_s"]}},
     {"name": "relation", "description": "Cross-signal relation: how series b follows series a (correlation, the lag with the strongest correlation, and the absolute difference when the units match), optionally inside a window. Use it for command vs response, setpoint vs measured, cause vs effect.",
      "input_schema": {"type": "object", "properties": {"a": {"type": "string"}, "b": {"type": "string"}, "start_s": {"type": "number"}, "end_s": {"type": "number"}, "max_lag_s": {"type": "number"}}, "required": ["a", "b"]}},
     {"name": "sequence", "description": "Event sequence: inside [start_s, end_s], which signals left their baseline (the baseline_s before start_s) first, in time order, with the events in the window. Use it to separate the earliest sign from its effects.",
@@ -537,21 +701,34 @@ RECORDING_TOOL_SPECS = [
      "input_schema": {"type": "object", "properties": {}}},
 ]
 
-RECORDING_TOOLS = {"overview", "read_lines", "search", "window", "changes", "relation", "sequence", "events", "anomalies"}
+RECORDING_TOOLS = {"overview", "read_lines", "search", "window", "changes", "compare", "relation", "sequence", "events", "anomalies"}
 
 RECORDING_PROMPT = """
 This case is a robot RECORDING (signals over time), not a text log. Veyra's parser has turned it into an EVIDENCE SHEET:
-numbered lines computed from the recorded rows (SERIES, EVENT, GAP, CONSTANT, CHANGE, TRACKING, ANOMALY). Wherever the
+numbered lines computed from the recorded rows (SERIES, EVENT, GAP, CONSTANT, ROLE, SHIFT, CHANGE, TRACKING, ANOMALY). Wherever the
 rules above say "log lines", read "sheet lines": quote them exactly with their line numbers. Times are seconds from t=0.
 Work the same way: map the fault space, then TEST each hypothesis with window, changes, relation, sequence and events,
 and cite their call ids for every number. Use sequence to separate the earliest sign from its effects, and relation for
 command against response. An ANOMALY line is a candidate, never a cause. A signal is what the machine's controller or
 estimator recorded, not the physical part itself: say where each piece of evidence was observed (a commanded value, an
-estimate, a sensor reading), and do not rule an area out with evidence that never observed it."""
+estimate, a sensor reading), and do not rule an area out with evidence that never observed it.
+How a machine fault shows in a recording, and how to test for it:
+- A fault CHANGES something at its onset. A response that is late by the same amount through the whole recording is that
+  machine's normal, never a finding. For every candidate time, run compare and ask what is different after it.
+- SHIFT lines (a level that changed for good) and outputs that were moving and then froze are the strongest candidates.
+  Check each one with compare before you settle on anything else. Manoeuvres come back; faults do not.
+- Start-up lines (marked [start-up]: first samples, boot warnings) appear in healthy runs too. Do not build the case on
+  them unless something that changed later points back to them.
+- A ROLE line says which loop an output serves. Name the loop and the channel; if an output of one loop freezes or stops
+  following while the others carry on, say so and name it as the place to look first.
+- A command that drops to zero, or an output that holds one value, with no mode change or operator event that explains it
+  is a fault candidate: report it with its time, and say that the recording does not show who or what commanded it.
+- If compare shows nothing changed at any candidate and tracking holds, say plainly that no fault is shown (status
+  no_failure_found). Do not list normal behaviour as findings."""
 
 STEP_LABEL = {"window": "Looked at {series} from {start_s} to {end_s} s", "changes": "Found the changes in {series}",
               "relation": "Related {a} and {b}", "sequence": "Ordered what moved first, {start_s}–{end_s} s", "events": "Listed the events",
-              "anomalies": "Listed the anomaly candidates", "overview": "Read the evidence sheet", "read_lines": "Read sheet lines {start}–{end}",
+              "anomalies": "Listed the anomaly candidates", "compare": "Compared before and after {t_s} s", "overview": "Read the evidence sheet", "read_lines": "Read sheet lines {start}–{end}",
               "search": "Searched the sheet for “{pattern}”"}
 
 
@@ -564,6 +741,9 @@ def summary(name: str, value: Any) -> str:
         return "; ".join(f"{s['series']}: {s.get('min')}–{s.get('max')} {s.get('unit', '')}".strip() for s in value.get("series") or [] if s.get("samples"))[:160]
     if name == "changes":
         return f"{len(value.get('changes') or [])} step change(s) in {value.get('series')}"
+    if name == "compare":
+        top = [r for r in value.get("series_ranked_by_change") or [] if (r.get("level_change_z") or 0) >= 4 or r.get("frozen_after")]
+        return (", ".join(f"{r['series']}{' froze' if r['frozen_after'] else ''}" for r in top[:3]) + " changed") if top else "nothing changed much"
     if name == "relation":
         return f"correlation {value.get('correlation')}, strongest at lag {value.get('best_lag_s')} s"
     if name == "sequence":
