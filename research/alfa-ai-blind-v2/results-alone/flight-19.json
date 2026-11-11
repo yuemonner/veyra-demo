@@ -1,0 +1,230 @@
+{
+ "arm": "alone",
+ "alias": "flight-19",
+ "folder": "carbonZ_2018-09-11-14-41-38_no_failure",
+ "input_sha256": "e93709046353a044c86befac64148bcbd5d183f7e6307e664478bb2407291c69",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 21.8
+  }
+ ],
+ "prompt_chars": 6238,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No control fault found; attitude tracked setpoints, but airspeed and yaw rate read constant zero from t=0.",
+   "status": "no_failure_found",
+   "explanation": "Roll and yaw follow the setpoints throughout a steady banked circle. The constant-zero airspeed and yaw_rate, with the t=0.9 s sensor-health error, point to a sensor or logging issue, not a control fault.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 6,
+     "quote": "t=5: roll setpoint 44.6, roll 47.2",
+     "shows": "Roll tracks the setpoint within a few degrees for the whole flight, so no loss of control.",
+     "calls": []
+    },
+    {
+     "line": 20,
+     "quote": "t=19: yaw setpoint 402, yaw -> 311",
+     "shows": "Yaw setpoint is unwrapped and ramps about 22 deg/s; the wrapped yaw follows it continuously.",
+     "calls": []
+    },
+    {
+     "line": 30,
+     "quote": "vehicle.airspeed 0 at every sample while velocity x/y reach 20+ m/s",
+     "shows": "Airspeed is stuck at zero although the aircraft is clearly moving, so the airspeed channel or its logging is invalid.",
+     "calls": []
+    },
+    {
+     "line": 1,
+     "quote": "mavros: System: ERROR: Sensor helth",
+     "shows": "A sensor health error is logged at 0.9 s, which fits the dead airspeed and yaw_rate channels.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Attitude vs setpoint, pitch/roll/yaw, all 44 samples",
+     "result": "Roll holds near 40-48 deg against a 45 deg setpoint. Pitch stays within about \u00b16 deg and follows its setpoint with lag. No divergence.",
+     "verdict": "rules_out",
+     "about": "control loop or attitude fault",
+     "calls": []
+    },
+    {
+     "check": "Actuator outputs ch0-ch7 for saturation or asymmetry",
+     "result": "Ch1-ch5 modulate within about 1.44-1.62 ms in step with setpoint changes. Ch0 and ch6 sit at 1500 and ch7 at 1930 for the whole flight. Nothing saturates.",
+     "verdict": "weakens",
+     "about": "actuator or control-surface fault",
+     "calls": []
+    },
+    {
+     "check": "Airspeed, yaw_rate and velocity consistency",
+     "result": "Airspeed and yaw_rate are exactly 0 throughout while ground speed is about 20 m/s and yaw changes about 20 deg/s.",
+     "verdict": "supports",
+     "about": "sensor or logging fault",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 1,
+     "quote": "mavros: Battery: WARN: Low voltage",
+     "why": "A warning at 0.9 s coincides with the throttle going from 0 to 47 % at t=1. It may be a startup transient, and no battery voltage signal is in the data."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect airspeed sensor and yaw-rate source; verify logging mapping",
+    "why": "Confirms whether airspeed and yaw_rate zeros are a real sensor failure or a logging or mapping artifact, and what the health error refers to.",
+    "how": [
+     "Check the pitot tube, tubing and airspeed sensor wiring",
+     "Read the full sensor-health status from the flight controller log",
+     "Compare with a normal flight on the same airframe"
+    ],
+    "where": "on_site",
+    "conditions": "Bench power-up, with airflow applied to the pitot tube and the vehicle rotated in yaw.",
+    "baseline": "A normal run of the same airframe where airspeed and yaw_rate vary.",
+    "record": [
+     "vehicle.airspeed",
+     "vehicle.yaw_rate[yaw]",
+     "controller.event"
+    ],
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "Airspeed stays zero under airflow",
+      "means": "The airspeed sensor or its wiring is faulty, matching the health error.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h3"
+      ],
+      "then": "Replace or repair the sensor and re-fly"
+     },
+     {
+      "label": "Sensor reads normally on the bench",
+      "means": "The zeros point to a logging or mapping problem, or an in-flight dropout.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": [],
+      "then": "Audit log mapping and firmware version"
+     }
+    ]
+   },
+   "unknowns": [
+    "No battery voltage or current signal, so the low-voltage warning cannot be assessed.",
+    "The health error text does not say which sensor it refers to."
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Flight control loop",
+     "claim": "A control fault occurred; attitude diverged from setpoint.",
+     "status": "ruled_out",
+     "role": "main_cause",
+     "because": "Roll, pitch and yaw follow their setpoints for the whole flight.",
+     "basis": "direct",
+     "observed_at": "attitude vs setpoint signals",
+     "excluded_by": "data",
+     "lines": [
+      6,
+      20
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Airspeed sensor",
+     "claim": "The airspeed sensor failed or was never valid, reading constant zero.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Airspeed is 0 while ground speed is about 20 m/s, and a sensor-health error is logged at 0.9 s.",
+     "basis": "indirect",
+     "lines": [
+      1,
+      30
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Logging or signal mapping",
+     "claim": "Airspeed and yaw_rate are not logged or mapped, so they show zero.",
+     "status": "open",
+     "role": "effect",
+     "because": "Both channels are exactly zero for the whole flight, which also fits an unlogged signal.",
+     "basis": "indirect",
+     "lines": [
+      30
+     ]
+    },
+    {
+     "id": "h4",
+     "area": "Battery/power",
+     "claim": "A low-voltage condition degraded the flight.",
+     "status": "weakened",
+     "role": "trigger",
+     "because": "The warning is a single event at 0.9 s and throttle and control response look normal afterward.",
+     "basis": "indirect",
+     "lines": [
+      1
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low voltage warning at 0.9 s",
+     "class": "anomaly",
+     "why": "Single warning, no voltage data, and no visible effect on control."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Sensor health error at 0.9 s",
+     "class": "root_cause_candidate",
+     "why": "Matches the dead airspeed and yaw_rate channels."
+    }
+   ],
+   "already_answered": [
+    {
+     "question": "Did the aircraft lose attitude control?",
+     "answer": "No. Roll and yaw follow their setpoints through the whole flight.",
+     "line": 6,
+     "quote": "roll setpoint 44.6, roll 47.2",
+     "calls": []
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "Which sensor the 'Sensor helth' error refers to",
+     "how_to_observe": "Read the flight controller sensor status and full log."
+    }
+   ],
+   "lesson": "",
+   "reuse_when": "A flight shows airspeed or yaw_rate stuck at zero from t=0 with a sensor-health error, while attitude still tracks its setpoints."
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 6115,
+   "output_tokens": 2911
+  },
+  "seconds": 21.8
+ },
+ "labels": {
+  "present_topics": [],
+  "nonzero": {},
+  "onset_s": null
+ }
+}

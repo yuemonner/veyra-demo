@@ -1,0 +1,204 @@
+{
+ "arm": "alone",
+ "alias": "flight-27",
+ "folder": "carbonZ_2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure",
+ "input_sha256": "0f2fc74b70788fef0ac0600ec0baa297c649a32fdc420d260030b81e6399ca23",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 26.1
+  }
+ ],
+ "prompt_chars": 18653,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "From about t=117 s, actuator ch[5] diverged from ch[4], which froze at 1500 us, and roll control became abnormal.",
+   "status": "cause_probable",
+   "explanation": "Output ch[5] stopped tracking its former twin ch[4] (identical until t=116) and swung to 1300-1680 us. Ch[4] and ch[3] sat flat at 1500 us. Roll setpoint and attitude went strongly negative, unlike earlier cycles.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 117,
+     "quote": "t=117: ch4 1.5e+03, ch5 1.52e+03",
+     "shows": "The ch4/ch5 pair, equal in every row from t=0 to t=116, splits for the first time.",
+     "calls": []
+    },
+    {
+     "line": 127,
+     "quote": "t=127: ch5 1.3e+03, roll setpoint -23, roll 37",
+     "shows": "Ch[5] hits about 1300 us while ch[4] holds 1500 us. Roll setpoint goes negative to -38 deg, with roll following to -34.7 deg at t=130.",
+     "calls": []
+    },
+    {
+     "line": 132,
+     "quote": "t=132: ch5 1.68e+03, ch4 1.5e+03",
+     "shows": "Ch[5] swings to 1680 us as ch[4] stays flat. Throughout t=120-143, ch[4] and ch[3] do not respond to the commands.",
+     "calls": []
+    },
+    {
+     "line": 0,
+     "quote": "t=0.6 Battery: WARN: Low voltage; System: ERROR: Sensor helth",
+     "shows": "Warnings at t=0.6 s, long before the anomaly. They are probably a start-up artefact and not clearly linked.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared actuator channel pairs over the whole flight",
+     "result": "Ch[4] and ch[5] are identical for t=0-116. They split at t=117, with ch[4] flat and ch[5] moving widely.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Compared roll setpoint and roll against the repeating pattern",
+     "result": "Cycles at t=2, 10, 31, 44, 68, 87 and 109 peak near +44 deg. After t=121 the peaks are -23 to -38 deg, so roll behaviour is abnormal.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Checked the other channels and the pitch and yaw axes",
+     "result": "Ch[0], ch[6] and ch[7] are constant by design. Ch[1] and ch[2] still respond, and pitch looks normal.",
+     "verdict": "weakens",
+     "about": "h2",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 128,
+     "quote": "roll setpoint -37.1, roll 7.45",
+     "shows": "Roll deviates from the earlier pattern. This is a consequence of the actuator anomaly or of compensation for it."
+    },
+    {
+     "line": 130,
+     "quote": "roll -34.7 deg",
+     "shows": "Roll excursion in the opposite direction. It is a consequence, not a cause."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the servo or ESC behind ch[5], and check ch[3] and ch[4] wiring.",
+    "why": "Separates a faulty actuator or its wiring from a mixer or allocation fault. Both produce the same ch[5] divergence.",
+    "how": [
+     "Command ch[5] and ch[4] with a bench sweep and compare the actual response",
+     "Check the connectors and signal wiring for ch[3], ch[4] and ch[5]",
+     "Review the control-allocation and mixer configuration for these channels"
+    ],
+    "where": "on_site",
+    "conditions": "Bench test with the vehicle disarmed and props removed, using the same mixer configuration as the flight.",
+    "baseline": "Ch[4] versus ch[5] behaviour in this log before t=117",
+    "record": [
+     "actuator.output[ch[3]]",
+     "actuator.output[ch[4]]",
+     "actuator.output[ch[5]]",
+     "vehicle.attitude[roll]"
+    ],
+    "needs_approval": true,
+    "outcomes": [
+     {
+      "label": "Ch[5] unit or its wiring is faulty",
+      "means": "A hardware fault on ch[5] is the cause.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Replace the actuator and repeat the flight test"
+     },
+     {
+      "label": "Hardware is fine and the mixer misbehaves",
+      "means": "A software or allocation fault is the cause.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Review the control-allocation configuration"
+     }
+    ]
+   },
+   "unknowns": [
+    "Which physical surface or motor ch[5] drives, and whether ch[4] was actually frozen or only sitting near neutral",
+    "Whether the roll excursions were commanded by the controller or came from the actuator fault"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Actuator ch[5], ch[4] and ch[3]",
+     "claim": "Ch[5] output or hardware failed from about t=117 s, with ch[4] and ch[3] unresponsive.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "The paired ch[4]/ch[5] symmetry is lost at t=117, and roll control degrades afterwards.",
+     "basis": "indirect",
+     "lines": [
+      117,
+      127,
+      132
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Control allocation or mixer",
+     "claim": "A mixer or allocation fault, not hardware, sends asymmetric commands to ch[5].",
+     "status": "open",
+     "because": "It cannot be separated from h1 using this data alone.",
+     "basis": "indirect"
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      0
+     ],
+     "what": "Low voltage warning and sensor health error at t=0.6 s",
+     "class": "anomaly",
+     "why": "Occurs far before the actuator anomaly and is not clearly related to it."
+    },
+    {
+     "lines": [
+      117,
+      132
+     ],
+     "what": "Ch[5] diverges from ch[4] and swings 1300-1680 us",
+     "class": "root_cause_candidate",
+     "why": "First point at which the symmetric pair breaks. Roll control is abnormal afterwards."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 15968,
+   "output_tokens": 3300
+  },
+  "seconds": 26.1
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/aileron",
+   "/failure_status/rudder"
+  ],
+  "nonzero": {
+   "/failure_status/aileron": {
+    "first_nonzero_s": 116.321,
+    "value": 2
+   },
+   "/failure_status/rudder": {
+    "first_nonzero_s": 116.324,
+    "value": 1
+   }
+  },
+  "onset_s": 116.321
+ }
+}

@@ -1,0 +1,220 @@
+{
+ "arm": "alone",
+ "alias": "flight-30",
+ "folder": "carbonZ_2018-09-11-17-55-30_2_left_aileron_failure",
+ "input_sha256": "47421d365d25b61e8ae8ee94d4f3a6bce35d743057ee67394a10201ad67752bc",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 24.2
+  }
+ ],
+ "prompt_chars": 11061,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Output channel 4 froze at 1500 us from about t=50 s while paired channel 5 kept moving.",
+   "status": "cause_probable",
+   "explanation": "Outputs ch[4] and ch[5] were identical until about t=50 s. After that, ch[4] stayed at neutral while ch[5] followed roll demand alone. This looks like a stuck or dropped command on ch[4], not a flight-wide control failure.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 52,
+     "quote": "49,...,1.5e+03 (ch4),1.5e+03 (ch5)",
+     "shows": "Up to t=49 s ch[4] and ch[5] were identical on every sample, so they behave as a mirrored pair.",
+     "calls": []
+    },
+    {
+     "line": 62,
+     "quote": "59,...,1.5e+03 (ch4),1.56e+03 (ch5), roll sp 37.4",
+     "shows": "The roll demand is large, ch[4] stays at 1500 and ch[5] moves to 1560.",
+     "calls": []
+    },
+    {
+     "line": 80,
+     "quote": "77,...,1.5e+03 (ch4),1.45e+03 (ch5)",
+     "shows": "ch[5] swings down to 1380 us at t=78 s while ch[4] still shows 1500 us. The asymmetry persists to the end of the log.",
+     "calls": []
+    },
+    {
+     "line": 86,
+     "quote": "mavros: System: ERROR: Sensor helth",
+     "shows": "A sensor-health error was logged at t=0.3 s. Airspeed and yaw rate are 0 for the whole flight, so those signals were not valid.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared ch[4] with ch[5] over the flight",
+     "result": "Identical through t=49 s. From about t=50 s ch[4] is pinned at 1500 and ch[5] varies from 1380 to 1560.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Compared attitude tracking before and after t=50 s",
+     "result": "Roll and pitch still follow their setpoints after t=50 s, for example roll 39 deg at t=61 s against a 38 deg setpoint. Attitude is slightly less crisp, but it is not lost.",
+     "verdict": "inconclusive",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Looked for other frozen outputs",
+     "result": "ch[0], ch[6] and ch[7] are constant for the whole flight (1500, 1500, 1930 us). They are probably unused or a throttle/aux channel and are not related to the t=50 s change.",
+     "verdict": "weakens",
+     "about": "h2",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 86,
+     "quote": "mavros: Battery: WARN: Low voltage",
+     "shows": "The t=0.3 s warning is a startup condition that comes long before the t=50 s change on ch[4], so it is not an effect of it.",
+     "why": "The timing does not tie the warning to ch[4]."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the ch[4] output channel, wiring and servo; replay the mixer.",
+    "why": "Separates a controller or mixer command fault from an output driver or servo fault on ch[4].",
+    "how": [
+     "Check the mixer configuration to see how ch[4] and ch[5] are mapped",
+     "Run a bench servo test on ch[4] and ch[5] with the same commands",
+     "Compare against the actuator command and feedback logs"
+    ],
+    "where": "on_site",
+    "conditions": "Bench test with the airframe disarmed and propellers off, sweeping roll commands of +/-40 deg.",
+    "baseline": "ch[5] response, and ch[4] before t=50 s, which mirrored ch[5].",
+    "record": [
+     "actuator.output[ch[4]]",
+     "actuator.output[ch[5]]",
+     "control.attitude_setpoint[roll]"
+    ],
+    "needs_approval": true,
+    "outcomes": [
+     {
+      "label": "ch[4] does not move on the bench",
+      "means": "The fault is in the output or mixer path for ch[4], or in the output hardware.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Trace the mixer and output driver for ch[4]."
+     },
+     {
+      "label": "ch[4] moves normally on the bench",
+      "means": "The freeze was a transient or a logged-signal artefact, or a condition that only occurs in flight.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [],
+      "then": "Request the full-rate log and check for dropouts."
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether ch[4] is a physical actuator command or a logged value that stopped updating.",
+    "What the sensor-health error at t=0.3 s refers to.",
+    "Whether the aircraft's mixer deliberately holds ch[4] at neutral from t=50 s."
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "ch[4] output or mixer path",
+     "claim": "ch[4] stopped following the control command at about t=50 s while its paired channel ch[5] kept working.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Identical outputs until t=49 s, then one channel is pinned at 1500 while the other tracks roll demand.",
+     "basis": "indirect",
+     "lines": [
+      52,
+      62,
+      80
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Mixer allocation or setpoint logic",
+     "claim": "The controller deliberately stopped using ch[4], for example by re-allocating roll authority to ch[5], so nothing is faulty.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "The data cannot separate a deliberate re-allocation from a stuck output. The change is sudden and one-sided, which favours a fault.",
+     "basis": "indirect",
+     "lines": [
+      62,
+      80
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Sensor health at startup",
+     "claim": "The t=0.3 s sensor error left airspeed and yaw rate invalid and is unrelated to the t=50 s change.",
+     "status": "open",
+     "role": "effect",
+     "because": "Airspeed and yaw rate are 0 for the whole flight, which matches a failed or absent sensor, but the timing does not link them to ch[4].",
+     "basis": "indirect",
+     "lines": [
+      86,
+      87
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      86
+     ],
+     "what": "Low voltage warning at start",
+     "class": "anomaly",
+     "why": "A power warning at t=0.3 s, before any control activity."
+    },
+    {
+     "lines": [
+      87
+     ],
+     "what": "System sensor health error at start",
+     "class": "anomaly",
+     "why": "Airspeed and yaw rate read 0 for the whole flight."
+    },
+    {
+     "lines": [
+      52,
+      62,
+      80
+     ],
+     "what": "ch[4] pinned at 1500 us while ch[5] keeps moving",
+     "class": "root_cause_candidate",
+     "why": "One-sided loss of a mirrored pair from about t=50 s."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 10009,
+   "output_tokens": 3151
+  },
+  "seconds": 24.2
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/aileron"
+  ],
+  "nonzero": {
+   "/failure_status/aileron": {
+    "first_nonzero_s": 49.98,
+    "value": 2
+   }
+  },
+  "onset_s": 49.98
+ }
+}

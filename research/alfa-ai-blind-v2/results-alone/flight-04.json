@@ -1,0 +1,180 @@
+{
+ "arm": "alone",
+ "alias": "flight-04",
+ "folder": "carbonZ_2018-07-18-16-22-01_engine_failure_with_emr_traj",
+ "input_sha256": "6d9b900701153abff64dd9d081a940a0196f2c7da27dc3d33bfab05518133823",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 21.0
+  }
+ ],
+ "prompt_chars": 17613,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No clear control fault; throttle channel 2 pinned at idle from 117 s while altitude fell to 6.6 m",
+   "status": "cause_unknown",
+   "explanation": "Attitude tracks setpoints throughout, so the attitude loop looks healthy. The only anomaly is the throttle/motor channel (ch[2]) held at 1100 us with 0% throttle from 117 s while altitude falls. Whether that is commanded or a fault cannot be told.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 118,
+     "quote": "117,...,1.25e+03,...,0,11.1,50.9",
+     "shows": "Throttle drops to 0% and ch[2] goes to the 1100 us floor at 117 s; this is the start of the sustained idle period.",
+     "calls": []
+    },
+    {
+     "line": 133,
+     "quote": "132,...,1.1e+03,...,0,15.4,6.59",
+     "shows": "After 16 s at zero throttle, relative altitude has fallen from about 50 m to 6.6 m with airspeed still 15 m/s.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "0.6 s mavros: Battery: WARN: Low voltage",
+     "shows": "The only logged event is a low-battery warning at the start, with no later fault event.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Does attitude follow the controller's attitude setpoints?",
+     "result": "Roll, pitch and yaw follow their setpoints with 1-2 s lag, including 44 deg roll setpoints, so no loss of attitude control is visible.",
+     "verdict": "weakens",
+     "about": "h2",
+     "calls": []
+    },
+    {
+     "check": "Which actuator channels are static or saturated?",
+     "result": "ch0, ch6 and ch7 are constant at 1500, 1500 and 2040 us. ch2 tracks throttle and sits at 1100 us at 0%. ch4 and ch5 are identical.",
+     "verdict": "inconclusive",
+     "about": "h1",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 133,
+     "quote": "132,...,6.59",
+     "shows": "The altitude loss follows the zero-throttle period and is a consequence of it, not a separate cause.",
+     "why": "Altitude falls only after the throttle goes to 0 at 117 s."
+    }
+   ],
+   "next_action": {
+    "action": "Check flight mode and mission state at 117 s for a commanded descent or landing",
+    "why": "This settles whether the zero throttle and descent were intended or a propulsion or energy-management fault.",
+    "how": [
+     "Read the mode and mission logs around 110-133 s",
+     "Check battery voltage and current across the whole flight"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Landing or descent commanded",
+      "means": "Zero throttle is intended and no fault occurred.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     },
+     {
+      "label": "Cruise mode, throttle forced to 0",
+      "means": "Throttle channel 2 or the throttle limiter is faulty, or the battery cut it.",
+      "keeps": [
+       "h1",
+       "h2"
+      ],
+      "rules_out": [
+       "h3"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether the 117-132 s idle period was commanded",
+    "Battery voltage and current history",
+    "Which physical device ch[2] drives"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Propulsion throttle channel ch[2]",
+     "claim": "Throttle or motor output was forced to idle, from low battery or a limiter, causing the altitude loss.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "Idle for 16 s with altitude falling matches this, but a commanded descent would look the same. A low-voltage warning exists at 0.6 s.",
+     "basis": "indirect",
+     "lines": [
+      118,
+      133
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Attitude control surfaces",
+     "claim": "A control-surface or attitude-loop fault occurred.",
+     "status": "weakened",
+     "because": "Attitude follows setpoints throughout and no surface channel saturates abnormally.",
+     "basis": "indirect"
+    },
+    {
+     "id": "h3",
+     "area": "Mission logic",
+     "claim": "The descent or landing with zero throttle was commanded, so there is no fault.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "The yaw setpoint wraps continuously, which suggests loiter or mission behaviour. The idle period could be planned, but there is no mode data.",
+     "basis": "indirect"
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      2
+     ],
+     "what": "Low voltage battery warning at 0.6 s",
+     "class": "anomaly",
+     "why": "It may relate to the throttle behaviour, but it is not followed by any other event."
+    },
+    {
+     "lines": [
+      118,
+      133
+     ],
+     "what": "Throttle 0% and ch[2] at 1100 us for 16 s while altitude falls",
+     "class": "root_cause_candidate",
+     "why": "Sustained propulsion idle with altitude loss; unclear whether commanded."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 15068,
+   "output_tokens": 2589
+  },
+  "seconds": 21.0
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 116.625,
+    "value": 1
+   }
+  },
+  "onset_s": 116.625
+ }
+}

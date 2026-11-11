@@ -1,0 +1,198 @@
+{
+ "arm": "alone",
+ "alias": "flight-06",
+ "folder": "carbonZ_2018-07-18-16-37-39_2_engine_failure_with_emr_traj",
+ "input_sha256": "e6f7f1e84d7bb887028d1b2178731fc2c9f494112ec25b468f393f4eeb67f3b7",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 22.6
+  }
+ ],
+ "prompt_chars": 17359,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No attitude-control fault; throttle cut to 0% at t=115 s with channel 2 pinned at 1100 us, cause unknown.",
+   "status": "cause_unknown",
+   "explanation": "Attitude follows setpoints throughout. The propulsion command (throttle, output ch[2]) drops from 32% to 0% at 115 s and stays there while the aircraft descends. The data does not show why. A battery-related or deliberate cut is possible.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 116,
+     "quote": "114: ch2=1.4e+03, throttle 35 -> 115: ch2=1.1e+03, throttle 0",
+     "shows": "Throttle command and ch[2] drop together at t=115 s and stay at 1100 us / 0% to the end (t=130 s).",
+     "calls": []
+    },
+    {
+     "line": 131,
+     "quote": "130: altitude 12 m, airspeed 14.3 m/s",
+     "shows": "Relative altitude falls from about 51 m to 12 m after the throttle cut, in an unpowered descent. Airspeed is held at 13-20 m/s.",
+     "calls": []
+    },
+    {
+     "line": 3,
+     "quote": "t=1.1 s Battery: WARN: Low voltage",
+     "shows": "A low-voltage warning appears early in the flight. It is the only logged event and could relate to the cut.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Attitude tracking: roll and pitch against their setpoints over the whole flight",
+     "result": "Roll and pitch follow setpoint steps with 1-3 s lag and no divergence or oscillation. This includes large steps at 22 s and 116 s.",
+     "verdict": "weakens",
+     "about": "h1 control-surface or attitude-loop fault",
+     "calls": []
+    },
+    {
+     "check": "Output channels for stuck or erratic values",
+     "result": "ch0 (1500), ch6 (1500) and ch7 (2040) are constant throughout. ch1, ch3, ch4 and ch5 vary normally. ch2 follows throttle and is pinned at 1100 us from 115 s.",
+     "verdict": "inconclusive",
+     "about": "h2 propulsion cut",
+     "calls": []
+    },
+    {
+     "check": "Throttle against ch[2] consistency",
+     "result": "ch2 matches the throttle command: higher throttle gives higher output. 0% throttle gives 1100 us, so the output is obeying a zero command.",
+     "verdict": "supports",
+     "about": "h2 propulsion cut",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 131,
+     "quote": "altitude falling 51 -> 12 m, 116-130 s",
+     "why": "Loss of thrust, not a control-loop failure."
+    },
+    {
+     "line": 117,
+     "quote": "t=116: roll setpoint -41.6, pitch setpoint -20, pitch -9.3",
+     "why": "Large attitude excursion after the throttle cut. It is tracked correctly, so it follows the cut."
+    }
+   ],
+   "next_action": {
+    "action": "Check battery voltage and flight-mode and failsafe logs around t=115 s",
+    "why": "Settles whether the throttle cut was a commanded failsafe or landing, or an upstream command fault.",
+    "how": [
+     "Pull the full-rate flight log around 105-120 s",
+     "Check mode changes and failsafe flags at 115 s",
+     "Check battery voltage and current across the flight"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Failsafe or mode change at 115 s",
+      "means": "The throttle cut was a commanded response, not a hardware fault.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h3"
+      ]
+     },
+     {
+      "label": "No mode change, throttle command dropped",
+      "means": "There is an upstream propulsion or command fault.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": []
+     }
+    ]
+   },
+   "unknowns": [
+    "Reason for the throttle cut at 115 s",
+    "Whether ch[2] is the main motor output (inferred only from its correlation with throttle)",
+    "Battery voltage trend, which is not in the data"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Attitude control loop / surfaces",
+     "claim": "A control-surface or attitude-loop fault caused tracking errors.",
+     "status": "weakened",
+     "because": "Attitude follows setpoints throughout, with no divergence or stuck outputs.",
+     "lines": []
+    },
+    {
+     "id": "h2",
+     "area": "Propulsion (output ch[2])",
+     "claim": "Throttle commanded to zero at 115 s, possibly a battery or low-voltage failsafe or a deliberate cut.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Throttle and ch[2] drop together and stay at the minimum while altitude falls.",
+     "basis": "indirect",
+     "lines": [
+      116
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Upstream throttle command",
+     "claim": "An unintended throttle command fault from the controller or mixer.",
+     "status": "open",
+     "because": "Cannot be separated from a commanded cut with this data.",
+     "lines": [
+      116
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      3
+     ],
+     "what": "Low voltage battery warning at 1.1 s",
+     "class": "anomaly",
+     "why": "Only logged event; could relate to the later throttle cut."
+    },
+    {
+     "lines": [
+      116
+     ],
+     "what": "Throttle to 0% and ch[2] at 1100 us",
+     "class": "root_cause_candidate",
+     "why": "Abrupt, sustained loss of propulsion command."
+    },
+    {
+     "lines": [
+      131
+     ],
+     "what": "Descent from 51 m to 12 m",
+     "class": "effect",
+     "why": "Consequence of no thrust."
+    }
+   ],
+   "lesson": "",
+   "reuse_when": ""
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 14872,
+   "output_tokens": 2806
+  },
+  "seconds": 22.6
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 114.064,
+    "value": 1
+   }
+  },
+  "onset_s": 114.064
+ }
+}

@@ -1,0 +1,223 @@
+{
+ "arm": "alone",
+ "alias": "flight-21",
+ "folder": "carbonZ_2018-09-11-14-52-54_left_aileron__right_aileron__failure",
+ "input_sha256": "c5e93c3ec1b67ce943673319da3fd53ae7591bd101c25435d005f073d5dc8578",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 34.5
+  }
+ ],
+ "prompt_chars": 30153,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Actuator ch[4]/ch[5] pair desynchronised: ch[4] pinned at 1500 us from t\u2248106 s, ch[5] from t\u2248177 s.",
+   "status": "cause_unknown",
+   "explanation": "Paired outputs ch[4]/ch[5] were identical until t=105. Afterwards one of them sat at neutral while the other kept moving. Attitude kept tracking, so the effect was small. The cause is not identifiable from this data.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 105,
+     "quote": "ch4=1.51e+03, ch5=1.51e+03 (t=105); ch4=1.5e+03, ch5=1.53e+03 (t=106)",
+     "shows": "Before t=106 ch[4] and ch[5] were identical. From t=106 ch[4] stays at 1500 while ch[5] moves, e.g. 1.41e3 at t=115 and 1.37e3 at t=174.",
+     "calls": []
+    },
+    {
+     "line": 178,
+     "quote": "ch4=1.58e+03, ch5=1.5e+03 (t=178)",
+     "shows": "Roles swap at t\u2248177: ch[5] is pinned at 1500 to the end of the log, and ch[4] now carries the command (1.58e3, 1.39e3).",
+     "calls": []
+    },
+    {
+     "line": 232,
+     "quote": "ch2=1.22e+03, throttle 13, pitch setpoint -22 (t=232)",
+     "shows": "Abrupt end-of-log transient on ch[2]: pitch setpoint steps from -3 to -22 deg, throttle falls 44\u219213\u21920 %, and ch[2] drops to 1.1e3 at t=233. Altitude falls, and pitch follows the setpoint (-19.6 deg).",
+     "calls": []
+    },
+    {
+     "line": 0,
+     "quote": "vehicle.airspeed = 0 for all t",
+     "shows": "Airspeed reads 0 for the whole flight, consistent with the 'Sensor helth' error at t=0.9 s.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Do ch[4] and ch[5] track each other over the flight?",
+     "result": "Identical to t=105. ch[4] pinned at 1500 for t\u2248106-177; ch[5] pinned at 1500 for t\u2248177-233.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Does attitude follow the setpoints during the stuck periods?",
+     "result": "Roll and pitch follow their setpoints with similar lag before and after t=106. There is no loss of control.",
+     "verdict": "weakens",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Is the t=232 step a control fault?",
+     "result": "Setpoint, throttle and ch[2] change together, and attitude responds. This looks like a commanded descent or cut, not an actuator failure.",
+     "verdict": "inconclusive",
+     "about": "h3",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 233,
+     "quote": "altitude 45.9, pitch -19.6",
+     "shows": "Altitude loss and nose-down pitch follow the t=232 setpoint and throttle change; they are consequences."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect ch[4]/ch[5] actuators, wiring and mixer; replay the log for the t=232 command source.",
+    "why": "This separates a real output or servo fault from a mixer or allocation change, and shows whether the t=232 descent was commanded.",
+    "how": [
+     "Check the mixer/allocation config for ch[4] and ch[5] roles",
+     "Bench-test ch[4] and ch[5] output response and linkage",
+     "Pull the flight-mode and command log around t=225-233 s"
+    ],
+    "where": "on_site",
+    "baseline": "ch[4] and ch[5] identical for t<106 in this log",
+    "record": [
+     "actuator.output[ch[4]]",
+     "actuator.output[ch[5]]",
+     "control.attitude_setpoint[pitch]",
+     "propulsion.throttle"
+    ],
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "Channel dead on bench",
+      "means": "Real actuator or output fault on ch[4]/ch[5].",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     },
+     {
+      "label": "Both channels respond normally",
+      "means": "Mixer/allocation reconfiguration or logging artifact is more likely.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h1"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Actual roles of ch[4], ch[5], ch[0], ch[6] and ch[7] (the last three are constant at 1500/1500/1930 us)",
+    "Reason for the t=232 pitch/throttle step",
+    "Whether the 0.9 s battery and sensor events relate to the airspeed reading 0"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "ch[4]/ch[5] output pair",
+     "claim": "One output of the ch[4]/ch[5] pair was held at neutral in turn (ch[4] t\u2248106-177, ch[5] from \u2248177).",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Clear, repeated desynchronisation in the logged outputs; no matching attitude error, so impact was minor.",
+     "basis": "indirect",
+     "lines": [
+      106,
+      177
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Mixer or allocation logic",
+     "claim": "Control allocation deliberately reassigned or disabled one of the pair, not a hardware fault.",
+     "status": "open",
+     "because": "Pinning exactly at 1500 and the swap are consistent with software behaviour; the data cannot separate this from a hardware fault.",
+     "lines": [
+      106,
+      177
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Flight-end command or failsafe",
+     "claim": "Pitch -22 deg and throttle cut at t=232 were a commanded descent or failsafe.",
+     "status": "open",
+     "because": "The setpoint changes before the attitude does and the attitude tracks it, so it is a command rather than an actuator failure.",
+     "lines": [
+      232,
+      233
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      0
+     ],
+     "what": "Low voltage warning",
+     "class": "anomaly",
+     "why": "Battery warning at t=0.9 s; no later voltage signal to confirm."
+    },
+    {
+     "lines": [
+      0
+     ],
+     "what": "System ERROR: Sensor helth",
+     "class": "anomaly",
+     "why": "Consistent with airspeed reading 0 for the whole flight."
+    },
+    {
+     "lines": [
+      106,
+      177
+     ],
+     "what": "ch[4] pinned at 1500 us, then ch[5] pinned",
+     "class": "root_cause_candidate",
+     "why": "Outputs that were identical for 105 s split apart."
+    },
+    {
+     "lines": [
+      232,
+      233
+     ],
+     "what": "Pitch setpoint step, throttle to 0, ch[2] drop",
+     "class": "effect",
+     "why": "Abrupt end-of-log command with altitude loss."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 25071,
+   "output_tokens": 4503
+  },
+  "seconds": 34.5
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/aileron"
+  ],
+  "nonzero": {
+   "/failure_status/aileron": {
+    "first_nonzero_s": 105.251,
+    "value": 2
+   }
+  },
+  "onset_s": 105.251
+ }
+}

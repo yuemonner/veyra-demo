@@ -1,0 +1,231 @@
+{
+ "arm": "alone",
+ "alias": "flight-11",
+ "folder": "carbonZ_2018-07-30-17-10-45_engine_failure_with_emr_traj",
+ "input_sha256": "ae1cc234df156e78505c05b4e213660c757ca1dd0417b266996942c97562965d",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 23.5
+  }
+ ],
+ "prompt_chars": 17712,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Propulsion output ch[2] and throttle dropped to minimum twice, at t=2-9s and from t=118s, and the aircraft lost airspeed and altitude.",
+   "status": "cause_unknown",
+   "explanation": "Throttle goes to 0% and the ch[2] output locks at 1100us twice, while the other channels keep working. The trigger is not visible. A low-voltage or sensor-health failsafe is possible, since both were logged at t=0.9s.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 3,
+     "quote": "2,...,1.1e+03,...,propulsion.throttle 0",
+     "shows": "At t=2s ch[2] jumps from about 1480 to 1100us and throttle falls from 40% to 0%. This is a step, not a ramp.",
+     "calls": []
+    },
+    {
+     "line": 120,
+     "quote": "118,...,1.1e+03,...,0,15.9,48.6",
+     "shows": "The second cutoff starts at t=118s. Throttle stays 0% and ch[2] stays at 1100us through t=132s, the end of the log. Airspeed falls from 15.9 to about 10.8 m/s and altitude from 48.6 to 28.3 m.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "t=0.9 s mavros: Battery: WARN: Low voltage / System: ERROR: Sensor helth",
+     "shows": "Two warnings were logged about one second before the first cutoff. They may be related, but the log does not link them.",
+     "calls": []
+    },
+    {
+     "line": 10,
+     "quote": "9,...,1.1e+03,...,58,...,34",
+     "shows": "The first cutoff lasts 8s (t=2-9). Altitude falls from 82 to 58 m and throttle then recovers around t=10-13. Roll is large at this point (34-44 deg).",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Whether ch[2] follows throttle",
+     "result": "Outside the cutoffs, ch[2] varies about 1340-1570us in step with throttle at 31-60%. It is the propulsion output, and 1100us matches throttle 0%.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Whether other channels show the same step",
+     "result": "ch[0], ch[6] and ch[7] are constant at 1500, 1500 and 2040us. ch[1], ch[3], ch[4] and ch[5] move smoothly with no step at t=2 or t=118. Only ch[2] steps.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Control-surface response in the second cutoff",
+     "result": "From t=126s ch[1] drops to 1210us and ch[4]/ch[5] rise to about 1670us. Pitch setpoint is 17.5 deg, but pitch only reaches 13 deg at t=132. This is the controller fighting falling airspeed and probably an effect of the cutoff.",
+     "verdict": "inconclusive",
+     "about": "h3",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 128,
+     "quote": "129,...,9.97,35.8",
+     "shows": "Airspeed and altitude decay is an effect of the throttle loss, not a separate fault.",
+     "why": "It follows the t=118s throttle cutoff."
+    },
+    {
+     "line": 132,
+     "quote": "130,...,1.21e+03,...,1.67e+03",
+     "shows": "Large ch[1] and ch[4]/ch[5] deflections are control saturation as airspeed falls.",
+     "why": "The surfaces compensate for lost thrust and airspeed."
+    }
+   ],
+   "next_action": {
+    "action": "Check the ch[2] motor, ESC and power chain, and review the failsafe logs.",
+    "why": "This separates a power or ESC cutout from a commanded throttle cut, and shows whether the low-voltage warning is the trigger.",
+    "how": [
+     "Pull the flight controller log around t=2s and t=118s for battery voltage, current and the failsafe or arming state",
+     "Bench-test the ch[2] motor and ESC, and inspect the wiring and connectors",
+     "Compare the throttle command with the ESC telemetry"
+    ],
+    "where": "lab",
+    "conditions": "Repeat at similar battery state of charge and a similar throttle profile (30-60%) with the aircraft restrained.",
+    "baseline": "A normal run with no throttle cutouts, compared with t=10-117s in this log.",
+    "record": [
+     "propulsion.throttle",
+     "actuator.output[ch[2]]",
+     "battery voltage",
+     "battery current",
+     "failsafe state"
+    ],
+    "needs_approval": true,
+    "outcomes": [
+     {
+      "label": "Battery voltage sag at cutoff",
+      "means": "Low-voltage failsafe or brownout cut the throttle.",
+      "keeps": [
+       "h1",
+       "h2"
+      ],
+      "rules_out": [
+       "h3"
+      ],
+      "then": "Inspect the battery and wiring, and check the voltage thresholds"
+     },
+     {
+      "label": "Command dropped, motor and ESC fine",
+      "means": "The controller or a failsafe commanded zero throttle, possibly from the sensor-health error.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Review the sensor-health and failsafe logic"
+     }
+    ]
+   },
+   "unknowns": [
+    "Battery voltage and current are not logged, so the cutoff cause cannot be separated.",
+    "Whether the throttle cut was commanded or a motor/ESC dropout is not visible.",
+    "What the ch[0], ch[6] and ch[7] channels drive is unknown."
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Propulsion motor / ESC ch[2]",
+     "claim": "The ch[2] propulsion motor or ESC output cut out intermittently.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Only ch[2] and throttle step to minimum, twice, with a sharp onset and no other channel affected.",
+     "basis": "indirect",
+     "lines": [
+      3,
+      120
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Power / failsafe logic",
+     "claim": "A low-voltage or sensor-health failsafe commanded throttle to zero.",
+     "status": "open",
+     "role": "trigger",
+     "because": "Both warnings were logged at t=0.9s, just before the first cutoff, but the data does not show a link."
+    },
+    {
+     "id": "h3",
+     "area": "Control surfaces / actuators",
+     "claim": "A control-surface fault caused the attitude problems.",
+     "status": "weakened",
+     "role": "effect",
+     "because": "Surface outputs track the setpoints and respond to the throttle loss, so they look like a consequence.",
+     "basis": "indirect"
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      2,
+      3
+     ],
+     "what": "Low voltage warning and sensor health error",
+     "class": "anomaly",
+     "why": "Logged about 1s before the first throttle cutoff."
+    },
+    {
+     "lines": [
+      3,
+      10
+     ],
+     "what": "First throttle cutoff to 0%, ch[2]=1100us",
+     "class": "root_cause_candidate",
+     "why": "Sharp step in the propulsion output only."
+    },
+    {
+     "lines": [
+      120,
+      132
+     ],
+     "what": "Second throttle cutoff, airspeed and altitude decay",
+     "class": "root_cause_candidate",
+     "why": "Sustained to the end of the log."
+    },
+    {
+     "lines": [
+      128,
+      132
+     ],
+     "what": "Large ch[1] and ch[4]/ch[5] deflections",
+     "class": "effect",
+     "why": "Control response to falling airspeed."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 15099,
+   "output_tokens": 3092
+  },
+  "seconds": 23.5
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 117.172,
+    "value": 1
+   }
+  },
+  "onset_s": 117.172
+ }
+}

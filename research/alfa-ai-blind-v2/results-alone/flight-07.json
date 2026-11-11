@@ -1,0 +1,190 @@
+{
+ "arm": "alone",
+ "alias": "flight-07",
+ "folder": "carbonZ_2018-07-30-16-29-45_engine_failure_with_emr_traj",
+ "input_sha256": "ec334a3ccb8e50410a2d6fb5a6c9bb0c34a53187ab9fe6fb245180fb536043ea",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 22.8
+  }
+ ],
+ "prompt_chars": 18182,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle cut to 0% at t=123s; motor output ch[2] followed to 1100us, attitude control stayed normal.",
+   "status": "cause_unknown",
+   "explanation": "Propulsion went to zero for about 19 s while attitude tracked its setpoints. The cut looks commanded (possible low-battery or landing logic), not an actuator or control-loop fault. The data cannot show why it was commanded.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 125,
+     "quote": "123,...,1.38e+03,...,0,16,51.2 (throttle 0 from t=123)",
+     "shows": "Throttle drops from 34% to 0% in one second and stays at 0 until t=141, while altitude falls from about 51 m to 5.9 m.",
+     "calls": []
+    },
+    {
+     "line": 126,
+     "quote": "124,...,1.1e+03,...",
+     "shows": "ch[2] drops to 1100us and stays pinned there from t=124 to t=141. It matches the zero throttle, so it is the motor channel and is following its command.",
+     "calls": []
+    },
+    {
+     "line": 144,
+     "quote": "142,...,1.56e+03,...,57,14.3,3.59",
+     "shows": "Throttle returns at 57% and ch[2] goes to 1560us at about 3.6 m altitude, so the motor responds again.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "t=0.4 s Battery: WARN: Low voltage; System: ERROR: Sensor helth",
+     "shows": "Low-voltage and sensor-health messages appear only at the start. They are not tied to the t=123 event.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Attitude and roll tracking against setpoints through the flight, including t=124-141",
+     "result": "Pitch and roll follow their setpoints. Surface channels ch[1], ch[3], ch[4] and ch[5] stay near 1500us and respond normally. Airspeed stays about 14-17 m/s.",
+     "verdict": "weakens",
+     "about": "h2",
+     "calls": []
+    },
+    {
+     "check": "Motor channel ch[2] against throttle",
+     "result": "ch[2] drops to 1100us exactly when throttle drops to 0%, and recovers when throttle returns. No mismatch.",
+     "verdict": "weakens",
+     "about": "h1",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 126,
+     "quote": "altitude 50.9 -> 3.59 m, pitch about -10 deg",
+     "why": "The glide descent follows the loss of thrust."
+    },
+    {
+     "line": 144,
+     "quote": "ch[2] 1.56e+03, throttle 57",
+     "why": "Throttle is applied again near the ground, which looks like a recovery or go-around response."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the flight mode and failsafe logs around t=120-142",
+    "why": "Settles whether the throttle cut was a commanded failsafe or landing step, or an unexpected propulsion or ESC fault.",
+    "how": [
+     "Read the mode and failsafe state transitions at t=123",
+     "Check battery voltage and current before and after t=123",
+     "Check ESC and motor telemetry on ch[2]"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Mode change or failsafe at t=123",
+      "means": "The cut was commanded and there is no hardware fault.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     },
+     {
+      "label": "No command, ESC or motor error logged",
+      "means": "A propulsion or ESC fault or a throttle-path glitch is likely.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Flight mode and mission state at t=123",
+    "Battery voltage and current over the flight",
+    "Why the sensor-health error was raised at t=0.4"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Propulsion/ESC or throttle path",
+     "claim": "An unexpected throttle or motor cut occurred at t=123s.",
+     "status": "open",
+     "because": "A sudden 34% to 0% step is abrupt, but the motor output followed the command and no fault event was logged."
+    },
+    {
+     "id": "h2",
+     "area": "Commanded throttle cut",
+     "claim": "The flight controller deliberately cut throttle (low battery failsafe or landing logic) at t=123s.",
+     "status": "leading",
+     "because": "Attitude control stayed healthy, the output matched the command, and throttle was restored at t=142."
+    },
+    {
+     "id": "h3",
+     "area": "Attitude control loop",
+     "claim": "A fault in the attitude control loop.",
+     "status": "weakened",
+     "because": "Pitch and roll track their setpoints throughout, so there is no sign of a loop fault."
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      123,
+      124
+     ],
+     "what": "Throttle to 0%, ch[2] pinned at 1100us",
+     "class": "anomaly",
+     "why": "This is the only abrupt change in the flight, and it is followed by a 19 s unpowered descent."
+    },
+    {
+     "lines": [
+      1,
+      2
+     ],
+     "what": "Low voltage warning and sensor health error at t=0.4",
+     "class": "anomaly",
+     "why": "The messages are early in the flight and are not tied to any later signal change."
+    },
+    {
+     "lines": [
+      144
+     ],
+     "what": "Throttle 57% at t=142",
+     "class": "effect",
+     "why": "The motor is re-commanded near the ground."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 15334,
+   "output_tokens": 2858
+  },
+  "seconds": 22.8
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 123.149,
+    "value": 1
+   }
+  },
+  "onset_s": 123.149
+ }
+}

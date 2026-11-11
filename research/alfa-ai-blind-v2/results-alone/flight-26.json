@@ -1,0 +1,233 @@
+{
+ "arm": "alone",
+ "alias": "flight-26",
+ "folder": "carbonZ_2018-09-11-15-06-34_3_rudder_left_failure",
+ "input_sha256": "faa271193b435e4162ae8caf6898c1398fd8f947b6042fc2a10e6605195918bc",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 23.0
+  }
+ ],
+ "prompt_chars": 9596,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Actuator output ch[3] dropped to 1100 us at t=61 s and stayed there; the other channels compensated.",
+   "status": "cause_probable",
+   "explanation": "Actuator channel 3 went from about 1500 us to a constant 1100 us at t=61 s and held until t=69 s. Roll and pitch were upset, and ch1, ch2, ch4, ch5 and throttle compensated. Whether the servo, its output driver or the controller caused it cannot be separated.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 62,
+     "quote": "61,1.5e+03,1.54e+03,1.5e+03,1.1e+03,1.58e+03,1.58e+03,...",
+     "shows": "ch[3] stepped from about 1500 to 1100 us in one second, and ch[2] fell from 1560 to 1500 us at the same time.",
+     "calls": []
+    },
+    {
+     "line": 63,
+     "quote": "62,...,1.1e+03,...,7.36,44.5,...,-6.54,27.4",
+     "shows": "ch[3] stayed at 1100 us while pitch oscillated from +10.7 to -6.5 deg and roll sat 17 deg below its 44.5 deg setpoint.",
+     "calls": []
+    },
+    {
+     "line": 64,
+     "quote": "63,1.5e+03,1.42e+03,1.69e+03,1.1e+03,1.6e+03,1.6e+03,...,74",
+     "shows": "ch[1] dropped to 1420, ch[2] rose to 1690, ch[4] and ch[5] rose to 1600, and throttle went to 74-75%. The controller was compensating for the lost ch[3] authority.",
+     "calls": []
+    },
+    {
+     "line": 70,
+     "quote": "69,...,1.1e+03,...,64,0,44,12,35.3",
+     "shows": "ch[3] was still at 1100 us at t=69 s, nine samples in a row, while roll stayed at 35-37 deg against a 44 deg setpoint.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Scanned all eight output channels for a step change or a stuck value over the flight",
+     "result": "Only ch[3] changed abruptly (t=61 s) and then stayed constant at 1100 us. Before t=61 s it stayed near 1500 us. ch[0], ch[6] and ch[7] never moved.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Compared attitude and altitude before and after t=61 s",
+     "result": "Roll fell from about 44 to about 27 deg, pitch swung between -7.4 and +14.7 deg, and altitude fell from 44 to 36 m before recovering to 44 m by t=69 s.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Checked the two logged events at t=0.7 s against the t=61 s change",
+     "result": "The low-voltage warning and sensor-health error were logged at 0.7 s, and flight was normal for the next 60 s. Nothing was logged at t=61 s.",
+     "verdict": "weakens",
+     "about": "h2",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 63,
+     "quote": "62,...,1.46e+03,...,-6.54",
+     "shows": "The pitch and roll upset follows the ch[3] step.",
+     "why": "It is the aircraft responding to the loss of ch[3] authority."
+    },
+    {
+     "line": 64,
+     "quote": "63,...,16.5,44.7,...,74",
+     "why": "The pitch setpoint jump to about 17 deg and throttle rise to 75% are the controller reacting to the loss of altitude and attitude."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the ch[3] servo, linkage and output wiring; bench-test the ch[3] output",
+    "why": "Separates a physical or electrical actuator failure from a commanded or driver output fault, which the logged us values cannot do.",
+    "how": [
+     "Command ch[3] across its range on the bench and watch for response",
+     "Check linkage, connector and servo power on ch[3]",
+     "Review the raw controller output and servo feedback logs around t=61 s"
+    ],
+    "where": "on_site",
+    "conditions": "Bench test, vehicle disarmed and secured, propellers off; repeat at the flight's roughly 45% roll attitude demand if possible.",
+    "baseline": "The same channel before t=61 s in this log, where ch[3] followed demand near 1500 us, or a healthy sister channel.",
+    "record": [
+     "actuator.output[ch[3]]",
+     "control.attitude_setpoint[roll]",
+     "vehicle.attitude[roll]"
+    ],
+    "needs_approval": true,
+    "outcomes": [
+     {
+      "label": "Servo does not move or jams",
+      "means": "A physical actuator or linkage failure on ch[3] is the likely cause.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h3"
+      ],
+      "then": "Replace the servo or linkage and retest"
+     },
+     {
+      "label": "Servo follows commands normally on the bench",
+      "means": "The fault is in the controller output path or its commanded value, not the servo.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Review controller output limits and mixer logic"
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether the servo physically failed or the controller commanded 1100 us.",
+    "Where ch[3] is on the airframe, since the data does not map channels to surfaces."
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Actuator ch[3] or its output",
+     "claim": "Output ch[3] failed or was forced to 1100 us from t=61 s, and the controller compensated.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "It is the only channel to step abruptly and then stay constant, and the attitude upset follows it by one second.",
+     "basis": "indirect",
+     "lines": [
+      62,
+      63,
+      64
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Power or sensor health",
+     "claim": "The low-voltage and sensor-health events at 0.7 s are related to the t=61 s change.",
+     "status": "weakened",
+     "role": "trigger",
+     "because": "Flight was normal for 60 s after those events, and nothing was logged at t=61 s.",
+     "basis": "indirect",
+     "lines": [
+      62
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Controller output or mixer",
+     "claim": "The controller or mixer commanded ch[3] to 1100 us, for example by saturation or a limit.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "The signal is commanded output only, so a commanded value cannot be separated from a physical fault.",
+     "basis": "indirect",
+     "lines": [
+      62,
+      63
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      62
+     ],
+     "what": "ch[3] output stepped to 1100 us and held",
+     "class": "root_cause_candidate",
+     "why": "Abrupt, sustained change on one channel, with no matching command change in the setpoints."
+    },
+    {
+     "lines": [
+      63,
+      64
+     ],
+     "what": "Pitch and roll upset, and altitude loss of about 8 m",
+     "class": "effect",
+     "why": "This follows the ch[3] step."
+    },
+    {
+     "lines": [
+      64,
+      65
+     ],
+     "what": "Compensating outputs on ch[1], ch[2], ch[4], ch[5] and throttle to 75%",
+     "class": "effect",
+     "why": "The controller reacted to the lost authority."
+    },
+    {
+     "lines": [
+      2
+     ],
+     "what": "Low voltage warning and sensor-health error at 0.7 s",
+     "class": "anomaly",
+     "why": "Logged early and not followed by any change until t=61 s."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 8840,
+   "output_tokens": 3003
+  },
+  "seconds": 23.0
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/rudder"
+  ],
+  "nonzero": {
+   "/failure_status/rudder": {
+    "first_nonzero_s": 60.115,
+    "value": 2
+   }
+  },
+  "onset_s": 60.115
+ }
+}

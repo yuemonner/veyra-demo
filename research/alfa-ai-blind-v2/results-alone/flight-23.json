@@ -1,0 +1,225 @@
+{
+ "arm": "alone",
+ "alias": "flight-23",
+ "folder": "carbonZ_2018-09-11-15-05-11_2_no_failure",
+ "input_sha256": "3ea428a49cd70f0fe54705b040181b4e72b4e15df8e84ae7a275b435fb52193b",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 25.2
+  }
+ ],
+ "prompt_chars": 9165,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Pitch control lost authority from about t=58 s: ch1 and ch2 saturated, ch7 jumped, aircraft sank.",
+   "status": "cause_probable",
+   "explanation": "Pitch demand of 17.5 deg was not achieved, with throttle at 75% and ch2 pinned at 1700 us. This points to lost pitch authority on the ch1/ch2 pair, with ch7 engaged at t=60. The data cannot separate an actuator fault from an aerodynamic limit.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 62,
+     "quote": "60,...,1.3e+03,1.7e+03,...,1.1e+03->1.51e+03,17.5,...,75,0,43.4,0.0593",
+     "shows": "ch2 pinned at 1700 us and ch1 falling. Pitch setpoint is 17.5 deg but pitch is about 0 deg. Throttle is 75%. ch7 steps from 1100 to 1510 us.",
+     "calls": []
+    },
+    {
+     "line": 63,
+     "quote": "61,...,1.25e+03,1.7e+03,...,1.93e+03,17.5,...,75,0,41.2,-6.36",
+     "shows": "ch7 jumps to 1930 us and stays there. Altitude keeps falling and the pitch error persists.",
+     "calls": []
+    },
+    {
+     "line": 69,
+     "quote": "67,...,1.16e+03,1.7e+03,...,17.4,...,75,0,31,4.29",
+     "shows": "Altitude has fallen from 44.6 m at t=59 to 31 m at t=67. Pitch is 4 deg against a 17.4 deg setpoint with maximum throttle.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "mavros: System: ERROR: Sensor helth",
+     "shows": "A sensor-health error is logged at t=0.1 s. Airspeed and yaw rate read exactly 0 for the whole flight, so those channels are dead or unreliable.",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "next_action": {
+    "action": "Inspect ch1, ch2 and ch7 actuators, linkages and servos on site",
+    "why": "Settles whether the saturation and the ch7 step come from a mechanical or actuator fault or from a controller or mixer response.",
+    "how": [
+     "Bench-test ch1, ch2 and ch7 travel and response against commanded PWM",
+     "Check linkages and servo current",
+     "Review the full-rate log around t=55-67"
+    ],
+    "where": "on_site",
+    "conditions": "Props off, powered on the ground, with commanded pitch inputs similar to t=55-67.",
+    "baseline": "Compare with ch1/ch2 behaviour at t=10-35 in this log, where outputs stay between about 1.45e3 and 1.54e3 us.",
+    "record": [
+     "actuator.output[ch[1]]",
+     "actuator.output[ch[2]]",
+     "actuator.output[ch[7]]",
+     "vehicle.attitude[pitch]",
+     "control.attitude_setpoint[pitch]"
+    ],
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "ch1/ch2 or linkage faulty",
+      "means": "Actuator or linkage fault caused the pitch authority loss.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Replace the part and re-fly"
+     },
+     {
+      "label": "Actuators respond normally",
+      "means": "The cause is a controller or mixer limit, or an aerodynamic limit, not a hardware fault.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h1"
+      ],
+      "then": "Review the mixer and controller limits"
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether ch7 is a motor or a control surface, so its step at t=60-61 cannot be classified",
+    "Whether the ch1/ch2 saturation is a cause or a response to a stuck surface",
+    "Whether the airspeed and yaw-rate readings are sensor faults or unlogged channels"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Pitch actuators ch1/ch2",
+     "claim": "Pitch-axis actuators ch1/ch2 lost effectiveness, so the controller saturated them and the aircraft could not hold altitude.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "ch2 is pinned at 1700 us and ch1 is driven low while pitch ignores a 17.5 deg setpoint and altitude falls.",
+     "basis": "indirect",
+     "lines": [
+      61,
+      62,
+      63,
+      69
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Controller or aerodynamic limit",
+     "claim": "The commanded pitch and thrust demand exceeded what the aircraft could deliver, with no hardware failure.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "Sustained 17.5 deg setpoint with 75% throttle could be an overdemand. Airspeed reads 0 throughout, so the controller state is uncertain.",
+     "basis": "indirect",
+     "lines": [
+      59,
+      67
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Sensors (health error)",
+     "claim": "Failed airspeed and yaw-rate sensing degraded control, as the sensor-health error at t=0.1 s suggests.",
+     "status": "open",
+     "role": "amplifier",
+     "because": "Airspeed and yaw rate are constantly 0, but the flight was controlled normally for about 55 s.",
+     "basis": "indirect",
+     "lines": [
+      2
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      2
+     ],
+     "what": "Sensor health ERROR at start of log",
+     "class": "anomaly",
+     "why": "Matches airspeed and yaw rate stuck at 0 for the whole flight."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Battery low voltage warning at t=0.1 s",
+     "class": "anomaly",
+     "why": "Throttle was commanded to 75% later without a recorded voltage trend, so its effect is unclear."
+    },
+    {
+     "lines": [
+      62,
+      63
+     ],
+     "what": "ch7 steps 1100 to 1510 to 1930 us at t=60-61",
+     "class": "root_cause_candidate",
+     "why": "Abrupt, sustained output change on a channel that was constant until then."
+    },
+    {
+     "lines": [
+      60,
+      61,
+      62,
+      63
+     ],
+     "what": "ch2 reaches 1700 us and stays pinned",
+     "class": "root_cause_candidate",
+     "why": "Output saturation while the pitch demand stays unmet."
+    },
+    {
+     "lines": [
+      63,
+      69
+     ],
+     "what": "Altitude loss from 44.6 m to 31 m",
+     "class": "effect",
+     "why": "Consequence of lost pitch authority while throttle is at maximum."
+    }
+   ],
+   "already_answered": [
+    {
+     "question": "Did a control fault occur, and when?",
+     "answer": "Yes. Saturation and loss of pitch authority begin around t=57-60 s and persist to the end of the log.",
+     "line": 62,
+     "quote": "60,...,1.7e+03,...,17.5,...,75",
+     "calls": []
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "Physical condition and actual deflection of the ch1, ch2 and ch7 actuators",
+     "why_it_matters": "h1 versus h2 depends on whether the actuators really moved as commanded.",
+     "how_to_observe": "Bench-test servo travel and linkage on the ground."
+    }
+   ],
+   "lesson": "",
+   "reuse_when": ""
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 8490,
+   "output_tokens": 3246
+  },
+  "seconds": 25.2
+ },
+ "labels": {
+  "present_topics": [],
+  "nonzero": {},
+  "onset_s": null
+ }
+}

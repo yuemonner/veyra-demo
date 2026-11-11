@@ -1,0 +1,219 @@
+{
+ "arm": "alone",
+ "alias": "flight-03",
+ "folder": "carbonZ_2018-07-18-15-53-31_2_engine_failure",
+ "input_sha256": "108708e4d844f483b82089f6635522f21e34e207d3064ce47b20a4b10b1304a7",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 23.3
+  }
+ ],
+ "prompt_chars": 12152,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle/motor output ch[2] dropped to minimum at 74 s and stayed there; aircraft slowed and lost altitude.",
+   "status": "cause_unknown",
+   "explanation": "Propulsion output ch[2] went to 1100 us with throttle 0% from t=74 to the end, with no logged event. The data cannot separate a commanded cut (failsafe, low battery) from a motor or ESC fault.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 74,
+     "quote": "74: ch[2]=1.1e+03, propulsion.throttle=0",
+     "shows": "The throttle channel went to its minimum and throttle to 0% in one step. It stayed there for every row until t=88.",
+     "calls": []
+    },
+    {
+     "line": 88,
+     "quote": "88: airspeed 9.92, altitude 31.8, pitch setpoint 17.4",
+     "shows": "With no thrust, airspeed fell from about 15.5 to 9.9 m/s and altitude from 51 to 32 m. The pitch setpoint rose to 17 deg and could not restore speed.",
+     "calls": []
+    },
+    {
+     "line": 0,
+     "quote": "t=0.9 mavros: Battery: WARN: Low voltage",
+     "shows": "The only logged event is a low-voltage warning at 0.9 s. Throttle dipped to 0-5% over t=2-5 and recovered, so a battery link is possible but not shown for t=74.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared each actuator channel against throttle across the flight",
+     "result": "ch[2] tracks throttle. It is at 1100 us whenever throttle is about 0%, and sits near 1400-1500 us in normal flight. ch[0], ch[6] and ch[7] are constant. ch[1], ch[3], ch[4] and ch[5] move with the attitude setpoints.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Looked for a precursor or event near t=74",
+     "result": "No event is logged at 74 s, and attitude, setpoints and airspeed were normal just before. The cut was abrupt.",
+     "verdict": "inconclusive",
+     "about": "h2",
+     "calls": []
+    },
+    {
+     "check": "Checked the attitude control surfaces",
+     "result": "The surfaces respond to the setpoints through t=88. Late in the run ch[1] goes to 1200 us as roll and pitch setpoints are tracked, which is consistent with control effort, not a surface fault.",
+     "verdict": "weakens",
+     "about": "h3",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 88,
+     "quote": "airspeed 9.92, altitude 31.8",
+     "why": "Airspeed and altitude decay is a consequence of lost thrust."
+    },
+    {
+     "line": 86,
+     "quote": "ch[1]=1.26e+03 with pitch setpoint 17.4",
+     "why": "Large pitch-up commands and extra surface effort follow from the controller trying to hold energy without thrust."
+    }
+   ],
+   "next_action": {
+    "action": "Pull the full log around t=70-90 for mode, failsafe and ESC data",
+    "why": "This will show whether the throttle cut was commanded (failsafe, mode change, low battery) or a motor or ESC loss.",
+    "how": [
+     "Read flight mode and failsafe flags at t=72-76",
+     "Read battery voltage and current across the flight",
+     "Read ESC and motor telemetry on the motor behind ch[2]"
+    ],
+    "where": "remote",
+    "baseline": "Throttle and ch[2] behaviour at t=10-60 of this flight",
+    "record": [
+     "propulsion.throttle",
+     "actuator.output[ch[2]]",
+     "vehicle.airspeed",
+     "vehicle.altitude[relative]"
+    ],
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "Failsafe or mode change at 74 s",
+      "means": "The throttle cut was commanded by the autopilot, not a hardware fault.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Review the failsafe trigger and battery thresholds"
+     },
+     {
+      "label": "No command change, ESC or motor fault flagged",
+      "means": "A propulsion hardware fault on the ch[2] motor.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Inspect the motor, ESC and wiring on the bench"
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether the autopilot commanded zero throttle or the motor or ESC stopped",
+    "Battery voltage trend, since the low-voltage warning at 0.9 s is the only log entry",
+    "Which physical motor ch[2] drives"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Propulsion motor/ESC ch[2]",
+     "claim": "Motor or ESC on output ch[2] failed or cut out at 74 s.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "The abrupt step to minimum output and 0% throttle with no setpoint-driven reason fits a propulsion cut, but nothing in the data observes the motor or ESC itself.",
+     "basis": "indirect",
+     "lines": [
+      74
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Autopilot throttle command",
+     "claim": "Autopilot commanded zero throttle through a failsafe or mode change, for example from battery state.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "A low-voltage warning was logged at 0.9 s, but no event is logged at 74 s, and mode and failsafe state are not in the data.",
+     "basis": "indirect",
+     "lines": [
+      0,
+      74
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Control surfaces",
+     "claim": "A control surface or its servo failed.",
+     "status": "weakened",
+     "role": "main_cause",
+     "because": "The surface channels follow the setpoints, and attitude tracks them through t=88.",
+     "basis": "indirect",
+     "lines": [
+      86,
+      88
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      0
+     ],
+     "what": "Low voltage warning",
+     "class": "anomaly",
+     "why": "The only logged event, 0.9 s into the flight, with a brief throttle dip over t=2-5."
+    },
+    {
+     "lines": [
+      74
+     ],
+     "what": "ch[2] to 1100 us and throttle to 0%, held to the end",
+     "class": "root_cause_candidate",
+     "why": "An abrupt, sustained propulsion cut with no logged cause."
+    },
+    {
+     "lines": [
+      76,
+      88
+     ],
+     "what": "Airspeed and altitude decay with pitch setpoint rising to 17 deg",
+     "class": "effect",
+     "why": "This follows from lost thrust."
+    }
+   ],
+   "lesson": "",
+   "reuse_when": ""
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 10865,
+   "output_tokens": 3017
+  },
+  "seconds": 23.3
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 73.411,
+    "value": 1
+   }
+  },
+  "onset_s": 73.411
+ }
+}
