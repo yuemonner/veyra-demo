@@ -1,0 +1,219 @@
+{
+ "arm": "alone",
+ "alias": "flight-41",
+ "folder": "carbonZ_2018-10-18-11-03-57_engine_failure_with_emr_traj",
+ "input_sha256": "caae58f15c10140c39a772c23ee90a93e4424e1af8fd2d6c79ebd5252807b7ab",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 21.3
+  }
+ ],
+ "prompt_chars": 15212,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Propulsion cut at 104 s: throttle and motor channel 2 dropped to minimum and stayed there while the aircraft descended.",
+   "status": "cause_unknown",
+   "explanation": "Throttle fell from 60% to 0% at 104 s and actuator ch[2], the motor channel, went from 1640 to 1100 us. The data cannot separate a commanded cut, a battery or power failure, or a motor/ESC fault.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 105,
+     "quote": "t=104: throttle 0, ch[2]=1.64e+03; t=105: ch[2]=1.1e+03",
+     "shows": "Abrupt step to minimum on the motor channel when throttle went to 0, with no ramp and no logged event.",
+     "calls": []
+    },
+    {
+     "line": 106,
+     "quote": "t=108: altitude 39 m, pitch -21.8; t=116: altitude 6.2 m",
+     "shows": "Sustained descent from about 48 m to 6 m with ch[2] pinned at 1100 us and throttle at 0%, with no recovery.",
+     "calls": []
+    },
+    {
+     "line": 1,
+     "quote": "t=0.7 WARN: Low voltage; ERROR: Sensor helth",
+     "shows": "A low-voltage warning and a sensor health error at the start of the flight. Possible links to the later cut and the zero airspeed, but the data does not show a link.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared each actuator channel against throttle and its own baseline over the whole flight",
+     "result": "Only ch[2] follows throttle and only ch[2] steps to its floor, at 105 s. ch[7] is fixed at 1100 us for the whole flight and ch[0] and ch[6] are fixed at 1500 us. ch[1], ch[3], ch[4] and ch[5] stay near 1500 us with small variation.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Looked for attitude or control saturation before 104 s",
+     "result": "Roll setpoint repeatedly saturates near 43.9 deg, and the aircraft tracks it with a few seconds' lag. That looks like normal manoeuvring.",
+     "verdict": "weakens",
+     "about": "h3",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 107,
+     "quote": "pitch -17 to -22 deg, altitude falling",
+     "why": "Nose-down attitude and altitude loss follow the loss of thrust."
+    },
+    {
+     "line": 106,
+     "quote": "t=105-107: pitch setpoint -3 to -25 deg",
+     "why": "The controller pitched down after the cut, probably to keep airspeed up or because it had no thrust. It looks like a reaction, not a cause."
+    }
+   ],
+   "next_action": {
+    "action": "Pull the full-rate log and power data around 100-106 s",
+    "why": "Settles whether the throttle cut was commanded or a power or motor fault, using battery voltage and current, ESC status and flight-mode changes.",
+    "how": [
+     "Check battery voltage and current around 104 s",
+     "Check ESC/motor telemetry for channel 2",
+     "Check mode changes and failsafe flags"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Voltage collapse before the cut",
+      "means": "Battery or power supply fault, consistent with the low-voltage warning",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Inspect the battery and power distribution"
+     },
+     {
+      "label": "Mode change or failsafe at 104 s",
+      "means": "The throttle cut was commanded, not a hardware fault",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Review the failsafe and mode logic"
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether the throttle cut was commanded or a fault",
+    "Battery voltage and current profile",
+    "Why airspeed reads 0 for the whole flight"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Motor/ESC on channel 2",
+     "claim": "Motor or ESC on channel 2 lost output at 104-105 s.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "Channel 2 stepped abruptly to its floor and stayed there.",
+     "basis": "indirect",
+     "lines": [
+      105,
+      106
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Battery or power supply",
+     "claim": "Power loss or a battery cutoff ended propulsion, consistent with the low-voltage warning at 0.7 s.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "A low-voltage warning was logged, but there is no voltage signal to confirm it.",
+     "basis": "indirect",
+     "lines": [
+      1,
+      105
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Commanded throttle cut or failsafe",
+     "claim": "A mode or failsafe change commanded throttle to 0.",
+     "status": "open",
+     "role": "trigger",
+     "because": "The throttle drop is abrupt and no event was logged, so a commanded cut cannot be excluded.",
+     "basis": "indirect",
+     "lines": [
+      105
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low voltage warning at 0.7 s",
+     "class": "anomaly",
+     "why": "Possible link to the later propulsion loss, but no voltage data to confirm."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Sensor health error at 0.7 s",
+     "class": "anomaly",
+     "why": "Airspeed reads 0 for the whole flight, which is consistent with a failed or absent airspeed sensor."
+    },
+    {
+     "lines": [
+      105
+     ],
+     "what": "Throttle to 0% and ch[2] to 1100 us at 104-105 s",
+     "class": "root_cause_candidate",
+     "why": "The only abrupt actuator change in the flight and it has no logged event."
+    },
+    {
+     "lines": [
+      106,
+      116
+     ],
+     "what": "Descent from 48 m to 6 m with nose down",
+     "class": "effect",
+     "why": "Follows the loss of thrust."
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "Battery voltage and current",
+     "why_it_matters": "Separates a battery or power fault from a motor fault",
+     "how_to_observe": "Read the power system log or battery telemetry around 100-106 s"
+    }
+   ],
+   "lesson": "",
+   "reuse_when": ""
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 13301,
+   "output_tokens": 2760
+  },
+  "seconds": 21.3
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 104.246,
+    "value": 1
+   }
+  },
+  "onset_s": 104.246
+ }
+}

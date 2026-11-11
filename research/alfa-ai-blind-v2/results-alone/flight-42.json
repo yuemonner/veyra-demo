@@ -1,0 +1,191 @@
+{
+ "arm": "alone",
+ "alias": "flight-42",
+ "folder": "carbonZ_2018-10-18-11-04-00_engine_failure_with_emr_traj",
+ "input_sha256": "dbd4d8549f651629b3464e4a35b5b716b583680800c199d1682e75371604a5bc",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.0
+  }
+ ],
+ "prompt_chars": 15917,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle dropped to 0 at 111 s; output ch[2] pinned at 1100 us from 112 s, ch[1] from 121 s, altitude falling.",
+   "status": "cause_probable",
+   "explanation": "Throttle fell to zero at t=111 and stayed there. Output ch[2] then saturated at its minimum, followed by ch[1], while the pitch setpoint froze at 18.6 deg and the aircraft lost about 27 m of altitude. The exact fault is not separable from this data.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 112,
+     "quote": "111,...,1.33e+03,...,0,0,49.1",
+     "shows": "Throttle goes from 44% to 0% at 111 s and stays at 0 to the end, while ch[2] is dropping from 1.45e3 to 1.33e3.",
+     "calls": []
+    },
+    {
+     "line": 113,
+     "quote": "112,...,1.1e+03,...,0,0,48.3",
+     "shows": "ch[2] is pinned at its 1100 us minimum from 112 s to the end of the log.",
+     "calls": []
+    },
+    {
+     "line": 122,
+     "quote": "121,1.5e+03,1.1e+03,1.1e+03,...,18.6,3.03",
+     "shows": "ch[1] also reaches 1100 us at 121 s. The pitch setpoint is stuck at 18.6 deg from 119 s while measured pitch is near 0 to -2 deg.",
+     "calls": []
+    },
+    {
+     "line": 124,
+     "quote": "122,...,22.4,-1.78",
+     "shows": "Altitude falls from about 49 m at 111 s to 22 m at 122 s and is still dropping, so the aircraft is not recovering.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Scanned all actuator outputs for saturation or divergence",
+     "result": "ch[2] sits at 1100 us from 112 s and ch[1] from 121 s. ch[0], ch[6] constant. ch[3] and ch[4]/ch[5] stay in normal range, with ch[4] and ch[5] identical throughout.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Checked tracking of attitude against setpoint",
+     "result": "Roll and pitch tracked well before 111 s. After 118 s the pitch setpoint is flat at 18.6 deg while measured pitch stays below about 6 deg.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Checked airspeed and the events",
+     "result": "Airspeed is 0 for the entire flight, a sensor-health error and a low-voltage warning are logged at 0.9 s, and ch[7] is flat at 1100 us for the whole log.",
+     "verdict": "inconclusive",
+     "about": "h2",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 122,
+     "quote": "121,...,22.4",
+     "shows": "Altitude loss follows the loss of throttle and the saturated actuators.",
+     "why": "Consequence of the lost propulsion and saturated outputs."
+    }
+   ],
+   "next_action": {
+    "action": "Pull raw flight log around 105-122 s and inspect output ch[2] and the throttle path",
+    "why": "Settles whether the throttle cut was a commanded failsafe, a battery cutoff or a motor/ESC fault on ch[2].",
+    "how": [
+     "Compare throttle command with motor/ESC feedback",
+     "Review battery voltage and current near 111 s",
+     "Inspect the ch[2] servo or motor, wiring and ESC"
+    ],
+    "where": "lab",
+    "outcomes": [
+     {
+      "label": "Battery sag or cutoff at 111 s",
+      "means": "The low-voltage warning was genuine and caused the throttle cut.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": []
+     },
+     {
+      "label": "Commanded failsafe or mixer limit",
+      "means": "The controller reduced throttle, and the ch[2] saturation is a control or allocation fault.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": []
+     }
+    ]
+   },
+   "unknowns": [
+    "What the ch[2] and ch[1] channels physically drive",
+    "Why throttle went to 0 at 111 s",
+    "Battery voltage is not in the data"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Output ch[2], then ch[1]",
+     "claim": "A control or actuator fault around the ch[2] channel and throttle cut caused saturation and descent.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Throttle zeroes at 111 s, ch[2] pegs at minimum next, and attitude no longer tracks the setpoint.",
+     "basis": "indirect",
+     "lines": [
+      112,
+      113,
+      122
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Power / battery",
+     "claim": "Low battery caused throttle loss and output saturation.",
+     "status": "open",
+     "role": "trigger",
+     "because": "A low-voltage warning is logged at 0.9 s, but no voltage signal exists to confirm it at 111 s.",
+     "basis": "indirect",
+     "lines": []
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low voltage warning and sensor health error at 0.9 s",
+     "class": "anomaly",
+     "why": "Could be related to the later throttle cut, but no direct link in the data."
+    },
+    {
+     "lines": [
+      112,
+      113
+     ],
+     "what": "Throttle to 0 at 111 s; ch[2] to 1100 us from 112 s",
+     "class": "root_cause_candidate",
+     "why": "First control anomaly in the flight."
+    },
+    {
+     "lines": [
+      122
+     ],
+     "what": "ch[1] pegged at 1100 us at 121 s",
+     "class": "effect",
+     "why": "Follows the ch[2] saturation as the controller tries to recover."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 13891,
+   "output_tokens": 2608
+  },
+  "seconds": 20.0
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 111.165,
+    "value": 1
+   }
+  },
+  "onset_s": 111.165
+ }
+}

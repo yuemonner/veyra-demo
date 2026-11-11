@@ -1,0 +1,213 @@
+{
+ "arm": "alone",
+ "alias": "flight-29",
+ "folder": "carbonZ_2018-09-11-17-55-30_1_right_aileron_failure",
+ "input_sha256": "f8324144fc23bdda9d539fc240748bc33a7178cf098936a2579fc240a2fb4ec2",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.5
+  }
+ ],
+ "prompt_chars": 17639,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Actuator output ch[5] froze at 1500 us from t=112 s while its twin ch[4] kept moving.",
+   "status": "cause_probable",
+   "explanation": "Output channel 5 stopped following the controller at t=112 s and sits at neutral. Until then it matched ch[4] exactly. The cause is in the output or mixer path or the ch[5] actuator link, not the attitude loop. The data cannot separate those.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 111,
+     "quote": "t=111: ch4=1.5e+03, ch5=1.5e+03; t=112: ch4=1.52e+03, ch5=1.5e+03",
+     "shows": "ch[4] and ch[5] were identical in every sample from t=0 to t=111. At t=112 ch[5] holds at 1500 us and ch[4] moves.",
+     "calls": []
+    },
+    {
+     "line": 133,
+     "quote": "t=133: ch4=1.56e+03, ch5=1.5e+03",
+     "shows": "ch[5] stays at 1500 us through the end of the log (t=133 s) while ch[4] swings 1390-1570 us with the roll and throttle demands.",
+     "calls": []
+    },
+    {
+     "line": 129,
+     "quote": "t=129: ch4=1.39e+03, ch5=1.5e+03",
+     "shows": "The ch[4] command reaches 1390 us. This is a value ch[5] would have received before t=112.",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "effects": [
+    {
+     "line": 128,
+     "quote": "roll sp 5.42 -> att roll 30.2 at t=128",
+     "shows": "Roll lags the setpoint more after the freeze, with 30 deg still held at t=128 against a 5 deg demand. This fits lost control authority but is not conclusive.",
+     "why": "Consequence of one of the paired outputs no longer following the controller."
+    },
+    {
+     "line": 0,
+     "quote": "t=0.2 Battery WARN Low voltage; System ERROR Sensor helth",
+     "shows": "Both events are logged at the start, 112 s before the output freeze. They are not tied to the freeze.",
+     "why": "Early warnings, not the cause of the t=112 anomaly."
+    }
+   ],
+   "next_action": {
+    "action": "Bench-test output ch[5]: command sweeps and compare against ch[4].",
+    "why": "Settles whether the freeze is in the output or mixer path or in the ch[5] actuator or link.",
+    "how": [
+     "Replay the log's mixer inputs and check the commanded ch[5] against the logged ch[5]",
+     "Sweep ch[5] on the bench with props off",
+     "Inspect the ch[5] connector, wiring and servo or ESC"
+    ],
+    "where": "on_site",
+    "conditions": "Props off, disarmed bench test, same firmware and mixer configuration.",
+    "baseline": "ch[4] response to the same sweep, and ch[5] before t=112 in this log.",
+    "record": [
+     "actuator.output[ch[4]]",
+     "actuator.output[ch[5]]",
+     "vehicle.attitude[roll]",
+     "control.attitude_setpoint[roll]"
+    ],
+    "needs_approval": true,
+    "outcomes": [
+     {
+      "label": "Bench ch[5] follows the sweep",
+      "means": "Software or mixer path froze it in flight",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Inspect firmware output driver and failsafe logic"
+     },
+     {
+      "label": "Bench ch[5] stays stuck",
+      "means": "Output hardware or driver fault on ch[5]",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Replace the output channel or actuator"
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether ch[5] was commanded to 1500 us by the controller or was frozen downstream of it",
+    "What ch[5] drives, and whether it is used on this airframe"
+   ],
+   "already_answered": [
+    {
+     "question": "Did a control fault occur?",
+     "answer": "Yes. Output ch[5] stuck at 1500 us from t=112 s.",
+     "line": 112,
+     "quote": "ch5=1.5e+03 while ch4=1.52e+03",
+     "calls": []
+    },
+    {
+     "question": "Where on the aircraft?",
+     "answer": "Actuator output channel 5, the pair of ch[4].",
+     "line": 112,
+     "quote": "ch[4] still varying",
+     "calls": []
+    }
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Mixer or output software",
+     "claim": "The mixer or output stage stopped updating ch[5] at t=112 s.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "ch[5] is exactly flat while its mirror ch[4] moves. The data cannot show which stage froze it.",
+     "basis": "indirect",
+     "lines": [
+      112,
+      133
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Actuator 5 hardware or link",
+     "claim": "The ch[5] actuator, driver or wiring failed and the output reads neutral.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "A frozen output is also consistent with a lost-output hardware fault. The log records only the commanded us value.",
+     "basis": "indirect",
+     "lines": [
+      112
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Attitude controller",
+     "claim": "The attitude controller itself faulted.",
+     "status": "weakened",
+     "role": "effect",
+     "because": "ch[4] and the attitude loop keep responding after t=112. The anomaly is confined to ch[5].",
+     "basis": "indirect",
+     "lines": [
+      112,
+      133
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      112
+     ],
+     "what": "ch[5] output flat at 1500 us",
+     "class": "root_cause_candidate",
+     "why": "The twin channel ch[4] is identical before t=112 and moves afterwards."
+    },
+    {
+     "lines": [
+      0
+     ],
+     "what": "Low voltage warning and sensor health error",
+     "class": "anomaly",
+     "why": "Logged at 0.2 s with no later change in signals tied to them."
+    },
+    {
+     "lines": [
+      0,
+      133
+     ],
+     "what": "ch[7] constant at 1930 us, ch[0] and ch[6] constant at 1500 us",
+     "class": "routine",
+     "why": "Constant from t=0, so most likely unused or auxiliary channels."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 55793,
+   "cache_creation_input_tokens": 20855,
+   "output_tokens": 2592
+  },
+  "seconds": 20.5
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/aileron"
+  ],
+  "nonzero": {
+   "/failure_status/aileron": {
+    "first_nonzero_s": 111.922,
+    "value": 1
+   }
+  },
+  "onset_s": 111.922
+ }
+}

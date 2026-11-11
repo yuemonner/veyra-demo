@@ -1,0 +1,149 @@
+{
+ "arm": "alone",
+ "alias": "flight-33",
+ "folder": "carbonZ_2018-10-05-14-37-22_1_no_failure",
+ "input_sha256": "b3460208ca90c2dcaaf286298a13d41d9652caeec37844abcf62d191b081dd7c",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 18.3
+  }
+ ],
+ "prompt_chars": 9841,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No control fault found; aircraft tracked setpoints, only startup battery and sensor warnings logged at 0.2 s.",
+   "status": "no_failure_found",
+   "explanation": "Attitude follows setpoints with roll limited to about \u00b145 deg, altitude holds near 62-70 m, and outputs stay in range. Channels 0, 6 and 7 are constant, which looks like unused or parked outputs rather than a fault.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 0,
+     "quote": "t=0.2 s mavros: System: ERROR: Sensor helth",
+     "shows": "A sensor-health error at startup. It is not tied to any later control deviation.",
+     "calls": []
+    },
+    {
+     "line": 0,
+     "quote": "t=0.2 s mavros: Battery: WARN: Low voltage",
+     "shows": "A low-voltage warning at startup. Throttle later reaches 66% with no output collapse, so no power-related loss of control is visible.",
+     "calls": []
+    },
+    {
+     "line": 10,
+     "quote": "9,...,-45,74,57,0,64.6,0.466,-45.4",
+     "shows": "Roll attitude (-45.4 deg) follows the -45 deg roll setpoint, so the control loop is tracking.",
+     "calls": []
+    },
+    {
+     "line": 30,
+     "quote": "29,...,1.5e+03,1.1e+03 (ch0, ch6 = 1500, ch7 = 1100)",
+     "shows": "Channels 0, 6 and 7 never change over 73 s. They look unused, neutral or parked, and nothing shows them failing.",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "effects": [
+    {
+     "line": 2,
+     "quote": "1,...,-8.13,41.3,96",
+     "shows": "Roll setpoint swings from about -45 to +43 deg and the yaw setpoint ramps continuously. This looks like commanded manoeuvring, not a fault.",
+     "why": "Attitude follows these commands, so they are inputs rather than evidence of failure."
+    }
+   ],
+   "next_action": {
+    "action": "Confirm airspeed and yaw-rate sensor status and the channel 0/6/7 mapping",
+    "why": "Settles whether the flat airspeed, yaw-rate and constant channels are unused signals or a failed sensor.",
+    "how": [
+     "Check the channel mapping for outputs 0, 6 and 7",
+     "Review the pre-flight sensor-health log around t=0.2 s"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Channels unused; airspeed sensor absent",
+      "means": "The flat signals are expected and no fault is present.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     },
+     {
+      "label": "Mapped actuator or sensor stuck",
+      "means": "A real actuator or sensor fault exists but is invisible in the control response.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "The log is 1 Hz, so any transient faster than 1 s would not show.",
+    "Which sensor triggered the 'Sensor helth' error."
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Whole aircraft",
+     "claim": "No control fault; the constant channels are unused and the startup warnings are benign.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Setpoints are tracked and altitude is held throughout; the only anomalies are two warnings at t=0.2 s.",
+     "basis": "indirect"
+    },
+    {
+     "id": "h2",
+     "area": "Sensor or output channels 0, 6, 7",
+     "claim": "A sensor or actuator channel is stuck, or airspeed and yaw rate are not being reported.",
+     "status": "open",
+     "role": "trigger",
+     "because": "Airspeed and yaw rate read exactly 0, and channels 0, 6 and 7 are constant. The sensor-health error is consistent with this.",
+     "basis": "indirect"
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      0
+     ],
+     "what": "Low voltage warning at 0.2 s",
+     "class": "anomaly",
+     "why": "A startup warning with no visible effect on actuator outputs."
+    },
+    {
+     "lines": [
+      0
+     ],
+     "what": "Sensor health error at 0.2 s",
+     "class": "anomaly",
+     "why": "The sensor is unspecified. Airspeed and yaw rate read zero throughout, which may relate."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 9025,
+   "output_tokens": 2193
+  },
+  "seconds": 18.3
+ },
+ "labels": {
+  "present_topics": [],
+  "nonzero": {},
+  "onset_s": null
+ }
+}

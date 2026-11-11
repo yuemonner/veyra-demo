@@ -1,0 +1,194 @@
+{
+ "arm": "alone",
+ "alias": "flight-44",
+ "folder": "carbonZ_2018-10-18-11-04-08_2_engine_failure_with_emr_traj",
+ "input_sha256": "d4252a3cc8232922f75eecffa2b58589e8d989e26251df6106147d29693be03c",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.4
+  }
+ ],
+ "prompt_chars": 15442,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle and output ch[2] dropped to minimum at t=99 s and stayed there; altitude then fell.",
+   "status": "cause_unknown",
+   "explanation": "From t=99 s throttle is 0% and ch[2] is pinned at 1100 us until the end. ch[2] follows throttle earlier in the flight. The cause is not separable: failsafe, motor or ESC loss, or a commanded cut.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 101,
+     "quote": "99,...,1.1e+03,...,propulsion.throttle 0",
+     "shows": "Throttle falls from 49% to 0% in one second and ch[2] drops to 1100 us, the minimum seen.",
+     "calls": []
+    },
+    {
+     "line": 119,
+     "quote": "117,...,1.1e+03,...,0,0,39",
+     "shows": "Throttle is still 0 and ch[2] is still 1100 us after 19 s. Altitude falls from 54 m to 39 m.",
+     "calls": []
+    },
+    {
+     "line": 115,
+     "quote": "113,...,18.6 pitch setpoint, 1.22e+03 ch[1]",
+     "shows": "Pitch setpoint saturates at 18.6 deg while attitude reaches only 2-8 deg. ch[1] falls to 1110 us, so the controller is demanding more than the aircraft delivers.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "t=0.8 s Low voltage / Sensor helth",
+     "shows": "Battery low-voltage and sensor-health errors were logged at 0.8 s, before the output fault, with nothing at t=99.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Correlated ch[2] with throttle over the whole flight",
+     "result": "ch[2] drops toward 1100 whenever throttle is near 0 (t=2-4) and rises with throttle. This makes it the propulsion/throttle-related output.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Looked for an event at t=99",
+     "result": "No event is logged near 99 s. The only events are at 0.8 s.",
+     "verdict": "inconclusive",
+     "about": "h2",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 115,
+     "quote": "18.6 pitch setpoint",
+     "shows": "",
+     "why": "Pitch setpoint saturation is the controller reacting to lost thrust and altitude."
+    },
+    {
+     "line": 119,
+     "quote": "altitude 39",
+     "why": "Altitude loss follows from zero throttle."
+    }
+   ],
+   "next_action": {
+    "action": "Pull the full flight log around t=95-105 s for failsafe and ESC data",
+    "why": "Separates a commanded throttle cut from a motor or ESC loss at t=99 s.",
+    "how": [
+     "Check flight-mode and failsafe messages near t=99",
+     "Check battery voltage and current",
+     "Check ESC telemetry for the motor on ch[2]"
+    ],
+    "where": "remote",
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "Failsafe or mode change at 99 s",
+      "means": "The throttle cut was commanded by the autopilot, for example on low battery.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     },
+     {
+      "label": "No command change, ESC or motor error",
+      "means": "The fault is in the propulsion output on ch[2].",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Why throttle went to 0 at t=99 s",
+    "What drives ch[2] and what ch[7] (constant 1930 us) is"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Propulsion output ch[2]",
+     "claim": "The throttle/motor output on ch[2] failed or was cut to minimum at t=99 s.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Throttle and ch[2] drop together and stay at minimum while the aircraft keeps flying and the controller demands more.",
+     "basis": "indirect",
+     "lines": [
+      101,
+      119
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Autopilot failsafe",
+     "claim": "A low-battery or sensor-health failsafe commanded throttle to zero.",
+     "status": "open",
+     "role": "trigger",
+     "because": "Low voltage and sensor errors were logged at 0.8 s, but nothing is logged at 99 s.",
+     "basis": "indirect"
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      2
+     ],
+     "what": "Low voltage warning and sensor health error at 0.8 s",
+     "class": "anomaly",
+     "why": "Early warnings that may relate to the later cut."
+    },
+    {
+     "lines": [
+      101
+     ],
+     "what": "Throttle to 0%, ch[2] to 1100 us at t=99 s",
+     "class": "root_cause_candidate",
+     "why": "Abrupt loss of thrust output with no logged event."
+    },
+    {
+     "lines": [
+      115,
+      116,
+      117,
+      118,
+      119
+     ],
+     "what": "Pitch setpoint saturated at 18.6 deg, ch[1] falling, altitude dropping",
+     "class": "effect",
+     "why": "Controller response to lost thrust."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 13419,
+   "output_tokens": 2583
+  },
+  "seconds": 20.4
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 98.274,
+    "value": 1
+   }
+  },
+  "onset_s": 98.274
+ }
+}

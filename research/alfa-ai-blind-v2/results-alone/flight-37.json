@@ -1,0 +1,166 @@
+{
+ "arm": "alone",
+ "alias": "flight-37",
+ "folder": "carbonZ_2018-10-05-15-52-12_2_no_failure",
+ "input_sha256": "136b5d1b3440e85eb84470ad4c69cd55dec9cf100e516170a995ca9c436551e3",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 19.9
+  }
+ ],
+ "prompt_chars": 6936,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No actuator or controller failure found; sensor-health error at 1 s and a large setpoint excursion at 0-4 s.",
+   "status": "cause_unknown",
+   "explanation": "Attitude tracked setpoints with no actuator saturation. Yaw-rate stuck at 0 while heading changes, plus Sensor health and Low voltage events at 1 s, point to a sensing/data fault, not a control fault.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 2,
+     "quote": "t=1.0 s mavros: System: ERROR: Sensor helth",
+     "shows": "Sensor-health error at 1 s, simultaneous with a violent setpoint and attitude excursion (roll setpoint -44.9, roll 6.85 then -33.7 at 2 s)",
+     "calls": []
+    },
+    {
+     "line": 10,
+     "quote": "vehicle.yaw_rate[yaw] = 0 all rows while yaw goes -92 to 136 deg",
+     "shows": "Yaw-rate signal is dead or not logged; heading changes of tens of deg/s are not reflected",
+     "calls": []
+    },
+    {
+     "line": 1,
+     "quote": "t=1.0 s mavros: Battery: WARN: Low voltage",
+     "shows": "Low-voltage warning at 1 s; throttle fell 39 to 4% by 2 s and altitude fell 62 to 46 m by 5 s",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Attitude tracking vs setpoint (roll, pitch) across flight",
+     "result": "Roll follows setpoint with ~1-2 s lag at 16-18, 25-28, 39-41 s; no divergence",
+     "verdict": "weakens",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Actuator outputs for saturation or stuck channels",
+     "result": "Ch1-5 move within 1130-1660 us; ch0, ch6, ch7 fixed at 1500/1500/1930 and ch4 equals ch5 throughout",
+     "verdict": "inconclusive",
+     "about": "h3",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 3,
+     "quote": "altitude 62 -> 46 m, throttle 4-13%",
+     "why": "Altitude loss and throttle dip follow the initial excursion at 1-4 s, not a separate fault"
+    },
+    {
+     "line": 42,
+     "quote": "roll -47, setpoint -28.8 at t=41",
+     "why": "Overshoot after the large roll command at 39 s; this is a response to the setpoint step"
+    }
+   ],
+   "next_action": {
+    "action": "Inspect IMU/gyro and battery logs around 0-5 s",
+    "why": "Settles whether the 1 s sensor-health error caused the bad setpoints or was caused by the battery sag.",
+    "how": [
+     "Check gyro and yaw-rate source health flags",
+     "Compare battery voltage and current at 0-5 s"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Gyro or yaw-rate source faulted",
+      "means": "Sensing fault explains the stuck yaw rate and the early excursion",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": []
+     },
+     {
+      "label": "Voltage sag only",
+      "means": "Power issue caused the warning; sensors are fine",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Why setpoints jump between -45 and +38 deg roll in the first seconds",
+    "Whether yaw-rate is a logging gap or a sensor failure"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Battery / power",
+     "claim": "Low voltage at 1 s caused a throttle and altitude dip and the sensor-health error.",
+     "status": "open",
+     "because": "Events coincide at 1 s and throttle collapses, but there is no voltage signal to confirm."
+    },
+    {
+     "id": "h2",
+     "area": "Yaw rate / gyro sensing",
+     "claim": "Yaw-rate sensing is dead or unlogged; sensor-health error at 1 s relates to it.",
+     "status": "leading",
+     "because": "Yaw rate is exactly 0 while heading swings over 200 deg."
+    },
+    {
+     "id": "h3",
+     "area": "Actuators ch1-5",
+     "claim": "A motor or servo fault caused the excursion.",
+     "status": "weakened",
+     "because": "Outputs are within range and attitude tracks the setpoint; no saturation."
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1,
+      2
+     ],
+     "what": "Low voltage warning and Sensor health error at 1 s",
+     "class": "anomaly",
+     "why": "Coincide with the largest early attitude excursion"
+    },
+    {
+     "lines": [
+      3,
+      4
+     ],
+     "what": "Roll and yaw setpoints jump by 80+ deg at 0-3 s",
+     "class": "anomaly",
+     "why": "Unexplained commanded transient"
+    }
+   ],
+   "reuse_when": ""
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 6685,
+   "output_tokens": 2346
+  },
+  "seconds": 19.9
+ },
+ "labels": {
+  "present_topics": [],
+  "nonzero": {},
+  "onset_s": null
+ }
+}

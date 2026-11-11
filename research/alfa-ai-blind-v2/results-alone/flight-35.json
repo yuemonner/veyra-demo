@@ -1,0 +1,213 @@
+{
+ "arm": "alone",
+ "alias": "flight-35",
+ "folder": "carbonZ_2018-10-05-14-37-22_3_left_aileron_failure",
+ "input_sha256": "ac5cf020f20bc2a044f0ce60369c80d25ce688bc460184f01b0ae5f1bd748c27",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.4
+  }
+ ],
+ "prompt_chars": 12892,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Actuator ch4 output froze at 1500 us from t=73 s while twin ch5 kept moving; ch7 stepped at t=95 s.",
+   "status": "cause_probable",
+   "explanation": "Output channel 4 stopped following the controller at t=73 s. Until then it matched ch5 exactly. Ch7 also dropped from 1930 to 1100 us at t=95 s. Attitude tracking stayed acceptable, so the effect is small.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 73,
+     "quote": "t=72: ch4=1.46e+03, ch5=1.46e+03",
+     "shows": "Until t=72 ch4 and ch5 were identical on every row, so they act as a mirrored pair.",
+     "calls": []
+    },
+    {
+     "line": 74,
+     "quote": "t=73: ch4=1.5e+03, ch5=1.46e+03",
+     "shows": "From t=73 ch4 sits at exactly 1500 while ch5 keeps varying.",
+     "calls": []
+    },
+    {
+     "line": 83,
+     "quote": "t=82: ch4=1.5e+03, ch5=1.37e+03",
+     "shows": "Ch5 swings from 1370 to 1610 us over t=73-93 while ch4 stays at 1500, so the mirror pair is broken for about 21 s.",
+     "calls": []
+    },
+    {
+     "line": 96,
+     "quote": "t=95: ch7 1.93e+03 -> 1.1e+03",
+     "shows": "Ch7 held 1930 us for 95 s, then stepped to 1100 us, an abrupt change in a channel that never moved before.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "mavros: System: ERROR: Sensor helth",
+     "shows": "A sensor-health error at t=0.4 s. Airspeed and yaw_rate read 0 for the whole flight, so those sensors are likely invalid.",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "effects": [
+    {
+     "line": 83,
+     "quote": "ch5 1.37e+03 at t=82",
+     "shows": "",
+     "why": "Ch5 swung wider than before (1370 to 1610 us), consistent with it compensating for the frozen ch4."
+    },
+    {
+     "line": 2,
+     "quote": "vehicle.airspeed 0, yaw_rate 0",
+     "why": "Both stay at zero for the whole flight, which is consistent with the t=0.4 s sensor-health error and not with an actuator fault."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the ch4 output path and its twin ch5",
+    "why": "Confirms whether ch4 froze in the mixer or output driver, or whether the servo or ESC link failed. Also explains the ch7 step.",
+    "how": [
+     "Pull the actuator output and mixer logs at full rate around t=70-96 s",
+     "Check the ch4 wiring, connector and driver",
+     "Check which function is assigned to ch7"
+    ],
+    "where": "on_site",
+    "outcomes": [
+     {
+      "label": "Ch4 commanded but output frozen",
+      "means": "Fault in the output driver or the ch4 hardware.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     },
+     {
+      "label": "Ch4 command itself frozen",
+      "means": "Fault in the controller or mixer upstream of the output.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Which function each channel drives, and which channels form a pair",
+    "Whether ch7 1930 to 1100 us was a commanded mode change",
+    "Whether the airspeed and yaw_rate sensors are really dead"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Output channel 4 hardware",
+     "claim": "Channel 4 actuator or driver stuck at neutral 1500 us from t=73 s.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Ch4 equals ch5 until t=72, then sits at exactly 1500 while ch5 keeps moving.",
+     "basis": "indirect",
+     "lines": [
+      74,
+      83
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Controller or mixer output",
+     "claim": "The controller stopped updating ch4 at t=73 s.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "The data cannot tell a frozen command from a frozen output.",
+     "basis": "indirect"
+    },
+    {
+     "id": "h3",
+     "area": "Ch7 aux channel",
+     "claim": "Ch7 dropped from 1930 to 1100 us at t=95 s, a possible failsafe or mode change.",
+     "status": "open",
+     "role": "trigger",
+     "because": "A step in a constant channel with no logged event to explain it.",
+     "basis": "indirect",
+     "lines": [
+      96
+     ]
+    },
+    {
+     "id": "h4",
+     "area": "Airspeed and yaw sensors",
+     "claim": "Airspeed and yaw rate sensors are invalid, matching the sensor-health error.",
+     "status": "open",
+     "role": "effect",
+     "because": "Both signals read exactly 0 for the whole flight, from the t=0.4 s sensor-health error.",
+     "basis": "indirect",
+     "lines": [
+      2
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      74
+     ],
+     "what": "Ch4 output freezes at 1500 us",
+     "class": "root_cause_candidate",
+     "why": "Ch4 stops tracking its twin ch5 from t=73 s."
+    },
+    {
+     "lines": [
+      96
+     ],
+     "what": "Ch7 steps from 1930 to 1100 us at t=95",
+     "class": "anomaly",
+     "why": "A constant channel changes suddenly with no explanation in the logs."
+    },
+    {
+     "lines": [
+      2
+     ],
+     "what": "Sensor health error at t=0.4 s",
+     "class": "anomaly",
+     "why": "Matches airspeed and yaw rate reading 0 all flight."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low battery voltage warning at t=0.4 s",
+     "class": "routine",
+     "why": "Not followed by any visible loss of thrust or control."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 11473,
+   "output_tokens": 2703
+  },
+  "seconds": 20.4
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/aileron"
+  ],
+  "nonzero": {
+   "/failure_status/aileron": {
+    "first_nonzero_s": 72.401,
+    "value": 2
+   }
+  },
+  "onset_s": 72.401
+ }
+}

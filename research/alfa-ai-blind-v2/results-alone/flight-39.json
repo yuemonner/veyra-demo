@@ -1,0 +1,189 @@
+{
+ "arm": "alone",
+ "alias": "flight-39",
+ "folder": "carbonZ_2018-10-05-15-55-10_engine_failure_with_emr_traj",
+ "input_sha256": "74f6436a9c9a3e528798440cb1caf965195774ed70029b2767cc2ef23dd11ef0",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 19.6
+  }
+ ],
+ "prompt_chars": 15078,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "At t=101 s throttle drops to 0 and output ch[2] pins at 1100 us; altitude falls from 49 m to 25 m.",
+   "status": "cause_unknown",
+   "explanation": "A step change at t=101 s: throttle goes 53%\u21920 and ch[2] pins at 1100 us (minimum) for 13+ s. This is either a commanded throttle cut or a ch[2] actuator/ESC fault. The data cannot separate the two.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 102,
+     "quote": "101,...,1.1e+03,...,0,0,49.1",
+     "shows": "ch[2] steps from ~1520 to 1100 us and throttle from 53% to 0 in the same second, with no gradual change.",
+     "calls": []
+    },
+    {
+     "line": 115,
+     "quote": "113,...,1.1e+03,...,0,0,25.3",
+     "shows": "ch[2] is still at 1100 us at the end of the log and throttle is still 0. Relative altitude has fallen from 49 m to 25 m, about 2 m/s.",
+     "calls": []
+    },
+    {
+     "line": 103,
+     "quote": "102,1.5e+03,1.44e+03,1.1e+03",
+     "shows": "The other channels (ch[1], ch[3], ch[4], ch[5]) keep moving about 1500 us and attitude stays roughly controlled, so only ch[2] is pinned.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared actuator outputs, throttle and altitude before and after t=101",
+     "result": "The step change is isolated to ch[2] and throttle. Before t=101, ch[2] varied normally between 1360 and 1680 us.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Looked for other anomalies in the first 100 s",
+     "result": "Roll setpoint saturates at \u00b145\u00b0 during yaw maneuvers (t=1-8, 33-48, 67-83) and the attitude tracks it. Airspeed reads 0 throughout.",
+     "verdict": "weakens",
+     "about": "h3",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 115,
+     "quote": "113,...,25.3",
+     "shows": "The altitude loss follows from the zero throttle (and the pinned ch[2]).",
+     "why": "Altitude falls from 49 m to 25 m only after t=101."
+    },
+    {
+     "line": 104,
+     "quote": "102,...,-9.89,25.7",
+     "shows": "The pitch dip and roll swings after t=101 are the controller reacting to the lost thrust and ch[2] saturation.",
+     "why": "These excursions begin after the step at t=101."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the ch[2] motor, ESC and wiring, and check the logs for a throttle cut or failsafe at t=101",
+    "why": "Separates a commanded throttle cut or failsafe from an actual ch[2] output or motor fault.",
+    "how": [
+     "Check the flight controller log for a mode change, kill switch or failsafe near t=101",
+     "Bench-test ch[2] output, ESC and motor",
+     "Check battery voltage and the low-voltage warning history"
+    ],
+    "where": "on_site",
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "Throttle cut or failsafe logged at t=101",
+      "means": "The cut was commanded. ch[2] at 1100 us is the minimum-output response, not a separate fault.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     },
+     {
+      "label": "No cut logged, ch[2] hardware faulty",
+      "means": "A ch[2] output, ESC or motor fault drove the event.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Why throttle went to 0 at t=101",
+    "Whether ch[2] was commanded or physically failed",
+    "Whether the low-voltage warning at t=0.6 relates to this event"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Actuator ch[2] / motor",
+     "claim": "Output ch[2] saturated at minimum (1100 us) from t=101 because of an actuator, ESC or motor fault.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "Only ch[2] is pinned, and it stays pinned for 13+ s. The other outputs stay active."
+    },
+    {
+     "id": "h2",
+     "area": "Throttle cut / failsafe",
+     "claim": "A commanded throttle cut or failsafe at t=101, possibly linked to the low-voltage warning, drove the throttle to 0.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "The throttle steps from 53% to 0 in the same second ch[2] drops, and the early low-voltage warning is a plausible trigger."
+    },
+    {
+     "id": "h3",
+     "area": "Battery / sensors",
+     "claim": "The low-voltage warning and sensor health error at t=0.6 s are a precursor to the event.",
+     "status": "open",
+     "role": "trigger",
+     "because": "Both events are logged at t=0.6, but the first 100 s show normal control, so the link is unproven."
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      102
+     ],
+     "what": "ch[2] pinned at 1100 us and throttle to 0 at t=101",
+     "class": "root_cause_candidate",
+     "why": "This is the step change where the fault begins."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low voltage warning and sensor health error at t=0.6",
+     "class": "anomaly",
+     "why": "Logged before the flight, no visible effect for 100 s."
+    },
+    {
+     "lines": [
+      103,
+      115
+     ],
+     "what": "Altitude loss and attitude excursions after t=101",
+     "class": "effect",
+     "why": "Follows the throttle loss."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 13227,
+   "output_tokens": 2584
+  },
+  "seconds": 19.6
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 100.133,
+    "value": 1
+   }
+  },
+  "onset_s": 100.133
+ }
+}

@@ -1,0 +1,210 @@
+{
+ "arm": "alone",
+ "alias": "flight-38",
+ "folder": "carbonZ_2018-10-05-15-52-12_3_engine_failure_with_emr_traj",
+ "input_sha256": "d65a30c8c481efc8ea9ee7a2f55314950f99f1c795c302692b259b9f2fc45dd2",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 21.1
+  }
+ ],
+ "prompt_chars": 9135,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle cut to zero at t=49 s; motor channel 2 pinned at 1100 us, aircraft descended 50 to 18 m.",
+   "status": "cause_unknown",
+   "explanation": "Throttle fell from ~50% to 0 and actuator ch[2] (the throttle-tracking motor output) went to minimum 1100 us, so this is a command or power-path loss. The data cannot separate battery, failsafe or ESC causes.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 50,
+     "quote": "49,...,1.29e+03,...,0,0,49.8",
+     "shows": "Throttle drops from 49% to 0 and ch[2] starts falling (1290 us), where it had tracked throttle before.",
+     "calls": []
+    },
+    {
+     "line": 51,
+     "quote": "50,...,1.1e+03,...,0,0,50.2",
+     "shows": "ch[2] is pinned at the 1100 us minimum for the rest of the flight (t=50-66).",
+     "calls": []
+    },
+    {
+     "line": 57,
+     "quote": "56,...,1.1e+03,...,0,0,36.3",
+     "shows": "Relative altitude falls from ~50 m to 18.4 m by t=66 with no thrust, while attitude setpoints keep saturating.",
+     "calls": []
+    },
+    {
+     "line": 1,
+     "quote": "t=0.2 s mavros: Battery: WARN: Low voltage",
+     "shows": "Low-voltage warning at the start of the flight. This is a possible precursor to the power loss but is 49 s earlier.",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "effects": [
+    {
+     "line": 53,
+     "quote": "51,...,-8.67,20.6",
+     "shows": "Pitch and roll excursions and the altitude loss after t=51 follow the loss of thrust.",
+     "why": "They are consequences of the throttle cut, not causes."
+    },
+    {
+     "line": 57,
+     "quote": "56,...,1.1e+03,...,36.3",
+     "why": "The altitude decay is the result of zero throttle."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the log around t=45-52 for failsafe, battery and ESC telemetry",
+    "why": "Separates a commanded throttle cut or failsafe from battery sag or an ESC or motor fault on channel 2.",
+    "how": [
+     "Check mode and failsafe messages near t=49",
+     "Check battery voltage and current traces",
+     "Check ESC telemetry for output channel 2"
+    ],
+    "where": "remote",
+    "baseline": "Same channel during t=0-48, when output tracked throttle (1370-1640 us)",
+    "record": [
+     "propulsion.throttle",
+     "actuator.output[ch[2]]",
+     "battery voltage",
+     "flight mode"
+    ],
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "Failsafe or mode change at t=49",
+      "means": "Command-level throttle cut, not a hardware fault.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Find the failsafe trigger"
+     },
+     {
+      "label": "Voltage collapse at t=49",
+      "means": "Power-system cause, linked to the low-voltage warning.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": [],
+      "then": "Inspect battery and power distribution"
+     },
+     {
+      "label": "Nothing logged, command simply zero",
+      "means": "Unexplained controller output or ESC fault.",
+      "keeps": [
+       "h1",
+       "h2"
+      ],
+      "rules_out": [],
+      "then": "Bench-test ESC and motor on channel 2"
+     }
+    ]
+   },
+   "unknowns": [
+    "Why throttle went to zero at t=49",
+    "Which physical motor or ESC channel 2 drives",
+    "Whether the low-voltage warning is real or a sensor artefact"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Motor/ESC output ch[2]",
+     "claim": "Motor or ESC on output channel 2 failed or was commanded to minimum at t=49.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "ch[2] alone went to the 1100 us minimum, but throttle also read 0, so this is not distinct from a command-level cut.",
+     "basis": "indirect",
+     "lines": [
+      50,
+      51
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Throttle command / failsafe",
+     "claim": "Throttle command was cut to 0 by a failsafe or controller decision at t=49.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "propulsion.throttle fell to 0 in the same sample that ch[2] started dropping, which fits a command-level cut.",
+     "basis": "indirect",
+     "lines": [
+      50
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Battery/power",
+     "claim": "Battery depletion or voltage sag caused loss of propulsion.",
+     "status": "open",
+     "role": "trigger",
+     "because": "A low-voltage warning was logged at 0.2 s, but there is no voltage signal to confirm it.",
+     "basis": "indirect",
+     "lines": [
+      1
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      50,
+      51
+     ],
+     "what": "Throttle to 0, ch[2] pinned at 1100 us",
+     "class": "root_cause_candidate",
+     "why": "Marks the loss of propulsion and the start of the descent."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low voltage warning and Sensor health error at 0.2 s",
+     "class": "anomaly",
+     "why": "Early warnings with no visible effect until t=49. Airspeed and yaw rate read constant 0, which suggests those sensors were dead."
+    },
+    {
+     "lines": [
+      52,
+      66
+     ],
+     "what": "Altitude falls from 50 m to 18 m",
+     "class": "effect",
+     "why": "A consequence of zero thrust."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 8444,
+   "output_tokens": 2653
+  },
+  "seconds": 21.1
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 49.133,
+    "value": 1
+   }
+  },
+  "onset_s": 49.133
+ }
+}
