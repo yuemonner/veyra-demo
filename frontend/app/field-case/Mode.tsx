@@ -28,21 +28,21 @@ export function useLiveAi(call: Call): boolean | null {
   return useInstance(call).liveAi;
 }
 
-export function ModeStrip({ current, liveAi, compact = false }: { current: ModeKind; liveAi: boolean | null; compact?: boolean }) {
+const SHORT: Record<ModeKind, string> = { replay: "Replay of a recorded investigation", rules: "Rules-only analysis, no AI model", live: "Live AI investigation" };
+
+/** One quiet line naming the mode; the three-mode explanation opens on demand, so the investigation stays in view. */
+export function ModeStrip({ current, liveAi }: { current: ModeKind; liveAi: boolean | null; compact?: boolean }) {
   return (
-    <div className={`${m.strip} ${compact ? m.compact : ""}`} role="note" aria-label={`Mode: ${MODES.find((x) => x.kind === current)!.name}`}>
-      {MODES.map((x) => {
-        const on = x.kind === current;
-        const offHere = x.kind === "live" && liveAi === false;
-        return (
-          <div key={x.kind} className={`${m.mode} ${on ? m.on : ""}`} aria-current={on ? "true" : undefined}>
-            <div className={m.name}>{on && <span className={m.dot} aria-hidden />}{x.name}{on && <span className={m.here}>you are here</span>}</div>
-            {!compact && <div className={m.what}>{x.what}</div>}
-            {offHere && <div className={m.avail}>Not on this public demo. Offered in a scheduled technical demo.</div>}
-          </div>
-        );
-      })}
-    </div>
+    <details className={m.chip}>
+      <summary><span className={m.dot} aria-hidden /><span>{SHORT[current]}</span><span className={m.more}>What is this?</span></summary>
+      <div className={m.panel} role="note">
+        {MODES.map((x) => (
+          <p key={x.kind} className={x.kind === current ? m.cur : undefined}>
+            <b>{x.name}</b> <span>{x.what}</span>
+            {x.kind === "live" && liveAi === false && <span className={m.avail}> Not on this public demo. Offered in a scheduled technical demo.</span>}
+          </p>))}
+      </div>
+    </details>
   );
 }
 
