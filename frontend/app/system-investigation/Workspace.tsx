@@ -114,40 +114,33 @@ export default function Workspace({ d }: { d: Any }) {
         <b>{Math.round(rc.timing.total_s)} seconds</b> to surface the decisive SOC inconsistency. <b>{Math.round(run.run_seconds / 60)} minutes</b> for the full AI investigation, with {toolsAll} engineering tool calls.
       </div>
 
+      {/* One slim strip for the case and the run, so the agent's work keeps the screen. */}
+      <div className={w.strip}>
+        <div className={w.stripCase}>
+          <span className={w.reported}><span>Reported</span> “{d.case.reported}”</span>
+          <span className={w.chips}>
+            <span>BMS + VCU logs · {(rc?.values || "").split(" ")[0]} values</span>
+            <span>No vehicle access</span><span>No supplier data</span><span>No manufacturer rules</span>
+          </span>
+        </div>
+        <div className={w.stripRun}>
+          <span className={w.meters}>
+            <span><b>{clock(nowMs)}</b> agent time</span>
+            <span><b>{stepsDone}/{run.turns.length}</b> steps</span>
+            <span><b>{toolsDone}/{toolsAll}</b> tool calls</span>
+          </span>
+          {done ? <button className={w.primary} onClick={restart}>Run again</button>
+            : playing ? <button className={w.primary} onClick={() => setPlaying(false)}>Pause</button>
+              : <button className={w.primary} onClick={() => setPlaying(true)}>{i < 0 ? "Start" : "Resume"}</button>}
+          {!done && <button className={w.ghost} onClick={skip}>Skip to result</button>}
+          <span className={w.speed} role="group" aria-label="Playback speed">
+            {SPEEDS.map((x) => <button key={x.k} className={x.k === speed.k ? w.on : ""} onClick={() => setSpeed(x)}>{x.label}</button>)}
+          </span>
+        </div>
+        <div className={w.stripTrack} title="Played back from the Veyra agent's recorded run on this case"><div style={{ width: `${Math.min(100, (Math.max(0, i + 1) / events.length) * 100)}%` }} /></div>
+      </div>
+
       <div className={w.grid}>
-        <aside className={w.side}>
-          <section className={w.card}>
-            <h2>Reported</h2>
-            <p className={w.quote}>“{d.case.reported}”</p>
-          </section>
-          <section className={w.card}>
-            <h2>What Veyra had</h2>
-            <ul className={w.facts}>
-              <li><span>Data</span>BMS and VCU logs, 3 time windows</li>
-              <li><span>Values</span>{(rc?.values || "").split(" ")[0]} recorded values</li>
-              <li><span>Vehicle access</span>None</li>
-              <li><span>Supplier data</span>None</li>
-              <li><span>Manufacturer rules</span>None</li>
-            </ul>
-          </section>
-          <section className={w.card}>
-            <h2>Run</h2>
-            <div className={w.meter}><span>Agent time</span><b>{clock(nowMs)}</b></div>
-            <div className={w.meter}><span>Agent steps</span><b>{stepsDone} / {run.turns.length}</b></div>
-            <div className={w.meter}><span>Engineering tool calls</span><b>{toolsDone} / {toolsAll}</b></div>
-            <div className={w.track}><div style={{ width: `${Math.min(100, (Math.max(0, i + 1) / events.length) * 100)}%` }} /></div>
-            <div className={w.controls}>
-              {done ? <button className={w.primary} onClick={restart}>Run again</button>
-                : playing ? <button className={w.primary} onClick={() => setPlaying(false)}>Pause</button>
-                  : <button className={w.primary} onClick={() => setPlaying(true)}>{i < 0 ? "Start investigation" : "Resume"}</button>}
-              {!done && <button className={w.ghost} onClick={skip}>Skip to result</button>}
-            </div>
-            <div className={w.speed} role="group" aria-label="Playback speed">
-              {SPEEDS.map((x) => <button key={x.k} className={x.k === speed.k ? w.on : ""} onClick={() => setSpeed(x)}>{x.label}</button>)}
-            </div>
-            <p className={w.fine}>Played back from the Veyra agent&apos;s recorded run on this case, step by step.</p>
-          </section>
-        </aside>
 
         <section className={`${w.card} ${w.feedCard}`}>
           <h2>Agent activity</h2>
