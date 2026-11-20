@@ -346,6 +346,7 @@ export default function FieldCasePage() {
         ) : <span className={s.crumb}>Field case</span>}
         <span className={s.spacer} />
         <div className={s.actions}>
+          {!isPrivate && <Link href="/system-investigation" className={s.quiet}>System-level investigation</Link>}
           <button className={s.button} onClick={() => (recordings ? setRecordingOpen(true) : setUploadOpen(true))}>{recordings ? "Upload data" : "Upload logs"}</button>
           {caseId && run && <button className={s.quiet} onClick={openDiscuss}>Debug with Veyra</button>}
           {caseId && !logCase && <a className={s.quiet} href={`${API}/engine/cases/${caseId}/report`} target="_blank" rel="noreferrer">Engine report</a>}
