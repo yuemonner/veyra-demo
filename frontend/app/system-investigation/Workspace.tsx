@@ -30,18 +30,16 @@ function viewFor(t: Tool, prev: View): View {
   if (t.tool === "submit_report") return { window: "fault", soc: true, band: true, thresholds: true };
   return prev;
 }
-const clock = (ms: number) => { const t = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
 const SPEEDS = [{ k: "fast", label: "8×", f: 8 }, { k: "real", label: "Real time", f: 1 }];
 
 export default function Workspace({ d }: { d: Any }) {
-  const run = d.agent_run, rc = d.real_case, bm = run.benchmark || {};
+  const run = d.agent_run, rc = d.real_case;
   const events = useMemo(() => {
     const out: Ev[] = [];
     for (const t of run.turns) { out.push({ kind: "think", turn: t.n, ms: t.ms, note: t.note }); for (const tool of t.tools) out.push({ kind: "tool", turn: t.n, tool }); }
     out.push({ kind: "report" });
     return out;
   }, [run]);
-  const endAt = useMemo(() => { let acc = 0; return events.map((e) => { acc += e.kind === "think" ? e.ms : e.kind === "tool" ? e.tool.ms || 0 : 0; return acc; }); }, [events]);
   const views = useMemo(() => { let v: View = { window: "fault" }; return events.map((e) => { if (e.kind === "tool") v = viewFor(e.tool, v); else if (e.kind === "report") v = { window: "fault", soc: true, band: true, thresholds: true }; return v; }); }, [events]);
   const idxOf = useMemo(() => { const m: Record<string, number> = {}; events.forEach((e, k) => { if (e.kind === "tool") m[e.tool.id] = k; }); return m; }, [events]);
 
@@ -83,8 +81,6 @@ export default function Workspace({ d }: { d: Any }) {
     if (list && el) list.scrollTo({ top: Math.max(0, el.offsetTop - list.clientHeight + el.offsetHeight + 24), behavior: "smooth" });
   }, [i, thinking]);
 
-  const cur = i >= 0 ? events[i] : null;
-  const nowMs = i < 0 ? 0 : cur?.kind === "think" ? endAt[i] - cur.ms * (1 - frac) : endAt[i];
   const view: View = i < 0 ? { window: "fault" } : views[i];
   const isEng = (e: Ev) => e.kind === "tool" && e.tool.tool !== "submit_report";
   const toolsDone = events.slice(0, i + 1).filter(isEng).length, toolsAll = events.filter(isEng).length;
@@ -93,8 +89,6 @@ export default function Workspace({ d }: { d: Any }) {
   const status = i < 0 ? "Ready" : done ? "Investigation complete" : "Investigating";
   const restart = () => { setOpen(null); setFrac(1); setI(-1); setPlaying(true); };
   const skip = () => { setPlaying(false); setFrac(1); setI(events.length - 1); };
-  const rep = run.report || {};
-  const rows: Any[] = bm.rows || [];
 
   return (
     <div className={w.app}>
@@ -130,7 +124,6 @@ export default function Workspace({ d }: { d: Any }) {
         </div>
         <div className={w.stripRun}>
           <span className={w.meters}>
-            <span><b>{clock(nowMs)}</b> agent time</span>
             <span><b>{stepsDone}/{run.turns.length}</b> steps</span>
             <span><b>{toolsDone}/{toolsAll}</b> tool calls</span>
           </span>
@@ -205,30 +198,46 @@ export default function Workspace({ d }: { d: Any }) {
         </div>
       </div>
 
-      {done && (
-        <section className={w.result} aria-live="polite">
-          <header>
-            <h2>Investigation complete</h2>
-            <span className={w.fine}>Full AI investigation in {Math.round(run.run_seconds / 60)} minutes, from the raw logs, without the vehicle or supplier data.</span>
-          </header>
+      <Outputs d={d} done={done} />
+    </div>
+  );
+}
+
+// What the investigation leaves behind, as the product keeps it: the report, how it was reached, the knowledge record and
+// the checks saved for the next record of this kind.
+const OUT_TABS = [["report", "Report"], ["reasoning", "System-level & physics"], ["knowledge", "Knowledge"], ["checks", "Checks"]] as const;
+
+function Outputs({ d, done }: { d: Any; done: boolean }) {
+  const run = d.agent_run, rc = d.real_case, rep = run.report || {};
+  const [tab, setTab] = useState<string>("reasoning");
+  useEffect(() => { if (done) setTab("report"); }, [done]);
+  const sys = d.system, ca = (d.physics.checks || []).find((c: Any) => c.id === "charge_accounting");
+  const pending = <p className={w.pending}>Available when the investigation completes.</p>;
+  const outcome: string = rc?.outcome?.statement || "";
+  return (
+    <section className={`${w.card} ${w.outputs}`}>
+      <header className={w.outHead}>
+        <h2>Case outputs</h2>
+        <nav className={w.outTabs} role="tablist" aria-label="Case outputs">
+          {OUT_TABS.map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? w.on : ""} onClick={() => setTab(k)}>
+              {label}{!done && k !== "reasoning" && <i className={w.lock} aria-hidden>·</i>}
+            </button>))}
+        </nav>
+      </header>
+
+      {tab === "report" && (!done ? pending : (
+        <div className={w.outBody}>
           <div className={w.three}>
             <div><h3>What happened</h3><p>The battery protection cut high voltage on a parked vehicle. The displayed charge was wrong: the pack held far less than it showed.</p></div>
             <div><h3>Still possible</h3><p>The SOC estimate drifted, usable capacity is low, or the current sensor under-reads. The logs alone cannot separate them.</p></div>
             <div><h3>Verify next</h3><p>{(rep.next_action || "").split(". ")[0]}. Read-only, no vehicle contact. Hold high voltage until every cell has been checked.</p></div>
           </div>
-          <div className={w.bench}>
-            <div><b>{Math.round(rc.timing.total_s)} s</b><span>to surface the decisive SOC inconsistency</span></div>
-            <div><b>{Math.round(run.run_seconds / 60)} min</b><span>full AI investigation</span></div>
-            <div className={w.benchThem}><b>≈ 2 days</b><span>{rows[rows.length - 1]?.label || "the manufacturer"}, with its battery supplier</span></div>
-          </div>
           {rc?.outcome && <p className={w.confirmed}><b>Confirmed afterwards by the manufacturer:</b> SOC drift after a long time without a full charge. The check Veyra put first is where it was found.</p>}
-        </section>
-      )}
+        </div>))}
 
-      {run.methods && (
-        <section className={w.methods}>
-          <p className={w.kicker}>How Veyra investigates a machine it has never seen</p>
-          <h2>No one went to the vehicle. Veyra rebuilt what it did, then held every explanation to physics.</h2>
+      {tab === "reasoning" && run.methods && (
+        <div className={w.outBody}>
           <div className={w.two}>
             <div className={w.col}>
               <h3><span className={`${w.chip} ${w.chipSys}`}>System-level investigation</span>What the vehicle actually did</h3>
@@ -239,22 +248,46 @@ export default function Workspace({ d }: { d: Any }) {
               <ol>{run.methods.physics.map((m: Any) => <li key={m.title}><b>{m.title}{m.badge && <span className={w.badge}>{m.badge}</span>}</b><p>{m.text}</p></li>)}</ol>
             </div>
           </div>
-          <p className={w.methodsResult}>{run.methods.result}</p>
-        </section>
-      )}
+          <p className={w.fine}>Applied to the vehicle&apos;s logs alone: nobody went to the vehicle, and no supplier data was used.</p>
+        </div>)}
 
-      <section className={w.after}>
-        <p className={w.kicker}>From one investigation</p>
-        <h2>A failure solved. Engineering knowledge retained.</h2>
-        <p className={w.afterLede}>What the customer gets after the investigation.</p>
-        <div className={w.three}>
-          <div><h3>Evidence-backed investigation</h3><p>What happened, which explanations can still hold, and what to verify next.</p></div>
-          <div><h3>Verified engineering knowledge</h3><p>The mechanism your engineers confirm afterwards, and where it applies, kept as a private knowledge asset.</p></div>
-          <div><h3>Reusable checks</h3><p>The relevant engineering checks run again on new records of the same kind. How widely they apply, and how often they raise a false alarm, still has to be validated.</p></div>
-        </div>
-        <p className={w.closing}>Every failure makes your engineering system more capable.</p>
-        <p className={w.closingSub}>Hand a field failure to Veyra, and your team does not have to walk the whole investigation again. Every past failure leaves a capability you can reuse.</p>
-      </section>
-    </div>
+      {tab === "knowledge" && (!done ? pending : (
+        <div className={w.outBody}>
+          <article className={w.record}>
+            <header>
+              <span className={w.recId}>Knowledge record</span>
+              <span className={`${w.chip} ${w.chipPhys}`}>Verified by the manufacturer</span>
+              <span className={w.recPriv}>Private to this customer</span>
+            </header>
+            <h3>SOC estimate drift after long periods without a full charge</h3>
+            <dl>
+              <dt>Mechanism</dt><dd>{outcome.replace(/^The manufacturer later confirmed SOC estimation drift: /, "").replace(/^the /, "The ")}</dd>
+              <dt>Signature in the logs</dt><dd>A large SOC correction with almost no counted charge (on this case {ca ? "40 points with 0.08 Ah" : "a large jump"}), and a displayed SOC well above the charge actually available.</dd>
+              <dt>Applies to</dt><dd>Packs with a flat voltage plateau that sit for long periods without a full charge.</dd>
+              <dt>Not yet established</dt><dd>How often it occurs across the fleet, and whether capacity loss also contributes on other vehicles.</dd>
+              <dt>Action</dt><dd>{rc?.outcome?.fix} Check the calibration history first when the signature appears.</dd>
+              <dt>Source</dt><dd>This investigation and the manufacturer&apos;s confirmation.</dd>
+            </dl>
+          </article>
+        </div>))}
+
+      {tab === "checks" && (!done ? pending : (
+        <div className={w.outBody}>
+          <div className={w.tableWrap}>
+            <table className={w.checks}>
+              <thead><tr><th>Check</th><th>What it flags</th><th>Needs</th><th>On this case</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td><b>Charge accounting</b></td><td>An SOC change the measured current cannot explain</td><td>Displayed SOC, pack current</td>
+                  <td><span className={w.flag}>Flagged</span> 40 points unexplained</td><td>Saved</td></tr>
+                <tr><td><b>Restart after a protective shutdown</b></td><td>High voltage switched back on after a protective shutdown, with the weakest cell&apos;s voltage each time</td><td>Fault level, contactors, cell voltages</td>
+                  <td><span className={w.flag}>Flagged</span> {(sys.restarts.rows || []).length} re-closures, safety hold</td><td>Saved</td></tr>
+                <tr><td><b>Protection thresholds from timing</b></td><td>The trigger voltage and delay of each protection level</td><td>Fault level, cell voltages</td>
+                  <td>{(sys.thresholds.rows || []).map((r: Any) => r.inferred_threshold).join(" / ")} V</td><td>Saved</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p className={w.fine}>These checks run on every new record of this kind. How widely they apply, and how often they raise a false alarm, is measured as they run; neither is validated yet.</p>
+        </div>))}
+    </section>
   );
 }
