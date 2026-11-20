@@ -164,8 +164,8 @@ function AccessDialog({ detail, onDone }: { detail: string; onDone: (code: strin
   );
 }
 
-// The public demo link that was shared widely (/field-case?case=case-c51d8bcdab94) now opens the current demo, at the same
-// address. Every other case id, and every private workspace, keeps the case workspace below.
+// The public demo link that was shared widely (/field-case?case=case-c51d8bcdab94), and /field-case itself in production,
+// open the current demo at the same address. The private instance (next dev) keeps the case workspace below.
 const SHARED_DEMO_CASE = "case-c51d8bcdab94";
 
 export default function FieldCasePage() {
@@ -173,7 +173,8 @@ export default function FieldCasePage() {
   useEffect(() => {
     let c: string | null = null;
     try { c = new URLSearchParams(window.location.search).get("case"); } catch { /* ignore */ }
-    setMode(c === SHARED_DEMO_CASE ? "demo" : "app");
+    // In production the public demo always shows the current demo (next.config.mjs also rewrites /field-case on the server).
+    setMode(c === SHARED_DEMO_CASE || process.env.NODE_ENV === "production" ? "demo" : "app");
   }, []);
   if (mode === "") return null;
   return mode === "demo" ? <SystemInvestigation /> : <FieldCaseApp />;
