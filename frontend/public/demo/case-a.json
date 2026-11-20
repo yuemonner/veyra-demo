@@ -38,6 +38,39 @@
    ]
   },
   "date": "2026-11-20",
+  "findings": [
+   {
+    "after": "cc_3",
+    "badge": "found in 16 s",
+    "kind": "key",
+    "text": "Displayed charge fell from 47 % to 7 % in 40 seconds while only 0.08 Ah flowed.",
+    "title": "The battery was not empty. The SOC estimate was wrong."
+   },
+   {
+    "after": "cc_9",
+    "kind": "context",
+    "text": "No drive request anywhere in the record. The battery protection cut high voltage: a protective response, not the cause.",
+    "title": "Parked, not driving"
+   },
+   {
+    "after": "cc_9",
+    "kind": "safety",
+    "text": "After the protective shutdown the weakest cell went lower than at the first trip. Hold before any further restart.",
+    "title": "High voltage switched on 5 more times"
+   },
+   {
+    "after": "cc_10",
+    "kind": "open",
+    "text": "SOC estimate drifted, usable capacity low, or the current sensor under-reads.",
+    "title": "Three explanations still possible"
+   },
+   {
+    "after": "cc_27",
+    "kind": "ruled",
+    "text": "A test of the agent's own prediction found no load bypassing the current sensor.",
+    "title": "Hidden load weakened"
+   }
+  ],
   "hypotheses": {
    "A": "SOC estimate drifted",
    "B": "usable capacity low",
@@ -101,7 +134,7 @@
       "id": "cc_3",
       "method": "physics",
       "ms": 0,
-      "summary": "charge_accounting: VIOLATION; ocv_consistency: INDETERMINATE; pack_cell_consistency: INDETERMINATE; protection_sequence: INDETERMINATE; relaxation: INDETERMINATE; restart_eligibility: INDETERMINATE; weak_cell_attribution: INDETERMINATE",
+      "summary": "charge accounting: VIOLATION; OCV consistency: INDETERMINATE; pack-cell consistency: INDETERMINATE; protection sequence: INDETERMINATE; relaxation: INDETERMINATE; restart: INDETERMINATE; weak-cell: INDETERMINATE",
       "title": "Ran the physical checks",
       "tool": "physical_checks"
      },
@@ -487,7 +520,7 @@
    {
     "ms": 56211,
     "n": 8,
-    "note": "Resubmitting with every required restart_eligibility and charge_accounting finding cited, and the hidden-load cause in a lower tier, since test T6 contradicted it and SOC error, low capacity and current scale survived.",
+    "note": "Resubmitting with every required restart and charge accounting finding cited, and the hidden-load cause in a lower tier, since test T6 contradicted it and SOC error, low capacity and current scale survived.",
     "tools": [
      {
       "id": "report_8",

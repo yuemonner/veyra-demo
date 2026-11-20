@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import s from "./system.module.css";
 import Replay from "./Replay";
-import AgentReplay from "./AgentReplay";
+import Workspace from "./Workspace";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
@@ -128,10 +128,16 @@ function Speed({ rc }: { rc: Any }) {
 
 export default function SystemInvestigation() {
   const [which, setWhich] = useState<string>("real");
+  const [tab, setTab] = useState<string>("live");
   const [data, setData] = useState<Any>(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    const read = () => setWhich(typeof window !== "undefined" && window.location.hash === "#synthetic" ? "synthetic" : "real");
+    const read = () => {
+      const h = typeof window !== "undefined" ? window.location.hash : "";
+      setWhich(h === "#synthetic" ? "synthetic" : "real");
+      setTab(h === "#report" ? "report" : "live");
+      if (h === "#report" || h === "#synthetic") window.scrollTo(0, 0);
+    };
     read();
     window.addEventListener("hashchange", read);
     return () => window.removeEventListener("hashchange", read);
@@ -147,6 +153,8 @@ export default function SystemInvestigation() {
   if (error) return <div className={s.page}><p className={s.note}>The investigation could not be loaded ({error}). Reload the page.</p></div>;
   if (!data) return <div className={s.page}><p className={s.note}>Loading the investigation…</p></div>;
 
+  if (which === "real" && tab === "live" && data.agent_run) return <Workspace d={data} />;
+
   const sys = data.system, phys = data.physics, ex = data.explanations, nx = data.next;
   const align = phys.alignment.value || {};
   const lead = ex.leading || ex.conditional_leading;
@@ -154,13 +162,14 @@ export default function SystemInvestigation() {
   return (
     <div className={s.page}>
       <header className={s.topbar}>
-        <a href="/field-case" className={s.brand}><span className={s.mark}>V</span>Veyra</a>
+        <a href="#live" className={s.brand}><span className={s.mark}>V</span>Veyra</a>
         <span className={s.crumb}>System-level investigation</span>
         <nav className={s.switch} aria-label="Case">
-          {Object.entries(CASES).map(([k, c]) => <a key={k} href={k === "real" ? "#real" : "#synthetic"} aria-current={which === k ? "page" : undefined}>{c.tab}</a>)}
+          <a href="#live">Investigation</a>
+          <a href="#report" aria-current={which === "real" ? "page" : undefined}>Engineering report</a>
+          <a href="#synthetic" aria-current={which === "synthetic" ? "page" : undefined}>Synthetic example</a>
         </nav>
         <span className={s.spacer} />
-        <a href="/field-case" className={s.quiet}>Field cases</a>
       </header>
 
       <main className={s.main}>
@@ -171,9 +180,7 @@ export default function SystemInvestigation() {
           </p>
           <h1>{data.case.title}</h1>
           <p className={s.lede}>Reported: “{data.case.reported}” {data.case.machine}.</p>
-          {data.agent_run?.benchmark?.headline?.text && (() => { const t: string = data.agent_run.benchmark.headline.text; const i = t.indexOf(". ");
-            return <p className={s.claim}><b>{t.slice(0, i + 1)}</b> {t.slice(i + 2)}</p>; })()}
-          {data.agent_run ? <AgentReplay key={which} d={data} /> : <Replay key={which} d={data} />}
+          {!data.agent_run && <Replay key={which} d={data} />}
           <div className={s.summary}>
             <div><b>What the record shows</b><p>{sys.symptom.statement}</p></div>
             <div><b>What the protection did</b><p>{say((sys.restarts.findings.find((f: Any) => f.id === "protection_not_latched") || {}).statement)}</p></div>

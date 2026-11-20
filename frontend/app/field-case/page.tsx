@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import s from "./field-case.module.css";
+import SystemInvestigation from "../system-investigation/page";
 import { Lessons, RecordingRead, SignalChain } from "./SignalChain";
 import Investigation, { AutoRecord, LogEvidence } from "./Investigation";
 import { plotFor, Waveform } from "./Waveform";
@@ -163,7 +164,22 @@ function AccessDialog({ detail, onDone }: { detail: string; onDone: (code: strin
   );
 }
 
+// The public demo link that was shared widely (/field-case?case=case-c51d8bcdab94) now opens the current demo, at the same
+// address. Every other case id, and every private workspace, keeps the case workspace below.
+const SHARED_DEMO_CASE = "case-c51d8bcdab94";
+
 export default function FieldCasePage() {
+  const [mode, setMode] = useState<"" | "demo" | "app">("");
+  useEffect(() => {
+    let c: string | null = null;
+    try { c = new URLSearchParams(window.location.search).get("case"); } catch { /* ignore */ }
+    setMode(c === SHARED_DEMO_CASE ? "demo" : "app");
+  }, []);
+  if (mode === "") return null;
+  return mode === "demo" ? <SystemInvestigation /> : <FieldCaseApp />;
+}
+
+function FieldCaseApp() {
   const [accessAsk, setAccessAsk] = useState<{ detail: string; resolve: (code: string | null) => void } | null>(null);
   useEffect(() => {
     askForCode = (detail) => new Promise((resolve) => setAccessAsk({ detail, resolve }));
