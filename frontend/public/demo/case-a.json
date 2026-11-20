@@ -58,8 +58,15 @@
     "after": "cc_9",
     "kind": "safety",
     "method": "system",
-    "text": "After the protective shutdown the weakest cell went lower than at the first trip. Hold before any further restart.",
-    "title": "High voltage switched on 5 more times"
+    "text": "After each reset the system allowed high voltage again (5 times) while the weakest cell was still at 2.51–2.68 V, below the 2.70 V where level 2 first appeared. A cleared fault state is not a safe battery: hold.",
+    "title": "Fault cleared, hazard still there"
+   },
+   {
+    "after": "cc_8",
+    "kind": "key2",
+    "method": "physics",
+    "text": "The weakest cell's voltage fell 12× faster just before the trip and the cell spread grew from 58 to 319 mV, while the charge gap stayed constant: the end of its discharge curve, not a new fault.",
+    "title": "What tripped the protection, kept apart from the cause"
    },
    {
     "after": "cc_10",
@@ -90,8 +97,12 @@
      "title": "Counted the charge"
     },
     {
-     "text": "The weakest cell runs a constant 0.92 Ah behind the strongest, about 7.6 minutes at this load. It explains when the protection tripped, about 2 % of the shortfall, not why.",
-     "title": "Weighed the weakest cell against the pack"
+     "text": "At a steady load, the weakest cell's voltage fall sped up from about 9 to 112 mV per minute before the trip, while the strongest cell's went only from 7 to 20. The spread between them grew from 58 to 319 mV, yet the charge gap between them stayed a constant 0.92 Ah. The growing spread is the weakest cell reaching the steep end of its discharge curve: that is the mechanism that tripped the protection.",
+     "title": "Read the dynamic voltage behaviour"
+    },
+    {
+     "text": "The weakest cell explains when the protection tripped, about 2 % of the shortfall. Why the pack was at the end of its charge while it showed 47 % is a separate, upstream question: the SOC estimate. Veyra keeps the two apart instead of blaming the cell.",
+     "title": "Kept the trigger apart from the root cause"
     },
     {
      "text": "Lost capacity, a sensor reading low, a hidden load, a harness or contactor fault: each would leave a different trace. The record weakens sensing and contactor faults; three causes remain.",
@@ -117,8 +128,9 @@
      "title": "Inferred the protection thresholds from timing"
     },
     {
-     "text": "High voltage was switched back on 5 times after the shutdown, each time with the weakest cell already below the level-2 voltage. That became a safety hold.",
-     "title": "Followed every restart"
+     "badge": "safety",
+     "text": "After each reset the BMS cleared its fault state and the system allowed high voltage again, 5 times. But the condition behind the fault had not gone: every re-closure was made with the weakest cell at 2.51–2.68 V, below the 2.70 V where level 2 first appeared, and 3 ended in another protective shutdown. A cleared fault state is not a safe battery, so Veyra put a hold on further restarts.",
+     "title": "Reasoned across state resets"
     },
     {
      "text": "Copies of the same signal were not counted twice, and a voltage field that never changes with the contactors was set aside as not measuring what its name says.",

@@ -27,6 +27,7 @@ const METHOD: Record<string, string> = { system: "System-level method", physics:
 function viewFor(t: Tool, prev: View): View {
   if (t.view) return t.view;
   if (t.tool === "physical_checks") return { window: "fault", soc: true, band: true, thresholds: true };
+  if (t.tool === "inquiry_dynamics") return { window: "fault", thresholds: true, events: true, emphHi: true };
   if (t.tool === "submit_report") return { window: "fault", soc: true, band: true, thresholds: true };
   return prev;
 }
@@ -241,7 +242,7 @@ function Outputs({ d, done }: { d: Any; done: boolean }) {
           <div className={w.two}>
             <div className={w.col}>
               <h3><span className={`${w.chip} ${w.chipSys}`}>System-level investigation</span>What the vehicle actually did</h3>
-              <ol>{run.methods.system.map((m: Any) => <li key={m.title}><b>{m.title}</b><p>{m.text}</p></li>)}</ol>
+              <ol>{run.methods.system.map((m: Any) => <li key={m.title}><b>{m.title}{m.badge && <span className={`${w.badge} ${w.badgeSafety}`}>{m.badge}</span>}</b><p>{m.text}</p></li>)}</ol>
             </div>
             <div className={w.col}>
               <h3><span className={`${w.chip} ${w.chipPhys}`}>Physics reasoning</span>What physics allows</h3>
