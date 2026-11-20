@@ -218,7 +218,10 @@ function Outputs({ d, done }: { d: Any; done: boolean }) {
   return (
     <section className={`${w.card} ${w.outputs}`}>
       <header className={w.outHead}>
-        <h2>Case outputs</h2>
+        <div className={w.outTitle}>
+          <h2>Case outputs</h2>
+          <p className={w.slogan}><b>From one investigation:</b> a failure solved, engineering knowledge retained.</p>
+        </div>
         <nav className={w.outTabs} role="tablist" aria-label="Case outputs">
           {OUT_TABS.map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? w.on : ""} onClick={() => setTab(k)}>
