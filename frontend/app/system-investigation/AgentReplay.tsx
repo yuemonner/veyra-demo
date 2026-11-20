@@ -84,7 +84,9 @@ export default function AgentReplay({ d }: { d: Any }) {
   const cur = i >= 0 ? events[i] : null;
   const nowMs = i < 0 ? 0 : cur?.kind === "think" ? endAt[i] - (cur.ms * (1 - thinkFrac)) : endAt[i];
   const view: View = i < 0 ? { window: d.series.window || "fault" } : views[i];
-  const toolsDone = events.slice(0, i + 1).filter((e) => e.kind === "tool").length;
+  const isEng = (e: Ev) => e.kind === "tool" && e.tool.tool !== "submit_report";
+  const toolsDone = events.slice(0, i + 1).filter(isEng).length;
+  const toolsAll = events.filter(isEng).length;
   const callsDone = events.slice(0, i + 1).filter((e) => e.kind === "think").length;
   const done = i >= events.length - 1;
   const start = () => { if (done) { setI(-1); setThinkFrac(1); } setPlaying(true); };
@@ -115,7 +117,7 @@ export default function AgentReplay({ d }: { d: Any }) {
       <div className={s.meters}>
         <span><b>{clock(nowMs)}</b> / {clock(run.seconds * 1000)} agent time</span>
         <span><b>{callsDone}</b> / {turns.length} agent steps</span>
-        <span><b>{toolsDone}</b> / {turns.reduce((a, t) => a + t.tools.length, 0)} tool calls</span>
+        <span><b>{toolsDone}</b> / {toolsAll} engineering tool calls</span>
         <span className={s.legend}>{Object.entries(run.hypotheses || {}).map(([k, v]) => `${k} = ${v}`).join(" · ")}</span>
         <div className={s.track}><div style={{ width: `${Math.min(100, (nowMs / (run.seconds * 1000)) * 100)}%` }} /></div>
       </div>
