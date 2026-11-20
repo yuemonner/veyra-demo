@@ -6,6 +6,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import s from "./system.module.css";
+import Replay from "./Replay";
+import AgentReplay from "./AgentReplay";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any;
@@ -13,6 +15,7 @@ type Any = any;
 const SIGNAL: Record<string, string> = {
   bms_fault_level: "BMS fault level", bms_state: "BMS state", power_state: "Vehicle power", dcdc_state: "DC/DC converter",
   main_negative_closed: "Main − contactor", main_positive_closed: "Main + contactor", precharge_closed: "Precharge contactor",
+  battery_code: "BMS battery code", vcu_bms_fault_level: "BMS fault level, as the VCU sees it",
 };
 const CHECK: Record<string, string> = {
   charge_accounting: "Charge balance", ocv_consistency: "Rested voltage against SOC", pack_cell_consistency: "Pack against cells",
@@ -93,13 +96,51 @@ function CellChart({ data }: { data: Any }) {
   );
 }
 
+// Two cases: the real field case (anonymised, the default) and a synthetic example (#synthetic).
+const CASES: Record<string, { file: string; tab: string }> = {
+  real: { file: "/demo/case-a.json", tab: "Real field case" },
+  synthetic: { file: "/demo/system-investigation.json", tab: "Synthetic example" },
+};
+const STAGE: Record<string, string> = {
+  read_logs: "Read the vehicle's logs", physical_checks: "Physical checks", explanations: "Possible causes weighed",
+  system_audit: "System-level audit", next_check: "Next check chosen",
+};
+
+/* How long the engine took, stage by stage, on the real data, against the original investigation. */
+function Speed({ rc }: { rc: Any }) {
+  const st: Record<string, number> = rc.timing.stages_s || {};
+  const max = Math.max(...Object.values(st), 0.01);
+  return (
+    <section className={`${s.panel} ${s.speed}`}>
+      <div className={s.speedHead}>
+        <div><span className={s.big}>{Math.round(rc.timing.total_s)} s</span><span className={s.bigLabel}>from the raw logs to the decisive finding: the 40-point SOC drop was not the battery emptying, the SOC estimate was wrong</span></div>
+        <div><span className={s.big}>0.08 Ah</span><span className={s.bigLabel}>actually flowed during that drop: the measured charge that rules out a real discharge</span></div>
+        <div><span className={`${s.big} ${s.bigMuted}`}>~2 days</span><span className={s.bigLabel}>the manufacturer, with its battery supplier, to reach the same point. Veyra had no access to the vehicle and no supplier data</span></div>
+      </div>
+      <ol className={s.stages}>
+        {Object.keys(STAGE).filter((k) => k in st).map((k) => [k, st[k]] as [string, number]).map(([k, v]) => (
+          <li key={k}><span>{STAGE[k] || k}</span><span className={s.bar}><i style={{ width: `${Math.max(2, (v / max) * 100)}%` }} /></span><span className={s.num}>{v.toFixed(2)} s</span></li>))}
+      </ol>
+      <p className={s.limit}>{rc.values}. Timings from one run of the deterministic engine; no AI model is called in these steps.</p>
+    </section>
+  );
+}
+
 export default function SystemInvestigation() {
+  const [which, setWhich] = useState<string>("real");
   const [data, setData] = useState<Any>(null);
   const [error, setError] = useState("");
   useEffect(() => {
-    fetch("/demo/system-investigation.json", { cache: "no-store" }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then(setData).catch((e) => setError(String(e)));
+    const read = () => setWhich(typeof window !== "undefined" && window.location.hash === "#synthetic" ? "synthetic" : "real");
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
   }, []);
+  useEffect(() => {
+    setData(null); setError("");
+    fetch(CASES[which].file, { cache: "no-store" }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then(setData).catch((e) => setError(String(e)));
+  }, [which]);
 
   const hyps = useMemo(() => (data ? (data.explanations.hypotheses as Any[]) : []), [data]);
 
@@ -115,15 +156,24 @@ export default function SystemInvestigation() {
       <header className={s.topbar}>
         <a href="/field-case" className={s.brand}><span className={s.mark}>V</span>Veyra</a>
         <span className={s.crumb}>System-level investigation</span>
+        <nav className={s.switch} aria-label="Case">
+          {Object.entries(CASES).map(([k, c]) => <a key={k} href={k === "real" ? "#real" : "#synthetic"} aria-current={which === k ? "page" : undefined}>{c.tab}</a>)}
+        </nav>
         <span className={s.spacer} />
         <a href="/field-case" className={s.quiet}>Field cases</a>
       </header>
 
       <main className={s.main}>
         <section className={s.hero}>
-          <p className={s.tags}><span className={s.tag}>Synthetic recording</span><span className={s.tag}>Computed by Veyra&apos;s engine</span><span className={s.tag}>Every number traces to a file and row</span></p>
+          <p className={s.tags}>
+            <span className={s.tag}>{data.real_case ? "Real field data, anonymised" : "Synthetic recording"}</span>
+            <span className={s.tag}>Computed by Veyra&apos;s engine</span><span className={s.tag}>Every number traces to a log and row</span>
+          </p>
           <h1>{data.case.title}</h1>
           <p className={s.lede}>Reported: “{data.case.reported}” {data.case.machine}.</p>
+          {data.agent_run?.benchmark?.headline?.text && (() => { const t: string = data.agent_run.benchmark.headline.text; const i = t.indexOf(". ");
+            return <p className={s.claim}><b>{t.slice(0, i + 1)}</b> {t.slice(i + 2)}</p>; })()}
+          {data.agent_run ? <AgentReplay key={which} d={data} /> : <Replay key={which} d={data} />}
           <div className={s.summary}>
             <div><b>What the record shows</b><p>{sys.symptom.statement}</p></div>
             <div><b>What the protection did</b><p>{say((sys.restarts.findings.find((f: Any) => f.id === "protection_not_latched") || {}).statement)}</p></div>
@@ -131,6 +181,8 @@ export default function SystemInvestigation() {
             {lead && <div><b>Check first</b><p>{lead.statement}</p></div>}
           </div>
         </section>
+
+        {data.real_case && <Speed rc={data.real_case} />}
 
         <h2 className={s.part}><span>1</span>System-level investigation</h2>
         <p className={s.partLede}>Veyra reads the whole machine before the battery: the reported symptom against the record, the order in which BMS, VCU, DC/DC and contactors acted, which signals are real measurements, and what happened at every restart.</p>
@@ -175,7 +227,7 @@ export default function SystemInvestigation() {
 
         <section className={s.panel}>
           <h3>Restarts and high-voltage authorisation</h3>
-          <p className={s.rule}>Rule declared for this machine: {data.case.rules.join(" ")}</p>
+          <p className={s.rule}>{data.case.rules?.length ? `Rule declared for this machine: ${data.case.rules.join(" ")}` : "No manufacturer rules were given at intake, so Veyra raises what the specification must decide as questions."}</p>
           <div className={s.scroll}>
             <table className={s.table}>
               <thead><tr><th>Closure</th><th>Time</th><th>Fault level at closure</th><th>Weakest cell at closure</th><th>Lowest while on</th><th>Ended by another shutdown</th></tr></thead>
@@ -247,8 +299,24 @@ export default function SystemInvestigation() {
           </ol>
         </section>
 
+        {data.real_case && (
+          <section className={`${s.panel} ${s.outcome}`}>
+            <h3>What the manufacturer confirmed afterwards</h3>
+            <p>{data.real_case.outcome.statement}</p>
+            <div className={s.scroll}>
+              <table className={s.table}>
+                <thead><tr><th>Veyra, before the cause was known</th><th>Confirmed by the manufacturer</th></tr></thead>
+                <tbody>{data.real_case.outcome.rows.map((r: string[], i: number) => <tr key={i}><td>{r[0]}</td><td>{r[1]}</td></tr>)}</tbody>
+              </table>
+            </div>
+            <p className={s.rule}>Fix in operation: {data.real_case.outcome.fix}</p>
+          </section>)}
+
         <footer className={s.foot}>
-          Synthetic recording, generated from first principles; no customer data. Computed by Veyra&apos;s engine ({data.case.engine.audit}, {data.case.engine.expert_layer}).
+          {data.real_case
+            ? `${data.real_case.label}. Computed views only; no raw data is published.`
+            : "Synthetic recording, generated from first principles; no customer data."}{" "}
+          Computed by Veyra&apos;s engine ({data.case.engine.audit}, {data.case.engine.expert_layer}).
         </footer>
       </main>
     </div>

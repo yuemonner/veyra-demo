@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-// The tool opens on the field cases.
+// The demo opens on the real field case, investigated at system level.
 export default function Home() {
-  redirect("/field-case");
+  redirect("/system-investigation");
 }

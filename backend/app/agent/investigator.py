@@ -975,7 +975,9 @@ def model_call_record(n: int, reply: Dict[str, Any], ms: int, fallback_model: Op
             "input_tokens": int(u.get("input_tokens") or 0), "cache_read_input_tokens": int(u.get("cache_read_input_tokens") or 0),
             "cache_creation_input_tokens": int(u.get("cache_creation_input_tokens") or 0), "output_tokens": int(u.get("output_tokens") or 0),
             "cost_usd": reply.get("cost_usd"), "cost_basis": reply.get("cost_basis"), "ms": ms, "api_ms": reply.get("api_ms"),
-            "requested": requested}
+            "requested": requested,
+            # The model's own words for this step (the reply's text), kept for the trace and replay.
+            "note": " ".join(str(b.get("text") or "").strip() for b in (reply.get("content") or []) if isinstance(b, dict) and b.get("type") == "text").strip() or None}
 
 
 def usage_totals(calls: List[Dict[str, Any]]) -> Dict[str, Any]:

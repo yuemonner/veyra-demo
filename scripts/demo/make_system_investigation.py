@@ -24,8 +24,8 @@ RULES = {
     "items": ["Fault level 1 and 2 permit high voltage; level 3 is the protective shutdown and should stay latched"],
 }
 REPORTED = "The shuttle lost drive power and would not move."
-SERIES = {"v_cell_min": "Lowest cell (V)", "v_cell_max": "Highest cell (V)", "soc": "Displayed SOC (%)", "i_pack": "Pack current (A)",
-          "fault_raw": "BMS fault level"}
+SERIES = {"v_cell_min": ("min_cell_voltage", "Lowest cell (V)"), "v_cell_max": ("max_cell_voltage", "Highest cell (V)"),
+          "soc": ("soc", "Displayed SOC (%)"), "i_pack": ("pack_current", "Pack current (A)"), "fault_raw": ("bms_fault_level", "BMS fault level")}
 
 
 def _ev(items, n=3):
@@ -37,10 +37,12 @@ def _finding(f):
             "evidence": _ev(f.get("evidence")), "limits": f.get("limits") or []}
 
 
-def _series(rec, window, step_s=2.0):
+def _series(rec, prof, window, step_s=2.0):
+    """Down-sampled lines keyed by a stable name (independent of the recording's own field names)."""
     out = {}
-    for field, label in SERIES.items():
-        if not rec.has(window, field):
+    for key, (role, label) in SERIES.items():
+        field = prof.role(role)["field"] if prof.has_role(role) else None
+        if not field or not rec.has(window, field):
             continue
         col = rec.column(window, field)
         pts, last = [], None
@@ -48,18 +50,35 @@ def _series(rec, window, step_s=2.0):
             if last is None or t - last >= step_s:
                 pts.append([round(t, 2), round(v, 4)])
                 last = t
-        out[field] = {"label": label, "points": pts}
+        out[key] = {"label": label, "points": pts}
     return out
 
 
 def build() -> dict:
-    from app.physchecks import base, expert_layer, facts as facts_mod, hypotheses, planner, synthetic
+    from app.physchecks import synthetic
     rec, prof = synthetic.incident(), synthetic.profile()
-    checks = base.run_all(rec, prof)
+    meta = {"title": "Parked shuttle loses high voltage after an undervoltage trip, then is restarted", "reported": REPORTED,
+            "machine": "Battery-electric shuttle (synthetic), 100 Ah pack, BMS and VCU logs",
+            "recording": rec.recording_id if hasattr(rec, "recording_id") else "syn-incident", "rules": RULES["items"]}
+    return build_from(rec, prof, rules=RULES, reported=REPORTED, meta=meta, synthetic=True)
+
+
+def build_from(rec, prof, *, rules, reported, meta, synthetic, params=None, window="fault", timings=None) -> dict:
+    """The engine's system-level audit, physical checks, explanations and plan for one recording, as the demo page reads them.
+    `timings` (optional dict) receives the seconds each stage took."""
+    import time
+    from app.physchecks import base, expert_layer, facts as facts_mod, hypotheses, planner
+    tm = timings if timings is not None else {}
+    t = time.perf_counter()
+    checks = base.run_all(rec, prof, params) if params is not None else base.run_all(rec, prof)
+    tm["physical_checks"] = time.perf_counter() - t; t = time.perf_counter()
     F = facts_mod.derive(rec, prof, checks)
     A = hypotheses.assess(checks, F, [], machine=hypotheses.machine_of(prof))
-    ex = expert_layer.enrich(rec, prof, checks, F, A, rules=RULES, reported_symptom=REPORTED)
+    tm["explanations"] = time.perf_counter() - t; t = time.perf_counter()
+    ex = expert_layer.enrich(rec, prof, checks, F, A, rules=rules, reported_symptom=reported)
+    tm["system_audit"] = time.perf_counter() - t; t = time.perf_counter()
     plan = planner.plan(A, checks)
+    tm["next_check"] = time.perf_counter() - t
     au = ex["audit"]
 
     cs = au.get("control_sequence") or {}
@@ -70,16 +89,9 @@ def build() -> dict:
     sv = au.get("symptom_vs_record") or {}
     return {
         "schema": "veyra-demo-system-investigation-v1",
-        "synthetic": True,
-        "case": {
-            "title": "Parked shuttle loses high voltage after an undervoltage trip, then is restarted",
-            "reported": REPORTED,
-            "machine": "Battery-electric shuttle (synthetic), 100 Ah pack, BMS and VCU logs",
-            "recording": rec.recording_id if hasattr(rec, "recording_id") else "syn-incident",
-            "windows": {w: list(rec.span(w)) for w in ("early", "fault", "repeat") if rec.span(w)},
-            "rules": RULES["items"],
-            "engine": {"audit": au.get("version"), "expert_layer": A.get("expert_layer")},
-        },
+        "synthetic": synthetic,
+        "case": dict(meta, windows={w: list(rec.span(w)) for w in rec.windows if rec.span(w)} if hasattr(rec, "windows") else {},
+                     engine={"audit": au.get("version"), "expert_layer": A.get("expert_layer")}),
         "system": {
             "symptom": {"statement": sv.get("statement"), "value": sv.get("value")},
             "sequence": {"statement": cs.get("statement"), "events": [{k: e.get(k) for k in ("t", "role", "from", "to")} | {"evidence": _ev(e.get("evidence"), 1)}
@@ -113,8 +125,9 @@ def build() -> dict:
             "safety_holds": plan.get("safety_holds") or [],
             "recommended": [{k: r.get(k) for k in ("id", "title", "kind", "hv_state", "distinguishes_labels", "predictions")} for r in (plan.get("recommended") or [])[:4]],
         },
-        "series": {"window": "fault", "trigger_t": (cs.get("value") or {}).get("trigger_t"), "open_t": (cs.get("value") or {}).get("open_t"),
-                   "lines": _series(rec, "fault")},
+        "series": {"window": window, "trigger_t": (cs.get("value") or {}).get("trigger_t"), "open_t": (cs.get("value") or {}).get("open_t"),
+                   "lines": _series(rec, prof, window),
+                   "by_window": {w: _series(rec, prof, w) for w in getattr(rec, "windows", []) if w != window}},
     }
 
 
