@@ -1,0 +1,212 @@
+{
+ "arm": "alone",
+ "alias": "flight-40",
+ "folder": "carbonZ_2018-10-05-16-04-46_engine_failure_with_emr_traj",
+ "input_sha256": "4436d09f034d2f5cb87c83479603c0606997d0f7d283d72962560cab522db801",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 23.4
+  }
+ ],
+ "prompt_chars": 12340,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Output ch[2] dropped to 1100 us and stayed there from t=77 s, after throttle fell to 0 at t=76 s; aircraft lost altitude.",
+   "status": "cause_unknown",
+   "explanation": "A control or propulsion fault began at t=76-77 s. Throttle went to 0% and ch[2] stuck at minimum for the rest of the flight. Data cannot separate a commanded failsafe from an actuator or ESC failure on ch[2].",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 78,
+     "quote": "76,...,50 -> 0 (propulsion.throttle)",
+     "shows": "Throttle fell from 45% to 0% and stayed at 0 for the rest of the log, with no recovery.",
+     "calls": []
+    },
+    {
+     "line": 79,
+     "quote": "77,1.5e+03,1.51e+03,1.1e+03,...",
+     "shows": "ch[2] went from 1480 us to 1100 us and stayed there through t=92. Other channels kept varying normally, so this one is pinned.",
+     "calls": []
+    },
+    {
+     "line": 94,
+     "quote": "92,...,26 (altitude)",
+     "shows": "Relative altitude fell from about 49 m at t=76 to 26 m at t=92 with no thrust, so the aircraft was sinking.",
+     "calls": []
+    },
+    {
+     "line": 94,
+     "quote": "92,...,1.18e+03,1.1e+03,1.57e+03,1.64e+03,1.64e+03",
+     "shows": "ch[1] fell to 1180 us while ch[4] and ch[5] rose to 1640 us and pitch setpoint rose to 17.7 deg. The controller was compensating with other outputs.",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "effects": [
+    {
+     "line": 79,
+     "quote": "yaw setpoint 516 -> 772 (unwrapped, rising every second)",
+     "why": "The yaw setpoint kept rising from t=77 s. The vehicle yaw followed it and altitude dropped, which looks like a consequence of lost thrust, not a separate cause."
+    },
+    {
+     "line": 94,
+     "quote": "92,...,1.18e+03 (ch[1])",
+     "why": "ch[1] fell to 1180 us in the last seconds, which looks like the controller compensating for the lost ch[2] output."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect ch[2] motor, ESC and wiring, and read the failsafe log.",
+    "why": "Separates a commanded throttle cut (failsafe or low battery) from a real ch[2] actuator or ESC failure.",
+    "how": [
+     "Check the controller log for a failsafe or arming-state change at t=76 s",
+     "Bench-test ch[2] output and its ESC or servo",
+     "Check battery voltage under load against the t=0.7 s low-voltage warning"
+    ],
+    "where": "on_site",
+    "outcomes": [
+     {
+      "label": "Failsafe or mode change logged at 76 s",
+      "means": "The throttle cut was commanded, probably by a battery or sensor failsafe.",
+      "keeps": [
+       "h2",
+       "h3"
+      ],
+      "rules_out": []
+     },
+     {
+      "label": "ch[2] actuator or ESC faulty on bench",
+      "means": "The ch[2] hardware failed and the output was pinned.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     }
+    ],
+    "needs_approval": true,
+    "record": [
+     "actuator.output[ch[2]]",
+     "propulsion.throttle",
+     "vehicle.altitude[relative]",
+     "battery voltage"
+    ]
+   },
+   "unknowns": [
+    "Whether the throttle cut was commanded by a failsafe or came from the throttle source",
+    "What ch[2] physically drives, since it is not labelled",
+    "Why the airspeed and yaw-rate signals read 0 for the whole flight"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Actuator output ch[2]",
+     "claim": "ch[2] output or its ESC or actuator failed or latched at minimum from t=77 s.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "ch[2] is pinned at 1100 us for 16 s while the controller keeps changing the other outputs.",
+     "basis": "indirect",
+     "lines": [
+      79,
+      94
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Failsafe or battery cutoff",
+     "claim": "Throttle was commanded to 0 at t=76 s by a failsafe, possibly from the low-voltage warning.",
+     "status": "open",
+     "role": "trigger",
+     "because": "Throttle drops to 0 one second before ch[2] pins, and a low-voltage warning was logged at 0.7 s.",
+     "basis": "indirect",
+     "lines": [
+      78
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Sensors",
+     "claim": "A sensor fault (the 'Sensor helth' error, airspeed and yaw rate flat at 0) degraded control.",
+     "status": "weakened",
+     "role": "amplifier",
+     "because": "The sensor error appears at 0.7 s, long before the t=76-77 s change, and attitude tracking looked normal before then.",
+     "basis": "indirect",
+     "lines": []
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      97
+     ],
+     "what": "Battery low voltage warning at 0.7 s",
+     "class": "anomaly",
+     "why": "This was logged at the start and could explain a later failsafe throttle cut."
+    },
+    {
+     "lines": [
+      98
+     ],
+     "what": "System error 'Sensor helth' at 0.7 s",
+     "class": "anomaly",
+     "why": "It is consistent with the airspeed and yaw-rate channels reading 0 all flight."
+    },
+    {
+     "lines": [
+      78,
+      79
+     ],
+     "what": "Throttle to 0 at t=76 s, ch[2] pinned at 1100 us at t=77 s",
+     "class": "root_cause_candidate",
+     "why": "This is the only abrupt change in the flight and it coincides with the loss of altitude."
+    },
+    {
+     "lines": [
+      94
+     ],
+     "what": "Altitude falling and ch[1] diverging at the end",
+     "class": "effect",
+     "why": "These follow the lost thrust and ch[2] output."
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "What ch[2] physically drives",
+     "why_it_matters": "The effect of the pinned output depends on whether it is a motor or a control surface.",
+     "how_to_observe": "Check the output mapping and wiring for ch[2]."
+    }
+   ],
+   "field_questions": [],
+   "lesson": "",
+   "reuse_when": ""
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 10958,
+   "output_tokens": 3146
+  },
+  "seconds": 23.4
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 76.195,
+    "value": 1
+   }
+  },
+  "onset_s": 76.195
+ }
+}

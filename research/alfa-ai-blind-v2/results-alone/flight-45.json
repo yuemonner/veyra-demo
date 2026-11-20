@@ -1,0 +1,199 @@
+{
+ "arm": "alone",
+ "alias": "flight-45",
+ "folder": "carbonZ_2018-10-18-11-04-35_engine_failure_with_emr_traj",
+ "input_sha256": "1eccdcfa306036ac37e456fc30d9ebd05042e86db4c6227fd8e1bcc28d723027",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 18.7
+  }
+ ],
+ "prompt_chars": 14374,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Propulsion cut at t=102 s: output ch[2] dropped to 1100 us, throttle fell to 0, aircraft descended.",
+   "status": "cause_probable",
+   "explanation": "At t=102 s throttle fell from 59% to 0% and ch[2] went to its 1100 us minimum, where it stayed. Pitch then went to -25 deg and altitude fell from 50 m to 14 m. Whether the cut was a failsafe or an output fault cannot be separated.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 102,
+     "quote": "t=102: ch[2]=1.1e+03, propulsion.throttle=0",
+     "shows": "Throttle dropped from 59% to 0 in one second, and ch[2] went from 1570 to its 1100 us minimum, the same value ch[7] holds all flight.",
+     "calls": []
+    },
+    {
+     "line": 104,
+     "quote": "t=104: pitch setpoint -24.8, altitude 45.5",
+     "shows": "The pitch setpoint saturated near -24.8 deg and altitude began falling at about 6 m/s, reaching 14.4 m at t=109. The controller was commanding a steep nose-down.",
+     "calls": []
+    },
+    {
+     "line": 0,
+     "quote": "controller.event[mavros: Battery] WARN: Low voltage",
+     "shows": "A low-voltage warning and a sensor-health error were logged at t=0.7 s, long before the cut. They may be related, but no event is logged at t=102.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared throttle with each actuator output for t=0-109",
+     "result": "Only ch[2] follows throttle (about 1.3k-1.65k tracking 22-69%). It is the only output that goes to minimum and stays there from t=102.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Looked for a pre-cut degradation trend",
+     "result": "No drift or oscillation before t=102. Roll and yaw tracking look normal, so the drop is a step.",
+     "verdict": "inconclusive",
+     "about": "h1",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 104,
+     "quote": "pitch -20.3 to -25.3, altitude 45.5 to 14.4",
+     "why": "Loss of thrust led to the nose-down attitude and the altitude loss."
+    },
+    {
+     "line": 108,
+     "quote": "roll setpoint 42.4 with ch[2]=1100",
+     "why": "The controller kept commanding a turn while thrust was absent."
+    }
+   ],
+   "next_action": {
+    "action": "Pull the full flight log around t=95-110 s and review the failsafe and motor-output state.",
+    "why": "Settles whether the ch[2] cut came from a commanded failsafe or a motor, ESC or output fault.",
+    "how": [
+     "Check mode and failsafe messages near t=102",
+     "Inspect the ESC and motor on output ch[2]",
+     "Check battery voltage and current before the cut"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Failsafe or commanded cut at t=102",
+      "means": "The controller deliberately zeroed the throttle, for example from the low-battery or sensor-health condition.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Review the failsafe configuration and battery thresholds"
+     },
+     {
+      "label": "No command, output simply failed",
+      "means": "A motor, ESC or output-channel fault on ch[2].",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Bench-test the ESC and motor on ch[2]"
+     }
+    ]
+   },
+   "unknowns": [
+    "Battery voltage and current values are not in the data.",
+    "Airspeed reads 0 for the whole flight, so the airspeed sensor appears unavailable.",
+    "Which physical motor or surface ch[2] drives is not stated."
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Propulsion output ch[2]",
+     "claim": "The motor, ESC or output on ch[2] failed or was cut to minimum at t=102.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "ch[2] and throttle both step to minimum at the same second with no precursor.",
+     "basis": "indirect",
+     "lines": [
+      102
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Failsafe / battery",
+     "claim": "A low-battery or sensor-health failsafe commanded the throttle cut.",
+     "status": "open",
+     "role": "trigger",
+     "because": "A low-voltage warning and a sensor-health error were logged at t=0.7 s, but no event is logged at t=102.",
+     "basis": "indirect",
+     "lines": [
+      0
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      0
+     ],
+     "what": "Low voltage warning and sensor health error",
+     "class": "anomaly",
+     "why": "Logged at t=0.7 s and could be linked to the later cut, but nothing is logged at t=102."
+    },
+    {
+     "lines": [
+      102
+     ],
+     "what": "ch[2] to 1100 us and throttle to 0",
+     "class": "root_cause_candidate",
+     "why": "Abrupt propulsion loss."
+    },
+    {
+     "lines": [
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109
+     ],
+     "what": "Pitch -25 deg and altitude falling",
+     "class": "effect",
+     "why": "Consequence of lost thrust."
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "Which physical motor or channel ch[2] drives",
+     "how_to_observe": "Check the output mapping in the vehicle configuration."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 12667,
+   "output_tokens": 2377
+  },
+  "seconds": 18.7
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 101.302,
+    "value": 1
+   }
+  },
+  "onset_s": 101.302
+ }
+}

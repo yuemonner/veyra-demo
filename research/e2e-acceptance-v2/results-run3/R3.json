@@ -1,0 +1,1112 @@
+{
+ "label": "R3",
+ "recording": "rec-0000000000000002",
+ "profile": "synthetic-bev-tables",
+ "engine_case": "case-ba1e2d34bada",
+ "seconds": 95.1,
+ "scan": {
+  "counts": {
+   "VIOLATION": 1
+  },
+  "filename": "SYNTHETIC-R3-correction.zip",
+  "format": "decoded_csv_package",
+  "profile": "synthetic-bev-tables",
+  "profiles": [
+   {
+    "bindings": {
+     "bms": "synbms"
+    },
+    "machine_class": "battery_electric_vehicle",
+    "origin": "built-in",
+    "profile": "synthetic-bev-tables",
+    "reasons": [],
+    "status": "compatible",
+    "synthetic": true
+   },
+   {
+    "bindings": {},
+    "machine_class": "battery_electric_vehicle",
+    "origin": "built-in",
+    "profile": "synthetic-bev-ros",
+    "reasons": [
+     "format decoded_csv_package is not one this profile reads (ros1_bag, ros2_bag, mcap)"
+    ],
+    "status": "incompatible",
+    "synthetic": true
+   },
+   {
+    "bindings": {},
+    "machine_class": "px4_vehicle",
+    "origin": "built-in",
+    "profile": "px4-battery-status",
+    "reasons": [
+     "format decoded_csv_package is not one this profile reads (px4_ulog)"
+    ],
+    "status": "incompatible",
+    "synthetic": false
+   },
+   {
+    "bindings": {},
+    "machine_class": null,
+    "origin": "built-in",
+    "profile": "ros-battery-state",
+    "reasons": [
+     "format decoded_csv_package is not one this profile reads (ros1_bag, ros2_bag, mcap)"
+    ],
+    "status": "incompatible",
+    "synthetic": false
+   }
+  ],
+  "recording": "rec-0000000000000002",
+  "results": [
+   {
+    "applicability": "applies",
+    "matched_original": true,
+    "outcome": "VIOLATION",
+    "reasons": [],
+    "scenario_id": "scn-e7154fccb2cf",
+    "scenario_title": "SOC correction not explained by measured charge (from R1)",
+    "scenario_version": 1,
+    "summary": "1 SOC correction(s) not explained by measured charge; largest: 56.8 % -> 24.0 % in 29.0 s (fault), measured charge 0.056 Ah explains 0.056 pp, 32.74 pp unexplained."
+   }
+  ],
+  "scenarios": [
+   "scn-e7154fccb2cf"
+  ],
+  "state": "scanned",
+  "synthetic": true
+ },
+ "investigation": {
+  "agent": {
+   "accepted_as_is": true,
+   "agent_report": {
+    "explanation": "The BMS opened the contactors on cell under-voltage, which explains how HV was lost, not why. About 4.1 Ah was delivered against 60.4 Ah promised by SOC. SOC error, capacity shortfall and current under-measurement all fit.",
+    "hypotheses": [
+     {
+      "id": "A",
+      "statement": "SOC estimation / calibration: SOC drifted high through coulomb counting and was corrected abruptly near the under-voltage alarm.",
+      "status": "open"
+     },
+     {
+      "id": "B",
+      "statement": "Usable capacity below parameter: Usable capacity is far below the stated capacity parameter (fade or wrong parameter).",
+      "status": "open"
+     },
+     {
+      "id": "C",
+      "statement": "Current measurement / bypass load: The BMS current sensor under-reads or a load bypasses it, so counted charge is too low.",
+      "status": "open"
+     },
+     {
+      "id": "D",
+      "statement": "Weak cell / imbalance: One weak or poorly balanced cell (index 81) reaches cutoff first.",
+      "status": "weakened"
+     },
+     {
+      "id": "E",
+      "statement": "Cell-voltage sensing / harness: The low cell reading is a sensing error.",
+      "status": "weakened"
+     },
+     {
+      "id": "F",
+      "statement": "Contactor / VCU / insulation first: A contactor, VCU or insulation fault came first and the battery alarms followed.",
+      "status": "weakened"
+     }
+    ],
+    "next_check": "Export BMS charge and calibration history plus the charger log",
+    "summary": "Under-voltage protection opened HV after a pack-wide energy shortfall; upstream cause unresolved among SOC, capacity and current sensing."
+   },
+   "constrained_claims": [
+    {
+     "constrained_status": "open",
+     "hypotheses": [
+      "B",
+      "E",
+      "P1"
+     ],
+     "kind": "text",
+     "reasons": [],
+     "source": "headline",
+     "text": "Under-voltage protection opened HV after a pack-wide energy shortfall; upstream cause unresolved among SOC, capacity and current sensing.",
+     "verdict": "accepted"
+    },
+    {
+     "constrained_status": "open",
+     "hypotheses": [
+      "A",
+      "B",
+      "P1"
+     ],
+     "kind": "text",
+     "reasons": [],
+     "source": "explanation",
+     "text": "The BMS opened the contactors on cell under-voltage, which explains how HV was lost, not why. About 4.1 Ah was delivered against 60.4 Ah promised by SOC. SOC error, capacity shortfall and current under-measurement all fit.",
+     "verdict": "accepted"
+    },
+    {
+     "assessment_role": "upstream_cause",
+     "assessment_status": "open",
+     "kind": "structured",
+     "physical_ref": "A",
+     "reasons": [
+      "consistent with SOC estimation / calibration error (open)"
+     ],
+     "source": "hypothesis h1",
+     "text": "SOC estimation / calibration: SOC drifted high through coulomb counting and was corrected abruptly near the under-voltage alarm.",
+     "verdict": "accepted"
+    },
+    {
+     "assessment_role": "upstream_cause",
+     "assessment_status": "open",
+     "kind": "structured",
+     "physical_ref": "B",
+     "reasons": [
+      "consistent with Usable capacity far below the stated parameter (open)"
+     ],
+     "source": "hypothesis h2",
+     "text": "Usable capacity below parameter: Usable capacity is far below the stated capacity parameter (fade or wrong parameter).",
+     "verdict": "accepted"
+    },
+    {
+     "assessment_role": "upstream_cause",
+     "assessment_status": "open",
+     "kind": "structured",
+     "physical_ref": "C",
+     "reasons": [
+      "consistent with Current under-measured or load bypassing the sensor (open)"
+     ],
+     "source": "hypothesis h3",
+     "text": "Current measurement / bypass load: The BMS current sensor under-reads or a load bypasses it, so counted charge is too low.",
+     "verdict": "accepted"
+    },
+    {
+     "assessment_role": "contributing_factor",
+     "assessment_status": "insufficient_alone",
+     "kind": "structured",
+     "physical_ref": "D",
+     "reasons": [
+      "consistent with Weak cell / imbalance (insufficient_alone)"
+     ],
+     "source": "hypothesis h4",
+     "text": "Weak cell / imbalance: One weak or poorly balanced cell (index 81) reaches cutoff first.",
+     "verdict": "accepted"
+    },
+    {
+     "assessment_role": "upstream_cause",
+     "assessment_status": "weakened",
+     "kind": "structured",
+     "physical_ref": "E",
+     "reasons": [
+      "consistent with Cell-voltage sensing or harness fault (weakened)"
+     ],
+     "source": "hypothesis h5",
+     "text": "Cell-voltage sensing / harness: The low cell reading is a sensing error.",
+     "verdict": "accepted"
+    },
+    {
+     "assessment_role": "upstream_cause",
+     "assessment_status": "weakened",
+     "kind": "structured",
+     "physical_ref": "F",
+     "reasons": [
+      "consistent with Contactor, VCU or insulation event first (weakened)"
+     ],
+     "source": "hypothesis h6",
+     "text": "Contactor / VCU / insulation first: A contactor, VCU or insulation fault came first and the battery alarms followed.",
+     "verdict": "accepted"
+    }
+   ],
+   "engine_case_id": "case-ba1e2d34bada",
+   "investigator": "main",
+   "mode": "agent",
+   "model": "claude-code:sonnet",
+   "note": "Veyra's main investigator (evidence sheet + physical layer), held to the quote/number verifier and to the physical assessment by reference. Statements are proposals until an engineer verifies them.",
+   "provider": "anthropic",
+   "reason": null,
+   "safety_gate": null,
+   "trace": [
+    {
+     "error": false,
+     "input": {},
+     "step": 0,
+     "tool": "overview"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 1,
+     "tool": "case_context"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 2,
+     "tool": "physical_checks"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 3,
+     "tool": "physical_hypotheses"
+    },
+    {
+     "error": false,
+     "input": {
+      "requester_qualification": "none"
+     },
+     "step": 4,
+     "tool": "physical_next_checks"
+    }
+   ],
+   "version": "veyra-investigator-v1"
+  },
+  "case_id": "rec-0000000000000002",
+  "deterministic": {
+   "checks": {
+    "charge_accounting": {
+     "outcome": "VIOLATION",
+     "summary": "1 SOC correction(s) not explained by measured charge; largest: 56.8 % -> 24.0 % in 29.0 s (fault), measured charge 0.056 Ah explains 0.056 pp, 32.74 pp unexplained."
+    },
+    "protection_sequence": {
+     "outcome": "INDETERMINATE",
+     "summary": "Indeterminate: 3 escalation(s) recorded (highest level 3); observed sequence reported, no specification to judge it against."
+    },
+    "restart_eligibility": {
+     "outcome": "PASS",
+     "summary": "1 protective shutdown(s); HV was not closed again afterwards in the record."
+    }
+   },
+   "hypotheses": [
+    {
+     "id": "S1",
+     "label": "HV lost",
+     "role": "observed_symptom",
+     "status": "observed"
+    },
+    {
+     "id": "P1",
+     "label": "Under-voltage protection",
+     "role": "protective_response",
+     "status": "observed"
+    },
+    {
+     "id": "A",
+     "label": "SOC estimation / calibration error",
+     "role": "upstream_cause",
+     "status": "open"
+    },
+    {
+     "id": "B",
+     "label": "Usable capacity far below the stated parameter",
+     "role": "upstream_cause",
+     "status": "open"
+    },
+    {
+     "id": "C",
+     "label": "Current under-measured or load bypassing the sensor",
+     "role": "upstream_cause",
+     "status": "open"
+    },
+    {
+     "id": "D",
+     "label": "Weak cell / imbalance",
+     "role": "contributing_factor",
+     "status": "insufficient_alone"
+    },
+    {
+     "id": "E",
+     "label": "Cell-voltage sensing or harness fault",
+     "role": "upstream_cause",
+     "status": "weakened"
+    },
+    {
+     "id": "F",
+     "label": "Contactor, VCU or insulation event first",
+     "role": "upstream_cause",
+     "status": "weakened"
+    }
+   ],
+   "next_check": {
+    "id": "DOC-BMS-HISTORY",
+    "prior": [
+     {
+      "applicability": "applies",
+      "case_id": "rec-0000000000000000",
+      "hypothesis_id": "A",
+      "result": "confirmed",
+      "verified_by": "Engineer B (scripted)"
+     }
+    ],
+    "title": "BMS charge and calibration history since the last full charge"
+   },
+   "summary": "HV loss was the BMS under-voltage protection acting (protective response, not the origin). Open upstream explanations: SOC estimation / calibration error; Usable capacity far below the stated parameter; Current under-measured or load bypassing the sensor. The recorded data does not separate them. A weak cell cannot explain the whole incident on its own: the highest cell was also depleted (pack-wide decline larger than the cell spread), and the SOC accounting discrepancy is pack-level: a weak cell can be an additional contributor, not the whole explanation. No root cause is confirmed."
+  },
+  "finished_at": "2026-11-16T19:13:40.532030+00:00",
+  "knowledge_used": [
+   {
+    "applicability": "applies",
+    "case_id": "rec-0000000000000000",
+    "hypothesis_id": "A",
+    "result": "confirmed"
+   }
+  ],
+  "recording_digest": "2fab149ba3f1f66f33800e0426f76a2183287caaa57190ee144beeaf220f0852",
+  "scenario_results": {
+   "here": [
+    {
+     "applicability": "applies",
+     "matched_original": true,
+     "outcome": "VIOLATION",
+     "recording": "rec-0000000000000002",
+     "scenario_id": "scn-e7154fccb2cf",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "1 SOC correction(s) not explained by measured charge; largest: 56.8 % -> 24.0 % in 29.0 s (fault), measured charge 0.056 Ah explains 0.056 pp, 32.74 pp unexplained.",
+     "synthetic": null,
+     "trigger": "ingest"
+    }
+   ],
+   "other_recordings": [
+    {
+     "applicability": "applies",
+     "matched_original": true,
+     "outcome": "VIOLATION",
+     "recording": "rec-0000000000000000",
+     "scenario_id": "scn-e7154fccb2cf",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "1 SOC correction(s) not explained by measured charge; largest: 60.8 % -> 22.8 % in 30.0 s (fault), measured charge 0.0545 Ah explains 0.054 pp, 37.95 pp unexplained.",
+     "synthetic": null,
+     "trigger": "approval-backfill"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": false,
+     "outcome": "PASS",
+     "recording": "rec-0000000000000001",
+     "scenario_id": "scn-e7154fccb2cf",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "synthetic": null,
+     "trigger": "ingest"
+    }
+   ]
+  },
+  "started_at": "2026-11-16T19:12:07.459156+00:00",
+  "synthetic": true,
+  "trigger": "ingest",
+  "version": "veyra-investigation-v1"
+ },
+ "main_investigator_record": {
+  "kind": "autonomous_investigation",
+  "version": "veyra-investigator-v1",
+  "run_id": "run-696deb60d64e",
+  "mode": "agent",
+  "source": {
+   "kind": "recording_sheet",
+   "version": "veyra-recording-sheet-v2",
+   "sha256": "c03bd629da774d38e07f50a2652a6d9b2670b92e493e1929ff85c2eaf57eb2cf",
+   "sheet": [
+    "RECORDING 28819 rows, 6 series, span 2400 s from t=0 at 2000-01-01T00:00:00Z (clock table_relative_seconds). Times below are seconds from t=0.",
+    "SERIES battery.capacity_parameter unit=Ah samples=4801 t=0..2400 s min=100 max=100 median=100 usual_interval=0.5 s",
+    "SERIES battery.cell_voltage[max] unit=V samples=4801 t=0..2400 s min=2.59 max=3.215 median=3.133 usual_interval=0.5 s",
+    "SERIES battery.cell_voltage[min] unit=V samples=4801 t=0..2400 s min=2.28 max=3.2 median=3.023 usual_interval=0.5 s",
+    "SERIES battery.pack_current unit=A samples=4801 t=0..2400 s min=0 max=6.95 median=6.95 usual_interval=0.5 s",
+    "SERIES battery.pack_voltage[pack] unit=V samples=4801 t=0..2400 s min=233.7 max=307.7 median=295.5 usual_interval=0.5 s",
+    "SERIES battery.soc[bms] unit=% samples=4801 t=0..2400 s min=22.8 max=60.4 median=58 usual_interval=0.5 s",
+    "EVENT t=0 s battery.state[bms_fault_level] bms_fault_level=0 (normal)",
+    "EVENT t=0 s battery.state[main_negative_closed] main_negative_closed=1 (closed)",
+    "EVENT t=0 s battery.state[main_positive_closed] main_positive_closed=1 (closed)",
+    "EVENT t=0 s battery.state[min_cell_index] min_cell_index=81",
+    "EVENT t=1200 s battery.state[bms_fault_level] bms_fault_level=0 (normal)",
+    "EVENT t=1200 s battery.state[main_negative_closed] main_negative_closed=1 (closed)",
+    "EVENT t=1200 s battery.state[main_positive_closed] main_positive_closed=1 (closed)",
+    "EVENT t=1200 s battery.state[min_cell_index] min_cell_index=81",
+    "EVENT t=1453 s battery.state[bms_fault_level] bms_fault_level=1 (level 1)",
+    "EVENT t=1799 s battery.state[bms_fault_level] bms_fault_level=2 (level 2)",
+    "EVENT t=2100.5 s battery.state[bms_fault_level] bms_fault_level=3 (level 3)",
+    "EVENT t=2100.5 s battery.state[main_negative_closed] main_negative_closed=0 (open)",
+    "EVENT t=2100.5 s battery.state[main_positive_closed] main_positive_closed=0 (open)",
+    "CONSTANT battery.capacity_parameter = 100 for the whole recording (4801 samples)",
+    "CONSTANT battery.pack_current held 6.95 from t=0 to 2100 s (4201 samples)",
+    "SHIFT battery.cell_voltage[max] changed level for good at t=640 s: median 3.21 before, 3.027 after V (915x its variation before)",
+    "SHIFT battery.cell_voltage[min] changed level for good at t=640 s: median 3.2 before, 2.864 after V (2240x its variation before)",
+    "SHIFT battery.pack_current changed level for good at t=1840 s: median 6.95 before, 0 after A (100x its variation before)",
+    "SHIFT battery.pack_voltage[pack] changed level for good at t=680 s: median 307.7 before, 281.9 after V (2580x its variation before)",
+    "SHIFT battery.soc[bms] changed level for good at t=240 s: median 60.4 before, 58 after % (120x its variation before)",
+    "CHANGE battery.pack_current at t=2094.5 s: 6.95 -> 0 A (step -6.95, 1000x its usual variation)",
+    "CHANGE battery.soc[bms] at t=1698.5 s: 45.2 -> 30.8 % (step -14.4, 9x its usual variation)",
+    "ANOMALY a1 t=240 s: battery.soc[bms] changed level for good (60.4 -> 58 %) (see line 27; strength 4.582)",
+    "ANOMALY a2 t=640 s: battery.cell_voltage[min] changed level for good (3.2 -> 2.864 V) (see line 24; strength 7.371)",
+    "ANOMALY a3 t=640 s: battery.cell_voltage[max] changed level for good (3.21 -> 3.027 V) (see line 23; strength 6.516)",
+    "ANOMALY a4 t=680 s: battery.pack_voltage[pack] changed level for good (307.7 -> 281.9 V) (see line 26; strength 7.506)",
+    "ANOMALY a5 t=1698.5 s: battery.soc[bms] stepped 45.2 -> 30.8 % (see line 29; strength 1.5)",
+    "ANOMALY a6 t=1840 s: battery.pack_current changed level for good (6.95 -> 0 A) (see line 25; strength 4.41)",
+    "ANOMALY a7 t=2094.5 s: battery.pack_current stepped 6.95 -> 0 A (see line 28; strength 4.501)"
+   ]
+  },
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [
+   {
+    "id": "cc_1",
+    "tool": "overview",
+    "input": {},
+    "label": "Read the evidence sheet",
+    "summary": "6 series, 13 events, 7 anomaly candidates",
+    "ms": 0
+   },
+   {
+    "id": "cc_2",
+    "tool": "case_context",
+    "input": {},
+    "label": "case_context",
+    "summary": "",
+    "ms": 1
+   },
+   {
+    "id": "cc_3",
+    "tool": "physical_checks",
+    "input": {},
+    "label": "Ran the physical checks",
+    "summary": "charge_accounting: VIOLATION; protection_sequence: INDETERMINATE; restart_eligibility: PASS",
+    "ms": 0
+   },
+   {
+    "id": "cc_4",
+    "tool": "physical_hypotheses",
+    "input": {},
+    "label": "Read the hypothesis assessment",
+    "summary": "8 hypotheses",
+    "ms": 0
+   },
+   {
+    "id": "cc_7",
+    "tool": "physical_next_checks",
+    "input": {
+     "requester_qualification": "none"
+    },
+    "label": "Planned the next decisive check",
+    "summary": "first: DOC-BMS-HISTORY",
+    "ms": 0
+   }
+  ],
+  "result": {
+   "headline": "Under-voltage protection opened HV after a pack-wide energy shortfall; upstream cause unresolved among SOC, capacity and current sensing.",
+   "status": "cause_unknown",
+   "explanation": "The BMS opened the contactors on cell under-voltage, which explains how HV was lost, not why. About 4.1 Ah was delivered against 60.4 Ah promised by SOC. SOC error, capacity shortfall and current under-measurement all fit.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 34,
+     "quote": "ANOMALY a5 t=1698.5 s: battery.soc[bms] stepped 45.2 -> 30.8 % (see line 29; strength 1.5)",
+     "shows": "Abrupt SOC re-statement. The physical check measures its largest step as 56.8 -> 24.0 % in 29 s with only 0.056 Ah behind it (32.74 pp unexplained). The time axes differ.",
+     "calls": [
+      "cc_1",
+      "cc_3"
+     ]
+    },
+    {
+     "line": 30,
+     "quote": "ANOMALY a1 t=240 s: battery.soc[bms] changed level for good (60.4 -> 58 %) (see line 27; strength 4.582)",
+     "shows": "SOC moved slowly early on, consistent with coulomb counting.",
+     "calls": [
+      "cc_1",
+      "cc_4"
+     ]
+    },
+    {
+     "line": 31,
+     "quote": "ANOMALY a2 t=640 s: battery.cell_voltage[min] changed level for good (3.2 -> 2.864 V) (see line 24; strength 7.371)",
+     "shows": "Pack-wide drop: the highest cell also fell (a3), by 450 mV by the trip against a 260 mV spread.",
+     "calls": [
+      "cc_1",
+      "cc_4"
+     ]
+    },
+    {
+     "line": 36,
+     "quote": "ANOMALY a7 t=2094.5 s: battery.pack_current stepped 6.95 -> 0 A (see line 28; strength 4.501)",
+     "shows": "Current goes to 0 A just before fault level 2 -> 3 and contactor opening at t=2100.5 s; an effect of the shutdown.",
+     "calls": [
+      "cc_1",
+      "cc_4"
+     ]
+    }
+   ],
+   "checked": [
+    {
+     "check": "Charge accounting between SOC corrections",
+     "result": "VIOLATION: 56.8 -> 24.0 % in 29 s with 0.056 Ah measured; 32.74 pp unexplained. Between corrections SOC followed counted charge.",
+     "verdict": "supports",
+     "about": "SOC estimation / calibration error",
+     "calls": [
+      "cc_3",
+      "cc_4"
+     ]
+    },
+    {
+     "check": "Energy shortfall across the recording",
+     "result": "About 4.1 Ah delivered to cutoff against 60.4 Ah promised: SOC overstated ~56 pp, or usable capacity ~7 Ah, or current under-read ~14.9x. Not separable.",
+     "verdict": "inconclusive",
+     "about": "SOC, capacity, current-sensing",
+     "calls": [
+      "cc_4"
+     ]
+    },
+    {
+     "check": "Protection sequence",
+     "result": "Fault level 2 -> 3 at t=2100.5 s, contactors opened at +0.0 s. Indeterminate without a specification.",
+     "verdict": "supports",
+     "about": "Under-voltage protection as response, not cause",
+     "calls": [
+      "cc_3",
+      "cc_4"
+     ]
+    },
+    {
+     "check": "Weak cell vs pack-wide decline",
+     "result": "Lowest cell was index 81 in 100% of samples, but the highest cell fell 450 mV vs 260 mV spread.",
+     "verdict": "weakens",
+     "about": "Weak cell / imbalance",
+     "calls": [
+      "cc_4"
+     ]
+    },
+    {
+     "check": "Sensing fault vs rest recovery",
+     "result": "Lowest-cell steps never exceeded 1 mV; the highest cell fell too; cells recovered at rest.",
+     "verdict": "weakens",
+     "about": "Cell-voltage sensing",
+     "calls": [
+      "cc_4"
+     ]
+    },
+    {
+     "check": "Which checks can separate the open hypotheses",
+     "result": "Telemetry cannot separate SOC, capacity and current sensing. Read-only documents can start to.",
+     "verdict": "inconclusive",
+     "about": "SOC, capacity, current-sensing",
+     "calls": [
+      "cc_7"
+     ]
+    }
+   ],
+   "effects": [
+    {
+     "line": 36,
+     "quote": "ANOMALY a7 t=2094.5 s: battery.pack_current stepped 6.95 -> 0 A (see line 28; strength 4.501)",
+     "why": "Sits at the shutdown and follows the under-voltage escalation."
+    }
+   ],
+   "next_action": {
+    "action": "Export BMS charge and calibration history plus the charger log",
+    "why": "Read-only records show whether the last full-charge calibration was old, recent, or whether charger energy and counted discharge disagree.",
+    "how": [
+     "Export the BMS event and history log since the last full charge",
+     "Get the charger log for the same period",
+     "Compare charger energy in with BMS-counted throughput"
+    ],
+    "where": "remote",
+    "conditions": "Document and data review only; no vehicle operation.",
+    "baseline": "Charger energy delivered against BMS-counted throughput, and the stated 100 Ah capacity.",
+    "record": [
+     "last full-charge calibration date",
+     "charger energy per charge",
+     "BMS counted throughput"
+    ],
+    "needs_approval": false,
+    "template_id": "DOC-BMS-HISTORY",
+    "outcomes": [
+     {
+      "label": "No recent calibration, long idle time",
+      "means": "SOC drifted high; consistent with the SOC estimation hypothesis.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h2",
+       "h3"
+      ],
+      "then": "Review the SOC algorithm document next."
+     },
+     {
+      "label": "Recent calibrations, small charge accepted",
+      "means": "Usable capacity is far below the parameter.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h1"
+      ],
+      "then": "Hand off a capacity test to HV-qualified staff."
+     },
+     {
+      "label": "Charger energy far above counted throughput",
+      "means": "Current under-measurement or a bypassing load.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h1",
+       "h2"
+      ],
+      "then": "Request the load inventory document."
+     }
+    ],
+    "provenance": {
+     "kind": "expert_proposal",
+     "source": "the AI investigator",
+     "status": "passed the action gate"
+    }
+   },
+   "safety_findings": [
+    {
+     "ref": "charge_accounting:unexplained_soc_correction",
+     "statement": "SOC went 56.8 -> 24.0 % in 29 s with 0.056 Ah measured charge; 32.74 pp unexplained. Data-analysis finding; supports offline review of SOC logic, no HV work."
+    },
+    {
+     "ref": "protection_sequence:indeterminate",
+     "statement": "Escalation and contactor opening observed but cannot be judged without the protection specification; treat as the machine acting as designed."
+    }
+   ],
+   "unknowns": [
+    "Whether the SOC estimate, usable capacity or current measurement is wrong; the data cannot separate them.",
+    "The protection specification (thresholds, delays, order).",
+    "What commanded pack current to 0 A at t=1840 s and t=2094.5 s; the recording does not show it."
+   ],
+   "already_answered": [
+    {
+     "question": "Which came first: contactor opening or battery protection?",
+     "answer": "Fault level rose to 3 and the contactors opened 0.0 s later: BMS under-voltage protection acting.",
+     "line": 36,
+     "quote": "ANOMALY a7 t=2094.5 s: battery.pack_current stepped 6.95 -> 0 A (see line 28; strength 4.501)",
+     "calls": [
+      "cc_4"
+     ]
+    },
+    {
+     "question": "Was a single weak cell the cause?",
+     "answer": "Not alone. The highest cell also fell 450 mV, more than the 260 mV spread: pack-wide depletion.",
+     "line": 32,
+     "quote": "ANOMALY a3 t=640 s: battery.cell_voltage[max] changed level for good (3.21 -> 3.027 V) (see line 23; strength 6.516)",
+     "calls": [
+      "cc_4"
+     ]
+    }
+   ],
+   "data_requests": [
+    {
+     "what": "Earlier records before the first window and wall-clock times of the windows",
+     "window": "Any earlier full cycle of this pack",
+     "conditions": "Comparable SOC range and load",
+     "signals": [
+      "battery.soc[bms]",
+      "battery.cell_voltage[min]",
+      "battery.cell_voltage[max]",
+      "battery.pack_current"
+     ],
+     "why_needed": "Shows whether SOC and cell voltage diverged after a specific event or from the last full charge.",
+     "searched_calls": [
+      "cc_1",
+      "cc_2",
+      "cc_7"
+     ]
+    }
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "SOC estimation / calibration",
+     "claim": "SOC drifted high through coulomb counting and was corrected abruptly near the under-voltage alarm.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "The 32.74 pp correction has only 0.056 Ah behind it; SOC tracked counted charge in between. Not separable from capacity or current sensing.",
+     "basis": "indirect",
+     "physical_ref": "A",
+     "observed_at": "BMS SOC estimate vs BMS-measured charge",
+     "lines": [
+      30,
+      34
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Usable capacity below parameter",
+     "claim": "Usable capacity is far below the stated capacity parameter (fade or wrong parameter).",
+     "status": "open",
+     "role": "main_cause",
+     "because": "About 4.1 Ah delivered implies about 7 Ah usable vs 100 Ah stated; very large, no capacity test.",
+     "basis": "indirect",
+     "physical_ref": "B",
+     "observed_at": "BMS-derived energy balance"
+    },
+    {
+     "id": "h3",
+     "area": "Current measurement / bypass load",
+     "claim": "The BMS current sensor under-reads or a load bypasses it, so counted charge is too low.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "Needs real discharge ~14.9x the measured 6.95 A; large, but not excluded without an independent measurement.",
+     "basis": "indirect",
+     "physical_ref": "C",
+     "observed_at": "BMS pack_current signal"
+    },
+    {
+     "id": "h4",
+     "area": "Weak cell / imbalance",
+     "claim": "One weak or poorly balanced cell (index 81) reaches cutoff first.",
+     "status": "weakened",
+     "role": "amplifier",
+     "because": "The highest cell also fell more than the spread; SOC discrepancy is pack-level. At most a contributor.",
+     "basis": "indirect",
+     "physical_ref": "D",
+     "observed_at": "Lowest and highest cell voltage channels",
+     "lines": [
+      31,
+      32
+     ]
+    },
+    {
+     "id": "h5",
+     "area": "Cell-voltage sensing / harness",
+     "claim": "The low cell reading is a sensing error.",
+     "status": "weakened",
+     "role": "effect",
+     "because": "Smooth, pack-wide decline and rest recovery; no inspection excludes it.",
+     "basis": "indirect",
+     "physical_ref": "E",
+     "observed_at": "BMS cell voltage channels"
+    },
+    {
+     "id": "h6",
+     "area": "Contactor / VCU / insulation first",
+     "claim": "A contactor, VCU or insulation fault came first and the battery alarms followed.",
+     "status": "weakened",
+     "role": "effect",
+     "because": "Recorded order runs from under-voltage escalation to contactor opening; only feedback is recorded.",
+     "basis": "indirect",
+     "physical_ref": "F",
+     "observed_at": "Contactor feedback and fault level"
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      30
+     ],
+     "what": "SOC level shift 60.4 -> 58 %",
+     "class": "routine",
+     "why": "Slow decrease consistent with counted charge."
+    },
+    {
+     "lines": [
+      31,
+      32,
+      33
+     ],
+     "what": "Cell and pack voltage level shifts at t=640 to 680 s",
+     "class": "anomaly",
+     "why": "Pack-wide voltage drop, much earlier than the trip."
+    },
+    {
+     "lines": [
+      34
+     ],
+     "what": "SOC re-statement 45.2 -> 30.8 % (check: 56.8 -> 24.0 %)",
+     "class": "root_cause_candidate",
+     "why": "Large correction not explained by measured charge."
+    },
+    {
+     "lines": [
+      35
+     ],
+     "what": "Pack current 6.95 -> 0 A permanent level change at t=1840 s",
+     "class": "anomaly",
+     "why": "The recording does not show who or what commanded it."
+    },
+    {
+     "lines": [
+      36
+     ],
+     "what": "Pack current to 0 A at t=2094.5 s, contactors open at t=2100.5 s",
+     "class": "effect",
+     "why": "Protective shutdown after the under-voltage escalation."
+    }
+   ],
+   "lesson": "No earlier-case lessons were retrieved for this case.",
+   "reuse_when": "A BEV with a coulomb-counting BMS where SOC is corrected by tens of points only at the low-end alarm, and delivered Ah is far below SOC times the capacity parameter.",
+   "field_questions": []
+  },
+  "dropped": [],
+  "usage": {
+   "input_tokens": 160734,
+   "output_tokens": 15206,
+   "uncached_input_tokens": 12,
+   "cache_read_input_tokens": 160722,
+   "cache_creation_input_tokens": 68402,
+   "model_calls": 5,
+   "model_ms": 92077,
+   "cost_usd": 0.441764,
+   "model_ids": [
+    "claude-sonnet-5-5"
+   ]
+  },
+  "model_calls": [
+   {
+    "call": 1,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 25373,
+    "cache_creation_input_tokens": 678,
+    "output_tokens": 102,
+    "cost_usd": 0.006273300000000001,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 2402,
+    "api_ms": 1259,
+    "requested": [
+     "overview",
+     "case_context",
+     "physical_checks",
+     "physical_hypotheses"
+    ]
+   },
+   {
+    "call": 2,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 4,
+    "cache_read_input_tokens": 59230,
+    "cache_creation_input_tokens": 12459,
+    "output_tokens": 5703,
+    "cost_usd": 0.112797,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 36792,
+    "api_ms": 35940,
+    "requested": [
+     "submit_report"
+    ]
+   },
+   {
+    "call": 3,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 25373,
+    "cache_creation_input_tokens": 13654,
+    "output_tokens": 4808,
+    "cost_usd": 0.10523729999999999,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 26407,
+    "api_ms": 25574,
+    "requested": [
+     "submit_report"
+    ]
+   },
+   {
+    "call": 4,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 25373,
+    "cache_creation_input_tokens": 18209,
+    "output_tokens": 194,
+    "cost_usd": 0.0773173,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 3440,
+    "api_ms": 2243,
+    "requested": [
+     "physical_next_checks"
+    ]
+   },
+   {
+    "call": 5,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 25373,
+    "cache_creation_input_tokens": 23402,
+    "output_tokens": 4399,
+    "cost_usd": 0.1401393,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 23036,
+    "api_ms": 22299,
+    "requested": [
+     "submit_report"
+    ]
+   }
+  ],
+  "seconds": 92.6,
+  "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it.",
+  "safety_gate": {
+   "version": "action-gate-v1",
+   "action_verdict": "pass",
+   "rules_fired": [],
+   "action_class": [
+    "offline"
+   ],
+   "blocked_actions": [],
+   "inserted_findings": [],
+   "covered_by_model": [
+    "charge_accounting:unexplained_soc_correction"
+   ],
+   "passed_unchanged": true
+  },
+  "reasoning": {
+   "signal": {
+    "evidence": "evidence sheet",
+    "verifier_dropped": 0,
+    "submit_attempts": 3
+   },
+   "physics": {
+    "profile": "synthetic-bev-tables",
+    "family_applies": true,
+    "claims": {
+     "accepted": 8,
+     "downgraded": 0,
+     "flagged": 0,
+     "rejected": 0
+    }
+   },
+   "safety": {
+    "action": "pass",
+    "rules": [],
+    "inserted_findings": [],
+    "covered_by_model": [
+     "charge_accounting:unexplained_soc_correction"
+    ]
+   },
+   "memory": {
+    "lessons_consulted": false
+   }
+  },
+  "physical": {
+   "version": "physical-layer-v1",
+   "recording_id": "rec-0000000000000002",
+   "profile": "synthetic-bev-tables",
+   "machine_class": "battery_electric_vehicle",
+   "family_applies": true,
+   "checks": {
+    "charge_accounting": {
+     "outcome": "VIOLATION",
+     "summary": "1 SOC correction(s) not explained by measured charge; largest: 56.8 % -> 24.0 % in 29.0 s (fault), measured charge 0.056 Ah explains 0.056 pp, 32.74 pp unexplained.",
+     "version": "charge-accounting-v1"
+    },
+    "protection_sequence": {
+     "outcome": "INDETERMINATE",
+     "summary": "Indeterminate: 3 escalation(s) recorded (highest level 3); observed sequence reported, no specification to judge it against.",
+     "version": "protection-sequence-v1"
+    },
+    "restart_eligibility": {
+     "outcome": "PASS",
+     "summary": "1 protective shutdown(s); HV was not closed again afterwards in the record.",
+     "version": "restart-eligibility-v1"
+    }
+   },
+   "summary": "HV loss was the BMS under-voltage protection acting (protective response, not the origin). Open upstream explanations: SOC estimation / calibration error; Usable capacity far below the stated parameter; Current under-measured or load bypassing the sensor. The recorded data does not separate them. A weak cell cannot explain the whole incident on its own: the highest cell was also depleted (pack-wide decline larger than the cell spread), and the SOC accounting discrepancy is pack-level: a weak cell can be an additional contributor, not the whole explanation. No root cause is confirmed.",
+   "constrained_claims": [
+    {
+     "text": "Under-voltage protection opened HV after a pack-wide energy shortfall; upstream cause unresolved among SOC, capacity and current sensing.",
+     "source": "headline",
+     "hypotheses": [
+      "B",
+      "E",
+      "P1"
+     ],
+     "verdict": "accepted",
+     "reasons": [],
+     "constrained_status": "open",
+     "kind": "text"
+    },
+    {
+     "text": "The BMS opened the contactors on cell under-voltage, which explains how HV was lost, not why. About 4.1 Ah was delivered against 60.4 Ah promised by SOC. SOC error, capacity shortfall and current under-measurement all fit.",
+     "source": "explanation",
+     "hypotheses": [
+      "A",
+      "B",
+      "P1"
+     ],
+     "verdict": "accepted",
+     "reasons": [],
+     "constrained_status": "open",
+     "kind": "text"
+    },
+    {
+     "source": "hypothesis h1",
+     "text": "SOC estimation / calibration: SOC drifted high through coulomb counting and was corrected abruptly near the under-voltage alarm.",
+     "kind": "structured",
+     "physical_ref": "A",
+     "verdict": "accepted",
+     "reasons": [
+      "consistent with SOC estimation / calibration error (open)"
+     ],
+     "assessment_status": "open",
+     "assessment_role": "upstream_cause"
+    },
+    {
+     "source": "hypothesis h2",
+     "text": "Usable capacity below parameter: Usable capacity is far below the stated capacity parameter (fade or wrong parameter).",
+     "kind": "structured",
+     "physical_ref": "B",
+     "verdict": "accepted",
+     "reasons": [
+      "consistent with Usable capacity far below the stated parameter (open)"
+     ],
+     "assessment_status": "open",
+     "assessment_role": "upstream_cause"
+    },
+    {
+     "source": "hypothesis h3",
+     "text": "Current measurement / bypass load: The BMS current sensor under-reads or a load bypasses it, so counted charge is too low.",
+     "kind": "structured",
+     "physical_ref": "C",
+     "verdict": "accepted",
+     "reasons": [
+      "consistent with Current under-measured or load bypassing the sensor (open)"
+     ],
+     "assessment_status": "open",
+     "assessment_role": "upstream_cause"
+    },
+    {
+     "source": "hypothesis h4",
+     "text": "Weak cell / imbalance: One weak or poorly balanced cell (index 81) reaches cutoff first.",
+     "kind": "structured",
+     "physical_ref": "D",
+     "verdict": "accepted",
+     "reasons": [
+      "consistent with Weak cell / imbalance (insufficient_alone)"
+     ],
+     "assessment_status": "insufficient_alone",
+     "assessment_role": "contributing_factor"
+    },
+    {
+     "source": "hypothesis h5",
+     "text": "Cell-voltage sensing / harness: The low cell reading is a sensing error.",
+     "kind": "structured",
+     "physical_ref": "E",
+     "verdict": "accepted",
+     "reasons": [
+      "consistent with Cell-voltage sensing or harness fault (weakened)"
+     ],
+     "assessment_status": "weakened",
+     "assessment_role": "upstream_cause"
+    },
+    {
+     "source": "hypothesis h6",
+     "text": "Contactor / VCU / insulation first: A contactor, VCU or insulation fault came first and the battery alarms followed.",
+     "kind": "structured",
+     "physical_ref": "F",
+     "verdict": "accepted",
+     "reasons": [
+      "consistent with Contactor, VCU or insulation event first (weakened)"
+     ],
+     "assessment_status": "weakened",
+     "assessment_role": "upstream_cause"
+    }
+   ],
+   "rule": "The report was held to the physical assessment; a rejected statement was returned to the model to fix."
+  },
+  "entry_id": "led-agent-report-9b477387e49e",
+  "recorded_at": "2026-11-16T19:13:40.528655+00:00"
+ }
+}

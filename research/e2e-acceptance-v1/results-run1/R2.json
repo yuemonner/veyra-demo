@@ -1,0 +1,789 @@
+{
+ "label": "R2",
+ "recording": "rec-0000000000000001",
+ "profile": "synthetic-bev-tables",
+ "engine_case": "case-ab55efeb2f10",
+ "seconds": 31.8,
+ "scan": {
+  "counts": {
+   "PASS": 1
+  },
+  "filename": "SYNTHETIC-R2-healthy.zip",
+  "format": "decoded_csv_package",
+  "profile": "synthetic-bev-tables",
+  "profiles": [
+   {
+    "bindings": {
+     "bms": "synbms"
+    },
+    "machine_class": "battery_electric_vehicle",
+    "origin": "built-in",
+    "profile": "synthetic-bev-tables",
+    "reasons": [],
+    "status": "compatible",
+    "synthetic": true
+   },
+   {
+    "bindings": {},
+    "machine_class": "battery_electric_vehicle",
+    "origin": "built-in",
+    "profile": "synthetic-bev-ros",
+    "reasons": [
+     "format decoded_csv_package is not one this profile reads (ros1_bag, ros2_bag, mcap)"
+    ],
+    "status": "incompatible",
+    "synthetic": true
+   },
+   {
+    "bindings": {},
+    "machine_class": "px4_vehicle",
+    "origin": "built-in",
+    "profile": "px4-battery-status",
+    "reasons": [
+     "format decoded_csv_package is not one this profile reads (px4_ulog)"
+    ],
+    "status": "incompatible",
+    "synthetic": false
+   },
+   {
+    "bindings": {},
+    "machine_class": null,
+    "origin": "built-in",
+    "profile": "ros-battery-state",
+    "reasons": [
+     "format decoded_csv_package is not one this profile reads (ros1_bag, ros2_bag, mcap)"
+    ],
+    "status": "incompatible",
+    "synthetic": false
+   }
+  ],
+  "recording": "rec-0000000000000001",
+  "results": [
+   {
+    "applicability": "applies",
+    "matched_original": false,
+    "outcome": "PASS",
+    "reasons": [],
+    "scenario_id": "scn-6e2d1f97caf2",
+    "scenario_title": "SOC correction not explained by measured charge (from R1)",
+    "scenario_version": 1,
+    "summary": "SOC changes are explained by the measured charge within tolerance."
+   }
+  ],
+  "scenarios": [
+   "scn-6e2d1f97caf2"
+  ],
+  "state": "scanned",
+  "synthetic": true
+ },
+ "investigation": {
+  "agent": {
+   "accepted_as_is": true,
+   "agent_report": {
+    "explanation": "SOC tracks integrated pack current in both windows (ratio 0.978). Contactors stay closed, BMS fault level stays 0, and all other signals are constant. The t=200 SHIFT flag matches a steady decline, not a correction.",
+    "hypotheses": [
+     {
+      "id": "none",
+      "statement": "BMS SOC estimator: The BMS SOC estimator applied an unexplained correction at t=200 s.",
+      "status": "ruled_out"
+     },
+     {
+      "id": "none",
+      "statement": "Detector artefact on a normal ramp: The SHIFT flag at t=200 is the detector reacting to normal steady discharge drift.",
+      "status": "leading"
+     },
+     {
+      "id": "none",
+      "statement": "Fault outside this window: A fault the reporter saw happened outside the recorded 2400 s.",
+      "status": "open"
+     }
+    ],
+    "next_check": "Confirm which symptom the reporter saw and when",
+    "summary": "No fault shown: SOC falls steadily in line with measured current; the t=200 'shift' is not a real jump."
+   },
+   "constrained_claims": [
+    {
+     "constrained_status": null,
+     "hypotheses": [],
+     "kind": "text",
+     "reasons": [],
+     "source": "headline",
+     "text": "No fault shown: SOC falls steadily in line with measured current; the t=200 'shift' is not a real jump.",
+     "verdict": "accepted"
+    },
+    {
+     "constrained_status": null,
+     "hypotheses": [
+      "P1"
+     ],
+     "kind": "text",
+     "reasons": [],
+     "source": "explanation",
+     "text": "SOC tracks integrated pack current in both windows (ratio 0.978). Contactors stay closed, BMS fault level stays 0, and all other signals are constant. The t=200 SHIFT flag matches a steady decline, not a correction.",
+     "verdict": "accepted"
+    },
+    {
+     "kind": "structured",
+     "physical_ref": "none",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ],
+     "source": "hypothesis h1",
+     "text": "BMS SOC estimator: The BMS SOC estimator applied an unexplained correction at t=200 s.",
+     "verdict": "accepted"
+    },
+    {
+     "kind": "structured",
+     "physical_ref": "none",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ],
+     "source": "hypothesis h2",
+     "text": "Detector artefact on a normal ramp: The SHIFT flag at t=200 is the detector reacting to normal steady discharge drift.",
+     "verdict": "accepted"
+    },
+    {
+     "kind": "structured",
+     "physical_ref": "none",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ],
+     "source": "hypothesis h3",
+     "text": "Fault outside this window: A fault the reporter saw happened outside the recorded 2400 s.",
+     "verdict": "accepted"
+    }
+   ],
+   "engine_case_id": "case-ab55efeb2f10",
+   "investigator": "main",
+   "mode": "agent",
+   "model": "claude-code:sonnet",
+   "note": "Veyra's main investigator (evidence sheet + physical layer), held to the quote/number verifier and to the physical assessment by reference. Statements are proposals until an engineer verifies them.",
+   "provider": "anthropic",
+   "reason": null,
+   "trace": [
+    {
+     "error": false,
+     "input": {},
+     "step": 0,
+     "tool": "overview"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 1,
+     "tool": "case_context"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 2,
+     "tool": "physical_checks"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 3,
+     "tool": "physical_hypotheses"
+    },
+    {
+     "error": false,
+     "input": {
+      "end": 22,
+      "start": 1
+     },
+     "step": 4,
+     "tool": "read_lines"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 5,
+     "tool": "events"
+    },
+    {
+     "error": false,
+     "input": {
+      "t_s": 200,
+      "window_s": 60
+     },
+     "step": 6,
+     "tool": "compare"
+    },
+    {
+     "error": false,
+     "input": {
+      "check_id": "charge_accounting"
+     },
+     "step": 7,
+     "tool": "physical_check_detail"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 8,
+     "tool": "lessons"
+    }
+   ],
+   "version": "veyra-investigator-v1"
+  },
+  "case_id": "rec-0000000000000001",
+  "deterministic": {
+   "checks": {
+    "charge_accounting": {
+     "outcome": "PASS",
+     "summary": "SOC changes are explained by the measured charge within tolerance."
+    },
+    "protection_sequence": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: no protection escalation in the recording."
+    },
+    "restart_eligibility": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: HV state never changes in the recording."
+    }
+   },
+   "hypotheses": [],
+   "next_check": null,
+   "summary": null
+  },
+  "finished_at": "2026-11-16T15:27:16.162261+00:00",
+  "knowledge_used": [],
+  "recording_digest": "b34ef2a8da578f63c4806fc9abef49d514cde0122a4c809a42cef081628b68a0",
+  "scenario_results": {
+   "here": [
+    {
+     "applicability": "applies",
+     "matched_original": false,
+     "outcome": "PASS",
+     "recording": "rec-0000000000000001",
+     "scenario_id": "scn-6e2d1f97caf2",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "synthetic": null,
+     "trigger": "ingest"
+    }
+   ],
+   "other_recordings": [
+    {
+     "applicability": "applies",
+     "matched_original": true,
+     "outcome": "VIOLATION",
+     "recording": "rec-0000000000000000",
+     "scenario_id": "scn-6e2d1f97caf2",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "1 SOC correction(s) not explained by measured charge; largest: 60.8 % -> 22.8 % in 30.0 s (fault), measured charge 0.0545 Ah explains 0.054 pp, 37.95 pp unexplained.",
+     "synthetic": null,
+     "trigger": "approval-backfill"
+    }
+   ]
+  },
+  "started_at": "2026-11-16T15:26:47.722266+00:00",
+  "synthetic": true,
+  "trigger": "ingest",
+  "version": "veyra-investigation-v1"
+ },
+ "main_investigator_record": {
+  "kind": "autonomous_investigation",
+  "version": "veyra-investigator-v1",
+  "run_id": "run-c99913fe01e8",
+  "mode": "agent",
+  "source": {
+   "kind": "recording_sheet",
+   "version": "veyra-recording-sheet-v2",
+   "sha256": "566073f74e11e889837fd45893ced8b112c7ef81183eb9e40185733ce14cdcb4",
+   "sheet": [
+    "RECORDING 28814 rows, 6 series, span 2400 s from t=0 at 2000-01-01T00:00:00Z (clock table_relative_seconds). Times below are seconds from t=0.",
+    "SERIES battery.capacity_parameter unit=Ah samples=4801 t=0..2400 s min=100 max=100 median=100 usual_interval=0.5 s",
+    "SERIES battery.cell_voltage[max] unit=V samples=4801 t=0..2400 s min=3.21 max=3.21 median=3.21 usual_interval=0.5 s",
+    "SERIES battery.cell_voltage[min] unit=V samples=4801 t=0..2400 s min=3.2 max=3.2 median=3.2 usual_interval=0.5 s",
+    "SERIES battery.pack_current unit=A samples=4801 t=0..2400 s min=9.82 max=9.82 median=9.82 usual_interval=0.5 s",
+    "SERIES battery.pack_voltage[pack] unit=V samples=4801 t=0..2400 s min=307.7 max=307.7 median=307.7 usual_interval=0.5 s",
+    "SERIES battery.soc[bms] unit=% samples=4801 t=0..2400 s min=58 max=64.4 median=61.2 usual_interval=0.5 s",
+    "EVENT t=0 s battery.state[bms_fault_level] bms_fault_level=0 (normal)",
+    "EVENT t=0 s battery.state[main_negative_closed] main_negative_closed=1 (closed)",
+    "EVENT t=0 s battery.state[main_positive_closed] main_positive_closed=1 (closed)",
+    "EVENT t=0 s battery.state[min_cell_index] min_cell_index=22",
+    "EVENT t=1200 s battery.state[bms_fault_level] bms_fault_level=0 (normal)",
+    "EVENT t=1200 s battery.state[main_negative_closed] main_negative_closed=1 (closed)",
+    "EVENT t=1200 s battery.state[main_positive_closed] main_positive_closed=1 (closed)",
+    "EVENT t=1200 s battery.state[min_cell_index] min_cell_index=22",
+    "CONSTANT battery.capacity_parameter = 100 for the whole recording (4801 samples)",
+    "CONSTANT battery.cell_voltage[max] = 3.21 for the whole recording (4801 samples)",
+    "CONSTANT battery.cell_voltage[min] = 3.2 for the whole recording (4801 samples)",
+    "CONSTANT battery.pack_current = 9.82 for the whole recording (4801 samples)",
+    "CONSTANT battery.pack_voltage[pack] = 307.7 for the whole recording (4801 samples)",
+    "SHIFT battery.soc[bms] changed level for good at t=200 s: median 64.4 before, 60.8 after % (180x its variation before)",
+    "ANOMALY a1 t=200 s: battery.soc[bms] changed level for good (64.4 -> 60.8 %) (see line 21; strength 4.967)"
+   ]
+  },
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [
+   {
+    "id": "cc_1",
+    "tool": "overview",
+    "input": {},
+    "label": "Read the evidence sheet",
+    "summary": "6 series, 8 events, 1 anomaly candidates",
+    "ms": 0
+   },
+   {
+    "id": "cc_2",
+    "tool": "case_context",
+    "input": {},
+    "label": "case_context",
+    "summary": "",
+    "ms": 0
+   },
+   {
+    "id": "cc_3",
+    "tool": "physical_checks",
+    "input": {},
+    "label": "Ran the physical checks",
+    "summary": "charge_accounting: PASS; protection_sequence: NOT_APPLICABLE; restart_eligibility: NOT_APPLICABLE",
+    "ms": 0
+   },
+   {
+    "id": "cc_4",
+    "tool": "physical_hypotheses",
+    "input": {},
+    "label": "Read the hypothesis assessment",
+    "summary": "0 hypotheses",
+    "ms": 0
+   },
+   {
+    "id": "cc_5",
+    "tool": "read_lines",
+    "input": {
+     "start": 1,
+     "end": 22
+    },
+    "label": "Read sheet lines 1\u201322",
+    "summary": "22 lines",
+    "ms": 0
+   },
+   {
+    "id": "cc_6",
+    "tool": "events",
+    "input": {},
+    "label": "Listed the events",
+    "summary": "8 event(s)",
+    "ms": 0
+   },
+   {
+    "id": "cc_7",
+    "tool": "compare",
+    "input": {
+     "t_s": 200,
+     "window_s": 60
+    },
+    "label": "Compared before and after 200 s",
+    "summary": "nothing changed much",
+    "ms": 0
+   },
+   {
+    "id": "cc_8",
+    "tool": "physical_check_detail",
+    "input": {
+     "check_id": "charge_accounting"
+    },
+    "label": "Opened physical check charge_accounting",
+    "summary": "charge_accounting: PASS, 2 finding(s)",
+    "ms": 0
+   },
+   {
+    "id": "cc_9",
+    "tool": "lessons",
+    "input": {},
+    "label": "lessons",
+    "summary": "",
+    "ms": 272
+   }
+  ],
+  "result": {
+   "headline": "No fault shown: SOC falls steadily in line with measured current; the t=200 'shift' is not a real jump.",
+   "status": "no_failure_found",
+   "explanation": "SOC tracks integrated pack current in both windows (ratio 0.978). Contactors stay closed, BMS fault level stays 0, and all other signals are constant. The t=200 SHIFT flag matches a steady decline, not a correction.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 21,
+     "quote": "SHIFT battery.soc[bms] changed level for good at t=200 s: median 64.4 before, 60.8 after % (180x its variation before)",
+     "shows": "The only anomaly candidate. Compare at t=200 found no level change in any series (before 64.0, after 64.0), so it does not look like a step.",
+     "calls": [
+      "cc_5",
+      "cc_7"
+     ]
+    },
+    {
+     "line": 7,
+     "quote": "SERIES battery.soc[bms] unit=% samples=4801 t=0..2400 s min=58 max=64.4 median=61.2 usual_interval=0.5 s",
+     "shows": "SOC declines 6.4 pp over 2400 s, a gradual drift.",
+     "calls": [
+      "cc_5"
+     ]
+    },
+    {
+     "line": 19,
+     "quote": "CONSTANT battery.pack_current = 9.82 for the whole recording (4801 samples)",
+     "shows": "Constant 9.82 A discharge predicts a steady SOC decline, which is what was recorded.",
+     "calls": [
+      "cc_5"
+     ]
+    },
+    {
+     "line": 12,
+     "quote": "EVENT t=1200 s battery.state[bms_fault_level] bms_fault_level=0 (normal)",
+     "shows": "No protection escalation; the t=1200 events only repeat the start state.",
+     "calls": [
+      "cc_6"
+     ]
+    }
+   ],
+   "checked": [
+    {
+     "check": "Charge accounting: SOC change against integrated pack current, both windows",
+     "result": "Reference: -3.2 pp reported vs -3.272 pp expected. Fault window: -3.2 pp vs -3.273 pp. Ratio 0.978 in both, max deviation 0.278 pp.",
+     "verdict": "rules_out",
+     "about": "Unexplained SOC correction or estimator fault",
+     "calls": [
+      "cc_8"
+     ]
+    },
+    {
+     "check": "compare at t=200 s, 60 s window",
+     "result": "No series changed level (z=0 for all). No frozen outputs. The sheet's SHIFT comes from the slow ramp.",
+     "verdict": "weakens",
+     "about": "SOC step at t=200",
+     "calls": [
+      "cc_7"
+     ]
+    },
+    {
+     "check": "Events and protection state",
+     "result": "8 events, all start-up or t=1200 restatements; fault level 0, both contactors closed. Protection and restart checks are not applicable.",
+     "verdict": "rules_out",
+     "about": "Protective shutdown or contactor fault",
+     "calls": [
+      "cc_6",
+      "cc_3"
+     ]
+    },
+    {
+     "check": "Physical hypothesis assessment and lessons",
+     "result": "No hypothesis family is raised and there are no earlier lessons. The case title says 'healthy'.",
+     "verdict": "supports",
+     "about": "No failure",
+     "calls": [
+      "cc_4",
+      "cc_9"
+     ]
+    }
+   ],
+   "effects": [],
+   "next_action": {
+    "action": "Confirm which symptom the reporter saw and when",
+    "why": "The recording shows no fault. The symptom or time window the reporter means decides whether other data is needed.",
+    "how": [
+     "Ask the reporter for the observed symptom and its approximate time.",
+     "If it falls outside t=0..2400 s, request that window."
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Symptom outside this recording",
+      "means": "This recording cannot show it; a different window is needed.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": []
+     },
+     {
+      "label": "Symptom is the SOC level at t=200",
+      "means": "Normal discharge drift; no action beyond a note on the 0.978 ratio.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [],
+      "then": "Close the case as no failure found"
+     }
+    ]
+   },
+   "unknowns": [
+    "The reporter's symptom is not in the case context.",
+    "Pack current, voltage and cell voltages are constant, so load changes and cell imbalance are not exercised by this recording.",
+    "The 0.978 ratio would fit a true capacity of about 102 Ah, but current sensor accuracy is not stated."
+   ],
+   "already_answered": [
+    {
+     "question": "Did the contactors open or a BMS fault trigger?",
+     "answer": "No. Both contactors stay closed and fault level is 0 through the whole recording.",
+     "line": 12,
+     "quote": "EVENT t=1200 s battery.state[bms_fault_level] bms_fault_level=0 (normal)",
+     "calls": [
+      "cc_6"
+     ]
+    },
+    {
+     "question": "Did SOC jump or get corrected unexpectedly?",
+     "answer": "No. SOC follows integrated current in both windows within tolerance.",
+     "line": 21,
+     "quote": "SHIFT battery.soc[bms] changed level for good at t=200 s: median 64.4 before, 60.8 after % (180x its variation before)",
+     "calls": [
+      "cc_7",
+      "cc_8"
+     ]
+    }
+   ],
+   "data_requests": [
+    {
+     "what": "Recording covering the reporter's observed symptom, if outside t=0..2400 s",
+     "window": "Around the time of the reported symptom",
+     "conditions": "Same vehicle and configuration",
+     "signals": [
+      "battery.soc[bms]",
+      "battery.pack_current",
+      "battery.pack_voltage[pack]",
+      "battery.state[bms_fault_level]"
+     ],
+     "why_needed": "This recording is healthy, so a fault, if any, is elsewhere in time.",
+     "searched_calls": [
+      "cc_1",
+      "cc_6"
+     ]
+    }
+   ],
+   "unobservable": [],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "BMS SOC estimator",
+     "claim": "The BMS SOC estimator applied an unexplained correction at t=200 s.",
+     "status": "ruled_out",
+     "role": "main_cause",
+     "because": "SOC change matches integrated charge within 0.278 pp in both windows, and compare at t=200 shows no step.",
+     "basis": "direct",
+     "physical_ref": "none",
+     "observed_at": "BMS SOC estimate against pack current measurement",
+     "excluded_by": "data",
+     "lines": [
+      21
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Detector artefact on a normal ramp",
+     "claim": "The SHIFT flag at t=200 is the detector reacting to normal steady discharge drift.",
+     "status": "leading",
+     "role": "effect",
+     "because": "Constant current predicts a steady SOC decline; no series changed in compare at t=200.",
+     "basis": "indirect",
+     "physical_ref": "none",
+     "observed_at": "BMS SOC and pack current",
+     "lines": [
+      21,
+      22
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Fault outside this window",
+     "claim": "A fault the reporter saw happened outside the recorded 2400 s.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "This recording has no failure, so any reported fault is not shown here.",
+     "basis": "indirect",
+     "physical_ref": "none",
+     "observed_at": "Whole recording",
+     "lines": []
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      8,
+      9,
+      10,
+      11
+     ],
+     "what": "Start-up state: no fault, contactors closed",
+     "class": "routine"
+    },
+    {
+     "lines": [
+      12,
+      13,
+      14,
+      15
+     ],
+     "what": "State restated at t=1200 s, unchanged",
+     "class": "routine"
+    },
+    {
+     "lines": [
+      21,
+      22
+     ],
+     "what": "SOC 'level shift' at t=200 s",
+     "class": "anomaly",
+     "why": "Detector flag on a slow ramp consistent with measured current; not an actual step."
+    }
+   ],
+   "lesson": "No earlier cases are available for this signature.",
+   "reuse_when": "Only as a reference healthy baseline: BEV with SOC by coulomb counting at 100 Ah, constant 9.82 A discharge, no protection events.",
+   "field_questions": []
+  },
+  "dropped": [],
+  "usage": {
+   "input_tokens": 201975,
+   "output_tokens": 3361,
+   "uncached_input_tokens": 6,
+   "cache_read_input_tokens": 201969,
+   "cache_creation_input_tokens": 11860,
+   "model_calls": 3,
+   "model_ms": 26994,
+   "cost_usd": 0.101259,
+   "model_ids": [
+    "claude-sonnet-5-5"
+   ]
+  },
+  "model_calls": [
+   {
+    "call": 1,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 67323,
+    "cache_creation_input_tokens": 1464,
+    "output_tokens": 102,
+    "cost_usd": 0.0136123,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 2228,
+    "api_ms": 1101,
+    "requested": [
+     "overview",
+     "case_context",
+     "physical_checks",
+     "physical_hypotheses"
+    ]
+   },
+   {
+    "call": 2,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 67323,
+    "cache_creation_input_tokens": 2607,
+    "output_tokens": 170,
+    "cost_usd": 0.0188643,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 2817,
+    "api_ms": 1622,
+    "requested": [
+     "read_lines",
+     "events",
+     "compare",
+     "physical_check_detail",
+     "lessons"
+    ]
+   },
+   {
+    "call": 3,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 67323,
+    "cache_creation_input_tokens": 7789,
+    "output_tokens": 3089,
+    "cost_usd": 0.0687823,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 21949,
+    "api_ms": 21065,
+    "requested": [
+     "submit_report"
+    ]
+   }
+  ],
+  "seconds": 27.9,
+  "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it.",
+  "physical": {
+   "version": "physical-layer-v1",
+   "recording_id": "rec-0000000000000001",
+   "profile": "synthetic-bev-tables",
+   "machine_class": "battery_electric_vehicle",
+   "family_applies": true,
+   "checks": {
+    "charge_accounting": {
+     "outcome": "PASS",
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "version": "charge-accounting-v1"
+    },
+    "protection_sequence": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: no protection escalation in the recording.",
+     "version": "protection-sequence-v1"
+    },
+    "restart_eligibility": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: HV state never changes in the recording.",
+     "version": "restart-eligibility-v1"
+    }
+   },
+   "summary": "No protective shutdown and no unexplained SOC correction: the battery energy-shortfall hypothesis family does not apply.",
+   "constrained_claims": [
+    {
+     "text": "No fault shown: SOC falls steadily in line with measured current; the t=200 'shift' is not a real jump.",
+     "source": "headline",
+     "hypotheses": [],
+     "verdict": "accepted",
+     "reasons": [],
+     "constrained_status": null,
+     "kind": "text"
+    },
+    {
+     "text": "SOC tracks integrated pack current in both windows (ratio 0.978). Contactors stay closed, BMS fault level stays 0, and all other signals are constant. The t=200 SHIFT flag matches a steady decline, not a correction.",
+     "source": "explanation",
+     "hypotheses": [
+      "P1"
+     ],
+     "verdict": "accepted",
+     "reasons": [],
+     "constrained_status": null,
+     "kind": "text"
+    },
+    {
+     "source": "hypothesis h1",
+     "text": "BMS SOC estimator: The BMS SOC estimator applied an unexplained correction at t=200 s.",
+     "kind": "structured",
+     "physical_ref": "none",
+     "verdict": "accepted",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ]
+    },
+    {
+     "source": "hypothesis h2",
+     "text": "Detector artefact on a normal ramp: The SHIFT flag at t=200 is the detector reacting to normal steady discharge drift.",
+     "kind": "structured",
+     "physical_ref": "none",
+     "verdict": "accepted",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ]
+    },
+    {
+     "source": "hypothesis h3",
+     "text": "Fault outside this window: A fault the reporter saw happened outside the recorded 2400 s.",
+     "kind": "structured",
+     "physical_ref": "none",
+     "verdict": "accepted",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ]
+    }
+   ],
+   "rule": "The report was held to the physical assessment; a rejected statement was returned to the model to fix."
+  },
+  "entry_id": "led-agent-report-e52513b462b2",
+  "recorded_at": "2026-11-16T15:27:16.157363+00:00"
+ }
+}

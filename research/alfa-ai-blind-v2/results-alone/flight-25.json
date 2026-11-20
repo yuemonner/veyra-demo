@@ -1,0 +1,307 @@
+{
+ "arm": "alone",
+ "alias": "flight-25",
+ "folder": "carbonZ_2018-09-11-15-06-34_2_rudder_right_failure",
+ "input_sha256": "d52fb5c81423c9584e4fa665bbee48716381f0070ee4eef9fbb1d2ca28f4da71",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 28.5
+  }
+ ],
+ "prompt_chars": 9484,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Actuator output channel 3 stuck at 1900 us from t=52 s; attitude control degraded afterwards.",
+   "status": "cause_probable",
+   "explanation": "Output ch[3] jumped from about 1500 to 1900 us at t=52 s and never moved again, while ch[1], ch[2], ch[4] and ch[5] kept reacting to setpoints. This points to a stuck or saturated actuator output on ch[3].",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 52,
+     "quote": "1.5e+03,1.54e+03,1.46e+03,1.9e+03",
+     "shows": "ch[3] steps from about 1.5k to 1.9k us at t=52 s. Before that it moved only between 1.47k and 1.52k us.",
+     "calls": []
+    },
+    {
+     "line": 60,
+     "quote": "1.5e+03,1.49e+03,1.64e+03,1.9e+03,1.39e+03,1.39e+03",
+     "shows": "ch[3] stays at 1900 us from t=52 to 69 while ch[2], ch[4] and ch[5] vary. It is not following the controller.",
+     "calls": []
+    },
+    {
+     "line": 57,
+     "quote": "-44.1,11.5,-33",
+     "shows": "Roll setpoint is held near -44 deg, the saturation limit. Roll reaches about -37 deg and pitch about +11 deg, which is a poor tracking match.",
+     "calls": []
+    },
+    {
+     "line": 65,
+     "quote": "1.4e+03,1.19e+03",
+     "shows": "ch[1] and ch[4]/ch[5] swing hard (down to 1190 us) at t=65 s, so the other channels are compensating.",
+     "calls": []
+    },
+    {
+     "line": 1,
+     "quote": "ERROR: Sensor helth",
+     "shows": "A sensor-health error and a low-voltage warning were logged at t=1 s. This is before the ch[3] event and they are not obviously linked.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared each output channel's behaviour before and after t=52 s",
+     "result": "Only ch[3] changed to a fixed value (1900 us). Others kept modulating.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Looked for the same saturation before t=52 s",
+     "result": "Roll setpoint saturated at +45 deg at t=0-4, 29-30 and 41-43 during normal turns, with no stuck output. Those are manoeuvres, not faults.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Compared ch[4] and ch[5]",
+     "result": "They are identical throughout, which is consistent with a mixed or paired output. Neither is faulted.",
+     "verdict": "inconclusive",
+     "about": "h1",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 53,
+     "quote": "-16.8,20.6",
+     "shows": "",
+     "why": "Roll excursion right after the ch[3] jump (attitude roll 20.6 deg at t=53 s, setpoint -16.8 deg), consistent with a sudden asymmetric actuator offset."
+    },
+    {
+     "line": 65,
+     "quote": "57.9,7.67,42.2",
+     "shows": "",
+     "why": "Large altitude and attitude swings (altitude 45 to 71 m, roll between +42 and -40 deg) at t=53-69 s follow from the uncorrectable ch[3] offset."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the ch[3] actuator, wiring and its output driver on the ground",
+    "why": "Settles whether ch[3] is physically stuck or driven by the controller or output stage to 1900 us.",
+    "how": [
+     "Bench-test ch[3] with a manual command sweep",
+     "Inspect servo/ESC, connector and signal wiring",
+     "Review the controller output log for a ch[3] command at 1900 us"
+    ],
+    "where": "on_site",
+    "conditions": "Props off, vehicle powered on the bench, battery at normal state of charge.",
+    "baseline": "Compare ch[3] response with ch[2] and ch[1] under the same commanded sweep, and with t<52 s in this log.",
+    "record": [
+     "actuator.output[ch[3]]",
+     "actuator.output[ch[2]]",
+     "control.attitude_setpoint[roll]",
+     "vehicle.attitude[roll]"
+    ],
+    "needs_approval": true,
+    "outcomes": [
+     {
+      "label": "ch[3] does not follow the command",
+      "means": "Physical or driver fault on the ch[3] output.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Replace the actuator or driver and re-test"
+     },
+     {
+      "label": "ch[3] follows the command normally",
+      "means": "The 1900 us came from the controller or mixer, so a software or sensor cause is likelier.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [],
+      "then": "Review the mixer and sensor-health logs"
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether ch[3] was commanded to 1900 us or the controller commanded something else.",
+    "What the ch[3] output is physically connected to.",
+    "What the sensor-health error at t=1 s refers to."
+   ],
+   "already_answered": [
+    {
+     "question": "When did the fault start?",
+     "answer": "t=52 s, when ch[3] stepped to 1900 us and stayed there.",
+     "line": 52,
+     "quote": "1.9e+03",
+     "calls": []
+    },
+    {
+     "question": "Where on the aircraft?",
+     "answer": "Actuator output channel 3 (ch[3]) of the actuator outputs.",
+     "line": 52,
+     "quote": "actuator.output[ch[3]]",
+     "calls": []
+    }
+   ],
+   "data_requests": [
+    {
+     "what": "Raw ch[3] command versus measured output and the controller's allocator output",
+     "window": "t=45-70 s of this flight",
+     "signals": [
+      "actuator.output[ch[3]]",
+      "controller.event"
+     ],
+     "why_needed": "Separates a stuck output from a commanded saturation.",
+     "searched_calls": []
+    }
+   ],
+   "field_questions": [
+    {
+     "question": "What does ch[3] drive on this airframe, and has it been changed or serviced?",
+     "ask": "field_engineer",
+     "why_needed": "Decides whether to inspect a servo, an ESC or the output board.",
+     "not_in_data": "The channel-to-hardware mapping is not in the signals or events.",
+     "searched_calls": [],
+     "if_answers": [
+      {
+       "answer": "A control surface or tilt servo",
+       "means": "Mechanical jam or servo failure likely."
+      },
+      {
+       "answer": "A motor ESC",
+       "means": "ESC or motor command saturation likely."
+      }
+     ]
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "Physical position of the ch[3] actuator",
+     "why_it_matters": "Separates a stuck actuator from a stuck command.",
+     "how_to_observe": "Inspect the actuator or its feedback during the bench sweep."
+    }
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Output channel 3 actuator",
+     "claim": "The ch[3] actuator or its output driver stuck at 1900 us from t=52 s.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Step to a fixed 1900 us while the other channels kept responding to the controller.",
+     "basis": "indirect",
+     "observed_at": "actuator.output[ch[3]]",
+     "lines": [
+      52,
+      60
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Controller or sensor input",
+     "claim": "The controller or mixer commanded 1900 us on ch[3] because of a bad sensor input.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "A sensor-health error was logged at t=1 s, but nothing links it to the ch[3] event at t=52 s.",
+     "basis": "indirect",
+     "lines": [
+      1
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Battery",
+     "claim": "Low battery voltage degraded the output.",
+     "status": "weakened",
+     "role": "amplifier",
+     "because": "The warning was at t=1 s and the other channels worked normally for 50 s afterwards.",
+     "basis": "indirect",
+     "lines": [
+      1
+     ]
+    },
+    {
+     "id": "h4",
+     "area": "Normal manoeuvre",
+     "claim": "The ch[3] jump was a commanded manoeuvre, not a fault.",
+     "status": "weakened",
+     "role": "effect",
+     "because": "The setpoint changes but ch[3] stays fixed for 17 s while the others vary.",
+     "basis": "indirect",
+     "lines": [
+      52,
+      69
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low battery voltage warning",
+     "class": "anomaly",
+     "why": "Logged at t=1 s; no later voltage signal to confirm."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Sensor health error",
+     "class": "anomaly",
+     "why": "Logged at t=1 s; source sensor unspecified."
+    },
+    {
+     "lines": [
+      52
+     ],
+     "what": "ch[3] output steps to 1900 us and stays",
+     "class": "root_cause_candidate",
+     "why": "Only channel that stops following control."
+    },
+    {
+     "lines": [
+      53,
+      69
+     ],
+     "what": "Roll setpoint saturated, large attitude and altitude swings",
+     "class": "effect",
+     "why": "Consequence of the uncorrectable ch[3] offset."
+    }
+   ],
+   "lesson": "",
+   "reuse_when": ""
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 8723,
+   "output_tokens": 3891
+  },
+  "seconds": 28.5
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/rudder"
+  ],
+  "nonzero": {
+   "/failure_status/rudder": {
+    "first_nonzero_s": 51.974,
+    "value": 3
+   }
+  },
+  "onset_s": 51.974
+ }
+}

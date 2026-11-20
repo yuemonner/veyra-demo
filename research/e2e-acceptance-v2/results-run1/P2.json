@@ -1,0 +1,594 @@
+{
+ "label": "P2",
+ "recording": "rec-0000000000000007",
+ "profile": "px4-battery-status",
+ "engine_case": "case-2dcc489e1373",
+ "seconds": 8.3,
+ "scan": {
+  "counts": {
+   "NOT_APPLICABLE": 1
+  },
+  "filename": "2023-08_sess006_log001.ulg",
+  "format": "px4_ulog",
+  "profile": "px4-battery-status",
+  "profiles": [
+   {
+    "bindings": {
+     "battery": "battery_status"
+    },
+    "machine_class": "px4_vehicle",
+    "origin": "built-in",
+    "profile": "px4-battery-status",
+    "reasons": [],
+    "status": "compatible",
+    "synthetic": false
+   },
+   {
+    "bindings": {},
+    "machine_class": "battery_electric_vehicle",
+    "origin": "built-in",
+    "profile": "synthetic-bev-ros",
+    "reasons": [
+     "format px4_ulog is not one this profile reads (ros1_bag, ros2_bag, mcap)"
+    ],
+    "status": "incompatible",
+    "synthetic": true
+   },
+   {
+    "bindings": {},
+    "machine_class": "battery_electric_vehicle",
+    "origin": "built-in",
+    "profile": "synthetic-bev-tables",
+    "reasons": [
+     "format px4_ulog is not one this profile reads (decoded_csv_package)"
+    ],
+    "status": "incompatible",
+    "synthetic": true
+   },
+   {
+    "bindings": {},
+    "machine_class": null,
+    "origin": "built-in",
+    "profile": "ros-battery-state",
+    "reasons": [
+     "format px4_ulog is not one this profile reads (ros1_bag, ros2_bag, mcap)"
+    ],
+    "status": "incompatible",
+    "synthetic": false
+   }
+  ],
+  "recording": "rec-0000000000000007",
+  "results": [
+   {
+    "applicability": "not_applicable",
+    "matched_original": null,
+    "outcome": "NOT_APPLICABLE",
+    "reasons": [
+     "machine class 'px4_vehicle' is not 'battery_electric_vehicle'"
+    ],
+    "scenario_id": "scn-2180784465e1",
+    "scenario_title": "SOC correction not explained by measured charge (from R1)",
+    "scenario_version": 1,
+    "summary": "Not applicable: machine class 'px4_vehicle' is not 'battery_electric_vehicle'"
+   }
+  ],
+  "scenarios": [
+   "scn-2180784465e1"
+  ],
+  "state": "scanned",
+  "synthetic": false
+ },
+ "investigation": {
+  "agent": {
+   "accepted_as_is": true,
+   "agent_report": {
+    "explanation": "",
+    "hypotheses": [],
+    "next_check": "Look at the recording around the strongest anomaly candidate",
+    "summary": "Strongest anomaly candidate at t=7.405 s: vehicle.altitude[estimate] changed level for good (0.11 -> 3.166 m)"
+   },
+   "constrained_claims": [],
+   "engine_case_id": "case-2dcc489e1373",
+   "investigator": "main",
+   "mode": "agent_failed",
+   "model": null,
+   "note": "Veyra's main investigator (evidence sheet + physical layer), held to the quote/number verifier and to the physical assessment by reference. Statements are proposals until an engineer verifies them.",
+   "provider": "anthropic",
+   "reason": "The model step failed: Claude Code returned an error (success): You've hit your 5-hour limit \u00b7 resets 6:50pm (Europe/Lisbon)",
+   "safety_gate": null,
+   "trace": [],
+   "version": "veyra-investigator-v1"
+  },
+  "case_id": "rec-0000000000000007",
+  "deterministic": {
+   "checks": {
+    "charge_accounting": {
+     "outcome": "INDETERMINATE",
+     "summary": "Indeterminate: the profile does not say how SOC is estimated, and this recording does not show it following measured charge (no tracking span of 600 s or more): a change the charge does not explain may be how this estimator works"
+    },
+    "protection_sequence": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: no fault-level signal."
+    },
+    "restart_eligibility": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: no contactor feedback / fault level."
+    }
+   },
+   "hypotheses": [],
+   "next_check": null,
+   "summary": null
+  },
+  "finished_at": "2026-11-16T16:29:09.368417+00:00",
+  "knowledge_used": [],
+  "recording_digest": "f74f31519311fd933c7cf846099c67cd5c38a300da986a352c0eb296d5504f7a",
+  "scenario_results": {
+   "here": [
+    {
+     "applicability": "not_applicable",
+     "matched_original": null,
+     "outcome": "NOT_APPLICABLE",
+     "recording": "rec-0000000000000007",
+     "scenario_id": "scn-2180784465e1",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "Not applicable: machine class 'px4_vehicle' is not 'battery_electric_vehicle'",
+     "synthetic": null,
+     "trigger": "ingest"
+    }
+   ],
+   "other_recordings": [
+    {
+     "applicability": "applies",
+     "matched_original": true,
+     "outcome": "VIOLATION",
+     "recording": "rec-0000000000000000",
+     "scenario_id": "scn-2180784465e1",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "1 SOC correction(s) not explained by measured charge; largest: 60.8 % -> 22.8 % in 30.0 s (fault), measured charge 0.0545 Ah explains 0.054 pp, 37.95 pp unexplained.",
+     "synthetic": null,
+     "trigger": "approval-backfill"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": false,
+     "outcome": "PASS",
+     "recording": "rec-0000000000000001",
+     "scenario_id": "scn-2180784465e1",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "synthetic": null,
+     "trigger": "ingest"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": true,
+     "outcome": "VIOLATION",
+     "recording": "rec-0000000000000002",
+     "scenario_id": "scn-2180784465e1",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "1 SOC correction(s) not explained by measured charge; largest: 56.8 % -> 24.0 % in 29.0 s (fault), measured charge 0.056 Ah explains 0.056 pp, 32.74 pp unexplained.",
+     "synthetic": null,
+     "trigger": "ingest"
+    },
+    {
+     "applicability": "not_applicable",
+     "matched_original": null,
+     "outcome": "NOT_APPLICABLE",
+     "recording": "rec-0000000000000003",
+     "scenario_id": "scn-2180784465e1",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "Not applicable: machine class 'px4_vehicle' is not 'battery_electric_vehicle'",
+     "synthetic": null,
+     "trigger": "ingest"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": false,
+     "outcome": "PASS",
+     "recording": "rec-0000000000000004",
+     "scenario_id": "scn-2180784465e1",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "synthetic": null,
+     "trigger": "ingest"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": false,
+     "outcome": "PASS",
+     "recording": "rec-0000000000000005",
+     "scenario_id": "scn-2180784465e1",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "synthetic": null,
+     "trigger": "ingest"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": false,
+     "outcome": "PASS",
+     "recording": "rec-0000000000000006",
+     "scenario_id": "scn-2180784465e1",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "synthetic": null,
+     "trigger": "ingest"
+    }
+   ]
+  },
+  "started_at": "2026-11-16T16:29:03.044167+00:00",
+  "synthetic": false,
+  "trigger": "ingest",
+  "version": "veyra-investigation-v1"
+ },
+ "main_investigator_record": {
+  "kind": "autonomous_investigation",
+  "version": "veyra-investigator-v1",
+  "run_id": "run-f16be248dc39",
+  "mode": "deterministic",
+  "source": {
+   "kind": "recording_sheet",
+   "version": "veyra-recording-sheet-v2",
+   "sha256": "399fec9c364e34e09b74016ba8969ccd0d2461adb99b866454ac4e90f90ebe3b",
+   "sheet": [
+    "RECORDING 12817 rows, 19 series, span 80.078 s from t=0 at 2026-11-16T16:29:00.332949Z (clock px4_boot_clock). Times below are seconds from t=0.",
+    "SERIES actuator.output[ch1] unit=us samples=738 t=0.706..80.078 s min=900 max=1672 median=1622 usual_interval=0.101 s",
+    "SERIES actuator.output[ch2] unit=us samples=738 t=0.706..80.078 s min=900 max=1648 median=1600 usual_interval=0.101 s",
+    "SERIES actuator.output[ch3] unit=us samples=738 t=0.706..80.078 s min=900 max=1706 median=1647 usual_interval=0.101 s",
+    "SERIES actuator.output[ch4] unit=us samples=738 t=0.706..80.078 s min=900 max=1706 median=1627 usual_interval=0.101 s",
+    "SERIES actuator.output[ch5] unit=us samples=738 t=0.706..80.078 s min=0 max=1500 median=1500 usual_interval=0.101 s",
+    "SERIES actuator.output[ch6] unit=us samples=738 t=0.706..80.078 s min=0 max=1500 median=1500 usual_interval=0.101 s",
+    "SERIES actuator.output[ch7] unit=us samples=738 t=0.706..80.078 s min=0 max=0 median=0 usual_interval=0.101 s",
+    "SERIES actuator.output[ch8] unit=us samples=738 t=0.706..80.078 s min=0 max=0 median=0 usual_interval=0.101 s",
+    "SERIES control.attitude_setpoint[pitch] unit=deg samples=428 t=0..78.982 s min=-0.105 max=3.966 median=0.598 usual_interval=0.194 s",
+    "SERIES control.attitude_setpoint[roll] unit=deg samples=428 t=0..78.982 s min=-4.712 max=2.14 median=0.668 usual_interval=0.194 s",
+    "SERIES control.attitude_setpoint[yaw] unit=deg samples=428 t=0..78.982 s min=0 max=3.185 median=2.337 usual_interval=0.194 s",
+    "SERIES control.yaw_rate_setpoint[yaw] unit=deg/s samples=755 t=0.706..80.002 s min=-8.055 max=7.647 median=-0.194 usual_interval=0.105 s",
+    "SERIES vehicle.altitude[baro] unit=m samples=788 t=0.702..80.023 s min=116.458 max=125.048 median=123.322 usual_interval=0.101 s",
+    "SERIES vehicle.altitude[estimate] unit=m samples=526 t=0.701..80.074 s min=0.035 max=3.585 median=2.726 usual_interval=0.106 s",
+    "SERIES vehicle.attitude[pitch] unit=deg samples=757 t=0.705..80.037 s min=-0.384 max=3.134 median=0.589 usual_interval=0.105 s",
+    "SERIES vehicle.attitude[roll] unit=deg samples=757 t=0.705..80.037 s min=-3.159 max=2.199 median=0.653 usual_interval=0.105 s",
+    "SERIES vehicle.attitude[yaw] unit=deg samples=757 t=0.705..80.037 s min=-0.806 max=3.507 median=2.415 usual_interval=0.105 s",
+    "SERIES vehicle.ground_speed unit=m/s samples=526 t=0.701..80.074 s min=0 max=0.26 median=0.076 usual_interval=0.106 s",
+    "SERIES vehicle.yaw_rate[yaw] unit=deg/s samples=755 t=0.708..80.004 s min=-35.546 max=13.394 median=0.012 usual_interval=0.105 s",
+    "EVENT t=0.02 s controller.event[log] INFO: [logger] Start file log (type: full)",
+    "EVENT t=0.66 s controller.event[log] INFO: [logger] Opened full log file: /fs/microsd/log/sess006/log001.ulg",
+    "EVENT t=1.871 s controller.event[log] INFO: [commander] Takeoff detected",
+    "EVENT t=69.847 s controller.event[vehicle_status] nav_state OFFBOARD -> AUTO_LAND",
+    "EVENT t=70.362 s controller.event[log] ERROR: [mavlink] [timesync] Time jump detected. Resetting time synchroniser.",
+    "EVENT t=76.915 s controller.event[log] ERROR: [commander] Manual kill-switch engaged",
+    "EVENT t=77.586 s controller.event[log] INFO: [commander] Landing detected",
+    "EVENT t=79.087 s controller.event[vehicle_status] arming_state ARMED -> DISARMED",
+    "CONSTANT actuator.output[ch5] held 1500 from t=0.706 to 76.833 s (709 samples)",
+    "CONSTANT actuator.output[ch6] held 1500 from t=0.706 to 76.833 s (709 samples)",
+    "CONSTANT actuator.output[ch7] = 0 for the whole recording (738 samples)",
+    "CONSTANT actuator.output[ch8] = 0 for the whole recording (738 samples)",
+    "GAP control.attitude_setpoint[pitch] no samples from t=0 to 1.029 s (1.029 s; usual interval 0.194 s)",
+    "GAP control.attitude_setpoint[roll] no samples from t=0 to 1.029 s (1.029 s; usual interval 0.194 s)",
+    "GAP control.attitude_setpoint[yaw] no samples from t=0 to 1.029 s (1.029 s; usual interval 0.194 s)",
+    "SHIFT actuator.output[ch1] changed level for good at t=73.584 s: median 1624 before, 1095 after us (48.1x its variation before)",
+    "SHIFT actuator.output[ch2] changed level for good at t=73.584 s: median 1602 before, 1242 after us (32.7x its variation before)",
+    "SHIFT actuator.output[ch3] changed level for good at t=73.584 s: median 1648 before, 1498 after us (10x its variation before)",
+    "SHIFT actuator.output[ch4] changed level for good at t=73.584 s: median 1629 before, 1464 after us (11x its variation before)",
+    "SHIFT vehicle.altitude[baro] changed level for good at t=7.356 s: median 119.742 before, 123.785 after m (4.8x its variation before)",
+    "SHIFT vehicle.altitude[estimate] changed level for good at t=7.405 s: median 0.11 before, 3.166 after m (277.8x its variation before)",
+    "SHIFT vehicle.attitude[pitch] changed level for good at t=7.317 s: median 0.256 before, 0.598 after deg (6.6x its variation before)",
+    "SHIFT vehicle.attitude[roll] changed level for good at t=6.682 s: median 0.43 before, 0.668 after deg (8.7x its variation before)",
+    "SHIFT vehicle.ground_speed changed level for good at t=27.198 s: median 0.021 before, 0.238 after m/s (19.7x its variation before)",
+    "CHANGE actuator.output[ch1] at t=76.122 s: 1608.5 -> 900 us (step -708.5, 50.6x its usual variation)",
+    "CHANGE actuator.output[ch1] at t=2.735 s: 1170.5 -> 1539.5 us (step 369, 26.4x its usual variation)",
+    "CHANGE actuator.output[ch2] at t=76.122 s: 1589 -> 900 us (step -689, 45.9x its usual variation)",
+    "CHANGE actuator.output[ch2] at t=2.838 s: 1162.5 -> 1540 us (step 377.5, 25.2x its usual variation)",
+    "CHANGE actuator.output[ch3] at t=76.122 s: 1662 -> 900 us (step -762, 34.6x its usual variation)",
+    "CHANGE actuator.output[ch3] at t=2.942 s: 1195 -> 1579 us (step 384, 17.5x its usual variation)",
+    "CHANGE actuator.output[ch4] at t=76.122 s: 1651 -> 900 us (step -751, 34.1x its usual variation)",
+    "CHANGE actuator.output[ch4] at t=2.735 s: 1153.5 -> 1532.5 us (step 379, 17.2x its usual variation)",
+    "CHANGE actuator.output[ch5] at t=76.122 s: 1500 -> 0 us (step -1500, 1000x its usual variation)",
+    "CHANGE actuator.output[ch6] at t=76.122 s: 1500 -> 0 us (step -1500, 1000x its usual variation)",
+    "CHANGE control.attitude_setpoint[pitch] at t=3.669 s: 0.089 -> 2.722 deg (step 2.633, 43.8x its usual variation)",
+    "CHANGE control.attitude_setpoint[pitch] at t=76.943 s: 0.814 -> 0 deg (step -0.814, 13.5x its usual variation)",
+    "CHANGE control.attitude_setpoint[pitch] at t=70.965 s: 0.333 -> 0.821 deg (step 0.488, 8.1x its usual variation)",
+    "CHANGE control.attitude_setpoint[roll] at t=73.197 s: -1.243 -> 1.712 deg (step 2.956, 34.9x its usual variation)",
+    "CHANGE control.attitude_setpoint[roll] at t=3.669 s: -0.064 -> 1.308 deg (step 1.373, 16.2x its usual variation)",
+    "CHANGE control.attitude_setpoint[roll] at t=76.749 s: 1.118 -> 0 deg (step -1.118, 13.2x its usual variation)",
+    "CHANGE control.yaw_rate_setpoint[yaw] at t=78.218 s: -0.07 -> -5.252 deg/s (step -5.182, 62.2x its usual variation)",
+    "CHANGE control.yaw_rate_setpoint[yaw] at t=13.222 s: -1.456 -> 1.58 deg/s (step 3.036, 36.4x its usual variation)",
+    "CHANGE control.yaw_rate_setpoint[yaw] at t=21.738 s: -0.209 -> 1.299 deg/s (step 1.508, 18.1x its usual variation)",
+    "CHANGE vehicle.altitude[baro] at t=75.086 s: 122.353 -> 119.153 m (step -3.2, 12.6x its usual variation)",
+    "CHANGE vehicle.altitude[baro] at t=5.038 s: 118.225 -> 120.585 m (step 2.36, 9.3x its usual variation)",
+    "CHANGE vehicle.altitude[estimate] at t=74.189 s: 1.971 -> 0.709 m (step -1.262, 631x its usual variation)",
+    "CHANGE vehicle.altitude[estimate] at t=70.334 s: 3.563 -> 3.111 m (step -0.452, 226x its usual variation)",
+    "CHANGE vehicle.altitude[estimate] at t=35.622 s: 3.075 -> 3.441 m (step 0.366, 183x its usual variation)",
+    "CHANGE vehicle.attitude[pitch] at t=5.529 s: 1.468 -> 0.198 deg (step -1.27, 39.4x its usual variation)",
+    "CHANGE vehicle.attitude[pitch] at t=52.962 s: 0.413 -> 0.807 deg (step 0.394, 12.2x its usual variation)",
+    "CHANGE vehicle.attitude[pitch] at t=27.251 s: 0.778 -> 0.437 deg (step -0.341, 10.6x its usual variation)",
+    "CHANGE vehicle.attitude[roll] at t=73.221 s: -0.785 -> 1.461 deg (step 2.246, 40.7x its usual variation)",
+    "CHANGE vehicle.attitude[roll] at t=36.381 s: 0.265 -> 1.073 deg (step 0.808, 14.6x its usual variation)",
+    "CHANGE vehicle.attitude[roll] at t=10.779 s: 1.048 -> 0.528 deg (step -0.52, 9.4x its usual variation)",
+    "CHANGE vehicle.ground_speed at t=37.349 s: 0.018 -> 0.233 m/s (step 0.215, 71.7x its usual variation)",
+    "CHANGE vehicle.ground_speed at t=70.742 s: 0.249 -> 0.053 m/s (step -0.196, 65.3x its usual variation)",
+    "CHANGE vehicle.ground_speed at t=4.156 s: 0.003 -> 0.09 m/s (step 0.087, 29x its usual variation)",
+    "TRACKING control.attitude_setpoint[pitch] vs vehicle.attitude[pitch]: steady lag 0.21 s removed (a constant lag is this recording's normal, not a fault); typical |error| 0.082 deg, worst 3.814 at t=76.749 s; 4 window(s) above 0.245",
+    "TRACKING vehicle.attitude[pitch] typical |error| by stretch: 1.029-8.824 s 0.288, 8.824-16.62 s 0.072, 16.62-24.415 s 0.137, 24.415-32.21 s 0.056, 32.21-40.006 s 0.056, 40.006-47.801 s 0.045, 47.801-55.596 s 0.074, 55.596-63.391 s 0.068, 63.391-71.187 s 0.107, 71.187-78.982 s 0.157 deg",
+    "TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=2.951 to 3.261 s (peak |error| 0.363 deg)",
+    "TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=3.862 to 7.007 s (peak |error| 1.533 deg)",
+    "TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=20.52 to 20.903 s (peak |error| 0.274 deg)",
+    "TRACKING control.attitude_setpoint[roll] vs vehicle.attitude[roll]: steady lag 0.21 s removed (a constant lag is this recording's normal, not a fault); typical |error| 0.183 deg, worst 1.553 at t=70.343 s; 5 window(s) above 0.548",
+    "TRACKING vehicle.attitude[roll] typical |error| by stretch: 1.029-8.824 s 0.522, 8.824-16.62 s 0.153, 16.62-24.415 s 0.221, 24.415-32.21 s 0.218, 32.21-40.006 s 0.162, 40.006-47.801 s 0.102, 47.801-55.596 s 0.078, 55.596-63.391 s 0.1, 63.391-71.187 s 0.102, 71.187-78.982 s 0.44 deg",
+    "TRACKING vehicle.attitude[roll] diverged from its setpoint from t=4.27 to 5.396 s (peak |error| 0.924 deg)",
+    "TRACKING vehicle.attitude[roll] diverged from its setpoint from t=5.783 to 6.308 s (peak |error| 0.629 deg)",
+    "TRACKING vehicle.attitude[roll] diverged from its setpoint from t=8.327 to 9.049 s (peak |error| 0.776 deg)",
+    "TRACKING control.attitude_setpoint[yaw] vs vehicle.attitude[yaw]: steady lag 0.314 s removed (a constant lag is this recording's normal, not a fault); typical |error| 0.117 deg, worst 1.024 at t=11.685 s; 6 window(s) above 0.351",
+    "SHIFT vehicle.attitude[yaw] followed its setpoint worse for good from t=72.579 s: typical |error| 0.106 before, 0.393 after deg (4.2x its variation before)",
+    "TRACKING vehicle.attitude[yaw] typical |error| by stretch: 1.029-8.824 s 0.153, 8.824-16.62 s 0.366, 16.62-24.415 s 0.154, 24.415-32.21 s 0.117, 32.21-40.006 s 0.046, 40.006-47.801 s 0.085, 47.801-55.596 s 0.084, 55.596-63.391 s 0.044, 63.391-71.187 s 0.142, 71.187-78.982 s 0.333 deg",
+    "TRACKING vehicle.attitude[yaw] diverged from its setpoint from t=3.669 to 4.27 s (peak |error| 0.544 deg)",
+    "TRACKING vehicle.attitude[yaw] diverged from its setpoint from t=5.396 to 5.901 s (peak |error| 0.552 deg)",
+    "TRACKING vehicle.attitude[yaw] diverged from its setpoint from t=8.831 to 9.238 s (peak |error| 0.439 deg)",
+    "TRACKING control.yaw_rate_setpoint[yaw] vs vehicle.yaw_rate[yaw]: steady lag 0 s removed (a constant lag is this recording's normal, not a fault); typical |error| 0.618 deg/s, worst 36.74 at t=76.535 s; 6 window(s) above 1.855",
+    "TRACKING vehicle.yaw_rate[yaw] typical |error| by stretch: 0.706-8.636 s 0.883, 8.636-16.566 s 1.026, 16.566-24.495 s 0.766, 24.495-32.425 s 0.41, 32.425-40.354 s 0.464, 40.354-48.284 s 0.607, 48.284-56.214 s 0.512, 56.214-64.143 s 0.635, 64.143-72.073 s 0.559, 72.073-80.002 s 1.651 deg/s",
+    "TRACKING vehicle.yaw_rate[yaw] diverged from its setpoint from t=3.858 to 4.383 s (peak |error| 5.848 deg/s)",
+    "TRACKING vehicle.yaw_rate[yaw] diverged from its setpoint from t=5.546 to 5.755 s (peak |error| 4.145 deg/s)",
+    "TRACKING vehicle.yaw_rate[yaw] diverged from its setpoint from t=11.644 to 12.068 s (peak |error| 5.041 deg/s)",
+    "ANOMALY a1 t=5.396 s: vehicle.attitude[yaw] did not follow control.attitude_setpoint[yaw] (peak |error| 0.552) (see line 92; strength 2.272)",
+    "ANOMALY a2 t=5.546 s: vehicle.yaw_rate[yaw] did not follow control.yaw_rate_setpoint[yaw] (peak |error| 4.145) (see line 97; strength 2.661)",
+    "ANOMALY a3 t=6.682 s: vehicle.attitude[roll] changed level for good (0.43 -> 0.668 deg) (see line 43; strength 2.171)",
+    "ANOMALY a4 t=7.405 s: vehicle.altitude[estimate] changed level for good (0.11 -> 3.166 m) (see line 41; strength 5.38)",
+    "ANOMALY a5 t=8.327 s: vehicle.attitude[roll] did not follow control.attitude_setpoint[roll] (peak |error| 0.776) (see line 87; strength 2.158)",
+    "ANOMALY a6 t=11.644 s: vehicle.yaw_rate[yaw] did not follow control.yaw_rate_setpoint[yaw] (peak |error| 5.041) (see line 98; strength 2.885)",
+    "ANOMALY a7 t=27.198 s: vehicle.ground_speed changed level for good (0.021 -> 0.238 m/s) (see line 44; strength 2.895)",
+    "ANOMALY a8 t=73.584 s: actuator.output[ch1] changed level for good (1624 -> 1095 us) (see line 36; strength 3.72)",
+    "ANOMALY a9 t=73.584 s: actuator.output[ch2] changed level for good (1602 -> 1242 us) (see line 37; strength 3.361)",
+    "ANOMALY a10 t=73.584 s: actuator.output[ch4] changed level for good (1629 -> 1464 us) (see line 39; strength 2.374)",
+    "ANOMALY a11 t=73.584 s: actuator.output[ch3] changed level for good (1648 -> 1498 us) (see line 38; strength 2.291)",
+    "ANOMALY a12 t=76.122 s: 6 channels of actuator.output stepped down together (see line 45; strength 3)"
+   ]
+  },
+  "model": null,
+  "fallback_reason": "The model step failed: Claude Code returned an error (success): You've hit your 5-hour limit \u00b7 resets 6:50pm (Europe/Lisbon)",
+  "steps": [],
+  "result": {
+   "events": [
+    {
+     "lines": [
+      99
+     ],
+     "what": "ANOMALY a1 t=5.396 s: vehicle.attitude[yaw] did not follow control.attitude_setpoint[yaw] ",
+     "class": "anomaly",
+     "why": "ranked anomaly candidate on the evidence sheet"
+    },
+    {
+     "lines": [
+      100
+     ],
+     "what": "ANOMALY a2 t=5.546 s: vehicle.yaw_rate[yaw] did not follow control.yaw_rate_setpoint[yaw] ",
+     "class": "anomaly",
+     "why": "ranked anomaly candidate on the evidence sheet"
+    },
+    {
+     "lines": [
+      101
+     ],
+     "what": "ANOMALY a3 t=6.682 s: vehicle.attitude[roll] changed level for good (0.43 -> 0.668 deg) (s",
+     "class": "anomaly",
+     "why": "ranked anomaly candidate on the evidence sheet"
+    },
+    {
+     "lines": [
+      102
+     ],
+     "what": "ANOMALY a4 t=7.405 s: vehicle.altitude[estimate] changed level for good (0.11 -> 3.166 m) ",
+     "class": "anomaly",
+     "why": "ranked anomaly candidate on the evidence sheet"
+    },
+    {
+     "lines": [
+      103
+     ],
+     "what": "ANOMALY a5 t=8.327 s: vehicle.attitude[roll] did not follow control.attitude_setpoint[roll",
+     "class": "anomaly",
+     "why": "ranked anomaly candidate on the evidence sheet"
+    },
+    {
+     "lines": [
+      104
+     ],
+     "what": "ANOMALY a6 t=11.644 s: vehicle.yaw_rate[yaw] did not follow control.yaw_rate_setpoint[yaw]",
+     "class": "anomaly",
+     "why": "ranked anomaly candidate on the evidence sheet"
+    },
+    {
+     "lines": [
+      105
+     ],
+     "what": "ANOMALY a7 t=27.198 s: vehicle.ground_speed changed level for good (0.021 -> 0.238 m/s) (s",
+     "class": "anomaly",
+     "why": "ranked anomaly candidate on the evidence sheet"
+    },
+    {
+     "lines": [
+      106
+     ],
+     "what": "ANOMALY a8 t=73.584 s: actuator.output[ch1] changed level for good (1624 -> 1095 us) (see ",
+     "class": "anomaly",
+     "why": "ranked anomaly candidate on the evidence sheet"
+    }
+   ],
+   "hypotheses": [],
+   "headline": "Strongest anomaly candidate at t=7.405 s: vehicle.altitude[estimate] changed level for good (0.11 -> 3.166 m)",
+   "status": "cause_unknown",
+   "explanation": "",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 102,
+     "quote": "ANOMALY a4 t=7.405 s: vehicle.altitude[estimate] changed level for good (0.11 -> 3.166 m) (see line 41; strength 5.38)",
+     "shows": "anomaly candidate (where to look, not a cause)",
+     "calls": []
+    },
+    {
+     "line": 41,
+     "quote": "SHIFT vehicle.altitude[estimate] changed level for good at t=7.405 s: median 0.11 before, 3.166 after m (277.8x its variation before)",
+     "shows": "the detail behind it",
+     "calls": []
+    },
+    {
+     "line": 106,
+     "quote": "ANOMALY a8 t=73.584 s: actuator.output[ch1] changed level for good (1624 -> 1095 us) (see line 36; strength 3.72)",
+     "shows": "anomaly candidate (where to look, not a cause)",
+     "calls": []
+    },
+    {
+     "line": 36,
+     "quote": "SHIFT actuator.output[ch1] changed level for good at t=73.584 s: median 1624 before, 1095 after us (48.1x its variation before)",
+     "shows": "the detail behind it",
+     "calls": []
+    },
+    {
+     "line": 107,
+     "quote": "ANOMALY a9 t=73.584 s: actuator.output[ch2] changed level for good (1602 -> 1242 us) (see line 37; strength 3.361)",
+     "shows": "anomaly candidate (where to look, not a cause)",
+     "calls": []
+    },
+    {
+     "line": 37,
+     "quote": "SHIFT actuator.output[ch2] changed level for good at t=73.584 s: median 1602 before, 1242 after us (32.7x its variation before)",
+     "shows": "the detail behind it",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "effects": [],
+   "next_action": {
+    "action": "Look at the recording around the strongest anomaly candidate",
+    "why": "",
+    "how": [],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Found it",
+      "means": "Record what you found"
+     },
+     {
+      "label": "Nothing found",
+      "means": "Record what you checked"
+     }
+    ],
+    "provenance": {
+     "kind": "expert_proposal",
+     "source": "the AI investigator",
+     "status": "passed the action gate; not a validated procedure"
+    }
+   },
+   "unknowns": [
+    "The model step failed: Claude Code returned an error (success): You've hit your 5-hour limit \u00b7 resets 6:50pm (Europe/Lisbon): this is Veyra's rule-based reading of the recording only, without an investigation. An anomaly candidate is where to look, never a cause."
+   ],
+   "lesson": "",
+   "safety_findings": [
+    {
+     "ref": "charge_accounting:soc_change_not_from_charge",
+     "statement": "recording: SOC went 86.19 % -> 60.61 % between t=0.0 s and t=79.09 s (79.09 s). Measured charge over the same interval: 0.0021 Ah = 0.013 pp at 16 Ah. Unexplained: 25.57 pp (tolerance 0.013 pp). Delivering it would need about 186 A for that time; the measured mean was 0.09 A.",
+     "inserted_by": "action-gate-v1",
+     "provenance": {
+      "kind": "check_result",
+      "source": "charge_accounting charge-accounting-v1",
+      "status": "computed from the rows"
+     }
+    }
+   ]
+  },
+  "dropped": [],
+  "usage": {
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "uncached_input_tokens": 0,
+   "cache_read_input_tokens": 0,
+   "cache_creation_input_tokens": 0,
+   "model_calls": 0,
+   "model_ms": 0,
+   "cost_usd": null,
+   "model_ids": []
+  },
+  "model_calls": [],
+  "seconds": 6.1,
+  "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it.",
+  "safety_gate": {
+   "version": "action-gate-v1",
+   "action_verdict": "pass",
+   "rules_fired": [],
+   "action_class": [
+    "low_risk_physical"
+   ],
+   "blocked_actions": [],
+   "inserted_findings": [
+    "charge_accounting:soc_change_not_from_charge"
+   ],
+   "covered_by_model": [],
+   "passed_unchanged": false
+  },
+  "reasoning": {
+   "signal": {
+    "evidence": "evidence sheet",
+    "verifier_dropped": 0,
+    "submit_attempts": 0
+   },
+   "physics": {
+    "profile": "px4-battery-status",
+    "family_applies": false,
+    "claims": {
+     "accepted": 0,
+     "downgraded": 0,
+     "flagged": 0,
+     "rejected": 0
+    }
+   },
+   "safety": {
+    "action": "pass",
+    "rules": [],
+    "inserted_findings": [
+     "charge_accounting:soc_change_not_from_charge"
+    ],
+    "covered_by_model": []
+   },
+   "memory": {
+    "lessons_consulted": false
+   }
+  },
+  "physical": {
+   "version": "physical-layer-v1",
+   "recording_id": "rec-0000000000000007",
+   "profile": "px4-battery-status",
+   "machine_class": "px4_vehicle",
+   "family_applies": false,
+   "checks": {
+    "charge_accounting": {
+     "outcome": "INDETERMINATE",
+     "summary": "Indeterminate: the profile does not say how SOC is estimated, and this recording does not show it following measured charge (no tracking span of 600 s or more): a change the charge does not explain may be how this estimator works",
+     "version": "charge-accounting-v1"
+    },
+    "protection_sequence": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: no fault-level signal.",
+     "version": "protection-sequence-v1"
+    },
+    "restart_eligibility": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: no contactor feedback / fault level.",
+     "version": "restart-eligibility-v1"
+    }
+   },
+   "summary": "The battery-electric-vehicle incident family does not apply to this machine: machine class 'px4_vehicle' is not a battery-electric vehicle; HV, BMS, contactor and restart-policy hypotheses and checks do not apply. The physical check results stand on their own; no HV, BMS or contactor hypothesis or check is proposed.",
+   "constrained_claims": [],
+   "rule": "The report was held to the physical assessment; a rejected statement was returned to the model to fix."
+  },
+  "entry_id": "led-agent-report-3b5fb709c59f",
+  "recorded_at": "2026-11-16T16:29:09.364788+00:00"
+ }
+}

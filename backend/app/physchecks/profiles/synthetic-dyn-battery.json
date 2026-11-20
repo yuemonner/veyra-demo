@@ -1,0 +1,125 @@
+{
+ "schema": "veyra-signal-profile-v1",
+ "id": "synthetic-dyn-battery",
+ "version": "1",
+ "synthetic": true,
+ "title": "SYNTHETIC battery string for the signal-dynamics evaluation (scripts/make_synthetic_dynamics.py)",
+ "source": "SYNTHETIC test profile (generated, not a real machine). Declares no series count, chemistry or OCV curve.",
+ "machine_class": "battery_electric_vehicle",
+ "conditions": {
+  "has_hv_contactors": true
+ },
+ "recording": {
+  "formats": [
+   "decoded_csv_package"
+  ],
+  "bind": {
+   "bat": {
+    "topics": [
+     "hbat"
+    ]
+   }
+  },
+  "time": "t_rel_s per file"
+ },
+ "max_sample_age_s": 2.0,
+ "max_gap_s": 3.0,
+ "roles": {
+  "pack_current": {
+   "field": "bat:i_pack_a",
+   "unit": "A",
+   "sign": "discharge_positive",
+   "kind": "measurement",
+   "valid": [
+    -2000,
+    2000
+   ],
+   "resolution": 0.1
+  },
+  "pack_voltage": {
+   "field": "bat:v_pack_v",
+   "unit": "V",
+   "kind": "measurement",
+   "valid": [
+    1,
+    2000
+   ]
+  },
+  "soc": {
+   "field": "bat:soc_pct",
+   "unit": "%",
+   "kind": "estimate",
+   "estimator": "coulomb_counting",
+   "valid": [
+    0,
+    100
+   ],
+   "resolution": 0.1
+  },
+  "min_cell_voltage": {
+   "field": "bat:v_cell_min_v",
+   "unit": "V",
+   "kind": "measurement",
+   "valid": [
+    1.0,
+    5.0
+   ],
+   "resolution": 0.001
+  },
+  "max_cell_voltage": {
+   "field": "bat:v_cell_max_v",
+   "unit": "V",
+   "kind": "measurement",
+   "valid": [
+    1.0,
+    5.0
+   ],
+   "resolution": 0.001
+  },
+  "min_cell_index": {
+   "field": "bat:idx_min",
+   "unit": "",
+   "kind": "state",
+   "valid": [
+    1,
+    400
+   ]
+  },
+  "max_cell_index": {
+   "field": "bat:idx_max",
+   "unit": "",
+   "kind": "state",
+   "valid": [
+    1,
+    400
+   ]
+  },
+  "bms_fault_level": {
+   "field": "bat:fault_level",
+   "unit": "",
+   "kind": "state",
+   "map": {
+    "0": 0,
+    "1": 1,
+    "2": 2,
+    "3": 3
+   },
+   "enum": {
+    "0": "normal",
+    "1": "level 1",
+    "2": "level 2",
+    "3": "level 3"
+   }
+  },
+  "main_positive_closed": {
+   "field": "bat:k_pos",
+   "unit": "",
+   "kind": "state",
+   "enum": {
+    "0": "open",
+    "1": "closed"
+   }
+  }
+ },
+ "parameters": {}
+}

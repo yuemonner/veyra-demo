@@ -1,0 +1,219 @@
+{
+ "case": "shuttle-synthetic-v2",
+ "source": "v2/results/shuttle-synthetic-v2.json",
+ "model": "claude-code:sonnet",
+ "provider": "anthropic",
+ "steps": [
+  {
+   "cutoff": "2026-10-21",
+   "step": "s2",
+   "check": "更换 FR 电机逆变器（MCU_FR）",
+   "status": "rejected",
+   "attempts": 2,
+   "rejections": [
+    [
+     "claim 1 is confirmed but its weakest evidence is inferred"
+    ],
+    [
+     "claim 1 is confirmed but its weakest evidence is inferred",
+     "claim 2 cites no fact: The engineers report that the e-stop happened again on 28 October after the FR i"
+    ]
+   ],
+   "error": null,
+   "seconds": 21.6,
+   "claims": [],
+   "eliminates": []
+  },
+  {
+   "cutoff": "2026-10-22",
+   "step": "s3",
+   "check": "用 BMS 诊断工具检查电池 SOC 和电芯电压",
+   "status": "rejected",
+   "attempts": 2,
+   "rejections": [
+    [
+     "claim 1 cites no fact: The engineers reported that SOC and cell voltages measured at the station were n",
+     "claim 2 is confirmed but its weakest evidence is inferred",
+     "eliminates 'Battery is flat or has faulty cells (low SOC or abnormal cell voltage) as the cause. This is eliminated on the engineers' report and does not cover the BMS discharge-limit exceedance.' without a fact that contradicts it (its status is unknown)"
+    ],
+    [
+     "claim 1 is confirmed but its weakest evidence is inferred"
+    ]
+   ],
+   "error": null,
+   "seconds": 19.7,
+   "claims": [],
+   "eliminates": []
+  },
+  {
+   "cutoff": "2026-10-23",
+   "step": "s4",
+   "check": "检查 VCU 2.4.1 的坡起辅助（HSA）设置，看会不会超过 BMS 扭矩限值",
+   "status": "accepted",
+   "attempts": 2,
+   "rejections": [
+    [
+     "claim 1 is confirmed but its weakest evidence is inferred",
+     "claim 2 is confirmed but its weakest evidence is inferred"
+    ]
+   ],
+   "error": null,
+   "seconds": 14.9,
+   "claims": [
+    {
+     "text": "The VCU 2.4.1 calibration sets HSA_FF_Torque_max_Nm = 95.0, which is above BMS_TqLim_cold_Nm = 80.0. The HSA setting can therefore exceed the BMS cold torque limit, which matches the check's question.",
+     "fact_ids": [
+      "a1"
+     ],
+     "tier": "inferred",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "In the one recorded launch, pack current exceeded the BMS discharge limit at +0.55 s (151.7 against 150.0). This is consistent with the reported result that HSA feed-forward torque goes over the BMS limit. It is one launch, and the facts do not show that HSA caused the excess.",
+     "fact_ids": [
+      "f4"
+     ],
+     "tier": "inferred",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "The engineers reported that the HSA feed-forward torque exceeds the BMS limit when the battery is cold. The expectation was only partly confirmed.",
+     "fact_ids": [
+      "a1"
+     ],
+     "tier": "reported",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "VCU 2.4.1 has been running since 2026-10-14, before the first reported symptom on 2026-10-20. This fits the 'after the upgrade' part of the engineer's expectation. The 'all stops happen on hill starts' part is not supported by the given facts.",
+     "fact_ids": [
+      "a2"
+     ],
+     "tier": "inferred",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "The inverter's undervoltage protection (bus under 55 V for 50 ms disables torque) held in the recorded launch. This is a designed protection that is working, not a fault in itself.",
+     "fact_ids": [
+      "f5"
+     ],
+     "tier": "confirmed",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "The facts do not link the HSA/BMS limit excess to the FR voltage drop. FR's voltage-drop slope is 3.1 times that of the other inverters. The facts do not say whether the HSA torque excess, the FR branch resistance, or both produce the bus dip that triggers the protection. The two threads stay separate.",
+     "fact_ids": [
+      "f1",
+      "f2",
+      "a1",
+      "f4"
+     ],
+     "tier": "inferred",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "The facts do not show whether the battery is cold in the recorded launch. The reported cold-battery condition is not confirmed by any measured fact.",
+     "fact_ids": [
+      "a1",
+      "f4"
+     ],
+     "tier": "not_identifiable",
+     "numbers_not_in_cited_facts": []
+    }
+   ],
+   "eliminates": []
+  },
+  {
+   "cutoff": "2026-10-29",
+   "step": "s5",
+   "check": "检查 FR 高压接插件：端子发黑，重新压接并紧固",
+   "status": "accepted",
+   "attempts": 2,
+   "rejections": [
+    [
+     "eliminates 'inverter' without a fact that contradicts it (its status is supported)"
+    ]
+   ],
+   "error": null,
+   "seconds": 17.6,
+   "claims": [
+    {
+     "text": "Engineers reported a blackened terminal and an elevated contact resistance on the bench at the FR connector. This is a reported finding, not a measurement in the recorded data.",
+     "fact_ids": [
+      "f1",
+      "f2"
+     ],
+     "tier": "reported",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "The reported finding fits the pre-step data. FR's voltage drop per amp is 3.2× that of the other inverters in 3 of 3 snapshots, and the implied branch resistance (26.1 mΩ vs 8.3 mΩ at equal share) is far above the others. The tier is capped at reported because the connector finding itself is only reported.",
+     "fact_ids": [
+      "f1",
+      "f2"
+     ],
+     "tier": "reported",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "The pre-step data alone could not separate the connector contact from the conductor or the inverter. The electrical facts only show extra resistance somewhere in the FR branch, or an unusually high FR current share. The bench finding is what favours contact.",
+     "fact_ids": [
+      "f2"
+     ],
+     "tier": "inferred",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "Engineers reported that replacing the FR motor inverter (2026-10-21) was not the issue, because the emergency stop recurred on 2026-10-28. This is a reported statement only.",
+     "fact_ids": [
+      "a1"
+     ],
+     "tier": "reported",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "The FR sensor gain-error explanation stays weakened. At rest FR reads +0.01 V from the others, where a gain error large enough for this slope would show about -4.78 V. An offset could partly cancel it, so it is not excluded.",
+     "fact_ids": [
+      "f3"
+     ],
+     "tier": "inferred",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "No post-repair measurement or launch is recorded in the facts, so it is not known whether re-crimping and tightening removed the FR drop or the emergency stop.",
+     "fact_ids": [
+      "f1"
+     ],
+     "tier": "not_identifiable",
+     "numbers_not_in_cited_facts": []
+    }
+   ],
+   "eliminates": []
+  }
+ ],
+ "summary": {
+  "steps": 4,
+  "accepted": 2,
+  "accepted_first_try": 0,
+  "rejected": 2,
+  "errors": 0,
+  "claims": 13,
+  "claims_with_unmatched_numbers": 0,
+  "rejection_reasons": [
+   "claim 1 is confirmed but its weakest evidence is inferred",
+   "claim 1 is confirmed but its weakest evidence is inferred",
+   "claim 2 cites no fact: The engineers report that the e-stop happened again on 28 October after the FR i",
+   "claim 1 cites no fact: The engineers reported that SOC and cell voltages measured at the station were n",
+   "claim 2 is confirmed but its weakest evidence is inferred",
+   "eliminates 'Battery is flat or has faulty cells (low SOC or abnormal cell voltage) as the cause. This is eliminated on the engineers' report and does not cover the BMS discharge-limit exceedance.' without a fact that contradicts it (its status is unknown)",
+   "claim 1 is confirmed but its weakest evidence is inferred",
+   "claim 1 is confirmed but its weakest evidence is inferred",
+   "claim 2 is confirmed but its weakest evidence is inferred",
+   "eliminates 'inverter' without a fact that contradicts it (its status is supported)"
+  ]
+ },
+ "served_by": [
+  "claude-sonnet-5-5"
+ ],
+ "model_calls": 15
+}

@@ -1,0 +1,684 @@
+{
+ "note": "Recorded 2026-10-28 with the live investigator (claude-code:sonnet) on a local instance.",
+ "entries": [
+  {
+   "kind": "agent_report",
+   "recorded_at": "2026-10-28T22:09:04.136448+00:00",
+   "actor": "Veyra investigator",
+   "payload": {
+    "kind": "autonomous_investigation",
+    "version": "veyra-investigator-v1",
+    "run_id": "run-eeb9dab58f8d",
+    "mode": "agent",
+    "model": "claude-code:sonnet",
+    "fallback_reason": null,
+    "steps": [
+     {
+      "id": "cc_1",
+      "tool": "overview",
+      "input": {},
+      "label": "Read the whole log",
+      "summary": "34 lines; no failure line recognised",
+      "ms": 0
+     },
+     {
+      "id": "cc_2",
+      "tool": "case_context",
+      "input": {},
+      "label": "Read the report and earlier results",
+      "summary": "",
+      "ms": 0
+     },
+     {
+      "id": "cc_3",
+      "tool": "lessons",
+      "input": {},
+      "label": "Compared with earlier cases",
+      "summary": "0 earlier case(s) compared",
+      "ms": 7
+     },
+     {
+      "id": "cc_4",
+      "tool": "read_lines",
+      "input": {
+       "start": 1,
+       "end": 34
+      },
+      "label": "Read lines 1\u201334",
+      "summary": "34 lines",
+      "ms": 0
+     },
+     {
+      "id": "cc_5",
+      "tool": "measure",
+      "input": {
+       "pattern": "recv_message.*client_key: 0x00000000, len: 13"
+      },
+      "label": "Measured \u201crecv_message.*client_key: 0x00000000, len: 13\u201d",
+      "summary": "9 occurrences, every 0.100299 s (median)",
+      "ms": 0
+     },
+     {
+      "id": "cc_6",
+      "tool": "measure",
+      "input": {
+       "pattern": "recv_message",
+       "then_pattern": "delete_client"
+      },
+      "label": "Measured \u201crecv_message\u201d",
+      "summary": "11 occurrences, every 0.100472 s (median); followed by \u201cdelete_client\u201d after 0.000123\u20130.108608 s",
+      "ms": 0
+     }
+    ],
+    "result": {
+     "headline": "Board sent a 36-byte all-zero packet after session setup; agent closed the session, board then repeated 13-byte packets.",
+     "status": "cause_unknown",
+     "explanation": "Most likely board-side: its XRCE transport or buffer sent a zero-filled datagram 108 ms after a valid CREATE_CLIENT. The agent only reacted to it. Wire capture is needed to exclude the host side.",
+     "confidence": "medium",
+     "evidence": [
+      {
+       "line": 5,
+       "quote": "0000: 80 00 00 00 00 01 10 00 58 52 43 45 01 00 01 0F 2A 2E D9 75 81 00 FC 01",
+       "shows": "Valid XRCE CREATE_CLIENT from the board: cookie 'XRCE', client key 2A2ED975.",
+       "calls": [
+        "cc_4"
+       ]
+      },
+      {
+       "line": 11,
+       "quote": "0000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00",
+       "shows": "Next 36-byte datagram from the same client is entirely zeros. This is not a valid XRCE message.",
+       "calls": [
+        "cc_4"
+       ]
+      },
+      {
+       "line": 13,
+       "quote": "[1707258509.539573] info     | Root.cpp           | delete_client            | delete                 | client_key: 0x2A2ED975",
+       "shows": "Session deleted 0.000123 s after the zero packet arrived. The agent reacted immediately.",
+       "calls": [
+        "cc_4",
+        "cc_6"
+       ]
+      },
+      {
+       "line": 15,
+       "quote": "[1707258509.539636] warning  | Root.cpp           | create_client            | invalid client key     | client_key: 0x00000000",
+       "shows": "The only warning. The agent parsed the zero payload as a create request with key 0.",
+       "calls": [
+        "cc_1",
+        "cc_4"
+       ]
+      },
+      {
+       "line": 18,
+       "quote": "[1707258509.643521] debug    | UDPv4AgentLinux.cpp | recv_message             | [==>> UDP <<==]        | client_key: 0x00000000, len: 13, data: ",
+       "shows": "After the close the board sends the same 13-byte payload (E8 03 00 00 00 CA 9A 3B C0 CB 17 07 00) every 0.1 s, with key 0.",
+       "calls": [
+        "cc_4",
+        "cc_5"
+       ]
+      }
+     ],
+     "checked": [
+      {
+       "check": "Read all 34 lines to get the session sequence",
+       "result": "Valid create at line 5, session established at line 7, zero packet at line 11, delete at line 13, warning at line 15, then 13-byte packets.",
+       "verdict": "supports",
+       "about": "h1",
+       "calls": [
+        "cc_4"
+       ]
+      },
+      {
+       "check": "Interval of the repeated 13-byte packets",
+       "result": "9 packets, median interval 0.100299 s, about 9.99 per s, all with identical bytes. This is a fixed 100 ms timer on the board sending a static buffer.",
+       "verdict": "supports",
+       "about": "h1",
+       "calls": [
+        "cc_5"
+       ]
+      },
+      {
+       "check": "Time from the zero packet to the session delete",
+       "result": "Line 10 to line 13 took 0.000123 s. The first packet at line 4 to line 13 took 0.108608 s.",
+       "verdict": "supports",
+       "about": "h2",
+       "calls": [
+        "cc_6"
+       ]
+      },
+      {
+       "check": "Compare with earlier cases",
+       "result": "No lessons in the workspace and no signature match.",
+       "verdict": "inconclusive",
+       "calls": [
+        "cc_3"
+       ]
+      }
+     ],
+     "effects": [
+      {
+       "line": 13,
+       "quote": "[1707258509.539573] info     | Root.cpp           | delete_client            | delete                 | client_key: 0x2A2ED975",
+       "why": "Agent closed the session in response to the zero packet."
+      },
+      {
+       "line": 14,
+       "quote": "[1707258509.539626] info     | SessionManager.hpp | destroy_session          | session closed         | client_key: 0x2A2ED975, address: 192.168.10.210:38908",
+       "why": "Consequence of the delete."
+      },
+      {
+       "line": 15,
+       "quote": "[1707258509.539636] warning  | Root.cpp           | create_client            | invalid client key     | client_key: 0x00000000",
+       "why": "Agent's reaction to the malformed zero payload."
+      },
+      {
+       "line": 34,
+       "quote": "[1707258510.444295] debug    | UDPv4AgentLinux.cpp | recv_message             | [==>> UDP <<==]        | client_key: 0x00000000, len: 13, data: ",
+       "why": "Board keeps sending 13-byte packets with no session. The agent cannot match them to a client."
+      }
+     ],
+     "next_action": {
+      "action": "Capture UDP on the agent host and compare with the board's send buffer",
+      "why": "Settles whether the zero datagram is on the wire (board or transport) or only appears at the agent host. Splits h1 from h2 and h3.",
+      "how": [
+       "On the agent host run: sudo tcpdump -i any -X -n udp and host 192.168.10.210",
+       "Reproduce the connect and find the 36-byte datagram about 108 ms after the 24-byte CREATE_CLIENT",
+       "In the debugger, break in the board's UDP write callback and dump buffer and length for that send"
+      ],
+      "where": "on_site",
+      "outcomes": [
+       {
+        "label": "Wire shows 36 zero bytes",
+        "means": "Board or its transport sent them. The agent and host receive path are fine.",
+        "keeps": [
+         "h1"
+        ],
+        "rules_out": [
+         "h2",
+         "h3"
+        ],
+        "then": "Inspect the board's transport write callback and buffer init."
+       },
+       {
+        "label": "Wire shows a valid XRCE message",
+        "means": "Datagram is corrupted or misread on the host side.",
+        "keeps": [
+         "h2",
+         "h3"
+        ],
+        "rules_out": [
+         "h1"
+        ],
+        "then": "Check the host NIC, driver and agent build."
+       },
+       {
+        "label": "Wire differs from the agent log in length",
+        "means": "Something between board and agent is altering packets.",
+        "keeps": [
+         "h3"
+        ],
+        "rules_out": [
+         "h1"
+        ],
+        "then": "Capture on the board side of the link."
+       }
+      ]
+     },
+     "unknowns": [
+      "Why the board's transport sent 36 zero bytes (uninitialised buffer, wrong length, or a stale DMA/lwIP buffer)",
+      "What the repeated 13-byte payload E8 03 00 00 00 CA 9A 3B C0 CB 17 07 00 is",
+      "Whether it reproduces on every connect or only some"
+     ],
+     "hypotheses": [
+      {
+       "id": "h1",
+       "area": "Board firmware / transport",
+       "claim": "The board's XRCE UDP transport or buffer sent a zero-filled datagram, then kept re-sending a static 13-byte buffer.",
+       "status": "leading",
+       "because": "Valid create at line 5, then 36 zero bytes at line 11, then identical 13-byte packets every 0.1 s. This looks like a stale or uninitialised buffer.",
+       "lines": [
+        5,
+        11,
+        18
+       ]
+      },
+      {
+       "id": "h2",
+       "area": "Agent / host side",
+       "claim": "The agent or host receive path mangled or misparsed a valid datagram.",
+       "status": "weakened",
+       "because": "The agent parsed line 5 correctly. The zero payload is consistent with its handling, and the delete follows by design. Not excluded without a capture.",
+       "lines": [
+        11,
+        13,
+        15
+       ]
+      },
+      {
+       "id": "h3",
+       "area": "Network path",
+       "claim": "Packet corruption or loss on the link caused the bad datagram.",
+       "status": "open",
+       "because": "A full 36-byte all-zero datagram is unlikely from corruption, and the earlier packets passed. No capture to confirm.",
+       "lines": [
+        11
+       ]
+      },
+      {
+       "id": "h4",
+       "area": "Agent launch config",
+       "claim": "The agent port argument 457879 is out of range and wraps to 64663.",
+       "status": "weakened",
+       "because": "Line 1 gives 457879 but line 2 shows 64663, and the board connected on the first packet. The port wrap is a config smell, not the cause of the zero packet.",
+       "lines": [
+        1,
+        2,
+        7
+       ]
+      }
+     ],
+     "events": [
+      {
+       "lines": [
+        1,
+        2,
+        3
+       ],
+       "what": "Agent start. Port 457879 reported as 64663.",
+       "class": "routine",
+       "why": "Port wraps modulo 65536 but the session still opens. Worth fixing."
+      },
+      {
+       "lines": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+       ],
+       "what": "Valid CREATE_CLIENT, session established, agent replies",
+       "class": "routine",
+       "why": "Normal handshake."
+      },
+      {
+       "lines": [
+        10,
+        11,
+        12
+       ],
+       "what": "36-byte all-zero datagram from the board",
+       "class": "root_cause_candidate",
+       "why": "First abnormal data, 108 ms after the valid create."
+      },
+      {
+       "lines": [
+        13,
+        14,
+        15,
+        16,
+        17
+       ],
+       "what": "Session deleted, invalid client key warning, agent reply",
+       "class": "effect",
+       "why": "Agent reaction to the zero datagram."
+      },
+      {
+       "lines": [
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34
+       ],
+       "what": "Identical 13-byte packets every 0.1 s with key 0",
+       "class": "anomaly",
+       "why": "Board keeps sending a static buffer without a session."
+      }
+     ],
+     "lesson": "No earlier cases matched.",
+     "reuse_when": "micro-ROS client on STM32H7 over UDP (custom transport) where the agent logs a valid create, then an all-zero datagram, then 'invalid client key 0x00000000' and 13-byte packets at 10 Hz."
+    },
+    "dropped": [],
+    "usage": {
+     "input_tokens": 36016,
+     "output_tokens": 5789
+    },
+    "seconds": 58.6,
+    "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it."
+   }
+  },
+  {
+   "kind": "engineer_finding",
+   "recorded_at": "2026-10-28T22:09:04.139346+00:00",
+   "actor": "Engineer",
+   "payload": {
+    "action": "Capture UDP on the agent host and compare with the board's send buffer",
+    "result": "found",
+    "observations": "Wire shows 36 zero bytes (Board or its transport sent them. The agent and host receive path are fine.). Tx buffer at sendto has the right XRCE bytes; tcpdump on the agent host shows 36 zero bytes on the wire. D-cache is enabled.",
+    "investigation_entry": null,
+    "verification_grade": "engineer_reported_not_independently_reviewed"
+   }
+  },
+  {
+   "kind": "agent_report",
+   "recorded_at": "2026-10-28T22:09:51.224340+00:00",
+   "actor": "Veyra investigator",
+   "payload": {
+    "kind": "autonomous_investigation",
+    "version": "veyra-investigator-v1",
+    "run_id": "run-eeb9dab58f8d",
+    "mode": "agent",
+    "model": "claude-code:sonnet",
+    "fallback_reason": null,
+    "steps": [
+     {
+      "id": "cc_8",
+      "tool": "overview",
+      "input": {},
+      "label": "Read the whole log",
+      "summary": "34 lines; no failure line recognised",
+      "ms": 0
+     },
+     {
+      "id": "cc_9",
+      "tool": "case_context",
+      "input": {},
+      "label": "Read the report and earlier results",
+      "summary": "",
+      "ms": 1
+     },
+     {
+      "id": "cc_10",
+      "tool": "read_lines",
+      "input": {
+       "start": 1,
+       "end": 34
+      },
+      "label": "Read lines 1\u201334",
+      "summary": "34 lines",
+      "ms": 0
+     },
+     {
+      "id": "cc_11",
+      "tool": "lessons",
+      "input": {},
+      "label": "Compared with earlier cases",
+      "summary": "0 earlier case(s) compared",
+      "ms": 10
+     }
+    ],
+    "result": {
+     "headline": "Board sent 36 zero bytes after a valid create; agent closed the session and the board kept resending a 13-byte packet.",
+     "status": "cause_probable",
+     "explanation": "The board's Tx buffer is correct at sendto, but zeros reach the wire. The fault is below the XRCE layer, in the board's UDP/Ethernet path. D-cache and DMA buffer coherence is the leading candidate; this is not confirmed.",
+     "confidence": "medium",
+     "evidence": [
+      {
+       "line": 5,
+       "quote": "0000: 80 00 00 00 00 01 10 00 58 52 43 45 01 00 01 0F 2A 2E D9 75 81 00 FC 01",
+       "shows": "The first datagram is a valid CREATE_CLIENT. The board can send correct data.",
+       "calls": [
+        "cc_10"
+       ]
+      },
+      {
+       "line": 11,
+       "quote": "0000: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00",
+       "shows": "The next datagram is 36 bytes of zeros, with client_key 0x2A2ED975 already established.",
+       "calls": [
+        "cc_10"
+       ]
+      },
+      {
+       "line": 13,
+       "quote": "[1707258509.539573] info     | Root.cpp           | delete_client            | delete                 | client_key: 0x2A2ED975",
+       "shows": "The agent deletes the session 123 ms after it was created (line 6 at .431336, line 13 at .539573). This is an effect of the zero payload.",
+       "calls": [
+        "cc_10"
+       ]
+      },
+      {
+       "line": 19,
+       "quote": "0000: E8 03 00 00 00 CA 9A 3B C0 CB 17 07 00",
+       "shows": "After the zero packet the board sends the same 13 bytes about every 0.1 s. Lines 18 to 34 show this pattern, and the board is not a working node.",
+       "calls": [
+        "cc_10"
+       ]
+      }
+     ],
+     "checked": [
+      {
+       "check": "Read the full 34-line log for the order of events and the payloads.",
+       "result": "Valid create at line 5, session established at line 7, 36 zero bytes at line 11, delete at line 13, then identical 13-byte packets from line 18.",
+       "verdict": "supports",
+       "about": "h1",
+       "calls": [
+        "cc_10"
+       ]
+      },
+      {
+       "check": "Engineer capture on the agent host, compared with the board's Tx buffer at sendto.",
+       "result": "The Tx buffer holds the right XRCE bytes at sendto, but tcpdump shows 36 zero bytes on the wire. D-cache is enabled.",
+       "verdict": "rules_out",
+       "about": "h2 (agent and host receive path) and h3 (network corruption)",
+       "calls": [
+        "cc_9"
+       ]
+      },
+      {
+       "check": "Compared with earlier cases.",
+       "result": "No earlier cases are in the workspace.",
+       "verdict": "inconclusive",
+       "about": "all",
+       "calls": [
+        "cc_11"
+       ]
+      }
+     ],
+     "effects": [
+      {
+       "line": 13,
+       "quote": "[1707258509.539573] info     | Root.cpp           | delete_client            | delete                 | client_key: 0x2A2ED975",
+       "why": "The agent handled the bad datagram and closed the session."
+      },
+      {
+       "line": 15,
+       "quote": "[1707258509.539636] warning  | Root.cpp           | create_client            | invalid client key     | client_key: 0x00000000",
+       "why": "This is the agent's reaction to the zero payload. Key 0 is invalid."
+      },
+      {
+       "line": 18,
+       "quote": "[1707258509.643521] debug    | UDPv4AgentLinux.cpp | recv_message             | [==>> UDP <<==]        | client_key: 0x00000000, len: 13, data: ",
+       "why": "The board keeps sending after the session is gone. This is the follow-on behavior, not a cause."
+      }
+     ],
+     "next_action": {
+      "action": "Make the Ethernet Tx buffers and descriptors non-cacheable, or clean the D-cache before transmit, then retest.",
+      "why": "This tests whether D-cache and DMA incoherence causes the wire to carry zeros while the Tx buffer is correct.",
+      "how": [
+       "Place the lwIP/Ethernet Tx buffers and descriptors in a region marked non-cacheable by the MPU, or in D2 SRAM with the MPU configured.",
+       "Alternatively call SCB_CleanDCache_by_Addr on the Tx buffer before the sendto/DMA kick.",
+       "As a quick test only, disable the D-cache with SCB_DisableDCache() and rerun the agent capture."
+      ],
+      "where": "lab",
+      "outcomes": [
+       {
+        "label": "Wire now carries the correct bytes",
+        "means": "Cache and DMA coherence is the cause. Fix it in the MPU or cache maintenance configuration.",
+        "keeps": [
+         "h1"
+        ],
+        "rules_out": [
+         "h2",
+         "h3",
+         "h4"
+        ]
+       },
+       {
+        "label": "Wire still shows 36 zero bytes",
+        "means": "Cache is not the cause. Look at the Ethernet driver, the DMA descriptors, or lwIP pbuf handling.",
+        "keeps": [
+         "h1"
+        ],
+        "rules_out": [
+         "h4"
+        ]
+       }
+      ]
+     },
+     "unknowns": [
+      "It is not known which layer zeroes the data: cache, DMA descriptor, driver or pbuf.",
+      "The log does not show how the 13-byte packet is generated or why it repeats."
+     ],
+     "hypotheses": [
+      {
+       "id": "h1",
+       "area": "Board firmware / transport",
+       "claim": "The board's UDP/Ethernet path, most likely D-cache and DMA coherence, sends zeros although the Tx buffer is correct.",
+       "status": "leading",
+       "because": "Valid bytes at sendto but 36 zero bytes on the wire, with D-cache enabled. The agent and network are cleared by the capture.",
+       "lines": [
+        5,
+        11
+       ]
+      },
+      {
+       "id": "h2",
+       "area": "Agent / host side",
+       "claim": "The agent or host receive path mangled or misparsed a valid datagram.",
+       "status": "ruled_out",
+       "because": "tcpdump on the agent host shows 36 zero bytes on the wire, so the zeros existed before the agent received them.",
+       "lines": [
+        11,
+        13,
+        15
+       ]
+      },
+      {
+       "id": "h3",
+       "area": "Network path",
+       "claim": "Packet corruption or loss on the link caused the bad datagram.",
+       "status": "ruled_out",
+       "because": "The zeros are on the wire at the agent host, and the engineer reports the board or its transport sent them. A whole datagram of zeros is not corruption.",
+       "lines": [
+        11
+       ]
+      },
+      {
+       "id": "h4",
+       "area": "Agent launch config",
+       "claim": "The agent port argument 457879 is out of range and wraps to 64663.",
+       "status": "weakened",
+       "because": "The board connected on the first packet, so the port wrap is a config smell and not the cause of the zero packet.",
+       "lines": [
+        1,
+        2,
+        7
+       ]
+      }
+     ],
+     "events": [
+      {
+       "lines": [
+        1,
+        2,
+        3
+       ],
+       "what": "Agent start with port 457879 wrapped to 64663",
+       "class": "anomaly",
+       "why": "Out-of-range port argument. The board connected anyway, so it is not the cause."
+      },
+      {
+       "lines": [
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+       ],
+       "what": "Valid CREATE_CLIENT, session established, agent reply sent",
+       "class": "routine",
+       "why": "Normal handshake."
+      },
+      {
+       "lines": [
+        10,
+        11,
+        12
+       ],
+       "what": "36 zero bytes received from the board",
+       "class": "root_cause_candidate",
+       "why": "This is the earliest bad data. The engineer's capture shows it is on the wire."
+      },
+      {
+       "lines": [
+        13,
+        14,
+        15,
+        16,
+        17
+       ],
+       "what": "Agent deletes the session and answers with key 0",
+       "class": "effect",
+       "why": "This is the agent's designed response to the zero payload."
+      },
+      {
+       "lines": [
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34
+       ],
+       "what": "Identical 13-byte packets about every 0.1 s from key 0",
+       "class": "effect",
+       "why": "The board keeps sending a static buffer after the session is closed."
+      }
+     ],
+     "lesson": "There are no earlier cases in the workspace to apply.",
+     "reuse_when": "STM32H7 (Cortex-M7) with micro-ROS XRCE over UDP/lwIP and Ethernet DMA, D-cache enabled, with Tx buffers or descriptors in cacheable RAM. Signature: valid first create, then an all-zero datagram, then a repeated static packet."
+    },
+    "dropped": [],
+    "usage": {
+     "input_tokens": 102896,
+     "output_tokens": 6370
+    },
+    "seconds": 46.1,
+    "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it."
+   }
+  }
+ ],
+ "close": {
+  "cause": "D-cache not cleaned before the Ethernet DMA sent the Tx buffer: the DMA read stale memory and sent zeros, so the agent dropped the session.",
+  "fix": "Clean the D-cache over the Tx buffer (cache-line aligned) before each send, or put the Ethernet buffers in a non-cacheable MPU region.",
+  "applies_when": "STM32H7/F7 with D-cache enabled and Ethernet DMA; packets correct in the CPU's buffer but zero on the wire."
+ }
+}

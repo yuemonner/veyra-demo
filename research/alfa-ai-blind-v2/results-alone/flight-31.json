@@ -1,0 +1,181 @@
+{
+ "arm": "alone",
+ "alias": "flight-31",
+ "folder": "carbonZ_2018-10-05-14-34-20_1_no_failure",
+ "input_sha256": "1a087c65e8ddbddb9e10344b8e73a8c12527ca5aeeb72de4ab23ae76f70eee7b",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 17.5
+  }
+ ],
+ "prompt_chars": 9223,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No control-loop fault seen; sensor-health error at 0.2 s with airspeed and yaw-rate flat at zero all flight",
+   "status": "cause_unknown",
+   "explanation": "Attitude tracks setpoints and actuators respond normally. The logged Sensor health error fits airspeed and yaw-rate readings stuck at 0, though the data cannot confirm which sensor failed. Channel 7 is fixed at 1930 us.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 2,
+     "quote": "t=0.2 s mavros: System: ERROR: Sensor helth",
+     "shows": "Sensor fault flagged at flight start, before any control anomaly.",
+     "calls": []
+    },
+    {
+     "line": 10,
+     "quote": "vehicle.yaw_rate[yaw] = 0 for all t while attitude yaw changes ~15-20 deg/s",
+     "shows": "Yaw-rate signal is dead or not populated, inconsistent with the yaw change.",
+     "calls": []
+    },
+    {
+     "line": 10,
+     "quote": "vehicle.airspeed = 0 for all t while velocity is large",
+     "shows": "Airspeed reading flat at zero for the whole flight, which is implausible while moving.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "actuator.output[ch[7]] = 1.93e+03 constant",
+     "shows": "One output channel never moves while channels 1-5 modulate with demand.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Roll and pitch tracking against setpoint",
+     "result": "Roll follows the ~42 deg setpoint with lag at the steps (t=10-12, 21-22). Pitch stays within a few degrees of setpoint.",
+     "verdict": "weakens",
+     "about": "control-loop fault",
+     "calls": []
+    },
+    {
+     "check": "Actuator response to demand",
+     "result": "Ch1-5 move with the setpoint steps. Ch0 and ch6 are constant at 1500 us.",
+     "verdict": "weakens",
+     "about": "actuator fault",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 2,
+     "quote": "t=0.2 s mavros: Battery: WARN: Low voltage",
+     "why": "A battery warning at the start; it has no visible effect on the controls in this data."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect airspeed and yaw-rate sensors and the ch7 output wiring and mapping",
+    "why": "Settles whether the flat-zero signals are real sensor failures or unpopulated channels, and whether ch7 is a parked or stuck output.",
+    "how": [
+     "Read raw gyro and pitot data from the full log",
+     "Check the output mapping for ch7",
+     "Check battery voltage history"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Raw gyro shows yaw rate",
+      "means": "The yaw-rate signal is a logging or mapping issue, not a sensor fault.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Check ch7 mapping"
+     },
+     {
+      "label": "Raw gyro also reads zero",
+      "means": "The gyro or its data path is faulty, matching the sensor-health error.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [],
+      "then": "Inspect sensor hardware"
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether ch7 is a parked or unused output",
+    "Whether the airspeed sensor is fitted",
+    "Battery voltage trend during flight"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Airspeed and yaw-rate sensors",
+     "claim": "Sensors reading constant zero explain the logged Sensor health error.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Flat-zero signals from t=0 coincide with the Sensor health error at 0.2 s.",
+     "basis": "indirect",
+     "lines": [
+      2,
+      10
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Logging or channel mapping",
+     "claim": "Flat signals and ch7 are unused or unmapped channels, not faults.",
+     "status": "open",
+     "because": "The flight is otherwise well controlled and no response degradation appears.",
+     "basis": "indirect"
+    },
+    {
+     "id": "h3",
+     "area": "Control loop or actuators",
+     "claim": "A control or actuator fault occurred in flight.",
+     "status": "weakened",
+     "because": "Setpoints are tracked and outputs respond throughout; no divergence found.",
+     "basis": "direct",
+     "observed_at": "attitude vs setpoint, actuator outputs",
+     "lines": [
+      12,
+      13
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      2
+     ],
+     "what": "Sensor health ERROR at 0.2 s",
+     "class": "root_cause_candidate",
+     "why": "Matches flat-zero airspeed and yaw-rate signals."
+    },
+    {
+     "lines": [
+      2
+     ],
+     "what": "Low voltage WARN at 0.2 s",
+     "class": "anomaly",
+     "why": "Battery warning at the start with no visible effect."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 8494,
+   "output_tokens": 2265
+  },
+  "seconds": 17.5
+ },
+ "labels": {
+  "present_topics": [],
+  "nonzero": {},
+  "onset_s": null
+ }
+}

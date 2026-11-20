@@ -1,0 +1,212 @@
+{
+ "arm": "alone",
+ "alias": "flight-22",
+ "folder": "carbonZ_2018-09-11-15-05-11_1_elevator_failure",
+ "input_sha256": "969f54a8a5b518c48eb50821fce3bebf35888b687a2df5248ff6b3f81f57a002",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 27.8
+  }
+ ],
+ "prompt_chars": 10266,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Pitch control lost from about t=73 s: nose-down divergence and altitude loss despite ch[2] saturated at 1700 us",
+   "status": "cause_unknown",
+   "explanation": "From t=73 s pitch diverges opposite to the setpoint while ch[2] sits at its 1700 us limit. Airspeed and yaw rate read exactly 0 all flight, matching the t=0.1 'Sensor helth' error. Actuator fault versus sensor-driven control failure cannot be separated.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 75,
+     "quote": "t=74: pitch setpoint 17.9, pitch -15, ch[2] 1.7e3, throttle 75, altitude 40.2",
+     "shows": "Pitch is commanded up but the aircraft pitches down with ch[2] saturated, so control authority is lost.",
+     "calls": []
+    },
+    {
+     "line": 77,
+     "quote": "t=76: pitch setpoint 18.1, pitch -20.4, altitude 26.7, ch[2] 1.7e3",
+     "shows": "The divergence has continued for 3 s and altitude has fallen from 49 m to 27 m. The data ends here.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "t=0.1 mavros: System: ERROR: Sensor helth",
+     "shows": "A sensor health fault was logged at the start, consistent with the airspeed and yaw-rate channels reading exactly 0 all flight.",
+     "calls": []
+    },
+    {
+     "line": 4,
+     "quote": "t=2: pitch setpoint 14.8, ch[2] 1.7e3, throttle 75 -> pitch 4 to 11 deg",
+     "shows": "The same saturated ch[2] command earlier produced a normal pitch response, so the t=73-76 behaviour is abnormal.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared pitch response to setpoint across the flight",
+     "result": "Pitch lagged the setpoint by about 1-2 s and followed it until t=72. From t=73 it went the opposite way.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Looked for flat or constant signals",
+     "result": "Airspeed and yaw rate are 0 for the whole flight, ch[7] is fixed at 1100, ch[0] and ch[6] at 1500, and ch[4] equals ch[5] throughout.",
+     "verdict": "supports",
+     "about": "h2",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 77,
+     "quote": "altitude 26.7",
+     "shows": "Altitude loss is a consequence of the nose-down divergence.",
+     "why": "Altitude fell about 22 m in 4 s after the pitch control loss."
+    },
+    {
+     "line": 76,
+     "quote": "throttle 75",
+     "why": "Maximum throttle is the controller reacting to the descent, not a cause."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect ch[2] actuator, linkage and control surface; check airspeed sensor and gyro",
+    "why": "Separates a mechanical or actuator fault on the ch[2] surface from a sensor-driven control failure.",
+    "how": [
+     "Bench-test ch[2] across its full travel and confirm motion matches the command",
+     "Check the pitot tube and the airspeed and gyro sensor health",
+     "Review the controller log around t=70-76"
+    ],
+    "where": "on_site",
+    "outcomes": [
+     {
+      "label": "ch[2] surface does not respond",
+      "means": "Actuator, linkage or servo fault on ch[2] caused the pitch control loss.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     },
+     {
+      "label": "ch[2] responds normally",
+      "means": "Sensor-driven control failure is more likely; the sensor health error and flat airspeed and yaw rate become the lead.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether the aircraft recovered or crashed after t=76",
+    "Which physical surface or motor ch[2] drives",
+    "Whether the 0 airspeed and 0 yaw rate come from dead sensors or from missing logging"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "ch[2] actuator / pitch surface",
+     "claim": "Pitch actuator on ch[2] lost effectiveness (stuck, saturated or failed) from about t=73 s, causing nose-down divergence.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Pitch moves opposite to the setpoint while ch[2] is at its limit, and the earlier response to the same command was normal.",
+     "basis": "indirect",
+     "lines": [
+      73,
+      74,
+      75,
+      76,
+      77
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Sensors (airspeed, yaw rate)",
+     "claim": "Failed airspeed and yaw-rate sensing degraded control; this is the logged 'Sensor helth' error.",
+     "status": "open",
+     "role": "trigger",
+     "because": "Both channels read exactly 0 all flight, but control was normal until t=72, so this alone does not explain the late divergence.",
+     "basis": "indirect",
+     "lines": [
+      2
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Battery / power",
+     "claim": "Low voltage reduced available thrust or actuator power.",
+     "status": "open",
+     "role": "amplifier",
+     "because": "A low-voltage warning was logged at t=0.1, but no voltage signal is available and early flight was normal.",
+     "basis": "indirect",
+     "lines": [
+      1
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      2
+     ],
+     "what": "Sensor health ERROR at t=0.1",
+     "class": "anomaly",
+     "why": "Matches airspeed and yaw rate flat at 0 for the whole flight."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Battery low voltage WARN at t=0.1",
+     "class": "anomaly",
+     "why": "No voltage signal in the data to confirm or size it."
+    },
+    {
+     "lines": [
+      73,
+      74,
+      75,
+      76,
+      77
+     ],
+     "what": "Nose-down divergence, ch[2] saturated, altitude loss",
+     "class": "root_cause_candidate",
+     "why": "Pitch moves opposite to the setpoint from t=73 s."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 9419,
+   "output_tokens": 3544
+  },
+  "seconds": 27.8
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/elevator"
+  ],
+  "nonzero": {
+   "/failure_status/elevator": {
+    "first_nonzero_s": 63.476,
+    "value": 1
+   }
+  },
+  "onset_s": 63.476
+ }
+}

@@ -1,0 +1,209 @@
+{
+ "arm": "alone",
+ "alias": "flight-34",
+ "folder": "carbonZ_2018-10-05-14-37-22_2_right_aileron_failure",
+ "input_sha256": "843469a68168a55d677e3569c09fe38f20772d357af833974cbb43e1ca8a7df5",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.5
+  }
+ ],
+ "prompt_chars": 18926,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Actuator channel 5 froze at 1500 us from about t=74 s while paired channel 4 kept responding.",
+   "status": "cause_probable",
+   "explanation": "Channels 4 and 5 matched exactly until t=73 s. From t=74-75 s ch5 stays at 1500 us while ch4 swings 1360-1680 us. That points to a stuck or lost output on ch5, one motor or servo of a pair.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 73,
+     "quote": "ch4=1.45e+03, ch5=1.45e+03",
+     "shows": "Before t=74 s the two channels are identical in every row.",
+     "calls": []
+    },
+    {
+     "line": 78,
+     "quote": "ch4=1.63e+03, ch5=1.5e+03",
+     "shows": "ch4 is commanded to 1630 us while ch5 stays at 1500 us.",
+     "calls": []
+    },
+    {
+     "line": 82,
+     "quote": "ch4=1.36e+03, ch5=1.5e+03",
+     "shows": "ch5 stays flat at 1500 us through t=144 s while ch4 keeps ranging 1340-1680 us, so ch5 no longer follows its pair.",
+     "calls": []
+    },
+    {
+     "line": 0,
+     "quote": "ch0=1.5e+03, ch6=1.5e+03, ch7=1.93e+03",
+     "shows": "ch0, ch6 and ch7 never change over the whole flight, so they are likely unused or fixed channels.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared ch4 and ch5 over the whole flight",
+     "result": "Identical through t=73 s. From t=74-75 s ch5 stays at 1500 us while ch4 varies.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Checked attitude tracking before and after t=74 s",
+     "result": "Roll and yaw keep following their setpoints with similar lag and large swings both before and after. No clear loss of control.",
+     "verdict": "weakens",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Checked airspeed and yaw rate",
+     "result": "Both are 0 for the whole flight, which looks like missing or invalid data. This fits the 'Sensor helth' error at t=0.9 s.",
+     "verdict": "supports",
+     "about": "h2",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 82,
+     "quote": "ch4 swings 1360-1680 us",
+     "why": "ch4 may be compensating for the dead ch5, but the data cannot confirm this."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect ch5 actuator, wiring and ESC/servo output, and bench-test it against ch4",
+    "why": "Settles whether ch5 is physically stuck or lost, or whether the mixer or output stage stopped commanding it.",
+    "how": [
+     "Command ch5 on the bench and watch the response",
+     "Check connector and wiring continuity",
+     "Compare the ch5 output command with the ch4 command in the raw log"
+    ],
+    "where": "on_site",
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "ch5 does not respond on bench",
+      "means": "Hardware fault on the ch5 actuator or its wiring.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h3"
+      ]
+     },
+     {
+      "label": "ch5 responds normally on bench",
+      "means": "The fault is in the control or mixer output path, or a sensor fault.",
+      "keeps": [
+       "h2",
+       "h3"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h1"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "What ch4 and ch5 physically drive",
+    "Why roll and yaw setpoints oscillate to \u00b145\u00b0 and \u00b1149\u00b0 from the start",
+    "Whether ch5 was commanded 1500 us or was dropped"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Output channel 5 actuator",
+     "claim": "Channel 5 output became stuck or unresponsive at about t=74 s while channel 4 kept working.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "ch4 and ch5 were identical before t=74 s and diverge permanently afterwards; the divergence is direct evidence of a single-channel fault.",
+     "basis": "direct",
+     "observed_at": "actuator.output ch5 vs ch4",
+     "lines": [
+      73,
+      74,
+      75,
+      78
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Sensor health",
+     "claim": "A sensor fault (airspeed and yaw rate stuck at 0) degraded control from the start of the flight.",
+     "status": "open",
+     "role": "trigger",
+     "because": "The 'Sensor helth' error at t=0.9 s and the flat zero signals fit this, but nothing ties it to the ch5 freeze.",
+     "basis": "indirect",
+     "lines": [
+      0
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Mixer or output path",
+     "claim": "The controller stopped updating output 5 through a mixer or output-stage fault.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "It would produce the same signature as h1, and the data cannot tell the two apart.",
+     "basis": "indirect"
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      0
+     ],
+     "what": "Low voltage warning at t=0.9 s",
+     "class": "anomaly",
+     "why": "Possible supply issue early in the flight; no later voltage signal to follow it."
+    },
+    {
+     "lines": [
+      0
+     ],
+     "what": "System error 'Sensor helth' at t=0.9 s",
+     "class": "anomaly",
+     "why": "Fits the airspeed and yaw rate signals that read 0 all flight."
+    },
+    {
+     "lines": [
+      74
+     ],
+     "what": "ch5 output frozen at 1500 us",
+     "class": "root_cause_candidate",
+     "why": "ch5 stops following ch4 from t=74-75 s and never recovers."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 16273,
+   "output_tokens": 2650
+  },
+  "seconds": 20.5
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/aileron"
+  ],
+  "nonzero": {
+   "/failure_status/aileron": {
+    "first_nonzero_s": 73.379,
+    "value": 1
+   }
+  },
+  "onset_s": 73.379
+ }
+}

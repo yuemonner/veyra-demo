@@ -1,0 +1,120 @@
+{
+ "schema": "veyra-dynamics-domain-v1",
+ "id": "robot_actuators",
+ "title": "Robot: comparable actuators sharing one command (wheel, joint or rotor motor currents)",
+ "note": "Domain meaning only. No thresholds, no robot, no case.",
+ "groups": [
+  {
+   "id": "actuator_current",
+   "title": "actuator currents",
+   "members": {
+    "pattern": "^(wheel|joint|motor|rotor)_\\d+_current$"
+   },
+   "limit_side": "high",
+   "driver_roles": [
+    "drive_command",
+    "commanded_torque",
+    "commanded_speed"
+   ],
+   "events": [
+    {
+     "name": "drive fault (fault state reaches its highest value)",
+     "role": "drive_fault",
+     "kind": "reaches_max"
+    },
+    {
+     "name": "protective stop",
+     "role": "protective_stop",
+     "kind": "becomes",
+     "value": 1
+    }
+   ],
+   "response": "static",
+   "response_note": "an actuator's current follows the present command: with the command fixed it has no trend of its own",
+   "reason_roles": [
+    "drive_fault_code",
+    "axis_fault_code",
+    "fault_code"
+   ],
+   "member_limit_reason": "over[ -]?current|i2t|overload|axis[^|]{0,30}(current|torque)",
+   "member_limit_reason_note": "the drive recorded that an axis reached its current limit: the group's own protection, not an outside request"
+  }
+ ],
+ "classes": {
+  "common": {
+   "label": "System-wide load increase",
+   "statement": "Every actuator's current rose beyond its earlier relation to the command (payload, terrain, a shared drivetrain or supply): the group moved together."
+  },
+  "component": {
+   "label": "Single-actuator deterioration",
+   "statement": "One actuator's current moved apart from the others under the same command and reached the limit first."
+  },
+  "drift": {
+   "label": "Rising friction or wear in one actuator",
+   "statement": "One actuator needs ever more current at the same command (bearing, gearbox, brake drag): its current drifts away from the group."
+  },
+  "load": {
+   "label": "Lost torque constant or winding fault",
+   "statement": "One actuator needs more current per unit of command (demagnetisation, winding or driver fault): its excess follows the command."
+  },
+  "sensing": {
+   "label": "Current-sensing fault on one actuator",
+   "statement": "One actuator's current reading is a measurement error: it jumps in ways the command and the other actuators do not explain."
+  },
+  "external": {
+   "label": "Stop initiated outside the actuators",
+   "statement": "A supervisor, operator or another protection initiated the stop; the actuators did not depart from their earlier behaviour before it."
+  }
+ },
+ "relates_to_assessment": {},
+ "external_checks": [
+  {
+   "id": "fault_log",
+   "record": "The drive controller's fault log covering the stop: which axis, which protection, threshold and command source",
+   "separates": [
+    [
+     "external",
+     "component"
+    ],
+    [
+     "external",
+     "common"
+    ]
+   ]
+  },
+  {
+   "id": "command_step_test",
+   "record": "Each actuator's current response to a known command step at standstill and at speed",
+   "separates": [
+    [
+     "drift",
+     "load"
+    ]
+   ]
+  },
+  {
+   "id": "independent_current",
+   "record": "An independent current measurement (clamp) on the deviating actuator",
+   "separates": [
+    [
+     "sensing",
+     "drift"
+    ],
+    [
+     "sensing",
+     "load"
+    ]
+   ]
+  },
+  {
+   "id": "payload_record",
+   "record": "The payload and terrain record for the run (what the whole machine carried and drove over)",
+   "separates": [
+    [
+     "common",
+     "component"
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,145 @@
+{
+ "schema": "veyra-dynamics-domain-v1",
+ "id": "battery_cells",
+ "title": "Battery: comparable cell voltages in a series string",
+ "note": "Domain meaning only (which signals are comparable components, which is the load, which state changes are protective events, what each mechanism class means here, which records would separate them). No thresholds, no machine, no case.",
+ "groups": [
+  {
+   "id": "cell_voltage",
+   "title": "cell voltages",
+   "members": {
+    "roles": [
+     "min_cell_voltage",
+     "max_cell_voltage"
+    ],
+    "pattern": "^cell_voltage_\\d+$"
+   },
+   "index_roles": [
+    "min_cell_index",
+    "max_cell_index"
+   ],
+   "limit_side": "low",
+   "driver_roles": [
+    "pack_current"
+   ],
+   "events": [
+    {
+     "name": "protection escalation (fault level reaches its highest value)",
+     "role": "bms_fault_level",
+     "kind": "reaches_max"
+    },
+    {
+     "name": "first alarm (fault level first changes)",
+     "role": "bms_fault_level",
+     "kind": "first_change"
+    },
+    {
+     "name": "main contactor opened",
+     "role": "main_positive_closed",
+     "kind": "becomes",
+     "value": 0
+    }
+   ],
+   "response": "integrating",
+   "response_note": "a cell's voltage integrates the drawn charge: it declines under any load, which is the healthy reference",
+   "reason_roles": [
+    "battery_code",
+    "bms_fault_code",
+    "protection_code",
+    "fault_code"
+   ],
+   "member_limit_reason": "cell[^|]{0,30}(low|under|over|high)|(under|over)[ -]?voltage",
+   "member_limit_reason_note": "the BMS recorded that a cell reached its voltage limit: the group's own protection, not an outside request"
+  }
+ ],
+ "classes": {
+  "common": {
+   "label": "Pack-level depletion",
+   "statement": "The whole pack approached its lower limit: the highest cell also fell beyond its earlier trend (a pack-level state of charge or capacity limit; it can act together with a cell-level limitation)."
+  },
+  "component": {
+   "label": "Cell-level limitation",
+   "statement": "The lowest cell moved apart from the rest of the pack and reached the limit first."
+  },
+  "drift": {
+   "label": "Cell capacity or SOC imbalance",
+   "statement": "The limiting cell has lower usable capacity or started at lower state of charge than the others: its voltage falls away from the rest at constant load."
+  },
+  "load": {
+   "label": "Cell or interconnection resistance",
+   "statement": "The limiting cell or its interconnection has higher resistance: its extra voltage drop follows the current."
+  },
+  "sensing": {
+   "label": "Cell-voltage sensing fault",
+   "statement": "The lowest-cell reading is a measurement or sense-wiring error: it jumps in ways the load and the other cells do not explain."
+  },
+  "external": {
+   "label": "Shutdown initiated outside the cells",
+   "statement": "Another protection or machine function initiated the shutdown; the cells did not depart from their earlier behaviour before it."
+  }
+ },
+ "relates_to_assessment": {
+  "component": "D",
+  "drift": "D",
+  "load": "D",
+  "sensing": "E",
+  "external": "F",
+  "common": "A, B"
+ },
+ "external_checks": [
+  {
+   "id": "first_fault_record",
+   "record": "The BMS first-fault / event record covering the shutdown: triggering cell index, measured voltage, protection code and threshold, contactor command",
+   "separates": [
+    [
+     "external",
+     "component"
+    ],
+    [
+     "external",
+     "common"
+    ]
+   ]
+  },
+  {
+   "id": "load_step_response",
+   "record": "The cell voltages' response to a known current change (a load step), with temperature recorded",
+   "separates": [
+    [
+     "drift",
+     "load"
+    ]
+   ]
+  },
+  {
+   "id": "independent_cell_voltage",
+   "record": "An independent voltage measurement of the limiting cell and its sense-wiring diagnostics",
+   "separates": [
+    [
+     "sensing",
+     "drift"
+    ],
+    [
+     "sensing",
+     "load"
+    ]
+   ]
+  },
+  {
+   "id": "all_cell_voltages",
+   "record": "Every individual cell voltage (not only the lowest and highest) through a discharge",
+   "separates": [
+    [
+     "common",
+     "component"
+    ]
+   ]
+  },
+  {
+   "id": "cell_history",
+   "record": "Individual cell histories and balancing records, or a controlled capacity assessment of the limiting cell",
+   "separates": [],
+   "within": "drift: lower capacity vs lower initial state of charge"
+  }
+ ]
+}

@@ -1,0 +1,159 @@
+{
+ "arm": "alone",
+ "alias": "flight-36",
+ "folder": "carbonZ_2018-10-05-15-52-12_1_no_failure",
+ "input_sha256": "9926267c5ddc9b86f4d5a4fa11174ae2be06a7b595bbb81ca38195bbe57b681f",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.4
+  }
+ ],
+ "prompt_chars": 12075,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No actuator control fault seen; yaw-rate and airspeed read zero all flight, matching the t=0 sensor error.",
+   "status": "cause_probable",
+   "explanation": "Yaw rate and airspeed are flat-lined at 0 while heading changes by tens of deg/s and ground speed is about 20 m/s. This points to dead or unreported sensor channels from t=0. Attitude tracks setpoints throughout.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 2,
+     "quote": "vehicle.yaw_rate[yaw] 0 ... vehicle.airspeed 0 (t=0)",
+     "shows": "Yaw rate and airspeed are exactly 0 at the start and stay 0 for all 90 s, even though yaw changes from -135 to -152 deg in the first 2 s.",
+     "calls": []
+    },
+    {
+     "line": 95,
+     "quote": "mavros: System: ERROR: Sensor helth",
+     "shows": "A sensor health error is logged at t=0, consistent with the flat-lined channels.",
+     "calls": []
+    },
+    {
+     "line": 96,
+     "quote": "mavros: Battery: WARN: Low voltage",
+     "shows": "A low-voltage warning is logged at t=0. Throttle responds normally and no sag or brownout appears in the logged signals.",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "effects": [
+    {
+     "line": 95,
+     "quote": "Sensor helth",
+     "why": "Flat-lined yaw rate and airspeed are the likely consequence of the sensor fault, not a separate control fault."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the gyro and airspeed sensor health and calibration on the aircraft",
+    "why": "Settles whether the zero readings are a real sensor or driver failure, or only a logging or telemetry gap.",
+    "how": [
+     "Check the raw gyro and airspeed topics in the full onboard log",
+     "Check the pitot tube, its wiring and the sensor driver status",
+     "Run the sensor calibration and health checks on the bench"
+    ],
+    "where": "on_site",
+    "outcomes": [
+     {
+      "label": "Raw sensors live, telemetry zero",
+      "means": "The fault is in logging or the telemetry mapping, not in the sensors.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     },
+     {
+      "label": "Raw sensors dead or erroring",
+      "means": "A real sensor or driver fault caused the t=0 health error.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether the airframe has an airspeed sensor at all",
+    "Whether the yaw rate is actually used by the controller",
+    "Whether the low-voltage warning reflects real battery sag"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Gyro / airspeed sensors",
+     "claim": "Yaw-rate and airspeed sensor channels are dead from t=0, matching the sensor health error.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Both are exactly 0 for 90 s while the vehicle yaws and moves at about 20 m/s; the sensor error is logged at t=0.",
+     "basis": "indirect",
+     "lines": [
+      2,
+      95
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Telemetry / logging mapping",
+     "claim": "The sensors work, but the yaw-rate and airspeed fields were never populated in this log.",
+     "status": "open",
+     "role": "effect",
+     "because": "Cannot be separated from a real sensor fault with this data alone.",
+     "basis": "indirect"
+    },
+    {
+     "id": "h3",
+     "area": "Actuator control loop",
+     "claim": "A control or actuator fault occurred.",
+     "status": "weakened",
+     "because": "Roll and pitch follow the setpoints with about 1-2 s lag. Output channels 1-5 vary smoothly. Channels 0, 6 and 7 are constant, which is likely unused or fixed outputs.",
+     "basis": "indirect",
+     "lines": [
+      2
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      95
+     ],
+     "what": "System ERROR: Sensor helth at t=0",
+     "class": "root_cause_candidate",
+     "why": "Matches the flat-lined yaw rate and airspeed signals."
+    },
+    {
+     "lines": [
+      96
+     ],
+     "what": "Battery WARN: Low voltage at t=0",
+     "class": "anomaly",
+     "why": "Not corroborated by any other signal in the log."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 10834,
+   "output_tokens": 2552
+  },
+  "seconds": 20.4
+ },
+ "labels": {
+  "present_topics": [],
+  "nonzero": {},
+  "onset_s": null
+ }
+}

@@ -1,0 +1,23 @@
+{
+  "schema": "veyra-signal-profile-v1",
+  "id": "px4-battery-status",
+  "version": "1",
+  "synthetic": false,
+  "title": "PX4 battery (ULog battery_status, instance 0)",
+  "machine_class": "px4_vehicle",
+  "note": "PX4 current_a is positive when discharging; remaining is 0-1 and, depending on firmware and BAT_CAPACITY, may be voltage-based rather than coulomb counted. Capacity comes from the logged BAT_CAPACITY parameter (configured, not measured).",
+  "recording": {
+    "formats": ["px4_ulog"],
+    "bind": {"battery": {"topics": ["battery_status"]}},
+    "parameters_from_log": {"capacity_ah": {"ulog_param": "BAT_CAPACITY", "unit": "mAh", "min": 1}},
+    "time": "ULog timestamps, seconds from the first battery_status message"
+  },
+  "max_sample_age_s": 1.0,
+  "max_gap_s": 3.0,
+  "roles": {
+    "pack_current": {"field": "battery:current_a", "unit": "A", "sign": "discharge_positive", "kind": "measurement", "valid": [-500, 1000]},
+    "soc": {"field": "battery:remaining", "unit": "fraction", "kind": "estimate", "estimator": "unknown", "estimator_note": "PX4 remaining is voltage-based unless BAT_CAPACITY is set and the estimator fuses coulomb counting; the log does not say which", "valid": [0, 1]},
+    "pack_voltage": {"field": "battery:voltage_v", "unit": "V", "kind": "measurement", "valid": [0, 200]}
+  },
+  "parameters": {}
+}

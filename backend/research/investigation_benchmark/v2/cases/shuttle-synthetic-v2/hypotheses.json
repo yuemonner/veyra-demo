@@ -1,0 +1,199 @@
+{
+ "note": "Hypothesis space for the SYNTHETIC shuttle case, v2: adds artifact rules and one consequence hypothesis. Written by the Veyra team as an example; for real cases the machine's engineers write or approve it, including each rule's available_from.",
+ "hypotheses": [
+  {
+   "id": "contact",
+   "name": "FR HV connector or terminal contact resistance",
+   "keywords": [
+    "connector",
+    "terminal",
+    "contact",
+    "crimp",
+    "接插件",
+    "端子",
+    "接头",
+    "压接"
+   ],
+   "maps": {
+    "electrical": {
+     "wheel": "FR",
+     "candidate": "contact"
+    },
+    "artifacts": {
+     "hardware": {
+      "component": "FR HV connector",
+      "affected": [
+       "B"
+      ],
+      "available_from": "2026-11-02",
+      "note": "from a supplier bulletin issued after the case closed: must not be used at any decision point of this case"
+     }
+    }
+   }
+  },
+  {
+   "id": "conductor",
+   "name": "FR HV cable, busbar or fuse resistance",
+   "keywords": [
+    "cable",
+    "busbar",
+    "fuse",
+    "harness",
+    "wiring",
+    "线缆",
+    "母排",
+    "保险丝",
+    "线束",
+    "线路"
+   ],
+   "maps": {
+    "electrical": {
+     "wheel": "FR",
+     "candidate": "conductor"
+    }
+   }
+  },
+  {
+   "id": "inverter",
+   "name": "FR inverter or motor drawing excess DC current, or an inverter fault",
+   "keywords": [
+    "inverter",
+    "MCU_FR",
+    "逆变器",
+    "电机控制器",
+    "motor fault",
+    "电机故障"
+   ],
+   "maps": {
+    "electrical": {
+     "wheel": "FR",
+     "candidate": "inverter_draw"
+    },
+    "artifacts": {
+     "work_on": [
+      "inverter",
+      "MCU_FR"
+     ]
+    }
+   }
+  },
+  {
+   "id": "fr_sensor",
+   "name": "FR DC voltage sensor error",
+   "keywords": [
+    "voltage sensor",
+    "电压传感器",
+    "电压采样"
+   ],
+   "maps": {
+    "electrical": {
+     "wheel": "FR",
+     "candidate": "sensor_gain"
+    }
+   }
+  },
+  {
+   "id": "battery",
+   "name": "Battery pack limiting power (cold, low charge or weak cells)",
+   "keywords": [
+    "battery",
+    "pack",
+    "SOC",
+    "cell",
+    "BMS",
+    "电池",
+    "电芯",
+    "电量"
+   ],
+   "maps": {
+    "expected": {
+     "id": "current_within_dcl"
+    },
+    "electrical_pack": true
+   },
+   "observe": {
+    "what": "Pack voltage, current and cell temperatures during a cold launch",
+    "cost_tier": 0
+   }
+  },
+  {
+   "id": "hsa_control",
+   "name": "VCU 2.4.1 hill-start assist commanding torque above the BMS limit",
+   "keywords": [
+    "HSA",
+    "hill-start",
+    "坡起",
+    "VCU 2.4.1",
+    "扭矩限值",
+    "torque limit"
+   ],
+   "maps": {
+    "expected": {
+     "id": "cmd_within_limit",
+     "requires": {
+      "signal": "VCU_Status.HSA_Active",
+      "value": 1
+     }
+    },
+    "artifacts": {
+     "config": {
+      "component": "VCU",
+      "param": "HSA_FF_Torque_max_Nm",
+      "op": ">",
+      "ref_param": "BMS_TqLim_cold_Nm"
+     },
+     "version": {
+      "component": "VCU",
+      "from": "2.4.1"
+     }
+    }
+   },
+   "observe": {
+    "what": "Record a cold ramp launch with HSA on and off",
+    "cost_tier": 2
+   }
+  },
+  {
+   "id": "motor_mech",
+   "name": "FR motor or wheel mechanical drag",
+   "keywords": [
+    "bearing",
+    "drag",
+    "mechanical",
+    "轴承",
+    "机械",
+    "卡滞"
+   ],
+   "maps": {},
+   "observe": {
+    "what": "Lift the wheel and check free rotation and brake drag",
+    "cost_tier": 1
+   }
+  },
+  {
+   "id": "fr_uv_protection",
+   "name": "FR inverter undervoltage protection tripping without a real undervoltage (threshold or debounce wrong)",
+   "keywords": [
+    "undervoltage threshold",
+    "欠压保护",
+    "欠压阈值",
+    "UV threshold",
+    "debounce"
+   ],
+   "maps": {
+    "expected": {
+     "id": "uv_trip"
+    }
+   },
+   "observe": {
+    "what": "Compare the trip moment with the FR DC voltage trace",
+    "cost_tier": 0
+   }
+  }
+ ],
+ "cost_tiers": {
+  "0": "data already logged (a log pull)",
+  "1": "parked vehicle at the depot",
+  "2": "instrumented driven launch"
+ }
+}

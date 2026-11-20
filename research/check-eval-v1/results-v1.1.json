@@ -1,0 +1,108 @@
+{
+ "synthetic": true,
+ "caveat": "tests the checks' logic on injected faults in a SYNTHETIC pack model; not evidence about real degradation",
+ "splits": {
+  "fit": [
+   1,
+   20
+  ],
+  "threshold": [
+   101,
+   120
+  ],
+  "test": [
+   301,
+   340
+  ]
+ },
+ "fit_tolerances": {
+  "weak_effect_v": 0.0841,
+  "r_ratio": 1.35,
+  "ocv_err_pp": 0.6625,
+  "relaxed_deficit_v": 0.0653
+ },
+ "parameters_used": {
+  "resistance_ratio_flag": 1.5,
+  "tolerance_pp": 5.0,
+  "cell_voltage_accuracy_v": 0.02803333333333333,
+  "relaxed_deficit_flag_v": 0.0653
+ },
+ "threshold_rounds": [
+  {
+   "params": {
+    "resistance_ratio_flag": 1.5,
+    "tolerance_pp": 5.0,
+    "cell_voltage_accuracy_v": 0.02803333333333333,
+    "relaxed_deficit_flag_v": 0.0653
+   },
+   "alarms": []
+  }
+ ],
+ "test_healthy": {
+  "pack_hours": 42.1,
+  "false_alarms": 2,
+  "per_pack_hour": 0.047,
+  "examples": [
+   {
+    "seed": 335,
+    "check": "weak_cell_attribution",
+    "summary": "The lowest cell's deficit supports: sensing."
+   },
+   {
+    "seed": 337,
+    "check": "weak_cell_attribution",
+    "summary": "The lowest cell's deficit supports: sensing."
+   }
+  ]
+ },
+ "test_faults": {
+  "resistance x3.5 (one cell)": {
+   "check": "weak_cell_attribution",
+   "detected": "40/40",
+   "missed": "0/40",
+   "correct_attribution": "40/40",
+   "other_attribution_examples": [],
+   "tie_records_abstained": "40/40",
+   "tie_records_claimed": []
+  },
+  "capacity fade 70% (one cell)": {
+   "check": "weak_cell_attribution",
+   "detected": "39/40",
+   "missed": "1/40",
+   "correct_attribution": "37/40",
+   "other_attribution_examples": [
+    {
+     "seed": 337,
+     "supported": [
+      "sensing"
+     ]
+    },
+    {
+     "seed": 339,
+     "supported": [
+      "sensing"
+     ]
+    }
+   ],
+   "tie_records_abstained": "40/40",
+   "tie_records_claimed": []
+  },
+  "imbalance -10 pp (one cell)": {
+   "check": "relaxation",
+   "detected": "25/40",
+   "missed": "15/40"
+  },
+  "cell sensing step -50 mV": {
+   "check": "weak_cell_attribution",
+   "detected": "39/40",
+   "missed": "1/40",
+   "correct_attribution": "39/40",
+   "other_attribution_examples": []
+  },
+  "current offset -3 A": {
+   "check": "ocv_consistency",
+   "detected": "38/40",
+   "missed": "2/40"
+  }
+ }
+}

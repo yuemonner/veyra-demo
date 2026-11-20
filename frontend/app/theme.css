@@ -1,0 +1,440 @@
+/*
+ * Veyra theme.
+ * Loaded after globals.css; restyles only (structure, routes and behaviour unchanged).
+ *
+ * Idea: woven silk under frosted glass. A pale pearl ground with a fine warp/weft weave and
+ * one soft sheen; deep indigo is the "thread of reasoning" (focus, measured data, primary action).
+ * Colour stays semantic: indigo = measured / focus, saffron = threshold crossed,
+ * jade = verified, carmine = fault.
+ */
+
+:root {
+  --sr-ground: #eceef4;
+  --sr-pearl: #f7f7fb;
+  --sr-glass: rgba(255, 255, 255, 0.62);
+  --sr-glass-strong: rgba(255, 255, 255, 0.86);
+  --sr-glass-nested: rgba(246, 247, 252, 0.7);
+  --sr-edge: rgba(35, 37, 92, 0.1);
+  --sr-edge-strong: rgba(35, 37, 92, 0.18);
+  --sr-ink: #17183a;
+  --sr-ink-2: #4a4d6e;
+  --sr-ink-3: #7b7e99;
+  --sr-thread: #3934c0;
+  --sr-thread-deep: #2a2696;
+  --sr-thread-soft: rgba(57, 52, 192, 0.08);
+  --sr-thread-line: rgba(57, 52, 192, 0.32);
+  --sr-anomaly: #b06a00;
+  --sr-anomaly-soft: rgba(242, 169, 59, 0.16);
+  --sr-verified: #10806a;
+  --sr-verified-soft: rgba(16, 128, 106, 0.09);
+  --sr-fault: #c2304a;
+  --sr-radius-panel: 16px;
+  --sr-radius-control: 9px;
+  --sr-blur: blur(22px) saturate(160%);
+  --sr-lift: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(23, 24, 58, 0.04), 0 14px 36px -18px rgba(23, 24, 58, 0.22);
+  --sr-font-body: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --sr-font-data: var(--font-data), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Legacy tokens re-pointed so older rules join the palette. */
+  --bg: var(--sr-ground);
+  --paper: var(--sr-glass);
+  --ink: var(--sr-ink);
+  --muted: var(--sr-ink-2);
+  --line: var(--sr-edge);
+  --soft: var(--sr-thread-soft);
+  --green: var(--sr-thread);
+  --lime: var(--sr-thread);
+  --blue: var(--sr-thread);
+  --red: var(--sr-fault);
+  --surface-muted: rgba(35, 37, 92, 0.03);
+  --sidebar: rgba(247, 247, 251, 0.6);
+  color-scheme: light;
+}
+
+/* ---------- Ground: woven silk with one sheen ---------- */
+html,
+body {
+  background: var(--sr-ground);
+}
+
+body {
+  color: var(--sr-ink);
+  font-family: var(--sr-font-body);
+  font-feature-settings: "tnum";
+  -webkit-font-smoothing: antialiased;
+  background:
+    /* the sheen: one soft diagonal band of light, like light across silk */
+    linear-gradient(118deg, transparent 18%, rgba(255, 255, 255, 0.75) 38%, rgba(255, 255, 255, 0) 56%),
+    /* iridescence at the edges */
+    radial-gradient(1200px 700px at 100% 0%, rgba(168, 160, 240, 0.45), transparent 60%),
+    radial-gradient(1000px 640px at 0% 100%, rgba(150, 206, 214, 0.38), transparent 62%),
+    /* warp and weft */
+    repeating-linear-gradient(0deg, rgba(35, 37, 92, 0.022) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgba(35, 37, 92, 0.018) 0 1px, transparent 1px 4px),
+    var(--sr-ground);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgba(57, 52, 192, 0.18);
+  color: var(--sr-ink);
+}
+
+/* ---------- Shell & type ---------- */
+main.ide-shell {
+  background: transparent !important;
+  color: var(--sr-ink);
+}
+
+main.ide-shell :is(h1, h2, h3, h4) {
+  font-family: var(--sr-font-body);
+  color: var(--sr-ink);
+  letter-spacing: -0.018em;
+}
+main.ide-shell h1 { font-weight: 600; letter-spacing: -0.026em; }
+main.ide-shell h2 { font-weight: 600; }
+main.ide-shell h3 { font-weight: 600; }
+
+main.ide-shell :is(p, li, dd, td, small, span, label, summary, legend) { color: inherit; }
+main.ide-shell :is(small, .muted, figcaption) { color: var(--sr-ink-2); }
+main.ide-shell a { color: var(--sr-thread); }
+
+/* Labels read as sentences, not shouted eyebrows. */
+main.ide-shell :is(.ide-left-title, .workspace-nav-group > :first-child, .section-eyebrow span, .ide-casebar small, .ide-casebar > span:first-child) {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  color: var(--sr-ink-3) !important;
+  font-weight: 500;
+}
+
+/* ---------- Glass ---------- */
+main.ide-shell :is(.ide-topbar, .ide-casebar, .ide-bottom) {
+  background: rgba(250, 250, 253, 0.6) !important;
+  backdrop-filter: var(--sr-blur);
+  -webkit-backdrop-filter: var(--sr-blur);
+  border-color: var(--sr-edge) !important;
+  color: var(--sr-ink);
+}
+main.ide-shell .ide-topbar { border-bottom: 1px solid var(--sr-edge) !important; box-shadow: none; }
+
+main.ide-shell .ide-left {
+  background: rgba(250, 250, 253, 0.42) !important;
+  backdrop-filter: var(--sr-blur);
+  -webkit-backdrop-filter: var(--sr-blur);
+  border-right: 1px solid var(--sr-edge) !important;
+  color: var(--sr-ink-2);
+}
+
+main.ide-shell :is(.ide-center, .ide-right, .ide-grid) { background: transparent !important; }
+
+main.ide-shell :is(
+  article, .investigation-card, .reasoning-panel, .next-gap-panel, .provenance-panel,
+  .support-overview, .signal-card, .workspace-side-stat, details.ide-mini-status
+) {
+  background: var(--sr-glass) !important;
+  backdrop-filter: var(--sr-blur);
+  -webkit-backdrop-filter: var(--sr-blur);
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+  outline: 1px solid var(--sr-edge);
+  outline-offset: -1px;
+  border-radius: var(--sr-radius-panel);
+  box-shadow: var(--sr-lift);
+  color: var(--sr-ink);
+}
+
+/* Nested surfaces: flatter, no second blur. */
+main.ide-shell :is(article, section) :is(article, details, .card, table, pre, fieldset) {
+  background: var(--sr-glass-nested) !important;
+  border-color: var(--sr-edge) !important;
+  outline: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* ---------- Brand & ask bar ---------- */
+main.ide-shell .ide-brand {
+  color: var(--sr-ink) !important;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+main.ide-shell .ide-brand :is(span, b, i, strong):first-child {
+  /* a small swatch of silk: indigo with a moving-light sheen */
+  background: linear-gradient(135deg, #24208a 0%, #4c47d6 42%, #8b87ef 52%, #3530b4 64%, #24208a 100%) !important;
+  color: #fff !important;
+  border: 0 !important;
+  box-shadow: 0 6px 16px -6px rgba(42, 38, 150, 0.6);
+}
+
+main.ide-shell .ide-command {
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid var(--sr-edge-strong) !important;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(23, 24, 58, 0.05);
+}
+main.ide-shell .ide-command:focus-within {
+  border-color: var(--sr-thread-line) !important;
+  box-shadow: 0 0 0 4px var(--sr-thread-soft);
+}
+main.ide-shell .ide-command :is(input, label, span, b) {
+  background: transparent !important;
+  color: var(--sr-ink) !important;
+  border-color: transparent !important;
+}
+main.ide-shell .ide-command input::placeholder { color: var(--sr-ink-3); }
+
+/* ---------- Navigation: the active stage is held by a thread ---------- */
+main.ide-shell .ide-left :is(button, a) {
+  background: transparent !important;
+  color: var(--sr-ink-2) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--sr-radius-control);
+  position: relative;
+}
+main.ide-shell .ide-left :is(button, a):hover {
+  background: rgba(255, 255, 255, 0.55) !important;
+  color: var(--sr-ink) !important;
+}
+main.ide-shell .ide-left :is(button, a).active,
+main.ide-shell .ide-left :is(button, a)[aria-current] {
+  background: rgba(255, 255, 255, 0.85) !important;
+  color: var(--sr-thread-deep) !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 1px 2px rgba(23, 24, 58, 0.06), 0 6px 16px -10px rgba(42, 38, 150, 0.35);
+  font-weight: 600;
+}
+main.ide-shell .ide-left :is(button, a).active::before,
+main.ide-shell .ide-left :is(button, a)[aria-current]::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 6px;
+  height: 1.5px;
+  background: var(--sr-thread);
+  border-radius: 2px;
+}
+
+/* ---------- Controls ---------- */
+main.ide-shell :is(input, select, textarea) {
+  background: rgba(255, 255, 255, 0.82) !important;
+  color: var(--sr-ink) !important;
+  border: 1px solid var(--sr-edge-strong) !important;
+  border-radius: var(--sr-radius-control);
+  font-family: var(--sr-font-body);
+}
+main.ide-shell :is(input, select, textarea)::placeholder { color: var(--sr-ink-3); }
+main.ide-shell :is(input, select, textarea):focus {
+  outline: none;
+  border-color: var(--sr-thread-line) !important;
+  box-shadow: 0 0 0 4px var(--sr-thread-soft);
+}
+main.ide-shell input[type="checkbox"],
+main.ide-shell input[type="radio"] { accent-color: var(--sr-thread); }
+main.ide-shell select option { background: #fff; color: var(--sr-ink); }
+
+main.ide-shell button {
+  font-family: var(--sr-font-body);
+  border-radius: var(--sr-radius-control);
+}
+
+/* Primary actions: indigo thread, white text */
+main.ide-shell :is(button[type="submit"], .ide-command button, .investigation-form button:not(.quiet-button), .primary, .primary-button, .next-action-strip button) {
+  background: var(--sr-thread) !important;
+  color: #fff !important;
+  border: 1px solid var(--sr-thread-deep) !important;
+  font-weight: 600;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 8px 18px -10px rgba(42, 38, 150, 0.7);
+}
+main.ide-shell :is(button[type="submit"], .ide-command button, .investigation-form button:not(.quiet-button), .primary, .primary-button, .next-action-strip button):hover {
+  background: var(--sr-thread-deep) !important;
+}
+
+/* Secondary: light glass */
+main.ide-shell :is(.quiet-button, .trace-button, button.secondary) {
+  background: rgba(255, 255, 255, 0.7) !important;
+  color: var(--sr-ink) !important;
+  border: 1px solid var(--sr-edge-strong) !important;
+  box-shadow: none;
+}
+
+main.ide-shell button:disabled,
+main.ide-shell button[disabled] {
+  background: rgba(35, 37, 92, 0.05) !important;
+  color: var(--sr-ink-3) !important;
+  border-color: var(--sr-edge) !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+}
+
+main.ide-shell :is(button, a, summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--sr-thread);
+  outline-offset: 2px;
+}
+
+/* ---------- Case bar chips ---------- */
+main.ide-shell .ide-casebar :is(b, span, em) {
+  border-color: var(--sr-edge-strong) !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  color: var(--sr-ink-2) !important;
+}
+main.ide-shell .ide-casebar b.open {
+  color: var(--sr-verified) !important;
+  border-color: rgba(16, 128, 106, 0.3) !important;
+  background: var(--sr-verified-soft) !important;
+}
+
+/* ---------- Data ---------- */
+main.ide-shell :is(code, pre, kbd, samp, .mono, .field-source-text) {
+  font-family: var(--sr-font-data);
+  color: var(--sr-ink-2);
+}
+main.ide-shell pre,
+main.ide-shell .field-source-text {
+  background: rgba(246, 247, 252, 0.9) !important;
+  border: 1px solid var(--sr-edge) !important;
+  border-radius: var(--sr-radius-control);
+}
+main.ide-shell :is(strong, b, .value, .reading, [class*="value"], [class*="reading"], [class*="metric"]) {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Tables ---------- */
+main.ide-shell table { border-collapse: collapse; color: var(--sr-ink); }
+main.ide-shell th {
+  background: rgba(35, 37, 92, 0.035) !important;
+  color: var(--sr-ink-2) !important;
+  border-color: var(--sr-edge) !important;
+  font-weight: 500;
+}
+main.ide-shell td { border-color: var(--sr-edge) !important; }
+main.ide-shell tbody tr:hover td { background: var(--sr-thread-soft); }
+
+main.ide-shell summary { color: var(--sr-ink-2); cursor: pointer; }
+main.ide-shell summary:hover { color: var(--sr-thread); }
+
+main.ide-shell * {
+  scrollbar-color: rgba(35, 37, 92, 0.2) transparent;
+  scrollbar-width: thin;
+}
+
+/* ---------- Legacy surfaces brought into the palette ---------- */
+main.ide-shell :is(.cohort-group, .change-card, .next-action-strip, .runtime-upload-file, .flow-steps) {
+  background: var(--sr-glass-nested) !important;
+  border-color: var(--sr-edge) !important;
+  color: var(--sr-ink) !important;
+}
+main.ide-shell .change-card {
+  background: rgba(255, 255, 255, 0.72) !important;
+  border-radius: 14px;
+}
+main.ide-shell .change-card footer {
+  background: transparent !important;
+  border-top: 1px solid var(--sr-edge) !important;
+  color: var(--sr-ink-2) !important;
+}
+main.ide-shell :is(.change-card footer b, .ide-source-counts b, .support-facts b) {
+  color: var(--sr-ink) !important;
+  background: transparent !important;
+  font-family: var(--sr-font-data);
+}
+main.ide-shell .flow-steps button {
+  background: transparent !important;
+  color: var(--sr-ink-2) !important;
+  border-color: transparent !important;
+}
+main.ide-shell .flow-steps button.selected {
+  background: #fff !important;
+  color: var(--sr-thread-deep) !important;
+  border-color: var(--sr-edge) !important;
+  box-shadow: 0 1px 2px rgba(23, 24, 58, 0.06);
+}
+main.ide-shell :is(.signal-symbol, .next-action-number) {
+  background: var(--sr-thread-soft) !important;
+  color: var(--sr-thread) !important;
+  border: 1px solid rgba(57, 52, 192, 0.16) !important;
+}
+main.ide-shell :is(.signal-label, .state-badge, .check-priority) {
+  background: rgba(35, 37, 92, 0.045) !important;
+  color: var(--sr-ink-2) !important;
+  border: 1px solid transparent !important;
+}
+main.ide-shell :is(.signal-label.improved, .support-state) {
+  background: var(--sr-verified-soft) !important;
+  color: var(--sr-verified) !important;
+  border: 1px solid rgba(16, 128, 106, 0.2) !important;
+}
+
+/* Charts: an indigo thread on a fine weave */
+main.ide-shell .runtime-chart {
+  background:
+    repeating-linear-gradient(0deg, rgba(35, 37, 92, 0.03) 0 1px, transparent 1px 24px),
+    rgba(255, 255, 255, 0.75) !important;
+  border: 1px solid var(--sr-edge);
+  border-radius: 10px;
+}
+main.ide-shell .runtime-chart path { stroke: rgba(35, 37, 92, 0.22); }
+main.ide-shell .runtime-chart polyline { stroke: var(--sr-thread); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+main.ide-shell .runtime-chart text { fill: var(--sr-ink-3); font-family: var(--sr-font-data); }
+
+/* Readouts: indigo = measured, saffron = threshold crossed, jade = later reading below threshold */
+main.ide-shell .window-compare label { color: var(--sr-ink-3) !important; }
+main.ide-shell .window-compare small { color: var(--sr-ink-3) !important; font-family: var(--sr-font-data); }
+main.ide-shell .window-compare strong {
+  font-family: var(--sr-font-data) !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.02em;
+  color: var(--sr-thread-deep) !important;
+}
+main.ide-shell .earlier-window.crossed strong {
+  color: var(--sr-anomaly) !important;
+  background: linear-gradient(transparent 62%, var(--sr-anomaly-soft) 62%);
+}
+main.ide-shell .later-window.improved strong { color: var(--sr-verified) !important; }
+main.ide-shell .change-arrow { color: var(--sr-ink-3) !important; }
+
+@media (prefers-reduced-transparency: reduce) {
+  main.ide-shell :is(.ide-topbar, .ide-casebar, .ide-left, article, .investigation-card, .reasoning-panel, .next-gap-panel, .provenance-panel) {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--sr-glass-strong) !important;
+  }
+}
+
+/* ---------- The one bold moment: the case summary carries a silk sheen ---------- */
+main.ide-shell div.support-overview.support-overview {
+  background:
+    linear-gradient(100deg, rgba(57, 52, 192, 0.12) 0%, rgba(150, 140, 240, 0.2) 22%, rgba(255, 255, 255, 0) 46%, rgba(130, 196, 206, 0.16) 72%, rgba(57, 52, 192, 0.06) 100%) 0 0 / 100% 190px no-repeat,
+    repeating-linear-gradient(90deg, rgba(57, 52, 192, 0.035) 0 1px, transparent 1px 3px) 0 0 / 100% 190px no-repeat,
+    var(--sr-glass) !important;
+}
+main.ide-shell .support-head h2 {
+  font-size: clamp(24px, 2.6vw, 34px) !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.2 !important;
+  color: var(--sr-ink) !important;
+}
+main.ide-shell .support-head p { color: var(--sr-ink-2) !important; font-size: 13px !important; }
+main.ide-shell .micro-label {
+  color: var(--sr-thread-deep) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+main.ide-shell .micro-label i { background: var(--sr-thread) !important; box-shadow: 0 0 0 3px var(--sr-thread-soft); }
+
+main.ide-shell .workspace-nav-group,
+main.ide-shell .ide-left-title {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  font-family: var(--sr-font-body) !important;
+  letter-spacing: 0 !important;
+  color: var(--sr-ink-3) !important;
+}
+main.ide-shell .ide-casebar :is(b, span) { font-family: var(--sr-font-body) !important; letter-spacing: 0 !important; }
+main.ide-shell .ide-casebar h1 { font-weight: 600 !important; letter-spacing: -0.015em; }
+main.ide-shell .runtime-runbar button { background: var(--sr-thread) !important; color: #fff !important; border: 1px solid var(--sr-thread-deep) !important; }
+main.ide-shell .field-case-link {
+  white-space: nowrap; font-size: 13px; font-weight: 600; color: var(--sr-thread-deep) !important; text-decoration: none;
+  padding: 6px 12px; border-radius: 9px; background: rgba(255, 255, 255, 0.8); border: 1px solid var(--sr-thread-line);
+}
+main.ide-shell .field-case-link:hover { background: var(--sr-thread-soft); }

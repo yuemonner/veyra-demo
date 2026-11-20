@@ -1,0 +1,160 @@
+{
+ "case": "shuttle-synthetic",
+ "source": "results/shuttle-synthetic.json",
+ "model": "claude-code:sonnet",
+ "provider": "anthropic",
+ "steps": [
+  {
+   "cutoff": "2026-10-21",
+   "step": "s2",
+   "check": "更换 FR 电机逆变器（MCU_FR）",
+   "status": "rejected",
+   "attempts": 2,
+   "rejections": [
+    [
+     "claim 1 is confirmed but its weakest evidence is inferred",
+     "claim 2 cites no fact: The engineers report the FR inverter swap did not resolve the problem, because a"
+    ],
+    [
+     "claim 1 is confirmed but its weakest evidence is inferred"
+    ]
+   ],
+   "error": null,
+   "seconds": 24.2,
+   "claims": [],
+   "eliminates": []
+  },
+  {
+   "cutoff": "2026-10-22",
+   "step": "s3",
+   "check": "用 BMS 诊断工具检查电池 SOC 和电芯电压",
+   "status": "rejected",
+   "attempts": 2,
+   "rejections": [
+    [
+     "claim 1 cites no fact: The engineers reported that SOC and cell voltages measured at the station were n",
+     "claim 2 is confirmed but its weakest evidence is inferred"
+    ],
+    [
+     "claim 2 is confirmed but its weakest evidence is inferred"
+    ]
+   ],
+   "error": null,
+   "seconds": 19.4,
+   "claims": [],
+   "eliminates": []
+  },
+  {
+   "cutoff": "2026-10-23",
+   "step": "s4",
+   "check": "检查 VCU 2.4.1 的坡起辅助（HSA）设置，看会不会超过 BMS 扭矩限值",
+   "status": "rejected",
+   "attempts": 2,
+   "rejections": [
+    [
+     "claim 1 is confirmed but its weakest evidence is inferred"
+    ],
+    [
+     "claim 1 is confirmed but its weakest evidence is inferred"
+    ]
+   ],
+   "error": null,
+   "seconds": 13.7,
+   "claims": [],
+   "eliminates": []
+  },
+  {
+   "cutoff": "2026-10-29",
+   "step": "s5",
+   "check": "检查 FR 高压接插件：端子发黑，重新压接并紧固",
+   "status": "accepted",
+   "attempts": 1,
+   "rejections": [],
+   "error": null,
+   "seconds": 6.7,
+   "claims": [
+    {
+     "text": "FR's voltage drop per amp of pack current is about 3.2× that of the other inverters in all 3 snapshots, so the anomaly is consistent and specific to the FR branch.",
+     "fact_ids": [
+      "f1"
+     ],
+     "tier": "confirmed",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "At an equal current share FR's branch resistance would be 26.1 mΩ against 8.3 mΩ for the others. Over the 21%–29% share allowed it would be 21.9–32.0 mΩ, so extra resistance in the FR branch fits the data.",
+     "fact_ids": [
+      "f2"
+     ],
+     "tier": "inferred",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "The engineers found a blackened terminal and measured high contact resistance on the bench. This is a reported finding that agrees with the extra-branch-resistance reading, but it was not recorded in the electrical data. It does not by itself show that this terminal caused the whole FR drop.",
+     "fact_ids": [
+      "f1",
+      "f2"
+     ],
+     "tier": "reported",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "The electrical data alone cannot separate a contact fault from a conductor fault, because both add branch resistance. The bench observation of a blackened terminal favours the contact, but the conductor stays open on the data alone.",
+     "fact_ids": [
+      "f2"
+     ],
+     "tier": "inferred",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "An FR sensor gain error is weakened, because it would also show about -4.78 V at rest, while FR reads +0.01 V from the others at rest. It is not excluded, since an offset could partly cancel it.",
+     "fact_ids": [
+      "f3"
+     ],
+     "tier": "inferred",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "No post-repair data is given, so it is not yet known whether re-crimping removed the FR slope. A snapshot taken after the repair is needed to confirm.",
+     "fact_ids": [
+      "f1"
+     ],
+     "tier": "inferred",
+     "numbers_not_in_cited_facts": []
+    },
+    {
+     "text": "The temperature dependence of pack resistance cannot be attributed to temperature alone, because state of charge and launch length also differ.",
+     "fact_ids": [
+      "f5"
+     ],
+     "tier": "confirmed",
+     "numbers_not_in_cited_facts": []
+    }
+   ],
+   "eliminates": []
+  }
+ ],
+ "summary": {
+  "steps": 4,
+  "accepted": 1,
+  "accepted_first_try": 1,
+  "rejected": 3,
+  "errors": 0,
+  "claims": 7,
+  "claims_with_unmatched_numbers": 0,
+  "rejection_reasons": [
+   "claim 1 is confirmed but its weakest evidence is inferred",
+   "claim 2 cites no fact: The engineers report the FR inverter swap did not resolve the problem, because a",
+   "claim 1 is confirmed but its weakest evidence is inferred",
+   "claim 1 cites no fact: The engineers reported that SOC and cell voltages measured at the station were n",
+   "claim 2 is confirmed but its weakest evidence is inferred",
+   "claim 2 is confirmed but its weakest evidence is inferred",
+   "claim 1 is confirmed but its weakest evidence is inferred",
+   "claim 1 is confirmed but its weakest evidence is inferred"
+  ]
+ },
+ "served_by": [
+  "claude-sonnet-5-5"
+ ],
+ "model_calls": 7
+}

@@ -1,0 +1,1319 @@
+{
+ "label": "P2",
+ "recording": "rec-0000000000000007",
+ "profile": "px4-battery-status",
+ "engine_case": "case-05fa9803d790",
+ "seconds": 70.7,
+ "scan": {
+  "counts": {
+   "NOT_APPLICABLE": 1
+  },
+  "filename": "2023-08_sess006_log001.ulg",
+  "format": "px4_ulog",
+  "profile": "px4-battery-status",
+  "profiles": [
+   {
+    "bindings": {
+     "battery": "battery_status"
+    },
+    "machine_class": "px4_vehicle",
+    "origin": "built-in",
+    "profile": "px4-battery-status",
+    "reasons": [],
+    "status": "compatible",
+    "synthetic": false
+   },
+   {
+    "bindings": {},
+    "machine_class": "battery_electric_vehicle",
+    "origin": "built-in",
+    "profile": "synthetic-bev-ros",
+    "reasons": [
+     "format px4_ulog is not one this profile reads (ros1_bag, ros2_bag, mcap)"
+    ],
+    "status": "incompatible",
+    "synthetic": true
+   },
+   {
+    "bindings": {},
+    "machine_class": "battery_electric_vehicle",
+    "origin": "built-in",
+    "profile": "synthetic-bev-tables",
+    "reasons": [
+     "format px4_ulog is not one this profile reads (decoded_csv_package)"
+    ],
+    "status": "incompatible",
+    "synthetic": true
+   },
+   {
+    "bindings": {},
+    "machine_class": null,
+    "origin": "built-in",
+    "profile": "ros-battery-state",
+    "reasons": [
+     "format px4_ulog is not one this profile reads (ros1_bag, ros2_bag, mcap)"
+    ],
+    "status": "incompatible",
+    "synthetic": false
+   }
+  ],
+  "recording": "rec-0000000000000007",
+  "results": [
+   {
+    "applicability": "not_applicable",
+    "matched_original": null,
+    "outcome": "NOT_APPLICABLE",
+    "reasons": [
+     "machine class 'px4_vehicle' is not 'battery_electric_vehicle'"
+    ],
+    "scenario_id": "scn-fd6263073bd9",
+    "scenario_title": "SOC correction not explained by measured charge (from R1)",
+    "scenario_version": 1,
+    "summary": "Not applicable: machine class 'px4_vehicle' is not 'battery_electric_vehicle'"
+   }
+  ],
+  "scenarios": [
+   "scn-fd6263073bd9"
+  ],
+  "state": "scanned",
+  "synthetic": false
+ },
+ "investigation": {
+  "agent": {
+   "accepted_as_is": true,
+   "agent_report": {
+    "explanation": "Offboard control ended (AUTO_LAND at 69.8 s). All motor outputs stepped to 900/0 us at 76.122 s, 0.79 s before 'Manual kill-switch engaged'. The recording does not show who or what commanded the kill.",
+    "hypotheses": [
+     {
+      "id": "none",
+      "statement": "Operator / manual kill: A deliberate or accidental manual kill-switch input cut the motor outputs during AUTO_LAND.",
+      "status": "leading"
+     },
+     {
+      "id": "none",
+      "statement": "Offboard link / companion: The offboard or companion link lost sync, causing the AUTO_LAND switch, and a failsafe or command cut the outputs.",
+      "status": "open"
+     },
+     {
+      "id": "none",
+      "statement": "Actuator / ESC output path: An output-stage or ESC fault dropped the outputs without a command.",
+      "status": "open"
+     },
+     {
+      "id": "none",
+      "statement": "Estimator / sensor: An estimator or sensor fault triggered the landing and the cut.",
+      "status": "weakened"
+     }
+    ],
+    "next_check": "Pull vehicle_command, failsafe, manual_control and RC-input topics from the full ulog around 69-77 s.",
+    "summary": "Motor outputs dropped to minimum at t=76.1 s, before the logged kill-switch event, during an AUTO_LAND descent."
+   },
+   "constrained_claims": [
+    {
+     "constrained_status": null,
+     "hypotheses": [],
+     "kind": "text",
+     "reasons": [],
+     "source": "headline",
+     "text": "Motor outputs dropped to minimum at t=76.1 s, before the logged kill-switch event, during an AUTO_LAND descent.",
+     "verdict": "accepted"
+    },
+    {
+     "constrained_status": null,
+     "hypotheses": [
+      "B"
+     ],
+     "kind": "text",
+     "reasons": [],
+     "source": "explanation",
+     "text": "Offboard control ended (AUTO_LAND at 69.8 s). All motor outputs stepped to 900/0 us at 76.122 s, 0.79 s before 'Manual kill-switch engaged'. The recording does not show who or what commanded the kill.",
+     "verdict": "accepted"
+    },
+    {
+     "kind": "structured",
+     "physical_ref": "none",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ],
+     "source": "hypothesis h1",
+     "text": "Operator / manual kill: A deliberate or accidental manual kill-switch input cut the motor outputs during AUTO_LAND.",
+     "verdict": "accepted"
+    },
+    {
+     "kind": "structured",
+     "physical_ref": "none",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ],
+     "source": "hypothesis h2",
+     "text": "Offboard link / companion: The offboard or companion link lost sync, causing the AUTO_LAND switch, and a failsafe or command cut the outputs.",
+     "verdict": "accepted"
+    },
+    {
+     "kind": "structured",
+     "physical_ref": "none",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ],
+     "source": "hypothesis h3",
+     "text": "Actuator / ESC output path: An output-stage or ESC fault dropped the outputs without a command.",
+     "verdict": "accepted"
+    },
+    {
+     "kind": "structured",
+     "physical_ref": "none",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ],
+     "source": "hypothesis h4",
+     "text": "Estimator / sensor: An estimator or sensor fault triggered the landing and the cut.",
+     "verdict": "accepted"
+    }
+   ],
+   "engine_case_id": "case-05fa9803d790",
+   "investigator": "main",
+   "mode": "agent",
+   "model": "claude-code:sonnet",
+   "note": "Veyra's main investigator (evidence sheet + physical layer), held to the quote/number verifier and to the physical assessment by reference. Statements are proposals until an engineer verifies them.",
+   "provider": "anthropic",
+   "reason": null,
+   "safety_gate": null,
+   "trace": [
+    {
+     "error": false,
+     "input": {},
+     "step": 0,
+     "tool": "overview"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 1,
+     "tool": "case_context"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 2,
+     "tool": "physical_checks"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 3,
+     "tool": "physical_hypotheses"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 4,
+     "tool": "physical_earlier_knowledge"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 5,
+     "tool": "events"
+    },
+    {
+     "error": false,
+     "input": {
+      "end": 110,
+      "start": 21
+     },
+     "step": 6,
+     "tool": "read_lines"
+    },
+    {
+     "error": false,
+     "input": {
+      "baseline_s": 30,
+      "end_s": 78,
+      "start_s": 70
+     },
+     "step": 7,
+     "tool": "sequence"
+    },
+    {
+     "error": false,
+     "input": {
+      "t_s": 73.584,
+      "window_s": 5
+     },
+     "step": 8,
+     "tool": "compare"
+    },
+    {
+     "error": false,
+     "input": {},
+     "step": 9,
+     "tool": "lessons"
+    }
+   ],
+   "version": "veyra-investigator-v1"
+  },
+  "case_id": "rec-0000000000000007",
+  "deterministic": {
+   "checks": {
+    "charge_accounting": {
+     "outcome": "INDETERMINATE",
+     "summary": "Indeterminate: the profile does not say how SOC is estimated, and this recording does not show it following measured charge (no tracking span of 600 s or more): a change the charge does not explain may be how this estimator works"
+    },
+    "ocv_consistency": {
+     "outcome": "INDETERMINATE",
+     "summary": "Indeterminate: no OCV curve, so the rested voltage cannot be turned into SOC."
+    },
+    "pack_cell_consistency": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: pack voltage or lowest/highest cell voltage is not recorded."
+    },
+    "protection_sequence": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: no fault-level signal."
+    },
+    "relaxation": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: pack current or lowest cell voltage is not recorded."
+    },
+    "restart_eligibility": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: no contactor feedback / fault level."
+    },
+    "weak_cell_attribution": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: pack voltage, lowest cell voltage or pack current is not recorded."
+    }
+   },
+   "hypotheses": [],
+   "next_check": null,
+   "summary": null
+  },
+  "finished_at": "2026-11-16T21:43:10.732450+00:00",
+  "knowledge_used": [],
+  "recording_digest": "f74f31519311fd933c7cf846099c67cd5c38a300da986a352c0eb296d5504f7a",
+  "scenario_results": {
+   "here": [
+    {
+     "applicability": "not_applicable",
+     "matched_original": null,
+     "outcome": "NOT_APPLICABLE",
+     "recording": "rec-0000000000000007",
+     "scenario_id": "scn-fd6263073bd9",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "Not applicable: machine class 'px4_vehicle' is not 'battery_electric_vehicle'",
+     "synthetic": null,
+     "trigger": "ingest"
+    }
+   ],
+   "other_recordings": [
+    {
+     "applicability": "applies",
+     "matched_original": true,
+     "outcome": "VIOLATION",
+     "recording": "rec-0000000000000000",
+     "scenario_id": "scn-fd6263073bd9",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "1 SOC correction(s) not explained by measured charge; largest: 60.8 % -> 22.8 % in 30.0 s (fault), measured charge 0.0545 Ah explains 0.054 pp, 37.95 pp unexplained.",
+     "synthetic": null,
+     "trigger": "approval-backfill"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": false,
+     "outcome": "PASS",
+     "recording": "rec-0000000000000001",
+     "scenario_id": "scn-fd6263073bd9",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "synthetic": null,
+     "trigger": "ingest"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": true,
+     "outcome": "VIOLATION",
+     "recording": "rec-0000000000000002",
+     "scenario_id": "scn-fd6263073bd9",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "1 SOC correction(s) not explained by measured charge; largest: 56.8 % -> 24.0 % in 29.0 s (fault), measured charge 0.056 Ah explains 0.056 pp, 32.74 pp unexplained.",
+     "synthetic": null,
+     "trigger": "ingest"
+    },
+    {
+     "applicability": "not_applicable",
+     "matched_original": null,
+     "outcome": "NOT_APPLICABLE",
+     "recording": "rec-0000000000000003",
+     "scenario_id": "scn-fd6263073bd9",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "Not applicable: machine class 'px4_vehicle' is not 'battery_electric_vehicle'",
+     "synthetic": null,
+     "trigger": "ingest"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": false,
+     "outcome": "PASS",
+     "recording": "rec-0000000000000004",
+     "scenario_id": "scn-fd6263073bd9",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "synthetic": null,
+     "trigger": "ingest"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": false,
+     "outcome": "PASS",
+     "recording": "rec-0000000000000005",
+     "scenario_id": "scn-fd6263073bd9",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "synthetic": null,
+     "trigger": "ingest"
+    },
+    {
+     "applicability": "applies",
+     "matched_original": false,
+     "outcome": "PASS",
+     "recording": "rec-0000000000000006",
+     "scenario_id": "scn-fd6263073bd9",
+     "scenario_title": "SOC correction not explained by measured charge (from R1)",
+     "scenario_version": 1,
+     "summary": "SOC changes are explained by the measured charge within tolerance.",
+     "synthetic": null,
+     "trigger": "ingest"
+    }
+   ]
+  },
+  "started_at": "2026-11-16T21:42:01.178469+00:00",
+  "synthetic": false,
+  "trigger": "ingest",
+  "version": "veyra-investigation-v1"
+ },
+ "main_investigator_record": {
+  "kind": "autonomous_investigation",
+  "version": "veyra-investigator-v1",
+  "run_id": "run-99b4d141e574",
+  "mode": "agent",
+  "source": {
+   "kind": "recording_sheet",
+   "version": "veyra-recording-sheet-v2",
+   "sha256": "f7b8e633c95fa365a527aeb4aec62be87ca542d7c862be7adc403ceca0049ae3",
+   "sheet": [
+    "RECORDING 12817 rows, 19 series, span 80.078 s from t=0 at 2026-11-16T21:41:59.309486Z (clock px4_boot_clock). Times below are seconds from t=0.",
+    "SERIES actuator.output[ch1] unit=us samples=738 t=0.706..80.078 s min=900 max=1672 median=1622 usual_interval=0.101 s",
+    "SERIES actuator.output[ch2] unit=us samples=738 t=0.706..80.078 s min=900 max=1648 median=1600 usual_interval=0.101 s",
+    "SERIES actuator.output[ch3] unit=us samples=738 t=0.706..80.078 s min=900 max=1706 median=1647 usual_interval=0.101 s",
+    "SERIES actuator.output[ch4] unit=us samples=738 t=0.706..80.078 s min=900 max=1706 median=1627 usual_interval=0.101 s",
+    "SERIES actuator.output[ch5] unit=us samples=738 t=0.706..80.078 s min=0 max=1500 median=1500 usual_interval=0.101 s",
+    "SERIES actuator.output[ch6] unit=us samples=738 t=0.706..80.078 s min=0 max=1500 median=1500 usual_interval=0.101 s",
+    "SERIES actuator.output[ch7] unit=us samples=738 t=0.706..80.078 s min=0 max=0 median=0 usual_interval=0.101 s",
+    "SERIES actuator.output[ch8] unit=us samples=738 t=0.706..80.078 s min=0 max=0 median=0 usual_interval=0.101 s",
+    "SERIES control.attitude_setpoint[pitch] unit=deg samples=428 t=0..78.982 s min=-0.105 max=3.966 median=0.598 usual_interval=0.194 s",
+    "SERIES control.attitude_setpoint[roll] unit=deg samples=428 t=0..78.982 s min=-4.712 max=2.14 median=0.668 usual_interval=0.194 s",
+    "SERIES control.attitude_setpoint[yaw] unit=deg samples=428 t=0..78.982 s min=0 max=3.185 median=2.337 usual_interval=0.194 s",
+    "SERIES control.yaw_rate_setpoint[yaw] unit=deg/s samples=755 t=0.706..80.002 s min=-8.055 max=7.647 median=-0.194 usual_interval=0.105 s",
+    "SERIES vehicle.altitude[baro] unit=m samples=788 t=0.702..80.023 s min=116.458 max=125.048 median=123.322 usual_interval=0.101 s",
+    "SERIES vehicle.altitude[estimate] unit=m samples=526 t=0.701..80.074 s min=0.035 max=3.585 median=2.726 usual_interval=0.106 s",
+    "SERIES vehicle.attitude[pitch] unit=deg samples=757 t=0.705..80.037 s min=-0.384 max=3.134 median=0.589 usual_interval=0.105 s",
+    "SERIES vehicle.attitude[roll] unit=deg samples=757 t=0.705..80.037 s min=-3.159 max=2.199 median=0.653 usual_interval=0.105 s",
+    "SERIES vehicle.attitude[yaw] unit=deg samples=757 t=0.705..80.037 s min=-0.806 max=3.507 median=2.415 usual_interval=0.105 s",
+    "SERIES vehicle.ground_speed unit=m/s samples=526 t=0.701..80.074 s min=0 max=0.26 median=0.076 usual_interval=0.106 s",
+    "SERIES vehicle.yaw_rate[yaw] unit=deg/s samples=755 t=0.708..80.004 s min=-35.546 max=13.394 median=0.012 usual_interval=0.105 s",
+    "EVENT t=0.02 s controller.event[log] INFO: [logger] Start file log (type: full)",
+    "EVENT t=0.66 s controller.event[log] INFO: [logger] Opened full log file: /fs/microsd/log/sess006/log001.ulg",
+    "EVENT t=1.871 s controller.event[log] INFO: [commander] Takeoff detected",
+    "EVENT t=69.847 s controller.event[vehicle_status] nav_state OFFBOARD -> AUTO_LAND",
+    "EVENT t=70.362 s controller.event[log] ERROR: [mavlink] [timesync] Time jump detected. Resetting time synchroniser.",
+    "EVENT t=76.915 s controller.event[log] ERROR: [commander] Manual kill-switch engaged",
+    "EVENT t=77.586 s controller.event[log] INFO: [commander] Landing detected",
+    "EVENT t=79.087 s controller.event[vehicle_status] arming_state ARMED -> DISARMED",
+    "CONSTANT actuator.output[ch5] held 1500 from t=0.706 to 76.833 s (709 samples)",
+    "CONSTANT actuator.output[ch6] held 1500 from t=0.706 to 76.833 s (709 samples)",
+    "CONSTANT actuator.output[ch7] = 0 for the whole recording (738 samples)",
+    "CONSTANT actuator.output[ch8] = 0 for the whole recording (738 samples)",
+    "GAP control.attitude_setpoint[pitch] no samples from t=0 to 1.029 s (1.029 s; usual interval 0.194 s)",
+    "GAP control.attitude_setpoint[roll] no samples from t=0 to 1.029 s (1.029 s; usual interval 0.194 s)",
+    "GAP control.attitude_setpoint[yaw] no samples from t=0 to 1.029 s (1.029 s; usual interval 0.194 s)",
+    "SHIFT actuator.output[ch1] changed level for good at t=73.584 s: median 1624 before, 1095 after us (48.1x its variation before)",
+    "SHIFT actuator.output[ch2] changed level for good at t=73.584 s: median 1602 before, 1242 after us (32.7x its variation before)",
+    "SHIFT actuator.output[ch3] changed level for good at t=73.584 s: median 1648 before, 1498 after us (10x its variation before)",
+    "SHIFT actuator.output[ch4] changed level for good at t=73.584 s: median 1629 before, 1464 after us (11x its variation before)",
+    "SHIFT vehicle.altitude[baro] changed level for good at t=7.356 s: median 119.742 before, 123.785 after m (4.8x its variation before)",
+    "SHIFT vehicle.altitude[estimate] changed level for good at t=7.405 s: median 0.11 before, 3.166 after m (277.8x its variation before)",
+    "SHIFT vehicle.attitude[pitch] changed level for good at t=7.317 s: median 0.256 before, 0.598 after deg (6.6x its variation before)",
+    "SHIFT vehicle.attitude[roll] changed level for good at t=6.682 s: median 0.43 before, 0.668 after deg (8.7x its variation before)",
+    "SHIFT vehicle.ground_speed changed level for good at t=27.198 s: median 0.021 before, 0.238 after m/s (19.7x its variation before)",
+    "CHANGE actuator.output[ch1] at t=76.122 s: 1608.5 -> 900 us (step -708.5, 50.6x its usual variation)",
+    "CHANGE actuator.output[ch1] at t=2.735 s: 1170.5 -> 1539.5 us (step 369, 26.4x its usual variation)",
+    "CHANGE actuator.output[ch2] at t=76.122 s: 1589 -> 900 us (step -689, 45.9x its usual variation)",
+    "CHANGE actuator.output[ch2] at t=2.838 s: 1162.5 -> 1540 us (step 377.5, 25.2x its usual variation)",
+    "CHANGE actuator.output[ch3] at t=76.122 s: 1662 -> 900 us (step -762, 34.6x its usual variation)",
+    "CHANGE actuator.output[ch3] at t=2.942 s: 1195 -> 1579 us (step 384, 17.5x its usual variation)",
+    "CHANGE actuator.output[ch4] at t=76.122 s: 1651 -> 900 us (step -751, 34.1x its usual variation)",
+    "CHANGE actuator.output[ch4] at t=2.735 s: 1153.5 -> 1532.5 us (step 379, 17.2x its usual variation)",
+    "CHANGE actuator.output[ch5] at t=76.122 s: 1500 -> 0 us (step -1500, 1000x its usual variation)",
+    "CHANGE actuator.output[ch6] at t=76.122 s: 1500 -> 0 us (step -1500, 1000x its usual variation)",
+    "CHANGE control.attitude_setpoint[pitch] at t=3.669 s: 0.089 -> 2.722 deg (step 2.633, 43.8x its usual variation)",
+    "CHANGE control.attitude_setpoint[pitch] at t=76.943 s: 0.814 -> 0 deg (step -0.814, 13.5x its usual variation)",
+    "CHANGE control.attitude_setpoint[pitch] at t=70.965 s: 0.333 -> 0.821 deg (step 0.488, 8.1x its usual variation)",
+    "CHANGE control.attitude_setpoint[roll] at t=73.197 s: -1.243 -> 1.712 deg (step 2.956, 34.9x its usual variation)",
+    "CHANGE control.attitude_setpoint[roll] at t=3.669 s: -0.064 -> 1.308 deg (step 1.373, 16.2x its usual variation)",
+    "CHANGE control.attitude_setpoint[roll] at t=76.749 s: 1.118 -> 0 deg (step -1.118, 13.2x its usual variation)",
+    "CHANGE control.yaw_rate_setpoint[yaw] at t=78.218 s: -0.07 -> -5.252 deg/s (step -5.182, 62.2x its usual variation)",
+    "CHANGE control.yaw_rate_setpoint[yaw] at t=13.222 s: -1.456 -> 1.58 deg/s (step 3.036, 36.4x its usual variation)",
+    "CHANGE control.yaw_rate_setpoint[yaw] at t=21.738 s: -0.209 -> 1.299 deg/s (step 1.508, 18.1x its usual variation)",
+    "CHANGE vehicle.altitude[baro] at t=75.086 s: 122.353 -> 119.153 m (step -3.2, 12.6x its usual variation)",
+    "CHANGE vehicle.altitude[baro] at t=5.038 s: 118.225 -> 120.585 m (step 2.36, 9.3x its usual variation)",
+    "CHANGE vehicle.altitude[estimate] at t=74.189 s: 1.971 -> 0.709 m (step -1.262, 631x its usual variation)",
+    "CHANGE vehicle.altitude[estimate] at t=70.334 s: 3.563 -> 3.111 m (step -0.452, 226x its usual variation)",
+    "CHANGE vehicle.altitude[estimate] at t=35.622 s: 3.075 -> 3.441 m (step 0.366, 183x its usual variation)",
+    "CHANGE vehicle.attitude[pitch] at t=5.529 s: 1.468 -> 0.198 deg (step -1.27, 39.4x its usual variation)",
+    "CHANGE vehicle.attitude[pitch] at t=52.962 s: 0.413 -> 0.807 deg (step 0.394, 12.2x its usual variation)",
+    "CHANGE vehicle.attitude[pitch] at t=27.251 s: 0.778 -> 0.437 deg (step -0.341, 10.6x its usual variation)",
+    "CHANGE vehicle.attitude[roll] at t=73.221 s: -0.785 -> 1.461 deg (step 2.246, 40.7x its usual variation)",
+    "CHANGE vehicle.attitude[roll] at t=36.381 s: 0.265 -> 1.073 deg (step 0.808, 14.6x its usual variation)",
+    "CHANGE vehicle.attitude[roll] at t=10.779 s: 1.048 -> 0.528 deg (step -0.52, 9.4x its usual variation)",
+    "CHANGE vehicle.ground_speed at t=37.349 s: 0.018 -> 0.233 m/s (step 0.215, 71.7x its usual variation)",
+    "CHANGE vehicle.ground_speed at t=70.742 s: 0.249 -> 0.053 m/s (step -0.196, 65.3x its usual variation)",
+    "CHANGE vehicle.ground_speed at t=4.156 s: 0.003 -> 0.09 m/s (step 0.087, 29x its usual variation)",
+    "TRACKING control.attitude_setpoint[pitch] vs vehicle.attitude[pitch]: steady lag 0.21 s removed (a constant lag is this recording's normal, not a fault); typical |error| 0.082 deg, worst 3.814 at t=76.749 s; 4 window(s) above 0.245",
+    "TRACKING vehicle.attitude[pitch] typical |error| by stretch: 1.029-8.824 s 0.288, 8.824-16.62 s 0.072, 16.62-24.415 s 0.137, 24.415-32.21 s 0.056, 32.21-40.006 s 0.056, 40.006-47.801 s 0.045, 47.801-55.596 s 0.074, 55.596-63.391 s 0.068, 63.391-71.187 s 0.107, 71.187-78.982 s 0.157 deg",
+    "TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=2.951 to 3.261 s (peak |error| 0.363 deg)",
+    "TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=3.862 to 7.007 s (peak |error| 1.533 deg)",
+    "TRACKING vehicle.attitude[pitch] diverged from its setpoint from t=20.52 to 20.903 s (peak |error| 0.274 deg)",
+    "TRACKING control.attitude_setpoint[roll] vs vehicle.attitude[roll]: steady lag 0.21 s removed (a constant lag is this recording's normal, not a fault); typical |error| 0.183 deg, worst 1.553 at t=70.343 s; 5 window(s) above 0.548",
+    "TRACKING vehicle.attitude[roll] typical |error| by stretch: 1.029-8.824 s 0.522, 8.824-16.62 s 0.153, 16.62-24.415 s 0.221, 24.415-32.21 s 0.218, 32.21-40.006 s 0.162, 40.006-47.801 s 0.102, 47.801-55.596 s 0.078, 55.596-63.391 s 0.1, 63.391-71.187 s 0.102, 71.187-78.982 s 0.44 deg",
+    "TRACKING vehicle.attitude[roll] diverged from its setpoint from t=4.27 to 5.396 s (peak |error| 0.924 deg)",
+    "TRACKING vehicle.attitude[roll] diverged from its setpoint from t=5.783 to 6.308 s (peak |error| 0.629 deg)",
+    "TRACKING vehicle.attitude[roll] diverged from its setpoint from t=8.327 to 9.049 s (peak |error| 0.776 deg)",
+    "TRACKING control.attitude_setpoint[yaw] vs vehicle.attitude[yaw]: steady lag 0.314 s removed (a constant lag is this recording's normal, not a fault); typical |error| 0.117 deg, worst 1.024 at t=11.685 s; 6 window(s) above 0.351",
+    "SHIFT vehicle.attitude[yaw] followed its setpoint worse for good from t=72.579 s: typical |error| 0.106 before, 0.393 after deg (4.2x its variation before)",
+    "TRACKING vehicle.attitude[yaw] typical |error| by stretch: 1.029-8.824 s 0.153, 8.824-16.62 s 0.366, 16.62-24.415 s 0.154, 24.415-32.21 s 0.117, 32.21-40.006 s 0.046, 40.006-47.801 s 0.085, 47.801-55.596 s 0.084, 55.596-63.391 s 0.044, 63.391-71.187 s 0.142, 71.187-78.982 s 0.333 deg",
+    "TRACKING vehicle.attitude[yaw] diverged from its setpoint from t=3.669 to 4.27 s (peak |error| 0.544 deg)",
+    "TRACKING vehicle.attitude[yaw] diverged from its setpoint from t=5.396 to 5.901 s (peak |error| 0.552 deg)",
+    "TRACKING vehicle.attitude[yaw] diverged from its setpoint from t=8.831 to 9.238 s (peak |error| 0.439 deg)",
+    "TRACKING control.yaw_rate_setpoint[yaw] vs vehicle.yaw_rate[yaw]: steady lag 0 s removed (a constant lag is this recording's normal, not a fault); typical |error| 0.618 deg/s, worst 36.74 at t=76.535 s; 6 window(s) above 1.855",
+    "TRACKING vehicle.yaw_rate[yaw] typical |error| by stretch: 0.706-8.636 s 0.883, 8.636-16.566 s 1.026, 16.566-24.495 s 0.766, 24.495-32.425 s 0.41, 32.425-40.354 s 0.464, 40.354-48.284 s 0.607, 48.284-56.214 s 0.512, 56.214-64.143 s 0.635, 64.143-72.073 s 0.559, 72.073-80.002 s 1.651 deg/s",
+    "TRACKING vehicle.yaw_rate[yaw] diverged from its setpoint from t=3.858 to 4.383 s (peak |error| 5.848 deg/s)",
+    "TRACKING vehicle.yaw_rate[yaw] diverged from its setpoint from t=5.546 to 5.755 s (peak |error| 4.145 deg/s)",
+    "TRACKING vehicle.yaw_rate[yaw] diverged from its setpoint from t=11.644 to 12.068 s (peak |error| 5.041 deg/s)",
+    "ANOMALY a1 t=5.396 s: vehicle.attitude[yaw] did not follow control.attitude_setpoint[yaw] (peak |error| 0.552) (see line 92; strength 2.272)",
+    "ANOMALY a2 t=5.546 s: vehicle.yaw_rate[yaw] did not follow control.yaw_rate_setpoint[yaw] (peak |error| 4.145) (see line 97; strength 2.661)",
+    "ANOMALY a3 t=6.682 s: vehicle.attitude[roll] changed level for good (0.43 -> 0.668 deg) (see line 43; strength 2.171)",
+    "ANOMALY a4 t=7.405 s: vehicle.altitude[estimate] changed level for good (0.11 -> 3.166 m) (see line 41; strength 5.38)",
+    "ANOMALY a5 t=8.327 s: vehicle.attitude[roll] did not follow control.attitude_setpoint[roll] (peak |error| 0.776) (see line 87; strength 2.158)",
+    "ANOMALY a6 t=11.644 s: vehicle.yaw_rate[yaw] did not follow control.yaw_rate_setpoint[yaw] (peak |error| 5.041) (see line 98; strength 2.885)",
+    "ANOMALY a7 t=27.198 s: vehicle.ground_speed changed level for good (0.021 -> 0.238 m/s) (see line 44; strength 2.895)",
+    "ANOMALY a8 t=73.584 s: actuator.output[ch1] changed level for good (1624 -> 1095 us) (see line 36; strength 3.72)",
+    "ANOMALY a9 t=73.584 s: actuator.output[ch2] changed level for good (1602 -> 1242 us) (see line 37; strength 3.361)",
+    "ANOMALY a10 t=73.584 s: actuator.output[ch4] changed level for good (1629 -> 1464 us) (see line 39; strength 2.374)",
+    "ANOMALY a11 t=73.584 s: actuator.output[ch3] changed level for good (1648 -> 1498 us) (see line 38; strength 2.291)",
+    "ANOMALY a12 t=76.122 s: 6 channels of actuator.output stepped down together (see line 45; strength 3)"
+   ]
+  },
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [
+   {
+    "id": "cc_1",
+    "tool": "overview",
+    "input": {},
+    "label": "Read the evidence sheet",
+    "summary": "19 series, 8 events, 12 anomaly candidates",
+    "ms": 0
+   },
+   {
+    "id": "cc_2",
+    "tool": "case_context",
+    "input": {},
+    "label": "case_context",
+    "summary": "",
+    "ms": 5
+   },
+   {
+    "id": "cc_3",
+    "tool": "physical_checks",
+    "input": {},
+    "label": "Ran the physical checks",
+    "summary": "charge_accounting: INDETERMINATE; ocv_consistency: INDETERMINATE; pack_cell_consistency: NOT_APPLICABLE; protection_sequence: NOT_APPLICABLE; relaxation: NOT_APPLICABLE; restart_eligibility: NOT_APPLICABLE; weak_cell_attribution: NOT_APPLICABLE",
+    "ms": 0
+   },
+   {
+    "id": "cc_4",
+    "tool": "physical_hypotheses",
+    "input": {},
+    "label": "Read the hypothesis assessment",
+    "summary": "vehicle family does not apply: machine class 'px4_vehicle' is not a battery-electric vehicle; HV, BMS, contactor and restart-policy hypotheses and checks do not apply",
+    "ms": 0
+   },
+   {
+    "id": "cc_5",
+    "tool": "physical_earlier_knowledge",
+    "input": {},
+    "label": "Read verified results from earlier cases",
+    "summary": "",
+    "ms": 0
+   },
+   {
+    "id": "cc_6",
+    "tool": "events",
+    "input": {},
+    "label": "Listed the events",
+    "summary": "8 event(s)",
+    "ms": 0
+   },
+   {
+    "id": "cc_7",
+    "tool": "read_lines",
+    "input": {
+     "start": 21,
+     "end": 110
+    },
+    "label": "Read sheet lines 21\u2013110",
+    "summary": "90 lines",
+    "ms": 0
+   },
+   {
+    "id": "cc_8",
+    "tool": "sequence",
+    "input": {
+     "start_s": 70,
+     "end_s": 78,
+     "baseline_s": 30
+    },
+    "label": "Ordered what moved first, 70\u201378 s",
+    "summary": "first to move: control.attitude_setpoint[roll] at 70.15 s, actuator.output[ch1] at 70.234 s, actuator.output[ch2] at 70.234 s",
+    "ms": 3
+   },
+   {
+    "id": "cc_9",
+    "tool": "compare",
+    "input": {
+     "t_s": 73.584,
+     "window_s": 5
+    },
+    "label": "Compared before and after 73.584 s",
+    "summary": "vehicle.altitude[estimate], vehicle.altitude[baro] changed",
+    "ms": 58
+   },
+   {
+    "id": "cc_10",
+    "tool": "lessons",
+    "input": {},
+    "label": "lessons",
+    "summary": "",
+    "ms": 67
+   }
+  ],
+  "result": {
+   "headline": "Motor outputs dropped to minimum at t=76.1 s, before the logged kill-switch event, during an AUTO_LAND descent.",
+   "status": "cause_unknown",
+   "explanation": "Offboard control ended (AUTO_LAND at 69.8 s). All motor outputs stepped to 900/0 us at 76.122 s, 0.79 s before 'Manual kill-switch engaged'. The recording does not show who or what commanded the kill.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 45,
+     "quote": "CHANGE actuator.output[ch1] at t=76.122 s: 1608.5 -> 900 us (step -708.5, 50.6x its usual variation)",
+     "shows": "Motor output fell to minimum with no ramp. ch2-ch4 did the same, and ch5/ch6 went 1500 -> 0 (lines 47, 49, 51, 53, 54).",
+     "calls": [
+      "cc_7"
+     ]
+    },
+    {
+     "line": 26,
+     "quote": "EVENT t=76.915 s controller.event[log] ERROR: [commander] Manual kill-switch engaged",
+     "shows": "The logged kill event comes after the output drop (76.122 s). Both occur after the AUTO_LAND switch.",
+     "calls": [
+      "cc_6",
+      "cc_8"
+     ]
+    },
+    {
+     "line": 24,
+     "quote": "EVENT t=69.847 s controller.event[vehicle_status] nav_state OFFBOARD -> AUTO_LAND",
+     "shows": "A mode change is the earliest event. The first signals to leave baseline follow at 70.15 s (roll setpoint) and 70.234 s (ch1-3).",
+     "calls": [
+      "cc_6",
+      "cc_8"
+     ]
+    },
+    {
+     "line": 25,
+     "quote": "EVENT t=70.362 s controller.event[log] ERROR: [mavlink] [timesync] Time jump detected. Resetting time synchroniser.",
+     "shows": "Time-sync reset 0.5 s after the mode change. This points to the offboard/companion link or clock, but the data does not link it to the kill.",
+     "calls": [
+      "cc_6"
+     ]
+    },
+    {
+     "line": 89,
+     "quote": "SHIFT vehicle.attitude[yaw] followed its setpoint worse for good from t=72.579 s: typical |error| 0.106 before, 0.393 after deg (4.2x its variation before)",
+     "shows": "Attitude tracking degraded from about 72.6 s, before the kill, with no actuator freeze. Yaw-rate error ratio is 2.27 and roll 1.73 across 73.584 s. This is consistent with a rough landing descent.",
+     "calls": [
+      "cc_7",
+      "cc_9"
+     ]
+    }
+   ],
+   "checked": [
+    {
+     "check": "Sequence of first departures from baseline, 70-78 s",
+     "result": "Roll setpoint (70.15 s), ch1-3 (70.234 s) and roll attitude (70.281 s) moved first. ch5/ch6 went to 0 at 76.934 s and ch4 at 76.627 s. The logged kill event is at 76.915 s.",
+     "verdict": "inconclusive",
+     "about": "Cause versus effect around the kill",
+     "calls": [
+      "cc_8"
+     ]
+    },
+    {
+     "check": "Compare before and after 73.584 s",
+     "result": "Nothing is frozen. Altitude estimate fell 3.144 -> 0.162 m, the expected descent. Actuator spread rose. Tracking error roughly doubled for yaw rate and rose 1.7x for roll.",
+     "verdict": "weakens",
+     "about": "Sensor or estimator freeze as the cause",
+     "calls": [
+      "cc_9"
+     ]
+    },
+    {
+     "check": "Earlier cases and physical checks",
+     "result": "No lessons. The battery and HV family does not apply (px4_vehicle). Charge accounting is indeterminate and the other physical checks are not applicable.",
+     "verdict": "inconclusive",
+     "about": "Battery and power-path causes",
+     "calls": [
+      "cc_3",
+      "cc_4",
+      "cc_5",
+      "cc_10"
+     ]
+    },
+    {
+     "check": "Start-up events and takeoff shifts at 2-8 s",
+     "result": "Altitude, attitude and tracking shifts sit at the takeoff transient. Nothing later points back to them.",
+     "verdict": "weakens",
+     "about": "Early anomalies as the cause",
+     "calls": [
+      "cc_1",
+      "cc_7"
+     ]
+    }
+   ],
+   "effects": [
+    {
+     "line": 27,
+     "quote": "EVENT t=77.586 s controller.event[log] INFO: [commander] Landing detected",
+     "why": "Follows the output cut."
+    },
+    {
+     "line": 28,
+     "quote": "EVENT t=79.087 s controller.event[vehicle_status] arming_state ARMED -> DISARMED",
+     "why": "Final state after the kill and landing."
+    },
+    {
+     "line": 94,
+     "quote": "TRACKING control.yaw_rate_setpoint[yaw] vs vehicle.yaw_rate[yaw]: steady lag 0 s removed (a constant lag is this recording's normal, not a fault); typical |error| 0.618 deg/s, worst 36.74 at t=76.535 s; 6 window(s) above 1.855",
+     "why": "The worst yaw-rate error is at 76.5 s, around the output cut."
+    }
+   ],
+   "next_action": {
+    "action": "Pull vehicle_command, failsafe, manual_control and RC-input topics from the full ulog around 69-77 s.",
+    "why": "Shows what commanded the output cut at 76.122 s: operator kill, a failsafe, or an offboard/companion command.",
+    "how": [
+     "Extract vehicle_command, failsafe_flags and manual_control_setpoint from 2023-08_sess006_log001.ulg for 69-78 s",
+     "Check whether the kill/termination flag or an actuator-armed change precedes 76.122 s",
+     "Check the time-jump at 70.362 s against the companion/offboard heartbeat"
+    ],
+    "where": "remote",
+    "conditions": "Offline analysis of the same recording; no vehicle operation.",
+    "baseline": "Output behaviour before 70 s in this recording, and any normal AUTO_LAND in another log from the same airframe.",
+    "record": [
+     "vehicle_command",
+     "failsafe_flags",
+     "manual_control_setpoint",
+     "actuator_armed",
+     "actuator.output[ch1]"
+    ],
+    "needs_approval": false,
+    "template_id": "none",
+    "steps": [
+     {
+      "kind": "read_data",
+      "text": "Extract command, failsafe and RC topics around 69-78 s from the full ulog"
+     },
+     {
+      "kind": "ask_person",
+      "text": "Ask the pilot whether the kill switch was pressed deliberately and at what time"
+     }
+    ],
+    "outcomes": [
+     {
+      "label": "Operator kill command precedes 76.122 s",
+      "means": "The cut was commanded. The remaining question is why the pilot killed during AUTO_LAND.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h2",
+       "h3"
+      ],
+      "then": "Review the operator and RC procedure with the pilot."
+     },
+     {
+      "label": "No kill command; a failsafe or offboard command",
+      "means": "The cut came from the control or link side, not the operator.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h1"
+      ],
+      "then": "Trace the time-jump and offboard link."
+     },
+     {
+      "label": "No command at all before the output drop",
+      "means": "The cut came without a recorded command, which points at the output or ESC path.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": [],
+      "weakens": [
+       "h1",
+       "h2"
+      ],
+      "then": "Request ESC and actuator-driver logs and a bench check."
+     }
+    ],
+    "provenance": {
+     "kind": "expert_proposal",
+     "source": "the AI investigator",
+     "status": "passed the action gate; not a validated procedure"
+    }
+   },
+   "safety_findings": [
+    {
+     "ref": "charge_accounting:soc_change_not_from_charge",
+     "statement": "Recorded SOC went 86.19 % -> 60.61 % over 79.09 s while measured charge was only 0.0021 Ah (0.013 pp). The SOC estimate is not trustworthy here and is not used as evidence."
+    }
+   ],
+   "unknowns": [
+    "Who or what commanded the output drop at 76.122 s: the recording does not show it.",
+    "Why the logged kill event is 0.79 s after the output drop (log timestamp offset or a different trigger).",
+    "Why the vehicle was switched from OFFBOARD to AUTO_LAND at 69.847 s."
+   ],
+   "already_answered": [
+    {
+     "question": "When did the outputs drop, and did a mode change come first?",
+     "answer": "Yes. OFFBOARD -> AUTO_LAND at 69.847 s. The outputs fell to minimum at 76.122 s, then the kill event, landing and disarm followed.",
+     "line": 24,
+     "quote": "EVENT t=69.847 s controller.event[vehicle_status] nav_state OFFBOARD -> AUTO_LAND",
+     "calls": [
+      "cc_6",
+      "cc_7"
+     ]
+    },
+    {
+     "question": "Did any output freeze before the incident?",
+     "answer": "No frozen outputs after 73.584 s. ch5/ch6 held 1500 until 76.833 s, and ch7/ch8 were 0 throughout.",
+     "line": 29,
+     "quote": "CONSTANT actuator.output[ch5] held 1500 from t=0.706 to 76.833 s (709 samples)",
+     "calls": [
+      "cc_7",
+      "cc_9"
+     ]
+    }
+   ],
+   "field_questions": [
+    {
+     "question": "Did the pilot deliberately press the kill switch, and at what moment relative to touchdown?",
+     "ask": "field_engineer",
+     "why_needed": "Separates an operator-commanded kill from a spurious or automatic cut.",
+     "not_in_data": "Searched events and the sheet for RC or command signals. Only the commander message appears, with no source, so the data cannot say who pressed it.",
+     "searched_calls": [
+      "cc_6",
+      "cc_7",
+      "cc_8"
+     ],
+     "if_answers": [
+      {
+       "answer": "Yes, deliberate at touchdown",
+       "means": "An operator-commanded cut. The timing offset is likely a log-time artefact.",
+       "keeps": [
+        "h1"
+       ],
+       "weakens": [
+        "h2",
+        "h3"
+       ]
+      },
+      {
+       "answer": "No, not pressed",
+       "means": "A spurious kill input, a failsafe or a link-side command is more likely.",
+       "keeps": [
+        "h2",
+        "h3"
+       ],
+       "weakens": [
+        "h1"
+       ]
+      }
+     ]
+    }
+   ],
+   "data_requests": [
+    {
+     "what": "Full ulog topics for command source, failsafe flags and RC input",
+     "window": "69-78 s of this log",
+     "conditions": "Same flight.",
+     "signals": [
+      "vehicle_command",
+      "failsafe_flags",
+      "manual_control_setpoint",
+      "actuator_armed"
+     ],
+     "why_needed": "Identifies who commanded the output drop at 76.122 s.",
+     "searched_calls": [
+      "cc_1",
+      "cc_7"
+     ]
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "Whether the kill switch or RC link was physically actuated or glitched",
+     "why_it_matters": "Separates an operator kill from a spurious input.",
+     "how_to_observe": "Interview the pilot, check the RC transmitter switch state and the link log."
+    },
+    {
+     "fact": "ESC and motor output-stage health",
+     "why_it_matters": "An output-stage fault would look like a cut without a command.",
+     "how_to_observe": "Bench-test the ESCs and read the ESC telemetry if available."
+    }
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Operator / manual kill",
+     "claim": "A deliberate or accidental manual kill-switch input cut the motor outputs during AUTO_LAND.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "The kill event at 76.915 s is logged and outputs cut at 76.122 s. The 0.79 s offset and the missing command source leave this unproven.",
+     "basis": "indirect",
+     "physical_ref": "none",
+     "observed_at": "commander log and actuator output readings",
+     "lines": [
+      26,
+      45,
+      53
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Offboard link / companion",
+     "claim": "The offboard or companion link lost sync, causing the AUTO_LAND switch, and a failsafe or command cut the outputs.",
+     "status": "open",
+     "role": "trigger",
+     "because": "The time-jump error at 70.362 s follows the mode change at 69.847 s. Whether the time-jump caused the mode change or is an effect of it cannot be told from this data.",
+     "basis": "indirect",
+     "physical_ref": "none",
+     "observed_at": "mavlink log and nav_state event",
+     "lines": [
+      24,
+      25
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Actuator / ESC output path",
+     "claim": "An output-stage or ESC fault dropped the outputs without a command.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "Outputs went from normal to 900/0 us at once, but this is also the pattern of a commanded kill. No signal observes the ESCs.",
+     "basis": "indirect",
+     "physical_ref": "none",
+     "observed_at": "controller actuator output commands",
+     "lines": [
+      45,
+      53,
+      54
+     ]
+    },
+    {
+     "id": "h4",
+     "area": "Estimator / sensor",
+     "claim": "An estimator or sensor fault triggered the landing and the cut.",
+     "status": "weakened",
+     "role": "trigger",
+     "because": "No signal froze. The altitude estimate fell 3.144 -> 0.162 m as expected for a descent. Tracking degraded only moderately.",
+     "basis": "indirect",
+     "physical_ref": "none",
+     "observed_at": "estimator outputs and tracking",
+     "lines": [
+      41,
+      66,
+      89
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      21,
+      22,
+      23
+     ],
+     "what": "Logger start and takeoff",
+     "class": "routine",
+     "why": "Normal start-up."
+    },
+    {
+     "lines": [
+      40,
+      41,
+      42,
+      43,
+      55,
+      59,
+      69
+     ],
+     "what": "Takeoff-time level shifts and attitude/yaw-rate tracking error at 2-12 s",
+     "class": "routine",
+     "why": "Takeoff transient. Nothing later points back to it."
+    },
+    {
+     "lines": [
+      24
+     ],
+     "what": "OFFBOARD -> AUTO_LAND",
+     "class": "anomaly",
+     "why": "Earliest mode change. The reason is not recorded."
+    },
+    {
+     "lines": [
+      25
+     ],
+     "what": "Time jump detected, timesync reset",
+     "class": "anomaly",
+     "why": "Possible link or clock issue 0.5 s after the mode change."
+    },
+    {
+     "lines": [
+      45,
+      47,
+      49,
+      51,
+      53,
+      54
+     ],
+     "what": "All motor outputs stepped to 900/0 us at 76.122 s",
+     "class": "root_cause_candidate",
+     "why": "Abrupt cut without a recorded commander."
+    },
+    {
+     "lines": [
+      26
+     ],
+     "what": "Manual kill-switch engaged",
+     "class": "root_cause_candidate",
+     "why": "Logged 0.79 s after the output cut; source unknown."
+    },
+    {
+     "lines": [
+      89,
+      94
+     ],
+     "what": "Yaw and yaw-rate tracking degraded from 72.6 s",
+     "class": "effect",
+     "why": "Likely descent or landing dynamics and the cut."
+    },
+    {
+     "lines": [
+      27,
+      28
+     ],
+     "what": "Landing detected, then disarm",
+     "class": "effect",
+     "why": "Consequence of the cut."
+    }
+   ],
+   "lesson": "No earlier cases apply; none are stored for this signature.",
+   "reuse_when": "Another PX4 vehicle, in the same firmware and offboard configuration, shows outputs dropping to minimum during AUTO_LAND shortly after a timesync reset and before the kill-switch event."
+  },
+  "dropped": [],
+  "usage": {
+   "input_tokens": 105072,
+   "output_tokens": 11123,
+   "uncached_input_tokens": 8,
+   "cache_read_input_tokens": 105064,
+   "cache_creation_input_tokens": 40372,
+   "model_calls": 4,
+   "model_ms": 68977,
+   "cost_usd": 0.28324,
+   "model_ids": [
+    "claude-sonnet-5-5"
+   ]
+  },
+  "model_calls": [
+   {
+    "call": 1,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 26266,
+    "cache_creation_input_tokens": 694,
+    "output_tokens": 135,
+    "cost_usd": 0.006756600000000001,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 2676,
+    "api_ms": 1381,
+    "requested": [
+     "overview",
+     "case_context",
+     "physical_checks",
+     "physical_hypotheses",
+     "physical_earlier_knowledge"
+    ]
+   },
+   {
+    "call": 2,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 26266,
+    "cache_creation_input_tokens": 4244,
+    "output_tokens": 179,
+    "cost_usd": 0.0213966,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 3014,
+    "api_ms": 1780,
+    "requested": [
+     "events",
+     "read_lines",
+     "sequence",
+     "compare",
+     "lessons"
+    ]
+   },
+   {
+    "call": 3,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 26266,
+    "cache_creation_input_tokens": 15141,
+    "output_tokens": 5398,
+    "cost_usd": 0.11717459999999999,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 36653,
+    "api_ms": 35747,
+    "requested": [
+     "submit_report"
+    ]
+   },
+   {
+    "call": 4,
+    "model_id": "claude-sonnet-5-5",
+    "input_tokens": 2,
+    "cache_read_input_tokens": 26266,
+    "cache_creation_input_tokens": 20293,
+    "output_tokens": 5411,
+    "cost_usd": 0.1379126,
+    "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+    "ms": 26634,
+    "api_ms": 25724,
+    "requested": [
+     "submit_report"
+    ]
+   }
+  ],
+  "seconds": 69.4,
+  "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it.",
+  "safety_gate": {
+   "version": "action-gate-v6.1",
+   "action_verdict": "pass",
+   "rules_fired": [],
+   "action_class": [
+    "ask_person",
+    "read_data"
+   ],
+   "blocked_actions": [],
+   "inserted_findings": [],
+   "covered_by_model": [
+    "charge_accounting:soc_change_not_from_charge"
+   ],
+   "final_action_verdict": "pass",
+   "outcome": "auto",
+   "requires_confirmation": false,
+   "steps": [
+    {
+     "declared": "read_data",
+     "kind": "read_data",
+     "text": "Extract command, failsafe and RC topics around 69-78 s from the full ulog",
+     "escalated": false
+    },
+    {
+     "declared": "ask_person",
+     "kind": "ask_person",
+     "text": "Ask the pilot whether the kill switch was pressed deliberately and at what time",
+     "escalated": false
+    }
+   ],
+   "passed_unchanged": true
+  },
+  "reasoning": {
+   "signal": {
+    "evidence": "evidence sheet",
+    "verifier_dropped": 0,
+    "submit_attempts": 2
+   },
+   "physics": {
+    "profile": "px4-battery-status",
+    "family_applies": false,
+    "claims": {
+     "accepted": 6,
+     "downgraded": 0,
+     "flagged": 0,
+     "rejected": 0
+    }
+   },
+   "safety": {
+    "action": "pass",
+    "outcome": "auto",
+    "requires_confirmation": false,
+    "rules": [],
+    "inserted_findings": [],
+    "covered_by_model": [
+     "charge_accounting:soc_change_not_from_charge"
+    ]
+   },
+   "memory": {
+    "lessons_consulted": true,
+    "earlier_knowledge_consulted": true,
+    "earlier_knowledge_items": 0
+   }
+  },
+  "physical": {
+   "version": "physical-layer-v1",
+   "recording_id": "rec-0000000000000007",
+   "profile": "px4-battery-status",
+   "machine_class": "px4_vehicle",
+   "family_applies": false,
+   "checks": {
+    "charge_accounting": {
+     "outcome": "INDETERMINATE",
+     "summary": "Indeterminate: the profile does not say how SOC is estimated, and this recording does not show it following measured charge (no tracking span of 600 s or more): a change the charge does not explain may be how this estimator works",
+     "version": "charge-accounting-v1"
+    },
+    "ocv_consistency": {
+     "outcome": "INDETERMINATE",
+     "summary": "Indeterminate: no OCV curve, so the rested voltage cannot be turned into SOC.",
+     "version": "ocv-consistency-v1",
+     "resolve_by": [
+      "the chemistry's OCV-SOC curve at temperature (with hysteresis), from the cell supplier (DOC-OCV-CURVE)"
+     ],
+     "provenance": "expert proposal, not yet field-validated"
+    },
+    "pack_cell_consistency": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: pack voltage or lowest/highest cell voltage is not recorded.",
+     "version": "pack-cell-consistency-v1",
+     "provenance": "expert proposal, not yet field-validated"
+    },
+    "protection_sequence": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: no fault-level signal.",
+     "version": "protection-sequence-v1"
+    },
+    "relaxation": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: pack current or lowest cell voltage is not recorded.",
+     "version": "relaxation-v1",
+     "provenance": "expert proposal, not yet field-validated"
+    },
+    "restart_eligibility": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: no contactor feedback / fault level.",
+     "version": "restart-eligibility-v1"
+    },
+    "weak_cell_attribution": {
+     "outcome": "NOT_APPLICABLE",
+     "summary": "Not applicable: pack voltage, lowest cell voltage or pack current is not recorded.",
+     "version": "weak-cell-attribution-v1",
+     "provenance": "expert proposal, not yet field-validated"
+    }
+   },
+   "summary": "The battery-electric-vehicle incident family does not apply to this machine: machine class 'px4_vehicle' is not a battery-electric vehicle; HV, BMS, contactor and restart-policy hypotheses and checks do not apply. The physical check results stand on their own; no HV, BMS or contactor hypothesis or check is proposed.",
+   "constrained_claims": [
+    {
+     "text": "Motor outputs dropped to minimum at t=76.1 s, before the logged kill-switch event, during an AUTO_LAND descent.",
+     "source": "headline",
+     "hypotheses": [],
+     "verdict": "accepted",
+     "reasons": [],
+     "constrained_status": null,
+     "kind": "text"
+    },
+    {
+     "text": "Offboard control ended (AUTO_LAND at 69.8 s). All motor outputs stepped to 900/0 us at 76.122 s, 0.79 s before 'Manual kill-switch engaged'. The recording does not show who or what commanded the kill.",
+     "source": "explanation",
+     "hypotheses": [
+      "B"
+     ],
+     "verdict": "accepted",
+     "reasons": [],
+     "constrained_status": null,
+     "kind": "text"
+    },
+    {
+     "source": "hypothesis h1",
+     "text": "Operator / manual kill: A deliberate or accidental manual kill-switch input cut the motor outputs during AUTO_LAND.",
+     "kind": "structured",
+     "physical_ref": "none",
+     "verdict": "accepted",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ]
+    },
+    {
+     "source": "hypothesis h2",
+     "text": "Offboard link / companion: The offboard or companion link lost sync, causing the AUTO_LAND switch, and a failsafe or command cut the outputs.",
+     "kind": "structured",
+     "physical_ref": "none",
+     "verdict": "accepted",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ]
+    },
+    {
+     "source": "hypothesis h3",
+     "text": "Actuator / ESC output path: An output-stage or ESC fault dropped the outputs without a command.",
+     "kind": "structured",
+     "physical_ref": "none",
+     "verdict": "accepted",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ]
+    },
+    {
+     "source": "hypothesis h4",
+     "text": "Estimator / sensor: An estimator or sensor fault triggered the landing and the cut.",
+     "kind": "structured",
+     "physical_ref": "none",
+     "verdict": "accepted",
+     "reasons": [
+      "not one of the physical hypotheses; held to the evidence sheet only"
+     ]
+    }
+   ],
+   "rule": "The report was held to the physical assessment; a rejected statement was returned to the model to fix."
+  },
+  "entry_id": "led-agent-report-b8741e3fe030",
+  "recorded_at": "2026-11-16T21:43:10.730111+00:00"
+ }
+}

@@ -1,0 +1,185 @@
+{
+ "arm": "alone",
+ "alias": "flight-18",
+ "folder": "carbonZ_2018-09-11-14-22-07_2_engine_failure",
+ "input_sha256": "85bac77c1388f0787a3d3f2c262cbaa2e700a8190b0f01248cdf52d29be2495a",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 19.0
+  }
+ ],
+ "prompt_chars": 8668,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle drops to zero at t=50 s with motor channel ch[2] at minimum; aircraft descends, ch[1] drifts.",
+   "status": "cause_probable",
+   "explanation": "Propulsion cut or lost on the ch[2] motor from t\u224850 s, possibly linked to the low-voltage warning at t=1.2 s. The cause is not separable from this data; battery, ESC or commanded cut are all possible.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 52,
+     "quote": "50,...,1.24e+03,...,0,0,54.2",
+     "shows": "Throttle falls from 37% to 0% and ch[2] drops to 1240 us at t=50 s.",
+     "calls": []
+    },
+    {
+     "line": 53,
+     "quote": "51,...,1.1e+03,...,0,0,53.3",
+     "shows": "ch[2] is pinned at 1100 us (minimum) from t=51 to 62 s with throttle at 0%.",
+     "calls": []
+    },
+    {
+     "line": 64,
+     "quote": "62,...,1.16e+03,1.1e+03,...,30.6",
+     "shows": "Altitude falls from 54 m to 31 m while ch[1] keeps drifting down to 1160 us and the pitch setpoint of 17.5 deg is not tracked.",
+     "calls": []
+    },
+    {
+     "line": 67,
+     "quote": "Low voltage / Sensor helth",
+     "shows": "Battery low-voltage warning and sensor-health error logged at t=1.2 s, early in the flight.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared ch[2] output to throttle across the flight",
+     "result": "ch[2] tracks throttle (about 1100 us at 0%, 1700 us at 75%), so it is the motor channel.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Looked at the other channels around t=50 s",
+     "result": "ch[0], ch[6], ch[7] are constant. ch[1] drifts down after t=55 s, which looks like a response to the loss of thrust.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 64,
+     "quote": "30.6",
+     "why": "Altitude loss from 54 m to 31 m follows the throttle cut."
+    },
+    {
+     "line": 62,
+     "quote": "ch[1] 1.22e+03",
+     "why": "ch[1] saturating downward is a control response to the unflown attitude setpoints."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect battery and ESC logs and the motor on ch[2]",
+    "why": "Separates a power or ESC fault from a commanded throttle cut at t=50 s.",
+    "how": [
+     "Check battery voltage and current around t=50 s",
+     "Review the flight mode and failsafe log at t=50 s"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Voltage sag or failsafe at t=50",
+      "means": "Battery or power failure drove the cut.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     },
+     {
+      "label": "Normal voltage, no failsafe",
+      "means": "Commanded or ESC or motor fault on ch[2].",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": []
+     }
+    ]
+   },
+   "unknowns": [
+    "Battery voltage trace is absent",
+    "Airspeed and yaw rate read zero all flight, so those sensors are unusable"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Motor ch[2] / power",
+     "claim": "Propulsion loss on ch[2] from t\u224850 s, possibly from low battery.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Throttle goes to 0 at t=50 s and the aircraft descends for the next 12 s.",
+     "basis": "indirect",
+     "lines": [
+      52,
+      53
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Commanded throttle cut",
+     "claim": "Controller or operator commanded zero throttle (failsafe or mode change).",
+     "status": "open",
+     "role": "main_cause",
+     "because": "The data cannot distinguish a command from a failure."
+    },
+    {
+     "id": "h3",
+     "area": "Sensors",
+     "claim": "Airspeed and yaw-rate sensors dead, matching the sensor-health error.",
+     "status": "open",
+     "role": "trigger",
+     "because": "Both signals are exactly 0 all flight."
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      67,
+      68
+     ],
+     "what": "Low voltage warning and sensor-health error at t=1.2 s",
+     "class": "anomaly",
+     "why": "Possible early sign of a power or sensor problem."
+    },
+    {
+     "lines": [
+      52
+     ],
+     "what": "Throttle drops to 0 at t=50 s",
+     "class": "root_cause_candidate",
+     "why": "Start of sustained loss of thrust and descent."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 8064,
+   "output_tokens": 2452
+  },
+  "seconds": 19.0
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 49.89,
+    "value": 1
+   }
+  },
+  "onset_s": 49.89
+ }
+}

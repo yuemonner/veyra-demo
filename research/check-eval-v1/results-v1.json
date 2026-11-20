@@ -1,0 +1,132 @@
+{
+ "synthetic": true,
+ "caveat": "tests the checks' logic on injected faults in a SYNTHETIC pack model; not evidence about real degradation",
+ "splits": {
+  "fit": [
+   1,
+   20
+  ],
+  "threshold": [
+   101,
+   120
+  ],
+  "test": [
+   201,
+   240
+  ]
+ },
+ "fit_tolerances": {
+  "weak_effect_v": 0.0548,
+  "r_ratio": 1.35,
+  "ocv_err_pp": 0.6625
+ },
+ "parameters_used": {
+  "resistance_ratio_flag": 1.5,
+  "tolerance_pp": 5.0,
+  "cell_voltage_accuracy_v": 0.018266666666666667
+ },
+ "threshold_set_false_alarms": [
+  [
+   107,
+   "relaxation"
+  ],
+  [
+   117,
+   "relaxation"
+  ]
+ ],
+ "test_healthy": {
+  "pack_hours": 41.3,
+  "false_alarms": 6,
+  "per_pack_hour": 0.145,
+  "examples": [
+   {
+    "seed": 205,
+    "check": "relaxation",
+    "summary": "1 interruption(s); the lowest cell departs from the average: similar resistance (x0.93) but the lowest cell relaxes 0.020 V lower: lower SOC in that cell (imbal"
+   },
+   {
+    "seed": 211,
+    "check": "relaxation",
+    "summary": "1 interruption(s); the lowest cell departs from the average: similar resistance (x1.00) but the lowest cell relaxes 0.014 V lower: lower SOC in that cell (imbal"
+   },
+   {
+    "seed": 215,
+    "check": "relaxation",
+    "summary": "1 interruption(s); the lowest cell departs from the average: similar resistance (x1.04) but the lowest cell relaxes 0.013 V lower: lower SOC in that cell (imbal"
+   },
+   {
+    "seed": 221,
+    "check": "relaxation",
+    "summary": "1 interruption(s); the lowest cell departs from the average: similar resistance (x1.02) but the lowest cell relaxes 0.017 V lower: lower SOC in that cell (imbal"
+   },
+   {
+    "seed": 231,
+    "check": "relaxation",
+    "summary": "1 interruption(s); the lowest cell departs from the average: similar resistance (x1.07) but the lowest cell relaxes 0.014 V lower: lower SOC in that cell (imbal"
+   }
+  ]
+ },
+ "test_faults": {
+  "resistance x3.5 (one cell)": {
+   "check": "weak_cell_attribution",
+   "detected": "40/40",
+   "missed": "0/40",
+   "correct_attribution": "40/40",
+   "other_attribution_examples": [],
+   "tie_records_abstained": "40/40",
+   "tie_records_claimed": []
+  },
+  "capacity fade 70% (one cell)": {
+   "check": "weak_cell_attribution",
+   "detected": "40/40",
+   "missed": "0/40",
+   "correct_attribution": "40/40",
+   "other_attribution_examples": [],
+   "tie_records_abstained": "0/40",
+   "tie_records_claimed": [
+    201,
+    202,
+    203,
+    204,
+    205
+   ]
+  },
+  "imbalance -10 pp (one cell)": {
+   "check": "relaxation",
+   "detected": "40/40",
+   "missed": "0/40"
+  },
+  "cell sensing step -50 mV": {
+   "check": "weak_cell_attribution",
+   "detected": "32/40",
+   "missed": "8/40",
+   "correct_attribution": "24/40",
+   "other_attribution_examples": [
+    {
+     "seed": 208,
+     "supported": [
+      "capacity_or_imbalance"
+     ]
+    },
+    {
+     "seed": 215,
+     "supported": [
+      "capacity_or_imbalance"
+     ]
+    },
+    {
+     "seed": 219,
+     "supported": [
+      "capacity_or_imbalance"
+     ]
+    }
+   ]
+  },
+  "current offset -3 A": {
+   "check": "ocv_consistency",
+   "detected": "39/40",
+   "missed": "1/40"
+  }
+ }
+}

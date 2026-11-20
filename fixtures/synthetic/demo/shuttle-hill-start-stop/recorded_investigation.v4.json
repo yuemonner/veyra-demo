@@ -1,0 +1,604 @@
+{
+ "version": "v4",
+ "note": "Recorded 2026-11-05 14:50 with the live investigator (claude-code:sonnet) on a local instance. SYNTHETIC case: the data is generated for this demo.",
+ "investigator": "veyra-investigator-v1",
+ "integrity_rules": "evidence-integrity-v2",
+ "entries": [
+  {
+   "kind": "agent_report",
+   "recorded_at": "2026-11-05T14:50:47.122151+00:00",
+   "actor": "Veyra investigator",
+   "payload": {
+    "kind": "autonomous_investigation",
+    "version": "veyra-investigator-v1",
+    "run_id": "run-d9ae4e8abea4",
+    "mode": "agent",
+    "model": "claude-code:sonnet",
+    "fallback_reason": null,
+    "steps": [
+     {
+      "id": "cc_1",
+      "tool": "overview",
+      "input": {},
+      "label": "Read the whole log",
+      "summary": "3289 lines; first failure at line 1101",
+      "ms": 0
+     },
+     {
+      "id": "cc_2",
+      "tool": "case_context",
+      "input": {},
+      "label": "Read the report and earlier results",
+      "summary": "",
+      "ms": 0
+     },
+     {
+      "id": "cc_3",
+      "tool": "lessons",
+      "input": {},
+      "label": "Compared with earlier cases",
+      "summary": "0 earlier case(s) compared",
+      "ms": 76
+     },
+     {
+      "id": "cc_4",
+      "tool": "read_lines",
+      "input": {
+       "start": 1,
+       "end": 30
+      },
+      "label": "Read lines 1\u201330",
+      "summary": "30 lines",
+      "ms": 0
+     },
+     {
+      "id": "cc_5",
+      "tool": "read_lines",
+      "input": {
+       "start": 1380,
+       "end": 1440
+      },
+      "label": "Read lines 1380\u20131440",
+      "summary": "61 lines",
+      "ms": 0
+     },
+     {
+      "id": "cc_6",
+      "tool": "search",
+      "input": {
+       "pattern": "snapshot",
+       "context": 1
+      },
+      "label": "Searched for \u201csnapshot\u201d",
+      "summary": "4 matching lines",
+      "ms": 3
+     },
+     {
+      "id": "cc_7",
+      "tool": "search",
+      "input": {
+       "pattern": "BMS_Event|MCU_FR_Event|cell|SOC|temp",
+       "context": 0
+      },
+      "label": "Searched for \u201cBMS_Event|MCU_FR_Event|cell|SOC|temp\u201d",
+      "summary": "656 matching lines",
+      "ms": 13
+     },
+     {
+      "id": "cc_8",
+      "tool": "read_lines",
+      "input": {
+       "start": 2440,
+       "end": 2540
+      },
+      "label": "Read lines 2440\u20132540",
+      "summary": "101 lines",
+      "ms": 0
+     },
+     {
+      "id": "cc_9",
+      "tool": "read_lines",
+      "input": {
+       "start": 300,
+       "end": 345
+      },
+      "label": "Read lines 300\u2013345",
+      "summary": "46 lines",
+      "ms": 0
+     },
+     {
+      "id": "cc_10",
+      "tool": "search",
+      "input": {
+       "pattern": "_Event ",
+       "context": 0
+      },
+      "label": "Searched for \u201c_Event \u201d",
+      "summary": "7 matching lines",
+      "ms": 2
+     },
+     {
+      "id": "cc_11",
+      "tool": "measure",
+      "input": {
+       "pattern": "HSA_Active=1"
+      },
+      "label": "Measured \u201cHSA_Active=1\u201d",
+      "summary": "29 occurrences, every 0.05 s (median)",
+      "ms": 5
+     }
+    ],
+    "result": {
+     "headline": "\u51b7\u8f66\u65e9\u73ed\u5761\u9053\u8d77\u6b65,HSA \u524d\u9988\u4f7f TqCmd_Out \u8d85\u51fa BMS \u9650\u503c,\u6bcd\u7ebf\u8dcc\u7834 55 V \u81f4 FR \u6b20\u538b\u6025\u505c",
+     "status": "cause_unknown",
+     "explanation": "\u6700\u53ef\u80fd\u662f VCU 2.4.1 \u7684 HSA \u524d\u9988\u8ba9 TqCmd_Out \u8d8a\u8fc7 TqLim_BMS,\u53e0\u52a0\u4f4e\u6e29\u4f4e SOC \u7535\u6c60,\u6bcd\u7ebf\u8dcc\u5230 55 V \u4ee5\u4e0b\u3002FR \u6bcd\u7ebf\u7535\u538b\u6bd4\u5176\u4ed6\u8f6e\u4f4e,\u5148\u89e6\u53d1\u3002",
+     "confidence": "medium",
+     "evidence": [
+      {
+       "line": 1416,
+       "quote": "2026-10-28T07:42:02.450 VCU_TqDebug   TqReq_Base=87.0 TqHSA_FF=45.0 TqLim_BMS=80.2 TqCmd_Out=125.2 (N.m per wheel)",
+       "shows": "\u65e9\u73ed TqCmd_Out=125.2 N.m,\u8d85\u8fc7 TqLim_BMS=80.2\u3002HSA \u524d\u9988 45.0 \u53e0\u52a0\u5728\u57fa\u7840\u626d\u77e9\u4e0a\u3002",
+       "calls": [
+        "cc_5"
+       ]
+      },
+      {
+       "line": 1417,
+       "quote": "2026-10-28T07:42:02.450 BMS_Status    Pack_V=55.89 Pack_I=232.5 SOC=38 DCL_A=150 T_cell_min=2 T_cell_max=4 SOH=91",
+       "shows": "\u4f4e\u6e29 2-4 \u00b0C\u3001SOC 38 \u65f6,Pack_I=232.5 A(DCL 150 A),Pack_V \u8dcc\u5230 55.89 V\u3002BMS \u72ec\u7acb\u6d4b\u91cf\u4e0e MCU \u8bfb\u6570\u543b\u5408,\u6b20\u538b\u662f\u771f\u5b9e\u538b\u964d\u3002",
+       "calls": [
+        "cc_5"
+       ]
+      },
+      {
+       "line": 1424,
+       "quote": "2026-10-28T07:42:02.450 MCU_FR_Event  ERROR DTC 0x2A11 DC bus under-voltage (54.3 V < 55.0 V for >= 50 ms), torque disabled",
+       "shows": "FR \u6bcd\u7ebf 54.36 V \u5148\u89e6\u53d1\u6b20\u538b DTC,\u540c\u523b MCU_FL \u4e3a 55.43 V \u672a\u89e6\u53d1\u3002",
+       "calls": [
+        "cc_5"
+       ]
+      },
+      {
+       "line": 342,
+       "quote": "2026-10-09T07:38:22.550 VCU_TqDebug   TqReq_Base=79.0 TqHSA_FF=0.0 TqLim_BMS=80.2 TqCmd_Out=79.0 (N.m per wheel)",
+       "shows": "VCU 2.3.8 \u65e0 HSA \u65f6 TqCmd_Out=79.0,\u4e0d\u8d85\u8fc7 TqLim_BMS=80.2,\u540c\u6837\u4f4e\u6e29\u4f46\u65e0\u6545\u969c\u3002",
+       "calls": [
+        "cc_9",
+        "cc_10"
+       ]
+      },
+      {
+       "line": 2522,
+       "quote": "2026-10-28T14:10:07.500 VCU_TqDebug   TqReq_Base=87.0 TqHSA_FF=45.0 TqLim_BMS=161.7 TqCmd_Out=132.0 (N.m per wheel)",
+       "shows": "\u4e0b\u5348\u540c\u6837 HSA \u524d\u9988,TqCmd_Out=132.0\u3001Pack_I=247.8 A \u66f4\u5927,\u4f46\u7535\u6c60 18-20 \u00b0C\u3001SOC 61\u3001DCL 300,Pack_V \u4ec5\u964d\u5230 66.51 V,FR \u4e3a 64.92 V,\u65e0\u6545\u969c\u3002",
+       "calls": [
+        "cc_8"
+       ]
+      }
+     ],
+     "checked": [
+      {
+       "check": "\u5bf9\u6bd4 10/09(VCU 2.3.8)\u4e0e 10/28 \u65e9\u73ed(VCU 2.4.1)\u7684\u626d\u77e9\u6307\u4ee4\u548c\u7535\u6d41",
+       "result": "2.3.8 \u65f6 TqCmd_Out=79.0\u3001Pack_I=147.1 A(\u7b2c 313 \u884c),\u65e0\u6545\u969c;2.4.1 \u65f6 TqCmd_Out=125.2\u3001Pack_I=232.5 A,\u89e6\u53d1 DTC\u3002",
+       "verdict": "supports",
+       "about": "HSA \u524d\u9988\u7ed5\u8fc7 BMS \u626d\u77e9\u9650\u5236",
+       "calls": [
+        "cc_5",
+        "cc_9"
+       ]
+      },
+      {
+       "check": "\u5bf9\u6bd4\u4e0b\u5348(\u6696\u3001SOC 61)\u540c\u6837 HSA \u8d77\u6b65",
+       "result": "TqCmd_Out=132.0\u3001Pack_I=247.8 A,\u4f46 Pack_V=66.51 V,FR 64.92 V,\u65e0\u6545\u969c\u3002\u8bf4\u660e\u4ec5\u6709 HSA \u4e0d\u8db3\u4ee5\u51fa\u6545\u969c,\u8fd8\u9700\u8981\u51b7\u7535\u6c60\u4f4e SOC\u3002",
+       "verdict": "supports",
+       "about": "\u4f4e\u6e29\u4f4e SOC \u7535\u6c60\u662f\u89e6\u53d1\u6761\u4ef6",
+       "calls": [
+        "cc_8"
+       ]
+      },
+      {
+       "check": "\u68c0\u67e5 BMS \u4e0e MCU \u5bf9\u6bcd\u7ebf\u7535\u538b\u7684\u8bfb\u6570\u662f\u5426\u4e00\u81f4",
+       "result": "\u65e9\u73ed Pack_V=55.89 V,MCU_FL 55.43 V,FR 54.36 V\u3002\u4e24\u8def\u72ec\u7acb\u6d4b\u91cf\u90fd\u663e\u793a\u771f\u5b9e\u538b\u964d,\u4e0d\u662f\u5355\u4e2a\u4f20\u611f\u5668\u8bef\u62a5\u3002",
+       "verdict": "weakens",
+       "about": "\u9608\u503c\u6216\u6d4b\u91cf\u914d\u7f6e\u9519\u8bef",
+       "calls": [
+        "cc_5"
+       ]
+      },
+      {
+       "check": "\u641c\u7d22\u5168\u90e8 _Event \u4e8b\u4ef6,\u770b BMS \u544a\u8b66\u4e0e DTC \u7684\u5148\u540e",
+       "result": "\u4ec5 7 \u6761:BMS WARN(174 A > DCL 150 A,\u7b2c 1393 \u884c)\u65e9\u4e8e MCU_FR DTC(\u7b2c 1424 \u884c)\u3001VCU \u7801 7(\u7b2c 1435 \u884c)\u548c AD \u6025\u505c(\u7b2c 1436 \u884c)\u3002",
+       "verdict": "supports",
+       "about": "\u56e0\u679c\u94fe\u987a\u5e8f",
+       "calls": [
+        "cc_10"
+       ]
+      },
+      {
+       "check": "\u67e5 FR \u6bcd\u7ebf\u7535\u538b\u662f\u5426\u4e00\u8d2f\u4f4e\u4e8e\u5176\u4ed6\u8f6e",
+       "result": "\u7b2c 306 \u884c 10/09 FR=62.27 V,\u5176\u4ed6\u8f6e 62.82-62.90 V;\u4e0b\u5348\u7b2c 2516 \u884c FR 64.92 V \u4f4e\u4e8e FL 65.98 V\u3002FR \u652f\u8def\u538b\u964d\u7a33\u5b9a\u504f\u5927,\u6240\u4ee5 FR \u5148\u8d8a\u7ebf\u3002",
+       "verdict": "supports",
+       "about": "FR \u9006\u53d8\u5668/\u7ebf\u675f\u652f\u8def",
+       "calls": [
+        "cc_9",
+        "cc_8"
+       ]
+      }
+     ],
+     "effects": [
+      {
+       "line": 1435,
+       "quote": "2026-10-28T07:42:02.500 VCU_Event     ERROR FaultLevel=3 MotorFault_FR=1: torque cut on all wheels, EPB apply, Remote_Code=7",
+       "why": "VCU \u5bf9 FR DTC \u7684\u54cd\u5e94,\u5c5e\u540e\u679c\u3002"
+      },
+      {
+       "line": 1436,
+       "quote": "2026-10-28T07:42:02.550 AD_Event      ERROR chassis fault reported by VCU -> EMERGENCY STOP, mission paused",
+       "why": "\u6025\u505c\u662f\u4e0a\u6e38\u6545\u969c\u7684\u6700\u7ec8\u540e\u679c\u3002"
+      },
+      {
+       "line": 1424,
+       "quote": "2026-10-28T07:42:02.450 MCU_FR_Event  ERROR DTC 0x2A11 DC bus under-voltage (54.3 V < 55.0 V for >= 50 ms), torque disabled",
+       "why": "\u6b20\u538b DTC \u662f\u6bcd\u7ebf\u8dcc\u843d\u7684\u7ed3\u679c\u3002FR \u9006\u53d8\u5668\u672c\u8eab\u53ef\u80fd\u6ca1\u574f\u3002"
+      }
+     ],
+     "next_action": {
+      "action": "\u5728\u51b7\u7535\u6c60\u6761\u4ef6\u4e0b\u540c\u5761\u9053\u8d77\u6b65,HSA \u5f00/\u5173\u5404\u4e00\u6b21\u5e76\u5f55\u6ce2",
+      "why": "\u5206\u79bb HSA \u524d\u9988\u4e0e\u51b7\u7535\u6c60\u7684\u4f5c\u7528:HSA \u5173\u95ed\u540e\u662f\u5426\u4ecd\u6b20\u538b,\u4ee5\u53ca TqCmd_Out \u662f\u5426\u88ab\u9650\u5728 TqLim_BMS \u5185\u3002",
+      "how": [
+       "\u51b7\u8f66\u65e9\u73ed(\u7535\u6c60 T_cell \u22645 \u00b0C\u3001SOC 35-40%),\u5728 B \u533a 8% \u5761\u9053\u5404\u8d77\u6b65\u4e00\u6b21:VCU 2.4.1 \u5f00 HSA\u3001\u5173 HSA(\u6216\u56de\u9000 2.3.8)",
+       "\u540c\u65f6\u5f55 VCU_TqDebug\u3001BMS_Status\u3001BMS_Cell \u4e0e\u56db\u4e2a MCU \u7684 DC_V",
+       "\u5728 MCU_FR \u7684 DC \u8f93\u5165\u7aef\u7528\u793a\u6ce2\u5668\u540c\u6b65\u6d4b\u6bcd\u7ebf\u538b\u964d,\u5e76\u6d4b FR \u4e0e FL \u7ebf\u675f\u53ca\u63a5\u5934\u7684\u538b\u964d\u5bf9\u6bd4"
+      ],
+      "where": "on_site",
+      "conditions": "\u73af\u5883\u548c\u7535\u6c60 \u22645 \u00b0C\u3001SOC 35-40%\u3001B \u533a 8% \u5761\u9053\u3001\u7a7a\u8f7d\u3001AUTO \u6a21\u5f0f\u4ece\u9759\u6b62\u8d77\u6b65,\u4e0e 10/28 \u65e9\u73ed\u4e00\u81f4\u3002",
+      "baseline": "10/09 \u5feb\u7167 1(VCU 2.3.8,\u7b2c 342 \u884c TqCmd_Out=79.0)\u548c 10/28 \u4e0b\u5348\u5feb\u7167 3(\u6696\u7535\u6c60,\u7b2c 2522 \u884c)\u3002",
+      "record": [
+       "TqReq_Base",
+       "TqHSA_FF",
+       "TqLim_BMS",
+       "TqCmd_Out",
+       "Pack_V",
+       "Pack_I",
+       "Cell_V_min",
+       "MCU_FR DC_V",
+       "MCU_FL DC_V",
+       "DTC"
+      ],
+      "needs_approval": true,
+      "outcomes": [
+       {
+        "label": "HSA \u5173\u95ed\u540e TqCmd_Out\u226480 \u4e14\u65e0\u6b20\u538b",
+        "means": "HSA \u524d\u9988\u7ed5\u8fc7 BMS \u9650\u503c\u662f\u4e3b\u56e0,\u51b7\u7535\u6c60\u53ea\u662f\u89e6\u53d1\u6761\u4ef6\u3002",
+        "keeps": [
+         "h1",
+         "h2"
+        ],
+        "rules_out": [],
+        "weakens": [
+         "h3"
+        ],
+        "then": "\u5efa\u8bae VCU \u628a HSA \u524d\u9988\u7eb3\u5165 TqLim_BMS \u9650\u5236"
+       },
+       {
+        "label": "HSA \u5173\u95ed\u540e\u4ecd\u6b20\u538b,FR \u660e\u663e\u4f4e\u4e8e\u5176\u4ed6\u8f6e",
+        "means": "\u51b7\u7535\u6c60\u5185\u963b\u6216 FR \u652f\u8def\u538b\u964d\u662f\u4e3b\u56e0,HSA \u53ea\u662f\u52a0\u91cd\u3002",
+        "keeps": [
+         "h2",
+         "h3"
+        ],
+        "rules_out": [],
+        "weakens": [
+         "h1"
+        ],
+        "then": "\u68c0\u67e5 FR \u7ebf\u675f\u3001\u63a5\u5934\u538b\u964d\u5e76\u8bc4\u4f30\u7535\u6c60\u9884\u70ed"
+       },
+       {
+        "label": "HSA \u5f00\u542f\u4e5f\u4e0d\u89e6\u53d1,\u51b7\u7535\u6c60\u4e0b\u65e0\u6b20\u538b",
+        "means": "\u5f53\u65f6\u8fd8\u7f3a\u5c11\u67d0\u4e2a\u5176\u4ed6\u6761\u4ef6,\u9700\u8981\u5bf9\u6bd4 10/20 \u548c 10/28 \u7684\u66f4\u591a\u6570\u636e\u3002",
+        "keeps": [
+         "h1",
+         "h2",
+         "h3"
+        ],
+        "rules_out": [],
+        "weakens": [],
+        "then": "\u5411\u5de5\u7a0b\u56e2\u961f\u7d22\u53d6\u5176\u4ed6\u65e5\u671f\u540c\u5761\u9053\u7684\u65e9\u73ed\u6570\u636e"
+       }
+      ]
+     },
+     "unknowns": [
+      "FR \u652f\u8def\u7ebf\u675f\u6216\u63a5\u5934\u7684\u5b9e\u9645\u7535\u963b\u662f\u5426\u504f\u5927,\u6570\u636e\u91cc\u770b\u4e0d\u5230\u3002",
+      "10/20 \u7b49\u5176\u4ed6\u6b21\u6545\u969c\u65f6\u7684\u7535\u6c60\u6e29\u5ea6\u3001SOC \u548c VCU \u7248\u672c,\u672c\u6848\u4f8b\u6ca1\u6709,\u65e0\u6cd5\u786e\u8ba4\u89c4\u5f8b\u3002",
+      "BMS \u5728 TqLim_BMS \u4e0e DCL \u4e4b\u95f4\u7684\u9650\u6d41\u903b\u8f91,\u4e3a\u4f55\u7535\u6d41\u8fbe 232.5 A \u4ecd\u672a\u6536\u7d27,\u65e5\u5fd7\u65e0\u6cd5\u56de\u7b54\u3002"
+     ],
+     "already_answered": [
+      {
+       "question": "\u6545\u969c\u65f6 VCU \u8f6f\u4ef6\u662f\u54ea\u4e2a\u7248\u672c,\u53d8\u8fc7\u5417?",
+       "answer": "2.3.8 \u4e8e 10/14 OTA \u5347\u7ea7\u5230 2.4.1,\u65b0\u589e HSA;10/09 \u5feb\u7167\u5728\u5347\u7ea7\u524d,10/28 \u5728\u5347\u7ea7\u540e\u3002",
+       "line": 3,
+       "quote": "# Software: VCU_SW 2.3.8 until 2026-10-14, then 2.4.1 (OTA, adds hill-start assist HSA). BMS_SW 1.9.2. MCU_SW 3.2.0.",
+       "calls": [
+        "cc_4"
+       ]
+      },
+      {
+       "question": "\u6025\u505c\u524d\u7535\u6c60\u72b6\u6001\u5982\u4f55,\u662f\u5426\u8fc7\u6d41?",
+       "answer": "SOC 38\u3001\u7535\u6c60 2-4 \u00b0C\u3001DCL 150 A;BMS \u5148\u8b66\u544a\u653e\u7535 174 A \u8d85 DCL\u3002",
+       "line": 1393,
+       "quote": "2026-10-28T07:42:02.300 BMS_Event     WARN discharge current 174 A above DCL 150 A",
+       "calls": [
+        "cc_5"
+       ]
+      },
+      {
+       "question": "\u6362\u4e86 FR \u9006\u53d8\u5668\u540e\u4e3a\u4ec0\u4e48\u8fd8\u51fa\u73b0?",
+       "answer": "\u6570\u636e\u663e\u793a\u6b20\u538b\u6765\u81ea\u6574\u5305\u6bcd\u7ebf\u8dcc\u843d,\u56db\u8f6e\u540c\u65f6\u4e0b\u964d,FR \u53ea\u662f\u6bd4 FL \u4f4e(54.37 V \u5bf9 55.45 V)\u5148\u8d8a\u7ebf\u3002",
+       "line": 1410,
+       "quote": "2026-10-28T07:42:02.400 MCU_FR        DC_V=54.37 Tq_Act=124.1 Spd_rpm=14 T_inv=6 DTC=0x0000",
+       "calls": [
+        "cc_5"
+       ]
+      },
+      {
+       "question": "\u65ad\u7535\u91cd\u542f\u540e\u6b63\u5e38,\u4e0b\u5348\u4e3a\u4f55\u4e0d\u518d\u51fa\u73b0?",
+       "answer": "\u4e0b\u5348\u7535\u6c60 18-20 \u00b0C\u3001SOC 61\u3001DCL 300,\u540c\u6837\u5927\u7535\u6d41\u65f6\u6bcd\u7ebf\u4ecd\u5728 64.92 V \u4ee5\u4e0a\u3002",
+       "line": 2443,
+       "quote": "2026-10-28T14:10:07.100 BMS_Status    Pack_V=72.40 Pack_I=61.9 SOC=61 DCL_A=300 T_cell_min=18 T_cell_max=20 SOH=91",
+       "calls": [
+        "cc_8"
+       ]
+      }
+     ],
+     "data_requests": [
+      {
+       "what": "10/20 \u53ca\u8fd1\u4e24\u5468\u5176\u4ed6\u65e9\u73ed\u6545\u969c\u65f6\u7684 CAN \u65e5\u5fd7\u6216 BMS \u8bb0\u5f55",
+       "window": "10/14 OTA \u4e4b\u540e\u6bcf\u6b21 B \u533a\u5761\u9053\u65e9\u73ed\u8d77\u6b65,\u542b\u6b63\u5e38\u548c\u6545\u969c\u7684\u5404\u6b21",
+       "conditions": "\u540c\u4e00\u8f66\u8f86\u3001\u540c\u4e00\u5761\u9053,\u9700\u5305\u542b\u73af\u5883\u6216\u7535\u6c60\u6e29\u5ea6\u4e0e SOC",
+       "signals": [
+        "TqCmd_Out",
+        "TqLim_BMS",
+        "Pack_V",
+        "Pack_I",
+        "T_cell_min",
+        "SOC",
+        "MCU_FR DC_V"
+       ],
+       "why_needed": "\u786e\u8ba4\u6545\u969c\u662f\u5426\u90fd\u53d1\u751f\u5728\u51b7\u7535\u6c60\u4f4e SOC \u52a0 HSA,\u800c\u4e0d\u662f\u53ea\u6709 10/28 \u4e00\u4f8b\u3002",
+       "searched_calls": [
+        "cc_6",
+        "cc_10"
+       ]
+      }
+     ],
+     "field_questions": [],
+     "unobservable": [
+      {
+       "fact": "FR \u6bcd\u7ebf\u7ebf\u675f\u4e0e\u63a5\u5934\u7684\u63a5\u89e6\u7535\u963b",
+       "why_it_matters": "FR \u4e00\u8d2f\u6bd4\u5176\u4ed6\u8f6e\u4f4e,\u82e5\u7ebf\u675f\u538b\u964d\u5927,\u5b83\u662f\u5148\u8d8a\u7ebf\u7684\u653e\u5927\u56e0\u7d20\u3002",
+       "how_to_observe": "\u65ad\u7535\u540e\u6d4b FR \u4e0e FL \u6bcd\u7ebf\u7aef\u5230\u7535\u6c60\u7aef\u7684\u538b\u964d\u6216\u7535\u963b\u5e76\u5bf9\u6bd4,\u68c0\u67e5\u63a5\u5934\u7d27\u56fa\u3002"
+      }
+     ],
+     "hypotheses": [
+      {
+       "id": "h1",
+       "area": "VCU HSA \u524d\u9988\u9650\u6d41\u7f3a\u5931",
+       "claim": "VCU 2.4.1 \u7684 HSA \u524d\u9988\u4f7f TqCmd_Out \u8d85\u8fc7 TqLim_BMS,\u62c9\u51fa\u8fc7\u5927\u7535\u6d41\u3002",
+       "status": "leading",
+       "role": "main_cause",
+       "because": "\u7b2c 1416 \u884c TqCmd_Out=125.2 \u8d85 TqLim_BMS=80.2;10/09 \u65e0 HSA \u65f6 TqCmd_Out=79.0 \u4e0d\u8d85\u9650\u3001\u65e0\u6545\u969c\u3002",
+       "basis": "indirect",
+       "observed_at": "VCU_TqDebug \u62a5\u6587",
+       "lines": [
+        1416,
+        342
+       ]
+      },
+      {
+       "id": "h2",
+       "area": "\u51b7\u7535\u6c60\u4f4e SOC \u538b\u964d",
+       "claim": "2-4 \u00b0C\u3001SOC 38 \u7684\u7535\u6c60\u5185\u963b\u5927\u3001DCL \u4ec5 150 A,\u5927\u7535\u6d41\u4e0b\u6bcd\u7ebf\u8dcc\u7834 55 V\u3002",
+       "status": "leading",
+       "role": "trigger",
+       "because": "\u65e9\u73ed Pack_V=55.89 V;\u4e0b\u5348 18-20 \u00b0C\u3001SOC 61 \u65f6 Pack_I=247.8 A \u53ea\u964d\u5230 66.51 V,\u65e0\u6545\u969c\u3002",
+       "basis": "indirect",
+       "observed_at": "BMS_Status \u4e0e BMS_Cell \u62a5\u6587",
+       "lines": [
+        1417,
+        2523
+       ]
+      },
+      {
+       "id": "h3",
+       "area": "FR \u9006\u53d8\u5668\u6216\u7ebf\u675f\u652f\u8def",
+       "claim": "FR \u652f\u8def\u538b\u964d\u504f\u5927\u6216\u9006\u53d8\u5668\u6709\u95ee\u9898,\u4f7f FR \u6bd4\u5176\u4ed6\u8f6e\u5148\u8d8a\u8fc7 55 V\u3002",
+       "status": "open",
+       "role": "amplifier",
+       "because": "FR \u4e00\u8d2f\u4f4e\u4e8e\u5176\u4ed6\u8f6e,\u51b3\u5b9a\u5b83\u5148\u89e6\u53d1;\u4f46 10/21 \u5df2\u6362\u63a7\u5236\u5668\u4ecd\u590d\u53d1,\u66f4\u50cf\u652f\u8def\u538b\u964d\u800c\u975e\u9006\u53d8\u5668\u672c\u8eab\u3002",
+       "basis": "indirect",
+       "observed_at": "MCU_FR DC_V \u62a5\u6587",
+       "lines": [
+        1410,
+        306
+       ]
+      },
+      {
+       "id": "h4",
+       "area": "\u6b20\u538b\u9608\u503c\u6216\u6d4b\u91cf\u914d\u7f6e",
+       "claim": "55.0 V \u9608\u503c\u300150 ms \u53bb\u6296\u6216\u7535\u538b\u6d4b\u91cf\u6709\u8bef,\u5bfc\u81f4\u8bef\u89e6\u53d1\u3002",
+       "status": "weakened",
+       "role": "effect",
+       "because": "BMS \u4e0e MCU \u72ec\u7acb\u8bfb\u6570\u90fd\u663e\u793a\u6bcd\u7ebf\u786e\u5b9e\u8dcc\u5230\u7ea6 55-56 V,\u662f\u771f\u5b9e\u538b\u964d,\u4e0d\u662f\u8bef\u62a5\u3002",
+       "basis": "indirect",
+       "observed_at": "BMS_Status \u4e0e MCU DC_V \u62a5\u6587",
+       "lines": [
+        1417,
+        1424
+       ]
+      }
+     ],
+     "events": [
+      {
+       "lines": [
+        1332,
+        1416
+       ],
+       "what": "HSA \u8d77\u6b65,TqCmd_Out \u8d85\u8fc7 TqLim_BMS",
+       "class": "root_cause_candidate",
+       "why": "VCU 2.4.1 \u65b0\u529f\u80fd,\u626d\u77e9\u6307\u4ee4\u8d8a\u8fc7 BMS \u9650\u503c\u3002"
+      },
+      {
+       "lines": [
+        1386,
+        1407
+       ],
+       "what": "\u51b7\u7535\u6c60\u5927\u7535\u6d41\u4e0b Pack_V \u4ece 60.18 V \u8dcc\u5230 55.85 V",
+       "class": "root_cause_candidate",
+       "why": "\u4f4e\u6e29\u4f4e SOC \u5185\u963b\u5927,\u7535\u6d41 232.1 A \u8fdc\u8d85 DCL 150 A\u3002"
+      },
+      {
+       "lines": [
+        1393
+       ],
+       "what": "BMS \u8b66\u544a\u653e\u7535\u7535\u6d41 174 A \u8d85 DCL 150 A",
+       "class": "anomaly",
+       "why": "\u6700\u65e9\u7684\u663e\u5f0f\u544a\u8b66,\u65e9\u4e8e\u6240\u6709 DTC\u3002"
+      },
+      {
+       "lines": [
+        1410,
+        1420,
+        1424
+       ],
+       "what": "MCU_FR \u6bcd\u7ebf 54.37 V,DTC 0x2A11 \u6b20\u538b",
+       "class": "effect",
+       "why": "FR \u6bd4 FL \u4f4e,\u5148\u8d8a\u8fc7 55 V \u9608\u503c\u3002"
+      },
+      {
+       "lines": [
+        1435,
+        1436,
+        1438
+       ],
+       "what": "VCU \u7801 7\u3001\u5168\u8f6e\u626d\u77e9\u5207\u65ad\u3001EPB \u62b1\u95f8\u3001AD \u6025\u505c",
+       "class": "effect",
+       "why": "\u5bf9 FR DTC \u7684\u6545\u969c\u54cd\u5e94\u94fe\u3002"
+      },
+      {
+       "lines": [
+        2429,
+        2523
+       ],
+       "what": "\u4e0b\u5348\u6696\u7535\u6c60\u540c\u6837 HSA \u8d77\u6b65,\u65e0\u6545\u969c",
+       "class": "routine",
+       "why": "\u4f5c\u4e3a\u5bf9\u7167:\u6696\u7535\u6c60 DCL 300,\u6bcd\u7ebf\u4fdd\u6301 64.92 V \u4ee5\u4e0a\u3002"
+      }
+     ],
+     "lesson": "\u5de5\u4f5c\u533a\u4e2d\u6ca1\u6709\u76f8\u4f3c\u7684\u5df2\u5173\u95ed\u6848\u4f8b,\u672c\u6848\u4f8b\u4e0d\u80fd\u501f\u7528\u65e9\u671f\u7ed3\u8bba\u3002",
+     "reuse_when": "4WD \u7ebf\u63a7\u5e95\u76d8,VCU \u5e26 HSA \u524d\u9988\u4e14\u672a\u7eb3\u5165 BMS \u626d\u77e9\u9650\u5236,\u7535\u6c60\u51b7\u4e14\u4f4e SOC\u3001DCL \u964d\u81f3 150 A,\u8d77\u6b65\u5cf0\u503c\u7535\u6d41\u8d85\u8fc7 232 A,\u65e5\u5fd7\u51fa\u73b0 DTC 0x2A11 \u52a0 Remote_Code=7\u3002"
+    },
+    "dropped": [],
+    "usage": {
+     "input_tokens": 80096,
+     "output_tokens": 15256,
+     "uncached_input_tokens": 12,
+     "cache_read_input_tokens": 80084,
+     "cache_creation_input_tokens": 167498,
+     "model_calls": 5,
+     "model_ms": 102516,
+     "cost_usd": 0.830584,
+     "model_ids": [
+      "claude-sonnet-5-5"
+     ]
+    },
+    "model_calls": [
+     {
+      "call": 1,
+      "model_id": "claude-sonnet-5-5",
+      "input_tokens": 2,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 24635,
+      "output_tokens": 79,
+      "cost_usd": 0.099334,
+      "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+      "ms": 3578,
+      "api_ms": 1277,
+      "requested": [
+       "overview",
+       "case_context",
+       "lessons"
+      ]
+     },
+     {
+      "call": 2,
+      "model_id": "claude-sonnet-5-5",
+      "input_tokens": 2,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 23273,
+      "output_tokens": 169,
+      "cost_usd": 0.094786,
+      "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+      "ms": 2686,
+      "api_ms": 1587,
+      "requested": [
+       "read_lines",
+       "read_lines",
+       "search",
+       "search"
+      ]
+     },
+     {
+      "call": 3,
+      "model_id": "claude-sonnet-5-5",
+      "input_tokens": 4,
+      "cache_read_input_tokens": 59345,
+      "cache_creation_input_tokens": 21986,
+      "output_tokens": 850,
+      "cost_usd": 0.10238649999999999,
+      "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+      "ms": 8299,
+      "api_ms": 7276,
+      "requested": [
+       "read_lines",
+       "read_lines",
+       "search",
+       "measure"
+      ]
+     },
+     {
+      "call": 4,
+      "model_id": "claude-sonnet-5-5",
+      "input_tokens": 2,
+      "cache_read_input_tokens": 20739,
+      "cache_creation_input_tokens": 32773,
+      "output_tokens": 7495,
+      "cost_usd": 0.2081199,
+      "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+      "ms": 52925,
+      "api_ms": 52236,
+      "requested": [
+       "submit_report"
+      ]
+     },
+     {
+      "call": 5,
+      "model_id": "claude-sonnet-5-5",
+      "input_tokens": 2,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 64831,
+      "output_tokens": 6663,
+      "cost_usd": 0.32595799999999997,
+      "cost_basis": "Claude Code estimate at API prices (not billed per call on a subscription sign-in)",
+      "ms": 35028,
+      "api_ms": 34109,
+      "requested": [
+       "submit_report"
+      ]
+     }
+    ],
+    "seconds": 103.0,
+    "boundary": "Read-only checks over the original data. No cause is confirmed until an engineer's result confirms it."
+   }
+  }
+ ]
+}

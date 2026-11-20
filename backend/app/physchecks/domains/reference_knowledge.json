@@ -1,0 +1,47 @@
+{
+  "schema": "veyra-reference-knowledge-v1",
+  "version": "1",
+  "note": "General engineering knowledge, kept as its own evidence tier. It is never a fact of the case: it orders explanations that the record cannot separate, and the customer's or supplier's confirmation always decides. Every entry states the condition under which it applies.",
+  "entries": [
+    {
+      "id": "RK-SOC-COUNTING-DRIFT",
+      "statement": "A coulomb-counting SOC estimate accumulates error between calibration anchors (a full charge, or a long rest at a voltage that maps to SOC). Sources: current-sensor offset and resolution, small standby or sleep currents near zero that the sensor does not resolve, and a capacity parameter that differs from the real capacity. The error grows with time and throughput since the last anchor.",
+      "applies_when": {"soc_estimator": "coulomb_counting"},
+      "bears_on": ["A"],
+      "source_kind": "general_engineering_knowledge",
+      "caveat": "How large the drift becomes depends on the estimator, the sensor and the duty cycle: only the history since the last anchor shows it for one machine."
+    },
+    {
+      "id": "RK-FLAT-OCV",
+      "statement": "On chemistries with a flat open-circuit-voltage plateau (for example LFP), voltage cannot correct SOC in the middle range. A drifted estimate is typically corrected only near full or near empty, and then in one large step when the voltage leaves the plateau.",
+      "applies_when": {"ocv_shape": "flat"},
+      "bears_on": ["A"],
+      "source_kind": "general_engineering_knowledge",
+      "caveat": "Some estimators use model-based or rest-voltage corrections that partly work on a plateau; the supplier's algorithm decides."
+    },
+    {
+      "id": "RK-FADE-END-OF-LIFE",
+      "statement": "Traction cells are commonly considered at end of life at about 70-80 % of rated capacity. A pack in service at far below that, without other signs of ageing (rising resistance, growing cell spread, earlier warnings), is unusual.",
+      "applies_when": {},
+      "bears_on": ["B"],
+      "source_kind": "general_engineering_knowledge",
+      "caveat": "A wrong capacity parameter (not fade) can produce the same arithmetic; the pack build record and a metered capacity measurement decide."
+    },
+    {
+      "id": "RK-CURRENT-SENSOR-ACCURACY",
+      "statement": "Pack current sensors are typically specified to within a few percent at operating current. An under-read of several times during operation is not a calibration-level error; it would need a fault or a load that bypasses the sensor. Small currents near zero, however, can fall below the sensor's resolution or deadband and go uncounted for long periods.",
+      "applies_when": {},
+      "bears_on": ["C", "A"],
+      "source_kind": "general_engineering_knowledge",
+      "caveat": "The sensor's datasheet and an independent measurement decide."
+    },
+    {
+      "id": "RK-WEAK-CELL-TIMING",
+      "statement": "In a series string the weakest cell decides when the usable charge ends. Its effect on usable charge equals its charge offset from the other cells; it does not change how the BMS counts pack charge.",
+      "applies_when": {"topology": "series"},
+      "bears_on": ["D"],
+      "source_kind": "general_engineering_knowledge",
+      "caveat": "A cell whose capacity is much lower shows an offset that grows with discharge; a short observation span cannot separate low capacity from imbalance."
+    }
+  ]
+}

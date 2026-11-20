@@ -1,0 +1,212 @@
+{
+ "arm": "alone",
+ "alias": "flight-08",
+ "folder": "carbonZ_2018-07-30-16-39-00_1_engine_failure",
+ "input_sha256": "294508976a3ded9e666c2c985cd0c2cb83618f942fff4fe9c17e4dca70255d74",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 22.1
+  }
+ ],
+ "prompt_chars": 17487,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle channel 2 dropped to idle at 117 s; pitch then failed to track setpoint from about 126 s while descending.",
+   "status": "cause_unknown",
+   "explanation": "Motor output ch[2] followed a zero throttle command from 117 to 130 s. Elevator ch[1] saturated but pitch stayed near 0 against a 17 deg setpoint. The reason for the throttle cut is not in the data.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 118,
+     "quote": "117,...,1.2e+03,...,0,16.4,50.3",
+     "shows": "Throttle goes from 38% to 0% and ch[2] falls to 1100 us. It stays there to t=130 while altitude drops from 50 to 28 m and airspeed falls from 16 to 12.7 m/s.",
+     "calls": []
+    },
+    {
+     "line": 129,
+     "quote": "128,...,1.26e+03,...,17.4,21.4,548,0,12.8,35.4,-0.384",
+     "shows": "Pitch setpoint is 17.4 deg for t=127-130, but measured pitch is only about -0.4 to 1.8 deg. Elevator ch[1] is pushed to 1260 us (about 240 us below neutral) and altitude keeps falling.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "t=1.5 s ... WARN: Low voltage / ERROR: Sensor helth",
+     "shows": "Battery low-voltage and sensor-health events are logged at 1.5 s. Nothing later in the log explains the throttle cut or the pitch tracking loss.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Does the motor output follow the throttle command?",
+     "result": "ch[2] tracks throttle throughout, e.g. 1100 us at 0% and 1680 us at 72%. The cut is a command, not an output fault.",
+     "verdict": "weakens",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Does attitude track the setpoint?",
+     "result": "It tracks adequately until about t=125. From t=126 to 129 pitch error reaches about 15 deg with the elevator saturated.",
+     "verdict": "supports",
+     "about": "h2",
+     "calls": []
+    },
+    {
+     "check": "Are the other channels stable?",
+     "result": "ch[0], ch[6] and ch[7] are constant at 1500, 1500 and 2040 us. ch[4] and ch[5] are identical throughout.",
+     "verdict": "inconclusive",
+     "about": "h3",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 129,
+     "quote": "altitude 50->28 m, airspeed 16->12.7",
+     "why": "Descent and low airspeed follow from the zero thrust. The reduced control authority explains the pitch tracking loss."
+    },
+    {
+     "line": 132,
+     "quote": "131,...,1.68e+03,...,72",
+     "shows": "Throttle jumps to 72% and the pitch setpoint is dropped, which looks like a recovery action.",
+     "why": "Reaction to the descent, not a cause."
+    }
+   ],
+   "next_action": {
+    "action": "Pull the flight log mode and failsafe messages around 110-131 s",
+    "why": "Settles whether the throttle cut was a commanded glide or a failsafe from low voltage, and whether pitch error was just low airspeed.",
+    "how": [
+     "Check flight mode and failsafe flags at 117 s",
+     "Plot battery voltage and current against throttle",
+     "Check airspeed sensor health"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Low-voltage failsafe triggered at 117 s",
+      "means": "Power or battery fault caused the throttle cut and the pitch loss followed.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h3"
+      ]
+     },
+     {
+      "label": "Commanded glide or mode change",
+      "means": "The throttle cut was intentional and the pitch error is low-airspeed saturation.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Why throttle went to 0 at 117 s",
+    "Battery voltage trend (not in the data)"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Power / battery failsafe",
+     "claim": "A low-voltage or sensor failsafe cut throttle at 117 s.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "Low voltage and sensor errors are logged at 1.5 s, but the data shows no voltage signal or failsafe event at 117 s.",
+     "basis": "indirect",
+     "lines": [
+      2,
+      118
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Pitch control (elevator ch[1])",
+     "claim": "Pitch authority was lost at low airspeed and zero thrust, with the elevator saturated.",
+     "status": "leading",
+     "role": "effect",
+     "because": "Pitch error of about 15 deg with the elevator saturated at t=126-129, coinciding with airspeed below 13 m/s.",
+     "basis": "indirect",
+     "lines": [
+      127,
+      128,
+      129,
+      130
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Actuator hardware",
+     "claim": "A servo or motor hardware fault caused the control loss.",
+     "status": "weakened",
+     "role": "main_cause",
+     "because": "Outputs track commands and no channel froze or diverged, apart from the constant ch[0], ch[6] and ch[7].",
+     "basis": "indirect",
+     "lines": [
+      118
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      2,
+      3
+     ],
+     "what": "Low voltage warning and sensor health error at 1.5 s",
+     "class": "anomaly",
+     "why": "Early warnings with no follow-up and no matching signal change"
+    },
+    {
+     "lines": [
+      118
+     ],
+     "what": "Throttle cut to 0 from 117 s",
+     "class": "root_cause_candidate",
+     "why": "Sustained 14 s zero throttle in flight"
+    },
+    {
+     "lines": [
+      127,
+      128,
+      129,
+      130
+     ],
+     "what": "Pitch tracking error with elevator saturated",
+     "class": "effect",
+     "why": "Follows the loss of thrust and airspeed"
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 14926,
+   "output_tokens": 2805
+  },
+  "seconds": 22.1
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 116.791,
+    "value": 1
+   }
+  },
+  "onset_s": 116.791
+ }
+}

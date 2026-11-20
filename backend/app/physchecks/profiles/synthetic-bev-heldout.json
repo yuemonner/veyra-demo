@@ -1,0 +1,28 @@
+{
+  "schema": "veyra-signal-profile-v1",
+  "id": "synthetic-bev-heldout",
+  "version": "1",
+  "synthetic": true,
+  "title": "SYNTHETIC battery-electric vehicle, held-out inquiry incidents (scripts/make_synthetic_heldout.py)",
+  "source": "SYNTHETIC test profile (generated, not a real vehicle). Like a customer profile, it declares no series count, chemistry or OCV curve.",
+  "machine_class": "battery_electric_vehicle",
+  "conditions": {"has_hv_contactors": true},
+  "recording": {"formats": ["decoded_csv_package"], "bind": {"bms": {"topics": ["hbms"]}, "vcu": {"topics": ["hvcu"]}}, "time": "t_rel_s per file"},
+  "max_sample_age_s": 1.5,
+  "max_gap_s": 3.0,
+  "roles": {
+    "pack_current": {"field": "bms:i_pack_a", "unit": "A", "sign": "discharge_positive", "kind": "measurement", "valid": [-1000, 1000], "max_age_s": 1.5},
+    "soc": {"field": "bms:soc_pct", "unit": "%", "kind": "estimate", "estimator": "coulomb_counting", "valid": [0, 100], "resolution": 0.1},
+    "rated_capacity": {"field": "bms:cap_ah", "unit": "Ah", "kind": "reported_parameter", "valid": [1, 1000]},
+    "pack_voltage": {"field": "bms:v_pack_v", "unit": "V", "kind": "measurement", "valid": [0, 1000], "max_age_s": 1.5},
+    "min_cell_voltage": {"field": "bms:v_cell_min_v", "unit": "V", "kind": "measurement", "valid": [1.0, 5.0], "placeholders": [0, 65.535], "max_age_s": 1.5},
+    "max_cell_voltage": {"field": "bms:v_cell_max_v", "unit": "V", "kind": "measurement", "valid": [1.0, 5.0], "placeholders": [0, 65.535], "max_age_s": 1.5},
+    "min_cell_index": {"field": "bms:idx_min", "unit": "", "kind": "state", "valid": [1, 400]},
+    "bms_fault_level": {"field": "bms:fault_level", "unit": "", "kind": "state", "map": {"0": 0, "1": 1, "2": 2, "3": 3}, "enum": {"0": "normal", "1": "level 1", "2": "level 2", "3": "level 3"}},
+    "main_positive_closed": {"field": "bms:k_pos", "unit": "", "kind": "state", "enum": {"0": "open", "1": "closed"}},
+    "main_negative_closed": {"field": "bms:k_neg", "unit": "", "kind": "state", "enum": {"0": "open", "1": "closed"}},
+    "dcdc_state": {"field": "vcu:dcdc_state", "unit": "", "kind": "state", "enum": {"0": "off", "1": "working"}, "max_age_s": 2.5},
+    "power_state": {"field": "vcu:power_state", "unit": "", "kind": "state", "enum": {"3": "ACC", "4": "READY"}, "max_age_s": 2.5}
+  },
+  "parameters": {}
+}

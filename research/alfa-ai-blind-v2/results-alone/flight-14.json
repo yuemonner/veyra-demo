@@ -1,0 +1,200 @@
+{
+ "arm": "alone",
+ "alias": "flight-14",
+ "folder": "carbonZ_2018-07-30-17-46-31_engine_failure_with_emr_traj",
+ "input_sha256": "333421e49d7773d454b512e7bf7aca04674d6fcef7e958c129e443223cd15d95",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.6
+  }
+ ],
+ "prompt_chars": 15064,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle channel ch[2] dropped to minimum 1100 us at t=91 s and stayed there, so the aircraft descended unpowered.",
+   "status": "cause_unknown",
+   "explanation": "The propulsion output (ch[2], throttle) collapsed to its minimum and stayed there while the surface channels kept responding. The data cannot separate a battery low-voltage cutback from a throttle or ESC fault.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 92,
+     "quote": "t=91: ch[2]=1.1e+03, throttle 0, altitude 51.7",
+     "shows": "At t=91 s the propulsion output steps from about 1460 us to the 1100 us minimum and throttle goes from 46% to 0%, in one second.",
+     "calls": []
+    },
+    {
+     "line": 113,
+     "quote": "t=112: ch[2]=1.1e+03, throttle 0, altitude 3.02",
+     "shows": "Throttle stays at 0% for 22 s (t=91 to 112) and altitude falls from 51.7 m to 3 m with no recovery.",
+     "calls": []
+    },
+    {
+     "line": 5,
+     "quote": "t=3..7: ch[2]=1.1e+03, throttle 0",
+     "shows": "An earlier 5 s cut at t=3 to 7 cleared by itself at t=8 and altitude fell 64 m to 52 m. The cutback is repeatable.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "t=0.3 s mavros: Battery: WARN: Low voltage",
+     "shows": "A low-voltage warning is logged at the start. It could explain the throttle cutbacks, but no later event confirms it.",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "effects": [
+    {
+     "line": 100,
+     "quote": "t=98..112 altitude 39.4 -> 3.02 m",
+     "shows": "Altitude loss is a consequence of the throttle cut.",
+     "why": "The aircraft descended about 49 m with no thrust."
+    },
+    {
+     "line": 93,
+     "quote": "t=92..95 roll 36..44 deg, yaw rate 15 -> -2",
+     "why": "Attitude follows the roll and pitch setpoints, so this is the control loop responding normally."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the log for throttle command, ESC and battery data around t=91 s",
+    "why": "Settles whether the 0% throttle was commanded (failsafe or battery limit) or the motor output failed.",
+    "how": [
+     "Plot battery voltage and current against throttle for t=0 to 112",
+     "Check the flight mode and failsafe state at t=3 and t=91",
+     "Check ESC and motor telemetry on the ch[2] motor"
+    ],
+    "where": "remote",
+    "record": [
+     "propulsion.throttle",
+     "actuator.output[ch[2]]",
+     "battery voltage",
+     "flight mode"
+    ],
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "Voltage sagged at the cut",
+      "means": "Battery or power-limit cutback is the cause, not a control fault.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     },
+     {
+      "label": "Voltage normal, throttle command nonzero",
+      "means": "The motor output or ESC path is faulty.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether 0% throttle was commanded by the autopilot or an output failure",
+    "Battery voltage and current are not in the data"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Battery or power limiting",
+     "claim": "Low battery voltage triggered a throttle cutback or failsafe that forced the output to minimum.",
+     "status": "open",
+     "because": "A low-voltage warning is logged at t=0.3 s, and the cuts are abrupt and repeated. No voltage signal is available to confirm it.",
+     "role": "trigger",
+     "basis": "indirect",
+     "lines": [
+      2,
+      92
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Propulsion output ch[2]",
+     "claim": "Motor or throttle output channel ch[2] is stuck at minimum, from a fault in the ESC or motor path.",
+     "status": "open",
+     "because": "ch[2] is the only channel that collapses, while the other outputs and the attitude tracking stay normal.",
+     "role": "main_cause",
+     "basis": "indirect",
+     "lines": [
+      92,
+      113
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Attitude control loop",
+     "claim": "A fault in attitude control or the control surfaces.",
+     "status": "weakened",
+     "because": "Roll, pitch and yaw follow their setpoints throughout, and the surface channels move normally.",
+     "basis": "direct",
+     "observed_at": "attitude vs setpoint",
+     "lines": [
+      93,
+      95
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      2
+     ],
+     "what": "Low voltage warning at t=0.3 s",
+     "class": "anomaly",
+     "why": "A possible cause of throttle cutbacks; no follow-up event is logged."
+    },
+    {
+     "lines": [
+      4,
+      8
+     ],
+     "what": "Throttle 0%, ch[2] at 1100 us, t=3 to 7",
+     "class": "anomaly",
+     "why": "A brief earlier cutback that recovered after 5 s."
+    },
+    {
+     "lines": [
+      92,
+      113
+     ],
+     "what": "Throttle 0%, ch[2] at 1100 us, t=91 to 112",
+     "class": "root_cause_candidate",
+     "why": "A sustained propulsion loss; altitude fell from 52 m to 3 m."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 13097,
+   "output_tokens": 2660
+  },
+  "seconds": 20.6
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 90.36,
+    "value": 1
+   }
+  },
+  "onset_s": 90.36
+ }
+}

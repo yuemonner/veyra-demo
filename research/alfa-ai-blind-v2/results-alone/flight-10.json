@@ -1,0 +1,176 @@
+{
+ "arm": "alone",
+ "alias": "flight-10",
+ "folder": "carbonZ_2018-07-30-16-39-00_3_no_failure",
+ "input_sha256": "d0c21d49ea3d7f64b7a375dd012a54425b7374cbe8f9b683fbac4eb1b4a8a3e0",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.3
+  }
+ ],
+ "prompt_chars": 11017,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No control fault found; setpoints tracked, but yaw-rate reads zero and a sensor-health error is logged at start.",
+   "status": "no_failure_found",
+   "explanation": "Attitude follows its setpoints and the outputs respond sensibly. The yaw-rate channel stays at 0 while heading changes, which fits the logged sensor-health error. It looks like a sensor or logging problem, not an actuator fault.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 75,
+     "quote": "t=75: pitch setpoint -10.8, pitch -12.9, throttle 0, ch2 1100",
+     "shows": "Pitch follows the commanded descent, and the low throttle output matches 0% throttle, so there is no loss of control.",
+     "calls": []
+    },
+    {
+     "line": 10,
+     "quote": "t=10: yaw -120, t=11: yaw -150, yaw_rate 0",
+     "shows": "Heading changes about 30 deg/s while yaw_rate stays 0 for the whole flight, so the yaw-rate signal is dead or not logged.",
+     "calls": []
+    },
+    {
+     "line": 0,
+     "quote": "mavros: System: ERROR: Sensor helth",
+     "shows": "A sensor-health error is logged at t=0.1, consistent with the flat yaw-rate signal.",
+     "calls": []
+    },
+    {
+     "line": 0,
+     "quote": "ch[7] 2.04e+03 for all t",
+     "shows": "Channel 7 never moves. It is either an unused or switch channel, or a stuck output, and the data cannot tell which.",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "next_action": {
+    "action": "Inspect the yaw-rate gyro and channel 7 wiring on site.",
+    "why": "This separates a gyro or logging fault from normal behaviour, and shows whether channel 7 is a stuck servo or an unused output.",
+    "how": [
+     "Compare yaw_rate with the raw gyro log",
+     "Check which function is mapped to output ch7",
+     "Check the battery voltage warning"
+    ],
+    "where": "on_site",
+    "outcomes": [
+     {
+      "label": "Gyro or logging fault confirmed",
+      "means": "The yaw-rate sensor or its logging is faulty, not an actuator.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     },
+     {
+      "label": "Ch7 is an unused or switch output",
+      "means": "The constant 2040 is normal and not a fault.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h3"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Which function ch7 drives",
+    "Why the low-voltage warning appeared at t=0.1 and whether it persisted"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Actuator or control loop",
+     "claim": "A control-surface or motor actuator fault occurred.",
+     "status": "weakened",
+     "because": "Attitude tracks its setpoints, and the motor channel ch2 follows throttle from 1100 up to 1610 as expected.",
+     "basis": "indirect",
+     "lines": [
+      75,
+      79
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Yaw-rate sensor or logging",
+     "claim": "The yaw-rate signal is dead or not logged, consistent with the sensor-health error.",
+     "status": "leading",
+     "because": "Yaw_rate is 0 throughout while heading changes by tens of deg/s, and a sensor-health error is logged at t=0.1.",
+     "role": "main_cause",
+     "basis": "direct",
+     "lines": [
+      10,
+      11
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Output channel 7",
+     "claim": "Channel 7 is stuck at 2040 us.",
+     "status": "open",
+     "because": "The output is constant, but it could be an unused or switch channel, so the data cannot separate the two.",
+     "role": "effect",
+     "lines": [
+      0
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      0
+     ],
+     "what": "Low voltage warning at t=0.1",
+     "class": "anomaly",
+     "why": "Occurs at the start with no later effect visible in the data."
+    },
+    {
+     "lines": [
+      0
+     ],
+     "what": "Sensor health error at t=0.1",
+     "class": "anomaly",
+     "why": "Matches the flat yaw-rate signal."
+    },
+    {
+     "lines": [
+      71,
+      79
+     ],
+     "what": "Throttle drops to 0, descent from 51 to 25 m, then 64% throttle at t=79",
+     "class": "routine",
+     "why": "The descent and recovery look commanded, with pitch tracking the setpoint."
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "What output ch7 is mapped to",
+     "how_to_observe": "Read the output mapping in the vehicle configuration."
+    }
+   ],
+   "reuse_when": ""
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 9956,
+   "output_tokens": 2507
+  },
+  "seconds": 20.3
+ },
+ "labels": {
+  "present_topics": [],
+  "nonzero": {},
+  "onset_s": null
+ }
+}

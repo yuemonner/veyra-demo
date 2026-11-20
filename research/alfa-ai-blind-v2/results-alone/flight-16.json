@@ -1,0 +1,193 @@
+{
+ "arm": "alone",
+ "alias": "flight-16",
+ "folder": "carbonZ_2018-09-11-14-16-55_no_failure",
+ "input_sha256": "a7e27202bec086b3a03f6621df7ea8a32d3ab79050a6305531474ea5e65b522f",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.8
+  }
+ ],
+ "prompt_chars": 5038,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No actuator control fault seen; airspeed and yaw-rate read zero all flight after a sensor-health error at 0.2 s.",
+   "status": "cause_unknown",
+   "explanation": "A sensor-health error was logged at t=0.2 s. Airspeed and yaw rate stay at exactly 0 throughout, so those sensors are likely invalid. The roll, throttle and altitude oscillation looks like a sustained banked circling turn rather than an actuator fault.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 2,
+     "quote": "t=0.2 s mavros: System: ERROR: Sensor helth",
+     "shows": "A sensor-health error is logged at the start of the flight",
+     "calls": []
+    },
+    {
+     "line": 3,
+     "quote": "vehicle.airspeed 0 and vehicle.yaw_rate[yaw] 0 for t=0..33",
+     "shows": "Both signals are flat at exactly 0 while the aircraft moves at 20+ m/s and its heading changes continuously; the sensors or their data are invalid",
+     "calls": []
+    },
+    {
+     "line": 4,
+     "quote": "attitude_setpoint[roll] ~44.8, vehicle.attitude[roll] ~40-49",
+     "shows": "Roll follows its setpoint, so the roll axis is not failing; the setpoint is clamped near 45 deg",
+     "calls": []
+    },
+    {
+     "line": 5,
+     "quote": "actuator.output[ch[7]] 1.93e+03 constant; ch[0], ch[6] 1.5e+03 constant",
+     "shows": "Three channels never move, so they are saturated or unused; no response can be assessed for them",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Roll and pitch setpoint tracking across the flight",
+     "result": "Roll tracks its setpoint within a few degrees; pitch swings but is bounded.",
+     "verdict": "weakens",
+     "about": "h2",
+     "calls": []
+    },
+    {
+     "check": "Yaw-rate signal and airspeed against vehicle motion",
+     "result": "Both are constant 0 while heading and velocity change, so the sensors are invalid.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Constant output channels",
+     "result": "ch[0] and ch[6] sit at 1500 us and ch[7] at 1930 us for the whole flight.",
+     "verdict": "inconclusive",
+     "about": "h3",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 6,
+     "quote": "propulsion.throttle 31-73% cycling about every 15 s",
+     "why": "The throttle cycles with the circling turn and the altitude changes, so it is likely a response to the manoeuvre rather than a fault."
+    },
+    {
+     "line": 7,
+     "quote": "control.attitude_setpoint[yaw] 93 to 710 deg",
+     "why": "The yaw setpoint is unwrapped and keeps growing as the aircraft circles, so it is not a divergence on its own."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect airspeed and gyro sensor health and the logged ch[7] function",
+    "why": "This separates a real sensor failure from missing logging, and shows whether the three constant channels are intended.",
+    "how": [
+     "Check the sensor-health status flags and EKF/estimator status at boot",
+     "Verify the airspeed sensor and gyro raw data",
+     "Check the servo/motor mapping for ch[0], ch[6] and ch[7]"
+    ],
+    "where": "on_site",
+    "conditions": "Bench power-up with the battery near the voltage seen in this flight; compare with a normal flight log.",
+    "baseline": "A normal flight of the same airframe with non-zero airspeed and yaw rate.",
+    "record": [
+     "vehicle.airspeed",
+     "vehicle.yaw_rate[yaw]",
+     "actuator.output[ch[7]]"
+    ],
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "Airspeed and gyro invalid at boot",
+      "means": "The sensor fault is real and explains the flat signals.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": []
+     },
+     {
+      "label": "Sensors fine, logging missing",
+      "means": "The zero signals are a data-recording gap, not a fault.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether airspeed and yaw rate are truly invalid or simply not logged",
+    "What the low-voltage warning was relative to",
+    "Whether the roll angle is a commanded circling manoeuvre"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Airspeed and yaw-rate sensors",
+     "claim": "A sensor-health fault left airspeed and yaw rate reading zero for the whole flight.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "The sensor-health error at 0.2 s coincides with signals that are flat at exactly 0 despite clear motion.",
+     "basis": "indirect",
+     "lines": [
+      2,
+      3
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Roll/pitch actuators",
+     "claim": "A control-surface actuator fault caused the oscillation.",
+     "status": "weakened",
+     "because": "Attitude follows its setpoint and the channels move plausibly; there is no divergence or saturation event.",
+     "basis": "indirect"
+    },
+    {
+     "id": "h3",
+     "area": "Output mapping or logging",
+     "claim": "The constant channels ch[0], ch[6] and ch[7] are unused or saturated, or the signals are not logged.",
+     "status": "open",
+     "because": "They are constant for the whole flight, so the data cannot show whether they should move."
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      2
+     ],
+     "what": "System error: Sensor helth",
+     "class": "root_cause_candidate",
+     "why": "This is the only fault-like event, and it matches the flat sensor signals."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Battery low voltage warning",
+     "class": "anomaly",
+     "why": "A warning at t=0.2 s with no visible effect on the flight data."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 5150,
+   "output_tokens": 2686
+  },
+  "seconds": 20.8
+ },
+ "labels": {
+  "present_topics": [],
+  "nonzero": {},
+  "onset_s": null
+ }
+}

@@ -1,0 +1,52 @@
+{
+  "id": "chassis-dbw-4wd",
+  "name": "4WD drive-by-wire chassis: autonomous launch",
+  "source": "Example constraints written from the log header (DBC v1.6, MCU under-voltage 55.0 V / 50 ms) and drive-by-wire conventions. To be confirmed or replaced by the machine's engineers.",
+  "applies_if_signals": ["VCU_TqDebug.TqCmd_Out", "MCU_*.Tq_Act", "BMS_Status.Pack_V"],
+  "layers": {
+    "intent": "What the operator or autonomy asked for",
+    "controller": "What the vehicle controller decided and commanded",
+    "physical": "What the motors, power and brakes actually did",
+    "environment": "Conditions: slope, temperature, charge, software"
+  },
+  "window": {
+    "label": "motion requested",
+    "start": [{"signal": "AD_Cmd.TargetSpeed_mps", "op": ">", "value": 0.05}, {"signal": "VCU_TqDebug.TqCmd_Out", "op": ">", "value": 1.0}],
+    "end": [{"signal": "VCU_Status.FaultLevel", "op": ">=", "value": 3}]
+  },
+  "symptom": {"signal": "VCU_Status.FaultLevel", "op": ">=", "value": 3, "text": "VCU fault level 3: torque cut, emergency stop"},
+  "expectations": [
+    {"id": "intent_request", "layer": "intent", "kind": "trigger", "text": "Autonomy asks the vehicle to move"},
+    {"id": "vcu_drive", "layer": "controller", "kind": "responds", "signal": "VCU_Status.State", "op": "==", "value": "DRIVE", "within_s": 1.5,
+     "text": "The VCU enters DRIVE within 1.5 s"},
+    {"id": "epb_release_cmd", "layer": "controller", "kind": "responds", "signal": "Veh.EPB", "op": "==", "value": "RELEASED", "within_s": 1.5,
+     "text": "The parking brake is reported released within 1.5 s"},
+    {"id": "cmd_within_limit", "layer": "controller", "kind": "holds", "signal": "VCU_TqDebug.TqCmd_Out", "op": "<=", "ref": "VCU_TqDebug.TqLim_BMS", "tol": 0.5,
+     "text": "The torque command stays within the BMS torque limit"},
+    {"id": "torque_follows", "layer": "physical", "kind": "follows", "signal": "MCU_*.Tq_Act", "ref": "VCU_TqDebug.TqCmd_Out", "lag_s": 0.15, "tol_abs": 8.0, "tol_rel": 0.15,
+     "text": "Each wheel's torque follows the command (within 15 % or 8 N.m, 0.15 s lag)"},
+    {"id": "current_within_dcl", "layer": "physical", "kind": "holds", "signal": "BMS_Status.Pack_I", "op": "<=", "ref": "BMS_Status.DCL_A",
+     "text": "Pack current stays within the BMS discharge limit"},
+    {"id": "bus_above_uv", "layer": "physical", "kind": "holds", "signal": "MCU_*.DC_V", "op": ">=", "value": 55.0,
+     "text": "Each inverter's DC bus stays above its 55 V under-voltage threshold"},
+    {"id": "wheels_turn", "layer": "physical", "kind": "responds", "signal": "MCU_*.Spd_rpm", "op": ">", "value": 5, "within_s": 3.0,
+     "text": "Every wheel motor turns within 3 s"},
+    {"id": "vehicle_moves", "layer": "physical", "kind": "responds", "signal": "Veh.Speed_mps", "op": ">", "value": 0.05, "within_s": 3.0,
+     "text": "The vehicle moves within 3 s"},
+    {"id": "epb_caliper_released", "layer": "physical", "kind": "responds", "signal": "Veh.EPB_Caliper_Pos", "op": "==", "value": "OPEN", "within_s": 1.5,
+     "text": "The parking brake calipers physically open",
+     "needs": "EPB caliper position or EPB motor current on CAN"},
+    {"id": "uv_trip", "layer": "controller", "kind": "reaction", "trigger": {"signal": "MCU_*.DC_V", "op": "<", "value": 55.0}, "for_s": 0.05,
+     "response_event": "0x2A11|under-voltage", "within_s": 0.2,
+     "text": "When an inverter's bus stays under 55 V for 50 ms, it disables torque (designed protection)"},
+    {"id": "fault_stop", "layer": "controller", "kind": "reaction", "trigger_event": "MotorFault|FaultLevel=3", "response_event": "EMERGENCY STOP", "within_s": 0.5,
+     "text": "When the VCU reports a motor fault, the autonomy stops (designed protection)"}
+  ],
+  "context": [
+    {"signal": "Veh.Pitch_deg", "label": "Slope", "unit": "°"},
+    {"signal": "BMS_Status.T_cell_min", "label": "Coldest cell", "unit": "°C"},
+    {"signal": "BMS_Status.SOC", "label": "Charge", "unit": "%"},
+    {"signal": "VCU_Status.VCU_SW", "label": "VCU software", "unit": ""},
+    {"signal": "VCU_Status.HSA_Active", "label": "Hill-start assist active", "unit": ""}
+  ]
+}

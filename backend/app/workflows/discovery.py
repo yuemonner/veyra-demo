@@ -1,0 +1,72 @@
+"""Evidence discovery as part of an investigation: after a recording is imported and investigated, read the WHOLE original
+recording around each anomaly the run found, and record what it holds as a trusted ledger record (kind
+`evidence_discovery`), so the case's questions, Brief and Next action use it before anyone is asked for more evidence.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from app import discovery
+from app.engine import mechanisms
+from app.machines import profiles
+
+
+def profile_for_run(run: Dict[str, Any]) -> Dict[str, Any]:
+    pid = (run.get("machine_profile") or {}).get("id")
+    every = profiles.load_all()
+    chosen = every.get(pid) or every[profiles.DEFAULT_ID]
+    if not chosen.get("signal_chain"):
+        chosen = {**chosen, "signal_chain": every[profiles.DEFAULT_ID].get("signal_chain")}
+    return chosen
+
+
+def incidents_from_run(run: Dict[str, Any], chain: Dict[str, Any], limit: int = 6) -> List[Dict[str, Any]]:
+    """The run's timed anomalies (earliest first; one per event), else the start of the reported symptom."""
+    timed = sorted([a for a in mechanisms.anomalies(run, chain) if a["t"] is not None], key=lambda a: a["t"])
+    out: List[Dict[str, Any]] = []
+    lag = float(chain.get("lag_s") or mechanisms.DEFAULT_LAG_S)
+    for a in timed:
+        if out and a["t"] - out[-1]["t"] <= lag:
+            continue
+        out.append({"id": a["key"], "t": a["t"], "label": a["text"], "channel": a["scope"], "basis": "anomaly found by the investigation"})
+        if len(out) >= limit:
+            break
+    if not out:
+        candidates = (run.get("entry") or {}).get("candidates") or []
+        if candidates:
+            return [{"id": c["id"], "t": c["anchor_s"], "label": "Evidence-backed candidate, not confirmed incident", "channel": None,
+                     "basis": c["support"], "input_hashes": run["input_hashes"]} for c in candidates[:limit]]
+        window = run.get("symptom_window") or []
+        t = mechanisms._iso_t(window[0]) if window else None
+        if t is not None:
+            out.append({"id": "symptom-start", "t": t, "label": "start of the reported symptom", "channel": None,
+                        "basis": "no timed anomaly; the reported symptom start is used"})
+    return out
+
+
+def discover_and_record(store, case_id: str, run: Dict[str, Any], path: Path, *, actor: str, source_name: Optional[str] = None,
+                        sha256: Optional[str] = None, text_log=None) -> Dict[str, Any]:
+    chain = profile_for_run(run)["signal_chain"]
+    if text_log is not None:
+        found = text_discovery(text_log, source_name=source_name or Path(path).name, sha256=sha256)
+    else:
+        found = discovery.discover(Path(path), incidents_from_run(run, chain), chain, source_name=source_name, sha256=sha256)
+    for receipt in found.get("execution", {}).get("probes", []):
+        receipt.update(run_id=run["id"], run_hash=run["run_hash"], input_hashes=run["input_hashes"], source_sha256=sha256)
+    return store.append_trusted(case_id, "evidence_discovery", {**found, "run_id": run["id"], "run_hash": run["run_hash"],
+                                "input_hashes": run["input_hashes"]}, actor=actor,
+                                source=f"veyra://discovery/{discovery.DISCOVERY_VERSION}")
+
+
+def text_discovery(text_log, *, source_name: str, sha256: Optional[str]) -> Dict[str, Any]:
+    """Evidence discovery for a text log: the log characterization (restarts, causes, faults, absences, checks)."""
+    from app.discovery import logs
+    found = logs.characterize(text_log, source_name=source_name)
+    return {"version": discovery.DISCOVERY_VERSION,
+            "source": {"name": source_name, "sha256": sha256, "format": "text_log", "clock": text_log.clock, "lines": len(text_log.lines)},
+            "inventory": {"streams": [{"stream": "(log lines)", "type": "text", "count": len(text_log.lines), "rate_hz": None, "role": "controller_text",
+                                       "why": "text log"}], "excluded": [], "not_understood": [], "read_by_probes": ["(log lines)"],
+                          "roles_present": ["controller_text"]},
+            "incidents": [], "gaps": [{"point": "controller", **g} for g in found["gaps"]], "log": found,
+            "boundary": found["boundary"]}

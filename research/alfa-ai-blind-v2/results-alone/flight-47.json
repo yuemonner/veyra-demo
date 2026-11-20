@@ -1,0 +1,236 @@
+{
+ "arm": "alone",
+ "alias": "flight-47",
+ "folder": "carbonZ_2018-10-18-11-08-24_no_failure",
+ "input_sha256": "cc8aa0daa699a05e854a5113110cab6311f6ad48a9601d22b368ec8f1c9e9bdf",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 23.8
+  }
+ ],
+ "prompt_chars": 4232,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No actuator control fault found; sensor-health error at 1.3 s and stuck airspeed and yaw-rate signals.",
+   "status": "cause_unknown",
+   "explanation": "Attitude followed setpoints through a large transient at 1-9 s, so control tracking looks healthy. A sensor-health error at 1.3 s fits the airspeed (0 m/s) and yaw-rate (0 deg/s) channels being flat all flight.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 1,
+     "quote": "t=1.3 s mavros: System: ERROR: Sensor helth",
+     "shows": "A system sensor-health error logged at 1.3 s, with a low-voltage warning at the same instant.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "vehicle.airspeed 0 and vehicle.yaw_rate[yaw] 0 for t=0..26 while velocity[x] is about 10 m/s and yaw moves -85 to -52 deg",
+     "shows": "Airspeed and yaw-rate readings are flat at zero and inconsistent with the motion, so those sensors or channels are stuck or unlogged.",
+     "calls": []
+    },
+    {
+     "line": 3,
+     "quote": "t=1..9 ch[2] 1360,1230,1210,1240,1250,1300,1570,1610 us; pitch -18.9 deg; altitude 75.7 to 45.2 m",
+     "shows": "Large ch[2] swing with a pitch-down and a 30 m altitude loss, while pitch follows the setpoint. This looks like a commanded recovery rather than an actuator failure.",
+     "calls": []
+    },
+    {
+     "line": 4,
+     "quote": "ch[7] 1.93e+03 and ch[0] 1.5e+03 constant all flight",
+     "shows": "Two channels never move. Probably unused, or a fixed function such as arm or gimbal; not shown to be faulty.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Attitude vs setpoint tracking (pitch, roll) over the flight",
+     "result": "Actual follows setpoint with about 1-2 s lag and settles by about t=10 s; no divergence or saturation.",
+     "verdict": "weakens",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Actuator outputs for stuck, saturated or asymmetric channels",
+     "result": "ch[0], ch[6] and ch[7] constant; ch[2] has the largest excursion, 1210-1610 us, and never hits a limit.",
+     "verdict": "inconclusive",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Airspeed and yaw-rate consistency with velocity and heading",
+     "result": "Both read exactly 0 all flight while ground speed is about 10 m/s and heading changes by about 30 deg.",
+     "verdict": "supports",
+     "about": "h2",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 3,
+     "quote": "altitude 76.8 to 45.2 m over t=0..7",
+     "why": "Altitude loss follows the pitch-down and low-throttle excursion; it is a consequence of the commanded manoeuvre."
+    },
+    {
+     "line": 1,
+     "quote": "Battery: WARN: Low voltage",
+     "why": "Throttle dropped from 47% to 14% around t=1..3 and recovered. This is not shown to be a battery fault."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect airspeed and gyro-yaw sensors and their logging configuration",
+    "why": "Settles whether the zero airspeed and yaw rate are real sensor failures, which the 1.3 s health error may point to, or just unconfigured logging.",
+    "how": [
+     "Check the pitot tube and airspeed sensor for blockage or disconnection",
+     "Check the sensor-health flags and the logged yaw-rate source",
+     "Review the battery voltage log around t=1 s"
+    ],
+    "where": "on_site",
+    "conditions": "Powered on the ground, then a short hover or low-speed run with the same firmware and configuration.",
+    "baseline": "A normal flight where airspeed tracks ground speed and yaw rate follows heading change.",
+    "record": [
+     "vehicle.airspeed",
+     "vehicle.yaw_rate[yaw]",
+     "vehicle.velocity[x]",
+     "vehicle.attitude[yaw]"
+    ],
+    "needs_approval": false,
+    "outcomes": [
+     {
+      "label": "Airspeed and yaw-rate sensors dead",
+      "means": "Real sensor fault, consistent with the 1.3 s health error.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h3"
+      ],
+      "then": "Replace or repair the sensor and recheck."
+     },
+     {
+      "label": "Sensors fine, channels unlogged",
+      "means": "Zero values are a logging artefact; no fault evidence remains.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Fix logging and re-fly for a baseline."
+     }
+    ]
+   },
+   "unknowns": [
+    "Which function ch[0], ch[6] and ch[7] drive",
+    "Battery voltage trace is not in the data",
+    "Whether the early 1-9 s manoeuvre was commanded or a recovery"
+   ],
+   "already_answered": [
+    {
+     "question": "When was the first fault indication logged?",
+     "answer": "1.3 s, a system sensor-health error together with a low-voltage warning.",
+     "line": 1,
+     "quote": "t=1.3 s mavros: System: ERROR: Sensor helth",
+     "calls": []
+    }
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Actuator / control loop",
+     "claim": "A control-surface or actuator fault degraded attitude control.",
+     "status": "weakened",
+     "role": "main_cause",
+     "because": "Attitude tracked setpoints and no output saturated or stuck in a way that diverged from the commands.",
+     "basis": "indirect",
+     "lines": [
+      3
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Airspeed / yaw-rate sensors",
+     "claim": "Airspeed and yaw-rate sensors are failed or stuck at zero, matching the sensor-health error.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Both read exactly zero all flight despite motion and heading change; the error at 1.3 s fits.",
+     "basis": "indirect",
+     "lines": [
+      1,
+      2
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Logging / configuration",
+     "claim": "The zero channels are an unconfigured or unlogged artefact, not a real fault.",
+     "status": "open",
+     "role": "effect",
+     "because": "Constant exact zeros can also mean the data was never populated.",
+     "basis": "indirect",
+     "lines": [
+      2
+     ]
+    },
+    {
+     "id": "h4",
+     "area": "Battery / power",
+     "claim": "Low voltage at about 1.3 s caused the throttle dip.",
+     "status": "open",
+     "role": "trigger",
+     "because": "Warning coincides with throttle falling from 47% to 14% at 1-3 s, but there is no voltage data.",
+     "basis": "indirect",
+     "lines": [
+      1
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1
+     ],
+     "what": "Sensor health ERROR at 1.3 s",
+     "class": "root_cause_candidate",
+     "why": "Only explicit error; aligns with airspeed and yaw-rate channels reading zero."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low voltage WARN at 1.3 s",
+     "class": "anomaly",
+     "why": "Coincides with throttle drop; no voltage signal to confirm."
+    },
+    {
+     "lines": [
+      3
+     ],
+     "what": "Pitch to -19 deg and 30 m altitude loss, 1-9 s",
+     "class": "effect",
+     "why": "Tracked the setpoint; a transient recovery rather than a control failure."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 4551,
+   "output_tokens": 3072
+  },
+  "seconds": 23.8
+ },
+ "labels": {
+  "present_topics": [],
+  "nonzero": {},
+  "onset_s": null
+ }
+}

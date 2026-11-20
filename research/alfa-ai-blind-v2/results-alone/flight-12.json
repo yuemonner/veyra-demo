@@ -1,0 +1,209 @@
+{
+ "arm": "alone",
+ "alias": "flight-12",
+ "folder": "carbonZ_2018-07-30-17-20-01_engine_failure_with_emr_traj",
+ "input_sha256": "84f544ae7b960e567fe993d05407a23fb8e712aca866b98b75cf70944c79599e",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.3
+  }
+ ],
+ "prompt_chars": 14386,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle channel ch[2] pinned at minimum from t=88 s with throttle 0%, while attitude control stayed normal.",
+   "status": "cause_unknown",
+   "explanation": "ch[2] follows throttle all flight, so it is probably the propulsion output. It dropped from 1.46e3 to 1.1e3 us and throttle fell to 0% at t=88 s. Whether this was commanded or a fault is not separable here.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 88,
+     "quote": "88,...,1.1e+03,...,0,14.3,51.2",
+     "shows": "ch[2] steps to 1100 us and throttle to 0% within 1 s, from 46% and about 1.46e3 us at t=87 s",
+     "calls": []
+    },
+    {
+     "line": 106,
+     "quote": "106,...,1.1e+03,...,0,14.7,5.75",
+     "shows": "ch[2] stays flat at 1100 us and throttle at 0% until the end of the log, with altitude down to 5.75 m",
+     "calls": []
+    },
+    {
+     "line": 7,
+     "quote": "7,...,1.14e+03,...,4,18.7,55.7",
+     "shows": "Earlier low-throttle moments also drove ch[2] low, so ch[2] follows throttle (probably the motor channel)",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "ch[2] versus throttle across the flight",
+     "result": "ch[2] falls whenever throttle falls (t=2-8, 20-30, 66-70). It is the only channel pinned flat at 1100 us after t=88.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Attitude tracking after t=88",
+     "result": "Roll follows the 44 deg setpoint with about 1 s lag (t=89-91, t=103-105). Pitch and yaw also follow. Surface channels 1, 3, 4 and 5 keep moving normally.",
+     "verdict": "weakens",
+     "about": "h2",
+     "calls": []
+    },
+    {
+     "check": "Airspeed and altitude after t=88",
+     "result": "Airspeed holds at 12-18 m/s. Altitude falls from 51 m to 5.75 m, about 2.5 m/s descent, which fits an unpowered glide or a landing approach.",
+     "verdict": "inconclusive",
+     "about": "h1",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 89,
+     "quote": "89,...,505,...,26.3",
+     "shows": "Yaw and roll setpoints keep changing after the throttle cut, so the controller still tracks them"
+    },
+    {
+     "line": 106,
+     "quote": "106,...,5.75",
+     "shows": "The altitude loss follows from zero thrust"
+    }
+   ],
+   "next_action": {
+    "action": "Check the flight mode and throttle command around t=88 s",
+    "why": "This settles whether the throttle cut was a commanded landing or failsafe, or an output or ESC fault.",
+    "how": [
+     "Inspect mode and mission state history near t=88 s",
+     "Compare the throttle command with the ch[2] PWM output",
+     "Review ESC telemetry and the failsafe log"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Landing or failsafe commanded the cut",
+      "means": "Normal behaviour, no control fault",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     },
+     {
+      "label": "Throttle command stayed high but ch[2] fell",
+      "means": "Output or actuator fault on ch[2]",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h3"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether the t=88 s throttle cut was commanded",
+    "What ch[2] physically drives",
+    "What the t=0 battery and sensor events refer to"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Motor output ch[2]",
+     "claim": "The propulsion output on ch[2] failed or was cut to minimum at t=88 s.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "ch[2] and throttle step to minimum together and stay flat for 19 s.",
+     "basis": "indirect",
+     "lines": [
+      88,
+      106
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Attitude control loop",
+     "claim": "The attitude controller lost authority or failed.",
+     "status": "weakened",
+     "role": "main_cause",
+     "because": "Attitude follows its setpoints throughout, including after t=88 s.",
+     "basis": "direct",
+     "observed_at": "attitude vs setpoint",
+     "lines": [
+      89,
+      105
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Commanded throttle cut",
+     "claim": "A landing or failsafe command, not a fault, set throttle to 0%.",
+     "status": "open",
+     "role": "trigger",
+     "because": "Steady descent and a flat command are consistent with an intentional cut, but no mode data is present.",
+     "basis": "indirect",
+     "lines": [
+      88,
+      106
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      0
+     ],
+     "what": "Low battery voltage warning at t=0",
+     "class": "anomaly",
+     "why": "Not followed by any matching change in the signals"
+    },
+    {
+     "lines": [
+      0
+     ],
+     "what": "Sensor health error at t=0",
+     "class": "anomaly",
+     "why": "Isolated at t=0 with no visible effect on attitude"
+    },
+    {
+     "lines": [
+      88
+     ],
+     "what": "ch[2] drops to 1100 us and throttle to 0%",
+     "class": "root_cause_candidate",
+     "why": "Abrupt and sustained, unlike the earlier throttle dips"
+    }
+   ],
+   "reuse_when": ""
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 12546,
+   "output_tokens": 2538
+  },
+  "seconds": 20.3
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 87.681,
+    "value": 1
+   }
+  },
+  "onset_s": 87.681
+ }
+}

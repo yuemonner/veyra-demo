@@ -1,0 +1,194 @@
+{
+ "engine": "v2",
+ "cases": 450,
+ "crashes": [],
+ "false_positive": {
+  "cases": 0,
+  "of": 120,
+  "pct": 0.0,
+  "by_scenario": {
+   "healthy_even": "0/30",
+   "healthy_uneven": "0/30",
+   "sensor_offset": "0/30",
+   "cold_battery": "0/30"
+  }
+ },
+ "missed": {
+  "faults": 44,
+  "of": 155,
+  "pct": 28.4,
+  "by_scenario": {
+   "connector": "0",
+   "connector_intermittent": "7",
+   "conductor": "2",
+   "inverter_loss": "21",
+   "combined": "14",
+   "sensor_gain": "0"
+  }
+ },
+ "wrong_wheel_in_fault_cases": 0,
+ "small_contact_4_8_mohm": {
+  "flagged": 3,
+  "of": 10
+ },
+ "fabrication": {
+  "cases": 0,
+  "examples": []
+ },
+ "attribution": {
+  "kept_true": 178,
+  "of": 178,
+  "pct": 100.0,
+  "errors": [],
+  "by_mechanism": {
+   "contact": "129/129",
+   "conductor": "28/28",
+   "inverter_draw": "14/14",
+   "sensor_gain": "7/7"
+  },
+  "mean_open_candidates": 3.2
+ },
+ "k_accuracy": {
+  "median_rel_err_pct": 4.2,
+  "p90_rel_err_pct": 12.8,
+  "n": 3648
+ },
+ "coverage": {
+  "fault_branches_inside": 85,
+  "of": 90,
+  "pct": 94.4,
+  "healthy_branches_inside": 987,
+  "healthy_of": 1005,
+  "fault_misses": [
+   {
+    "wheel": "FR",
+    "true_mohm": 17.5,
+    "lo": 10.77,
+    "hi": 17.19,
+    "inside": false,
+    "fault": "contact"
+   },
+   {
+    "wheel": "FL",
+    "true_mohm": 17.36,
+    "lo": 11.16,
+    "hi": 17.32,
+    "inside": false,
+    "fault": "contact"
+   },
+   {
+    "wheel": "RR",
+    "true_mohm": 26.85,
+    "lo": 15.14,
+    "hi": 22.25,
+    "inside": false,
+    "fault": "contact"
+   },
+   {
+    "wheel": "FR",
+    "true_mohm": 18.43,
+    "lo": 10.21,
+    "hi": 16.55,
+    "inside": false,
+    "fault": "contact"
+   },
+   {
+    "wheel": "RL",
+    "true_mohm": 20.47,
+    "lo": 12.49,
+    "hi": 19.75,
+    "inside": false,
+    "fault": "conductor"
+   }
+  ]
+ },
+ "battery": {
+  "apparent_inside": 986,
+  "of": 986,
+  "pct": 100.0,
+  "outside_examples": [],
+  "soc_confound_flagged": "14/14",
+  "soc_confound_false_flags": "0/24"
+ },
+ "sensor_offset": {
+  "flagged": 41,
+  "of": 44,
+  "pct": 93.2,
+  "false_flags": 32
+ },
+ "measurement": {
+  "good": 172,
+  "of": 178,
+  "pct": 96.6,
+  "misleading": 6,
+  "misleading_examples": [
+   {
+    "wheel": "FL",
+    "recommended": "segment_r",
+    "outcome": "normal",
+    "keeps_true": false,
+    "eliminates": [
+     "conductor"
+    ],
+    "misleading": true
+   },
+   {
+    "wheel": "FR",
+    "recommended": "segment_r",
+    "outcome": "normal",
+    "keeps_true": false,
+    "eliminates": [
+     "conductor"
+    ],
+    "misleading": true
+   },
+   {
+    "wheel": "RR",
+    "recommended": "segment_r",
+    "outcome": "normal",
+    "keeps_true": false,
+    "eliminates": [
+     "conductor"
+    ],
+    "misleading": true
+   },
+   {
+    "wheel": "RR",
+    "recommended": "segment_r",
+    "outcome": "normal",
+    "keeps_true": false,
+    "eliminates": [
+     "conductor"
+    ],
+    "misleading": true
+   },
+   {
+    "wheel": "RR",
+    "recommended": "segment_r",
+    "outcome": "normal",
+    "keeps_true": false,
+    "eliminates": [
+     "conductor"
+    ],
+    "misleading": true
+   }
+  ],
+  "recommended": {
+   "meter_v": 1,
+   "segment_dv_loaded": 21,
+   "segment_r": 156
+  }
+ },
+ "criteria": {
+  "1_fabrication": true,
+  "2_false_positive_le_5pct": true,
+  "3_missed_le_10pct": false,
+  "4_attribution_ge_95pct": true,
+  "5a_k_median_le_10pct": true,
+  "5b_coverage_ge_90pct": true,
+  "6a_confound_100pct": true,
+  "6b_apparent_ge_90pct": true,
+  "7_offset_ge_90pct": true,
+  "8_measurement_ge_90pct": true
+ }
+}

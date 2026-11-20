@@ -1,0 +1,172 @@
+{
+ "arm": "alone",
+ "alias": "flight-05",
+ "folder": "carbonZ_2018-07-18-16-37-39_1_no_failure",
+ "input_sha256": "ccfb34a9a72c677b0d1d7a7dafc8f707401b70b7c6a60c18aaefcd99fac0c936",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 18.9
+  }
+ ],
+ "prompt_chars": 4664,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "No control fault found; attitude tracks setpoints, though yaw-rate reads a constant 0 and a battery warning was logged.",
+   "status": "no_failure_found",
+   "explanation": "Roll and yaw follow their setpoints through a sustained banked turn with no saturation or divergence. The flat-zero yaw-rate channel and the constant ch7 output look like logging or unused-channel artifacts, not control faults.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 1,
+     "quote": "vehicle.yaw_rate[yaw] (deg/s) = 0 for all t",
+     "shows": "Yaw rate stays at 0 while yaw changes about 12-20 deg/s, so the channel is not logging real data.",
+     "calls": []
+    },
+    {
+     "line": 1,
+     "quote": "actuator.output[ch[7]] = 2.04e+03 constant",
+     "shows": "Channel 7 is fixed at 2040 us for the whole flight, as is ch0 at 1500 us. Probably an unused or parked channel.",
+     "calls": []
+    },
+    {
+     "line": 2,
+     "quote": "attitude_setpoint[roll] 45 vs vehicle.attitude[roll] 42-47 (t=0-5)",
+     "shows": "Roll follows the 45 deg setpoint and later follows the setpoint change at t=6-8, so roll control responds normally.",
+     "calls": []
+    },
+    {
+     "line": 3,
+     "quote": "attitude_setpoint[yaw] 37 to 513 vs vehicle.attitude[yaw] -141 to 402",
+     "shows": "Both yaw values drift together at a steady rate of about 12-16 deg/s. The setpoint is a rolling lead and the vehicle follows.",
+     "calls": []
+    },
+    {
+     "line": 4,
+     "quote": "Low voltage warning at t=0.8 s",
+     "shows": "A battery warning was logged. Throttle and outputs stay normal afterwards, so no control impact is visible.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Attitude setpoint vs measured (roll, pitch, yaw)",
+     "result": "Tracks with lag; no divergence or sustained error",
+     "verdict": "rules_out",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Actuator outputs for saturation or stuck channels",
+     "result": "ch0, ch6 and ch7 are constant, but the others move with demand and none is saturated. ch4 and ch5 are identical, which fits a paired surface.",
+     "verdict": "weakens",
+     "about": "h2",
+     "calls": []
+    },
+    {
+     "check": "Yaw-rate signal vs yaw change",
+     "result": "Yaw rate is 0 throughout while yaw changes several deg/s",
+     "verdict": "supports",
+     "about": "h3",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 4,
+     "quote": "Low voltage warning",
+     "why": "There is no throttle or output change after it, so it did not degrade control."
+    }
+   ],
+   "next_action": {
+    "action": "Verify yaw-rate logging and the ch7 and ch0 channel mapping",
+    "why": "Confirms whether the flat yaw rate and fixed outputs are logging artifacts or a real sensor or servo problem.",
+    "how": [
+     "Check the yaw_rate topic source and logging config",
+     "Check the servo output mapping for ch0, ch6 and ch7"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Yaw rate logged flat by config",
+      "means": "A logging artifact; no hardware fault.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     },
+     {
+      "label": "Ch7 mapped to a live servo",
+      "means": "Possible stuck actuator at 2040 us.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": []
+     }
+    ]
+   },
+   "unknowns": [
+    "Which function ch0, ch6 and ch7 drive",
+    "Whether the low-voltage warning reflects a real battery state"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Attitude control loop",
+     "claim": "Control loop fault causing poor setpoint tracking",
+     "status": "ruled_out",
+     "because": "Roll, pitch and yaw follow their setpoints without divergence",
+     "basis": "direct",
+     "observed_at": "setpoint vs measured attitude",
+     "excluded_by": "data"
+    },
+    {
+     "id": "h2",
+     "area": "Actuator ch7 or ch0",
+     "claim": "Output ch7 (2040 us) or ch0 stuck or saturated",
+     "status": "open",
+     "because": "Constant from t=0, but no attitude effect is visible; likely an unused channel"
+    },
+    {
+     "id": "h3",
+     "area": "Yaw-rate signal",
+     "claim": "Yaw-rate sensor or log channel flat at zero",
+     "status": "leading",
+     "because": "Contradicts the observed yaw change; a data artifact"
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low voltage warning at 0.8 s",
+     "class": "anomaly",
+     "why": "No visible control impact afterwards"
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 4844,
+   "output_tokens": 2293
+  },
+  "seconds": 18.9
+ },
+ "labels": {
+  "present_topics": [],
+  "nonzero": {},
+  "onset_s": null
+ }
+}

@@ -1,0 +1,243 @@
+{
+ "arm": "alone",
+ "alias": "flight-28",
+ "folder": "carbonZ_2018-09-11-17-27-13_2_both_ailerons_failure",
+ "input_sha256": "f9fba60abc0c7d075dd94f83ad559e4ae50d601f320cf95e17a10f99bbf79d5b",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 30.0
+  }
+ ],
+ "prompt_chars": 13454,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Outputs ch4 and ch5 froze at exactly 1500 us from about t=66 s, then roll control degraded and diverged.",
+   "status": "cause_probable",
+   "explanation": "Actuator channels 4 and 5 stopped responding from about t=66 s. The remaining channels (1, 2, 3) saturated trying to compensate. Roll then lagged the setpoint and reached 63 deg by t=101 s.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 67,
+     "quote": "t=66: ch4=1.5e+03, ch5=1.5e+03",
+     "shows": "ch4 and ch5 become exactly 1500 us at t=66 and stay there to t=101, while they moved every second before. Their identical values throughout suggest a mirrored pair.",
+     "calls": []
+    },
+    {
+     "line": 89,
+     "quote": "t=88: roll setpoint 43.8, roll -54.4",
+     "shows": "Roll is opposite in sign to the setpoint and lags it by about 100 deg, far beyond earlier tracking.",
+     "calls": []
+    },
+    {
+     "line": 102,
+     "quote": "t=101: roll 63, setpoint -38.8, ch2 1.7e+03, ch3 1.4e+03",
+     "shows": "Roll is at 63 deg and diverging, with ch2 saturated at 1700 and ch3 and ch1 driven hard.",
+     "calls": []
+    },
+    {
+     "line": 1,
+     "quote": "ch[0]=1.5e+03 and ch[6]=1.5e+03 constant, ch[7]=1.93e+03 constant",
+     "shows": "Three of eight channels never move for the whole flight, so they are unused or dead.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Read the table for outputs that stop varying while the setpoints keep changing",
+     "result": "ch4 and ch5 are stuck at 1500 us from t=66. ch0, ch6 and ch7 are constant for the whole flight. Yaw rate is 0 throughout.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Compared roll setpoint with roll response before and after t=66",
+     "result": "Roll tracks within a few degrees before t=66. After t=66 the setpoint is saturated at about +/-45 deg for long periods, roll lags it and reaches 51-63 deg.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 99,
+     "quote": "setpoint roll 44.8 sustained t=72-86 and t=89-99",
+     "shows": "The setpoint is pinned at the limit, which is the controller fighting reduced authority.",
+     "why": "It is a consequence of the loss of control effectiveness."
+    },
+    {
+     "line": 101,
+     "quote": "ch[3] 1.36e+03 and ch[2] 1.7e+03 at the limits",
+     "why": "The remaining actuators saturate while compensating for the lost pair."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect motors, ESCs and wiring on outputs 4 and 5; run a bench test",
+    "why": "This settles whether the frozen outputs come from the hardware or from the mixer or controller.",
+    "how": [
+     "Command outputs 4 and 5 individually on the bench with props off and check the response",
+     "Inspect the ESC, signal and power connectors on outputs 4 and 5",
+     "Compare the full log, including the raw mixer outputs, for t=60-70"
+    ],
+    "where": "on_site",
+    "conditions": "Props removed, battery at normal charge, armed on the bench, then hover-load test.",
+    "baseline": "Outputs 0-3 in this log before t=66, or a known-good flight.",
+    "record": [
+     "actuator.output[ch[4]]",
+     "actuator.output[ch[5]]",
+     "vehicle.attitude[roll]",
+     "control.attitude_setpoint[roll]"
+    ],
+    "needs_approval": true,
+    "outcomes": [
+     {
+      "label": "Outputs 4/5 do not respond on bench",
+      "means": "Output stage, wiring or ESC fault on outputs 4 and 5.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Replace the ESC or wiring and retest."
+     },
+     {
+      "label": "Outputs respond normally on bench",
+      "means": "The freeze came from the mixer or controller, or from a sensor fault.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Review the controller and mixer logs and the sensor health."
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether ch4 and ch5 were commanded to 1500 by the controller or the outputs failed.",
+    "Why yaw rate and airspeed read exactly 0 for the whole flight."
+   ],
+   "already_answered": [
+    {
+     "question": "Did a control fault occur, and when?",
+     "answer": "Yes. Outputs ch4 and ch5 froze at 1500 us from about t=66 s, and roll control degraded after that.",
+     "line": 67,
+     "quote": "ch4=ch5=1.5e+03 from t=66",
+     "calls": []
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "Which physical motor or surface ch4 and ch5 drive",
+     "why_it_matters": "It decides where on the aircraft the fault sits.",
+     "how_to_observe": "Check the output mapping and wiring against the airframe."
+    }
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Outputs ch4/ch5 (actuator pair)",
+     "claim": "The ch4 and ch5 actuator outputs stopped responding at about t=66, reducing control authority and causing roll divergence.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Both outputs are frozen at 1500 us while the others saturate, and roll tracking degrades from that point.",
+     "basis": "indirect",
+     "lines": [
+      67,
+      89,
+      102
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Controller or mixer / sensor health",
+     "claim": "A controller or sensor fault (yaw rate dead at 0, system sensor health error) caused the degraded control.",
+     "status": "open",
+     "role": "trigger",
+     "because": "The sensor health error at 0.5 s and yaw rate stuck at 0 show a sensor problem, but they do not explain the frozen outputs.",
+     "basis": "indirect",
+     "lines": [
+      1
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Battery",
+     "claim": "Low battery voltage limited the thrust available.",
+     "status": "weakened",
+     "role": "amplifier",
+     "because": "The low voltage warning is at t=0.5 s only, and the first 60 s are stable.",
+     "basis": "indirect",
+     "lines": [
+      1
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1
+     ],
+     "what": "Battery low voltage warning at 0.5 s",
+     "class": "anomaly",
+     "why": "It is a single early warning and the first 60 s fly stably."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "System sensor health error at 0.5 s",
+     "class": "anomaly",
+     "why": "It is consistent with yaw rate and airspeed reading 0."
+    },
+    {
+     "lines": [
+      67
+     ],
+     "what": "ch4 and ch5 frozen at 1500 us",
+     "class": "root_cause_candidate",
+     "why": "These outputs stop responding while the others keep varying."
+    },
+    {
+     "lines": [
+      89,
+      102
+     ],
+     "what": "Roll lags the setpoint and diverges to 63 deg",
+     "class": "effect",
+     "why": "It follows the loss of control authority."
+    }
+   ],
+   "lesson": "",
+   "reuse_when": "A multi-channel vehicle where an output pair freezes at neutral while the others saturate and attitude diverges."
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 11894,
+   "output_tokens": 3791
+  },
+  "seconds": 30.0
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/aileron"
+  ],
+  "nonzero": {
+   "/failure_status/aileron": {
+    "first_nonzero_s": 65.771,
+    "value": 3
+   }
+  },
+  "onset_s": 65.771
+ }
+}

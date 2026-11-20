@@ -1,0 +1,129 @@
+{
+ "engine": "v2",
+ "cases": 300,
+ "crashes": [],
+ "false_positive": {
+  "cases": 0,
+  "of": 80,
+  "pct": 0.0,
+  "by_scenario": {
+   "healthy_even": "0/20",
+   "healthy_uneven": "0/20",
+   "sensor_offset": "0/20",
+   "cold_battery": "0/20"
+  }
+ },
+ "missed": {
+  "faults": 26,
+  "of": 106,
+  "pct": 24.5,
+  "by_scenario": {
+   "connector": "0",
+   "connector_intermittent": "2",
+   "conductor": "0",
+   "inverter_loss": "15",
+   "combined": "9",
+   "sensor_gain": "0"
+  }
+ },
+ "wrong_wheel_in_fault_cases": 0,
+ "small_contact_4_8_mohm": {
+  "flagged": 1,
+  "of": 4
+ },
+ "fabrication": {
+  "cases": 0,
+  "examples": []
+ },
+ "attribution": {
+  "kept_true": 120,
+  "of": 120,
+  "pct": 100.0,
+  "errors": [],
+  "by_mechanism": {
+   "contact": "91/91",
+   "conductor": "19/19",
+   "inverter_draw": "9/9",
+   "sensor_gain": "1/1"
+  },
+  "mean_open_candidates": 3.17
+ },
+ "k_accuracy": {
+  "median_rel_err_pct": 4.3,
+  "p90_rel_err_pct": 12.9,
+  "n": 2411
+ },
+ "coverage": {
+  "fault_branches_inside": 58,
+  "of": 60,
+  "pct": 96.7,
+  "healthy_branches_inside": 659,
+  "healthy_of": 670,
+  "fault_misses": [
+   {
+    "wheel": "RR",
+    "true_mohm": 31.79,
+    "lo": 20.1,
+    "hi": 30.34,
+    "inside": false,
+    "fault": "contact"
+   },
+   {
+    "wheel": "RL",
+    "true_mohm": 23.36,
+    "lo": 12.23,
+    "hi": 18.57,
+    "inside": false,
+    "fault": "contact"
+   }
+  ]
+ },
+ "battery": {
+  "apparent_inside": 652,
+  "of": 652,
+  "pct": 100.0,
+  "outside_examples": [],
+  "soc_confound_flagged": "9/9",
+  "soc_confound_false_flags": "0/16"
+ },
+ "sensor_offset": {
+  "flagged": 29,
+  "of": 29,
+  "pct": 100.0,
+  "false_flags": 16
+ },
+ "measurement": {
+  "good": 119,
+  "of": 120,
+  "pct": 99.2,
+  "misleading": 1,
+  "misleading_examples": [
+   {
+    "wheel": "RL",
+    "recommended": "segment_r",
+    "outcome": "normal",
+    "keeps_true": false,
+    "eliminates": [
+     "conductor"
+    ],
+    "misleading": true
+   }
+  ],
+  "recommended": {
+   "segment_dv_loaded": 19,
+   "segment_r": 101
+  }
+ },
+ "criteria": {
+  "1_fabrication": true,
+  "2_false_positive_le_5pct": true,
+  "3_missed_le_10pct": false,
+  "4_attribution_ge_95pct": true,
+  "5a_k_median_le_10pct": true,
+  "5b_coverage_ge_90pct": true,
+  "6a_confound_100pct": true,
+  "6b_apparent_ge_90pct": true,
+  "7_offset_ge_90pct": true,
+  "8_measurement_ge_90pct": true
+ }
+}

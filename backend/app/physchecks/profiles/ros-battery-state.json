@@ -1,0 +1,23 @@
+{
+  "schema": "veyra-signal-profile-v1",
+  "id": "ros-battery-state",
+  "version": "1",
+  "synthetic": false,
+  "title": "Any ROS battery (sensor_msgs/BatteryState)",
+  "machine_class": null,
+  "note": "Vendor-neutral: binds the one topic of type sensor_msgs/BatteryState. ROS defines current as negative when discharging and percentage as 0-1. Machine class is not known from the message, so scenarios that require one do not apply until a private profile states it.",
+  "recording": {
+    "formats": ["ros1_bag", "ros2_bag", "mcap"],
+    "bind": {"battery": {"types": ["sensor_msgs/msg/BatteryState", "sensor_msgs/BatteryState"]}},
+    "time": "log (receive) time, seconds from the first message of the recording"
+  },
+  "max_sample_age_s": 2.0,
+  "max_gap_s": 5.0,
+  "roles": {
+    "pack_current": {"field": "battery:current", "unit": "A", "sign": "charge_positive", "kind": "measurement", "valid": [-2000, 2000]},
+    "soc": {"field": "battery:percentage", "unit": "fraction", "kind": "estimate", "estimator": "unknown", "valid": [0, 1]},
+    "rated_capacity": {"field": "battery:capacity", "unit": "Ah", "kind": "reported_parameter", "valid": [0.01, 5000]},
+    "pack_voltage": {"field": "battery:voltage", "unit": "V", "kind": "measurement", "valid": [0, 2000]}
+  },
+  "parameters": {}
+}

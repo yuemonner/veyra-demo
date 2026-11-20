@@ -1,0 +1,292 @@
+{
+ "arm": "alone",
+ "alias": "flight-20",
+ "folder": "carbonZ_2018-09-11-14-41-51_elevator_failure",
+ "input_sha256": "e76c07243ba7daa06464cd50baf9b1e86a5e123585bd55ea07a771719d99d37c",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 31.2
+  }
+ ],
+ "prompt_chars": 16880,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Pitch-axis control loss from t\u2248119 s; actuator ch[2] and pitch diverged, altitude fell 57 to 36 m.",
+   "status": "cause_probable",
+   "explanation": "Pitch responded opposite to the setpoint at t=120-122, then overshot to -30 deg and +33 deg. Actuator ch[2], which drives pitch and throttle, saturated. The cause is not separated between a ch[2] actuator or pitch-loop fault and an external disturbance.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 119,
+     "quote": "119: pitch setpoint -2.71, attitude pitch 8.66",
+     "shows": "Pitch rose about 8 deg before any command change. Before this the loop tracked within a few degrees.",
+     "calls": []
+    },
+    {
+     "line": 121,
+     "quote": "121: pitch setpoint -23.1, pitch +22.9, ch[2] 1170, throttle 8%",
+     "shows": "The nose went up while the setpoint was nose down. The same ch[2] command at t=2-3 gave the correct response (pitch -12.8, then -21.7).",
+     "calls": []
+    },
+    {
+     "line": 124,
+     "quote": "124: setpoint -4.21, pitch -29.8; 125: setpoint 17.4, pitch -25.8",
+     "shows": "Pitch overshot to nose down by about 25 deg, then stayed negative while ch[2] rose to 1680 and throttle to 75%.",
+     "calls": []
+    },
+    {
+     "line": 126,
+     "quote": "126: altitude 35.7 m (119: 49.8 m)",
+     "shows": "Altitude fell about 20 m after peaking at 58.6 m at t=122.",
+     "calls": []
+    },
+    {
+     "line": 128,
+     "quote": "128: pitch 33, roll 30.2, ch[2] 1420",
+     "shows": "The aircraft was still unstable at the end of the log, with pitch +33 deg and roll 30 deg.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Pitch tracking before t=119 compared with t=119-128",
+     "result": "Pitch followed its setpoint within about 5 deg for t=4-118, including repeated 45 deg roll turns. It diverged from t=119.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Which channels move with the fault",
+     "result": "Only ch[2] and the throttle moved sharply, which places the fault on the pitch axis. ch[1], ch[3], ch[4] and ch[5] barely moved, ch[4] and ch[5] are identical throughout, and ch[0], ch[6] and ch[7] are constant.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Roll and yaw behaviour at t=119-128",
+     "result": "Roll stayed within about 13 deg until t=127 and heading was steady near 635-640 deg, so the fault is pitch-specific.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Airspeed and yaw-rate channels",
+     "result": "Both are 0 for the whole flight while ground speed is about 15-20 m/s and heading changes. They are dead or not logged.",
+     "verdict": "supports",
+     "about": "h3",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 126,
+     "quote": "altitude 35.7 m",
+     "why": "Altitude loss follows from the pitch and throttle excursion."
+    },
+    {
+     "line": 125,
+     "quote": "throttle 75%",
+     "why": "Throttle saturation looks like the controller reacting to the pitch and altitude error."
+    },
+    {
+     "line": 128,
+     "quote": "roll 30.2 deg",
+     "why": "The late roll excursion follows the pitch upset."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect the ch[2] actuator, linkage and pitch estimator, and replay the t=115-128 s log",
+    "why": "Separates a ch[2] actuator or linkage fault, a pitch-estimate fault and an external disturbance as the cause of the pitch divergence.",
+    "how": [
+     "Compare ch[2] commanded output with measured actuator position or feedback, if it is logged",
+     "Check the IMU pitch against the attitude estimate for t=115-128",
+     "Bench-test ch[2] response and direction across its full range"
+    ],
+    "where": "on_site",
+    "conditions": "Bench test with the vehicle disarmed and propellers removed; replay the log with the same control gains.",
+    "baseline": "Compare with the earlier correct pitch response at t=1-4 s for the same ch[2] command.",
+    "record": [
+     "actuator.output[ch[2]]",
+     "control.attitude_setpoint[pitch]",
+     "vehicle.attitude[pitch]",
+     "propulsion.throttle",
+     "vehicle.altitude[relative]"
+    ],
+    "needs_approval": true,
+    "outcomes": [
+     {
+      "label": "ch[2] response is wrong or sluggish",
+      "means": "Actuator, linkage or ESC fault on ch[2] is the main cause.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Replace the ch[2] actuator or linkage and retest"
+     },
+     {
+      "label": "Actuator is fine, estimator pitch disagrees with IMU",
+      "means": "The pitch estimate was faulty, so the controller acted on a wrong pitch.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Review the estimator and IMU health logs"
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether ch[2] is a throttle, elevator or thrust-vectoring output; the data does not label it.",
+    "Whether wind or a gust acted at t\u2248119; no wind data is in the log."
+   ],
+   "already_answered": [
+    {
+     "question": "When did the control fault start?",
+     "answer": "Pitch started to diverge at about t=119-120 s, after more than 100 s of normal tracking.",
+     "line": 120,
+     "quote": "120: pitch 17.3 vs setpoint -12.3",
+     "calls": []
+    },
+    {
+     "question": "Which axis and channel was affected?",
+     "answer": "The pitch axis, with the large swings on actuator ch[2] and throttle.",
+     "line": 121,
+     "quote": "ch[2] 1170, throttle 8",
+     "calls": []
+    }
+   ],
+   "unobservable": [
+    {
+     "fact": "Physical condition and direction of the ch[2] actuator or linkage",
+     "why_it_matters": "Separates an actuator fault from an estimator or disturbance cause.",
+     "how_to_observe": "Inspect the actuator and bench-test its travel and direction."
+    }
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Pitch actuator ch[2] / pitch loop",
+     "claim": "Pitch control through ch[2] failed or reversed at about t=119-120, causing the pitch divergence and altitude loss.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "The pitch response was opposite to the setpoint with the same ch[2] command that worked early in the flight; roll and yaw were unaffected.",
+     "basis": "indirect",
+     "lines": [
+      119,
+      120,
+      121,
+      124
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Attitude estimator",
+     "claim": "The pitch estimate was faulty, so the controller acted on a wrong pitch.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "The data cannot separate it from an actuator fault, and the airspeed and yaw-rate channels are dead, so sensor health is already poor.",
+     "basis": "indirect",
+     "lines": [
+      119,
+      120
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Airspeed and yaw-rate sensors",
+     "claim": "The airspeed and yaw-rate signals are dead, as the sensor-health error at t=0.3 s suggests.",
+     "status": "open",
+     "role": "trigger",
+     "because": "Airspeed and yaw rate are 0 for the whole flight. Normal flight continued until t=119, so this did not directly cause the divergence.",
+     "basis": "indirect",
+     "lines": [
+      0
+     ]
+    },
+    {
+     "id": "h4",
+     "area": "External disturbance",
+     "claim": "A gust or aerodynamic disturbance pushed the nose up at about t=119.",
+     "status": "open",
+     "role": "trigger",
+     "because": "The pitch rise preceded the command change, but there is no wind data to confirm it.",
+     "basis": "indirect"
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      0
+     ],
+     "what": "Low battery voltage warning at t=0.3 s",
+     "class": "anomaly",
+     "why": "Battery warning at the start of the flight; no related change is visible in the data."
+    },
+    {
+     "lines": [
+      0
+     ],
+     "what": "System error 'Sensor helth' at t=0.3 s",
+     "class": "anomaly",
+     "why": "Consistent with airspeed and yaw-rate reading 0 for the whole flight."
+    },
+    {
+     "lines": [
+      119,
+      120,
+      121,
+      122
+     ],
+     "what": "Pitch rises as throttle drops to 3%",
+     "class": "root_cause_candidate",
+     "why": "Start of the pitch divergence and the opposite-sign response."
+    },
+    {
+     "lines": [
+      124,
+      125,
+      126,
+      127,
+      128
+     ],
+     "what": "Pitch -30 to +33 deg, altitude 57 to 36 m",
+     "class": "effect",
+     "why": "Pitch oscillation and altitude loss following the upset."
+    }
+   ],
+   "lesson": "",
+   "reuse_when": "A pitch response opposite to its setpoint on a channel that previously tracked well, with the airspeed and yaw-rate channels dead and a sensor-health error at flight start."
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 14547,
+   "output_tokens": 4199
+  },
+  "seconds": 31.2
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/elevator"
+  ],
+  "nonzero": {
+   "/failure_status/elevator": {
+    "first_nonzero_s": 117.883,
+    "value": 1
+   }
+  },
+  "onset_s": 117.883
+ }
+}

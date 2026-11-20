@@ -1,0 +1,203 @@
+{
+ "arm": "alone",
+ "alias": "flight-17",
+ "folder": "carbonZ_2018-09-11-14-22-07_1_engine_failure",
+ "input_sha256": "28ba7b8e4155ee079798b960fdb50b629b22aea98a1f273fe8acfc3221843dd5",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 20.3
+  }
+ ],
+ "prompt_chars": 15082,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle collapsed to 0% at t=105 s; propulsion channel ch[2] stuck at minimum while aircraft lost altitude.",
+   "status": "cause_probable",
+   "explanation": "Propulsion output (ch[2], the throttle-following channel) fell to 1100 us at t=105 s and stayed there for 10 s despite rising pitch demand. The data cannot separate battery failsafe, throttle controller fault or motor/ESC loss.",
+   "confidence": "low",
+   "evidence": [
+    {
+     "line": 105,
+     "quote": "105,...,1.1e+03,...,0,0,51",
+     "shows": "Throttle went from 56% to 0% in one second and ch[2] went to 1100 us.",
+     "calls": []
+    },
+    {
+     "line": 114,
+     "quote": "114,...,1.1e+03,...,17.5,23,566,0,0,39.9",
+     "shows": "Still 0% throttle at t=114 s with a pitch setpoint of 17.5 deg; altitude fell from 51.8 m to 39.9 m.",
+     "calls": []
+    },
+    {
+     "line": 1,
+     "quote": "mavros: Battery: WARN: Low voltage",
+     "shows": "Low-voltage warning at t=0.7 s, which makes a battery-related cutoff plausible.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared ch[2] with throttle across the flight",
+     "result": "ch[2] follows throttle (1100 us at 0%, about 1560 us at 57%). Its 3 s dip at t=3-4 matched a brief 0% throttle during setup. The t=105-114 cut is sustained.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Compared the other outputs during the cut",
+     "result": "ch[1], ch[4] and ch[5] keep responding to attitude demand. ch[0], ch[6] and ch[7] are constant throughout.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 112,
+     "quote": "1.4e+03 ... 16.6 ... 44.6",
+     "shows": "Altitude loss, growing pitch setpoint and ch[1] saturating are consequences of the throttle loss."
+    }
+   ],
+   "next_action": {
+    "action": "Pull the raw battery voltage and ESC/throttle command logs around t=100-106 s",
+    "why": "Settles whether the cut was a commanded battery failsafe, a controller fault or a motor/ESC dropout.",
+    "how": [
+     "Plot battery voltage and current against throttle",
+     "Check failsafe and mode events near t=105 s",
+     "Inspect the ch[2] motor/ESC"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Voltage sag before the cut",
+      "means": "Battery or low-voltage failsafe cut the throttle.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ],
+      "then": "Inspect battery health"
+     },
+     {
+      "label": "Normal voltage, no failsafe event",
+      "means": "Throttle controller or output fault on ch[2].",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ],
+      "then": "Inspect ESC and wiring"
+     }
+    ]
+   },
+   "unknowns": [
+    "Battery voltage trend is not in the data",
+    "Which physical motor or actuator ch[2] drives"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Propulsion output ch[2]",
+     "claim": "Throttle/motor output ch[2] was cut to minimum from t=105 s by a controller or ESC fault.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "Output and throttle dropped abruptly to minimum with no matching demand; other channels kept responding.",
+     "basis": "indirect",
+     "lines": [
+      105,
+      114
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Battery / power",
+     "claim": "Low battery voltage (warned at t=0.7 s) triggered a failsafe or power loss cutting throttle.",
+     "status": "open",
+     "role": "trigger",
+     "because": "A low-voltage warning is logged, but no voltage signal is available to confirm it.",
+     "basis": "indirect",
+     "lines": [
+      1
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Airspeed sensor",
+     "claim": "Failed airspeed sensor (reads 0 all flight, 'Sensor helth' error) degraded control.",
+     "status": "open",
+     "role": "amplifier",
+     "because": "Airspeed is 0 throughout and a sensor error is logged, but the throttle cut does not clearly follow from it.",
+     "basis": "indirect",
+     "lines": [
+      1
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low voltage warning at t=0.7 s",
+     "class": "anomaly",
+     "why": "Possible precursor to the power loss at t=105 s."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "System sensor health error at t=0.7 s",
+     "class": "anomaly",
+     "why": "Airspeed reads 0 all flight."
+    },
+    {
+     "lines": [
+      105
+     ],
+     "what": "Throttle drop to 0% and ch[2] to 1100 us",
+     "class": "root_cause_candidate",
+     "why": "Abrupt, sustained loss of thrust."
+    },
+    {
+     "lines": [
+      112,
+      114
+     ],
+     "what": "Altitude loss with ch[1] saturating",
+     "class": "effect",
+     "why": "Result of the thrust loss."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 13147,
+   "output_tokens": 2565
+  },
+  "seconds": 20.3
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 104.854,
+    "value": 1
+   }
+  },
+  "onset_s": 104.854
+ }
+}

@@ -1,0 +1,253 @@
+{
+ "arm": "alone",
+ "alias": "flight-09",
+ "folder": "carbonZ_2018-07-30-16-39-00_2_engine_failure",
+ "input_sha256": "a518e446c89faf9562a4e83dabe64d6dbc9f084533396b4ab932f09dbd12aa22",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 27.0
+  }
+ ],
+ "prompt_chars": 14337,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Throttle/motor channel 2 dropped to minimum for 14 s (t=92\u2013105) in flight while the aircraft lost altitude.",
+   "status": "cause_unknown",
+   "explanation": "Propulsion thrust was lost from t=92 to t=105: throttle 0% and output ch[2] pinned at 1100 us. Output followed the command, so the drop came from the throttle command (failsafe or commanded cut), not a stuck output. The data cannot separate the cause.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 92,
+     "quote": "92,...,1.15e+03,...,propulsion.throttle 0",
+     "shows": "Motor channel ch[2] falls to the minimum and throttle goes to 0% from a normal ~44% at t=91.",
+     "calls": []
+    },
+    {
+     "line": 100,
+     "quote": "100,...,1.1e+03,...,0,...,vehicle.altitude 40.2",
+     "shows": "ch[2] stays at 1100 us and throttle at 0% for t=93\u2013105. Altitude falls from 48.6 m to 26.9 m and airspeed falls from 15.6 to 12.4 m/s.",
+     "calls": []
+    },
+    {
+     "line": 105,
+     "quote": "105,...,pitch setpoint 17.4,...,ch[1] 1.21e+03",
+     "shows": "Pitch setpoint saturates at 17.4 deg from t=102 and ch[1] moves steadily from 1510 to 1210 us. The controller is demanding nose-up to compensate for lost thrust.",
+     "calls": []
+    },
+    {
+     "line": 106,
+     "quote": "106,...,1.52e+03,...,propulsion.throttle 54",
+     "shows": "Throttle command returns (54%) at t=106 and ch[2] returns to 1520 us, so the output was not mechanically stuck.",
+     "calls": []
+    },
+    {
+     "line": 1.1,
+     "quote": "mavros: Battery: WARN: Low voltage / System: ERROR: Sensor helth",
+     "shows": "Both warnings are logged at t=1.1, long before the t=92 drop. Any link to it is unproven.",
+     "calls": []
+    }
+   ],
+   "checked": [],
+   "effects": [
+    {
+     "line": 100,
+     "quote": "vehicle.altitude 40.2",
+     "why": "The altitude loss (48.6 to 26.9 m) is the consequence of zero thrust."
+    },
+    {
+     "line": 102,
+     "quote": "control.attitude_setpoint[pitch] 17.4",
+     "why": "The saturated pitch-up demand and the ch[1] deflection are the controller's reaction to the thrust loss."
+    }
+   ],
+   "next_action": {
+    "action": "Pull flight-controller mode, failsafe and battery logs for t=85\u2013110.",
+    "why": "Decides whether the throttle cut was a commanded or failsafe action or a propulsion/ESC/battery fault.",
+    "how": [
+     "Check flight mode and failsafe flags at t=92",
+     "Check battery voltage/current and ESC telemetry at t=88\u2013106",
+     "Inspect motor, ESC and wiring for ch[2]"
+    ],
+    "where": "remote",
+    "outcomes": [
+     {
+      "label": "Failsafe or mode change at t=92",
+      "means": "The cut was commanded by logic, not a hardware fault.",
+      "keeps": [
+       "h2"
+      ],
+      "rules_out": [
+       "h1"
+      ]
+     },
+     {
+      "label": "Voltage sag or ESC fault at t=92",
+      "means": "A power or ESC fault caused the loss of thrust.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h2"
+      ]
+     }
+    ]
+   },
+   "unknowns": [
+    "Why throttle was commanded to 0% at t=92, and why it returned at t=106",
+    "Whether the t=1.1 low-voltage and sensor-health warnings relate to the cut"
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Propulsion/ESC/battery, ch[2]",
+     "claim": "A motor, ESC or battery fault, possibly linked to the low-voltage warning, cut thrust at t=92.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "Thrust loss is clear, but no current, voltage or ESC signal is in the data to confirm a hardware cause.",
+     "basis": "indirect",
+     "lines": [
+      92,
+      105
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Throttle command logic/failsafe",
+     "claim": "The flight controller commanded zero throttle (failsafe or mode logic) for 14 s.",
+     "status": "open",
+     "role": "main_cause",
+     "because": "The output followed the 0% command exactly and the controller reacted with pitch-up, consistent with a commanded cut.",
+     "basis": "indirect",
+     "lines": [
+      92,
+      106
+     ]
+    },
+    {
+     "id": "h3",
+     "area": "Control surfaces ch[0],[1],[3-7]",
+     "claim": "A control-surface fault caused the event.",
+     "status": "weakened",
+     "role": "effect",
+     "because": "The surface outputs respond smoothly to the setpoints; ch[0], ch[6] and ch[7] are constant, which looks like unused channels.",
+     "basis": "indirect",
+     "lines": [
+      92,
+      105
+     ]
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1.1
+     ],
+     "what": "Low voltage warning and sensor health error",
+     "class": "anomaly",
+     "why": "Logged at takeoff, 90 s before the throttle cut; link unproven."
+    },
+    {
+     "lines": [
+      92,
+      105
+     ],
+     "what": "Throttle 0% and ch[2] at 1100 us for 14 s",
+     "class": "root_cause_candidate",
+     "why": "Thrust lost in flight, followed by altitude loss."
+    },
+    {
+     "lines": [
+      102,
+      105
+     ],
+     "what": "Pitch setpoint saturates at 17.4 deg",
+     "class": "effect",
+     "why": "Controller response to lost thrust and falling altitude."
+    },
+    {
+     "lines": [
+      106
+     ],
+     "what": "Throttle returns to 54%",
+     "class": "routine",
+     "why": "Recovery after the cut."
+    }
+   ],
+   "field_questions": [
+    {
+     "question": "Was throttle cut deliberately or by failsafe around t=92?",
+     "ask": "field_engineer",
+     "why_needed": "Separates a commanded cut from a propulsion or ESC fault.",
+     "not_in_data": "No mode, failsafe or arming signals are in the table, and the events list only shows t=1.1 warnings.",
+     "searched_calls": [],
+     "if_answers": [
+      {
+       "answer": "Yes, deliberate or failsafe",
+       "means": "Not a hardware fault; check why the failsafe triggered.",
+       "keeps": [
+        "h2"
+       ],
+       "weakens": [
+        "h1"
+       ]
+      },
+      {
+       "answer": "No, unexpected",
+       "means": "Investigate the motor, ESC and battery on ch[2].",
+       "keeps": [
+        "h1"
+       ],
+       "weakens": [
+        "h2"
+       ]
+      }
+     ]
+    }
+   ],
+   "already_answered": [
+    {
+     "question": "Did a control fault occur, and when?",
+     "answer": "Yes: throttle and motor channel ch[2] dropped to minimum at t=92 and stayed there until t=105.",
+     "line": 92,
+     "quote": "propulsion.throttle 0",
+     "calls": []
+    },
+    {
+     "question": "Where on the aircraft?",
+     "answer": "The propulsion/throttle output, ch[2], not the control surfaces.",
+     "line": 93,
+     "quote": "ch[2] 1.1e+03",
+     "calls": []
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 12447,
+   "output_tokens": 3411
+  },
+  "seconds": 27.0
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/engines"
+  ],
+  "nonzero": {
+   "/failure_status/engines": {
+    "first_nonzero_s": 91.598,
+    "value": 1
+   }
+  },
+  "onset_s": 91.598
+ }
+}

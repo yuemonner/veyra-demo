@@ -1,0 +1,226 @@
+{
+ "arm": "alone",
+ "alias": "flight-32",
+ "folder": "carbonZ_2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj",
+ "input_sha256": "3fc34bda0ca6da597a8ccf2566d361cd927eec767149f567d091a368e03c3a32",
+ "frozen_commit": "30f459b",
+ "request": "Check this flight: did a control fault occur, when, and where on the aircraft?",
+ "cli": "2.1.322 (Claude Code)",
+ "attempts": [
+  {
+   "mode": "agent",
+   "fallback_reason": null,
+   "wall_s": 25.7
+  }
+ ],
+ "prompt_chars": 21076,
+ "investigation": {
+  "mode": "agent",
+  "model": "claude-code:sonnet",
+  "fallback_reason": null,
+  "steps": [],
+  "result": {
+   "headline": "Actuator channel 5 froze at 1500 us at t=153 s while its twin channel 4 kept moving; altitude then fell.",
+   "status": "cause_probable",
+   "explanation": "Channels 4 and 5 were identical for 0-152 s. From 153 s channel 5 is pinned at 1500 us while channel 4 still commands 1440-1610 us. This points to a stuck or lost output on channel 5, a paired control surface or motor.",
+   "confidence": "medium",
+   "evidence": [
+    {
+     "line": 153,
+     "quote": "t=152: ch4=1.5e+03, ch5=1.5e+03; t=153: ch4=1.61e+03, ch5=1.5e+03",
+     "shows": "The mirrored pair split at t=153 and ch5 stopped following ch4 (ch4 later moves 1540, 1470, 1460).",
+     "calls": []
+    },
+    {
+     "line": 162,
+     "quote": "ch5 = 1.5e+03 at t=153..162 while ch4 = 1.54e+03, 1.47e+03, 1.46e+03, 1.51e+03...",
+     "shows": "Channel 5 stayed flat for 10 s while channel 4 kept moving, so this is a persistent divergence and not a glitch.",
+     "calls": []
+    },
+    {
+     "line": 158,
+     "quote": "t=152 altitude 47.9 m -> t=162 altitude 14.2 m, pitch -18 deg, roll 30-44 deg",
+     "shows": "After the divergence the aircraft lost about 34 m of height with large pitch and roll errors.",
+     "calls": []
+    },
+    {
+     "line": 1,
+     "quote": "mavros: System: ERROR: Sensor helth",
+     "shows": "Airspeed and yaw rate read 0 for the whole flight, so these sensors never worked. This is a separate and earlier problem.",
+     "calls": []
+    }
+   ],
+   "checked": [
+    {
+     "check": "Compared each actuator channel against its twin for the whole flight",
+     "result": "ch4 equals ch5 for t=0-152. They diverge at t=153 when ch5 sticks at 1500 us. ch0, ch6 and ch7 are constant, and ch7 sits at 1100 us for the whole flight.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Looked for other changes at t=153",
+     "result": "Throttle fell from 53% to 33% and then 13% by t=155. The pitch setpoint went to -8 and then -19 deg. Altitude then fell steadily.",
+     "verdict": "supports",
+     "about": "h1",
+     "calls": []
+    },
+    {
+     "check": "Checked the logged events",
+     "result": "Low voltage and sensor health messages at t=1 s only. Nothing was logged near t=153 and the throttle drop is not a power sag.",
+     "verdict": "inconclusive",
+     "about": "h2",
+     "calls": []
+    }
+   ],
+   "effects": [
+    {
+     "line": 155,
+     "quote": "throttle 14 %, pitch -18.3 deg, altitude 42.4 m",
+     "shows": "This is the controller's reaction. It cut throttle and commanded nose-down, and the aircraft descended."
+    },
+    {
+     "line": 162,
+     "quote": "altitude 14.2 m",
+     "why": "The altitude loss is a consequence of the fault. It is not the cause."
+    }
+   ],
+   "next_action": {
+    "action": "Inspect and bench-test output channel 5 and its servo or ESC",
+    "why": "Settles whether channel 5 is stuck at the actuator or the output driver, or whether the mixer or commanded output was frozen in software.",
+    "how": [
+     "Command channel 5 on the bench and compare the response with channel 4",
+     "Check wiring and connector on channel 5",
+     "Review the full log for channel 5 failure flags"
+    ],
+    "where": "on_site",
+    "conditions": "On the ground, props off, powered from a stable supply, actuators free to move.",
+    "baseline": "Channel 4, which tracked channel 5 exactly for t=0-152.",
+    "record": [
+     "actuator.output[ch[4]]",
+     "actuator.output[ch[5]]"
+    ],
+    "needs_approval": true,
+    "outcomes": [
+     {
+      "label": "Channel 5 does not respond on bench",
+      "means": "The actuator, wiring or driver on channel 5 is faulty.",
+      "keeps": [
+       "h1"
+      ],
+      "rules_out": [
+       "h3"
+      ]
+     },
+     {
+      "label": "Channel 5 responds normally",
+      "means": "The freeze came from software or mixer logic, or from an intermittent fault.",
+      "keeps": [
+       "h3"
+      ],
+      "rules_out": []
+     }
+    ]
+   },
+   "unknowns": [
+    "Whether channel 5 is a control surface or a motor. The data only shows it mirroring channel 4.",
+    "Why throttle and pitch setpoint dropped at t=153, and whether that was manual, a mode change or the controller.",
+    "Whether the aircraft was in a normal circling pattern, since yaw increases continuously through the flight."
+   ],
+   "hypotheses": [
+    {
+     "id": "h1",
+     "area": "Actuator channel 5 output",
+     "claim": "Channel 5 output or its actuator froze at 1500 us from t=153 while channel 4 continued to command.",
+     "status": "leading",
+     "role": "main_cause",
+     "because": "The paired channel divergence is abrupt, lasts 10 s, and is followed by a loss of control and altitude.",
+     "basis": "indirect",
+     "observed_at": "actuator.output[ch[5]] vs ch[4]",
+     "lines": [
+      153,
+      162
+     ]
+    },
+    {
+     "id": "h2",
+     "area": "Power or battery",
+     "claim": "Low battery voltage affected the outputs.",
+     "status": "open",
+     "because": "A low voltage warning at t=1 s only. Nothing links it to t=153.",
+     "basis": "indirect"
+    },
+    {
+     "id": "h3",
+     "area": "Controller or mixer software",
+     "claim": "A mode or mixer change froze channel 5 or caused the setpoint step.",
+     "status": "open",
+     "because": "Throttle and pitch setpoint stepped at the same moment, so the setpoint change may be commanded and not a fault.",
+     "basis": "indirect"
+    },
+    {
+     "id": "h4",
+     "area": "Airspeed and yaw-rate sensors",
+     "claim": "Dead airspeed and yaw-rate sensors degraded control.",
+     "status": "weakened",
+     "because": "They read 0 for the whole flight and control looked normal until t=153, so they do not explain the onset.",
+     "basis": "indirect"
+    }
+   ],
+   "events": [
+    {
+     "lines": [
+      1
+     ],
+     "what": "Low voltage warning",
+     "class": "anomaly",
+     "why": "Only at t=1 s and no later changes follow it."
+    },
+    {
+     "lines": [
+      1
+     ],
+     "what": "Sensor health error",
+     "class": "anomaly",
+     "why": "Consistent with airspeed and yaw rate flat at zero all flight."
+    },
+    {
+     "lines": [
+      153
+     ],
+     "what": "Channel 5 stuck at 1500 us while channel 4 moves",
+     "class": "root_cause_candidate",
+     "why": "First point where the mirrored pair separates."
+    },
+    {
+     "lines": [
+      154,
+      162
+     ],
+     "what": "Throttle drop, nose-down, altitude loss of 34 m",
+     "class": "effect",
+     "why": "Follows the channel 5 divergence."
+    }
+   ]
+  },
+  "usage": {
+   "input_tokens": 2,
+   "cache_read_input_tokens": 61411,
+   "cache_creation_input_tokens": 17969,
+   "output_tokens": 3282
+  },
+  "seconds": 25.7
+ },
+ "labels": {
+  "present_topics": [
+   "/failure_status/aileron"
+  ],
+  "nonzero": {
+   "/failure_status/aileron": {
+    "first_nonzero_s": 152.199,
+    "value": 1
+   }
+  },
+  "onset_s": 152.199
+ }
+}

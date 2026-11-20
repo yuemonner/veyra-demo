@@ -1,0 +1,67 @@
+# ALFA blind evaluation v1 — baseline (frozen at e9bc6ce)
+
+Preregistered in PREREGISTRATION.md before any run. Every flight is listed, failures included.
+
+Flights: {'flights': 47, 'faulty_scored': 36, 'healthy_scored': 10, 'infrastructure_failures': 0, 'errors': 0, 'unlabelled': 1}
+
+| Set | G evidence generated | R anomaly ranked | T tool on the fault window | Evidence recall | D-strict | D-axis | Mean window coverage |
+|---|---|---|---|---|---|---|---|
+| all | 32/36 | 20/36 | 36/36 | 9/36 | 6/36 | 20/36 | 1.0 |
+| development | 13/15 | 9/15 | 15/15 | 5/15 | 4/15 | 9/15 | 1.0 |
+| validation | 19/21 | 11/21 | 21/21 | 4/21 | 2/21 | 11/21 | 1.0 |
+
+Healthy flights: FP-strict 0/10, FP-flag 2/10.
+
+Failure stages (faulty flights that miss D-axis): {'reasoning': 15, 'evidence generation': 1}
+
+Median per flight: {'tool_calls': 11, 'model_calls': 5, 'seconds': 69.1, 'input_tokens': 328130, 'output_tokens': 10438, 'cache_read_tokens': 328120, 'total_cost_usd': 14.48}
+
+| Flight | Folder | Split | Kind | Components | Onset s | G | R | T | Cov | Recall | D-strict | D-axis | Stage | Status | Tools | s | Headline |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| flight-01 | 2018-07-18-12-10-11_no_ground_truth | development | unlabelled |  | None |  |  |  |  |  |  |  |  | cause_unknown | 10 | 61.8 | No clear control fault found; roll tracks its setpoint, pitch looks sign-inverted, airspee |
+| flight-02 | 2018-07-18-15-53-31_1_engine_failure | validation | faulty | engine | 116.268 | yes | yes | yes | 1.0 | no | no | no | reasoning | no_failure_found | 11 | 78.4 | No control-surface fault found; one early low-voltage warning, roll lags setpoint about 1  |
+| flight-03 | 2018-07-18-15-53-31_2_engine_failure | development | faulty | engine | 73.411 | yes | yes | yes | 1.0 | no | no | yes |  | cause_unknown | 9 | 71.6 | No hard control fault found; roll lags setpoint about 1 s, and pitch diverged at start-up  |
+| flight-04 | 2018-07-18-16-22-01_engine_failure_with_emr_traj | validation | faulty | engine | 116.625 | yes | yes | yes | 1.0 | yes | no | yes |  | cause_unknown | 9 | 43.8 | No control-loop fault found; setpoint-led maneuvers tracked with ~1 s lag, but throttle dr |
+| flight-05 | 2018-07-18-16-37-39_1_no_failure | development | healthy |  | None |  |  |  |  |  |  |  |  | cause_unknown | 10 | 45.5 | Roll tracked its setpoint worse from t=5-15 s; the data shows a lag during hard maneuvers, |
+| flight-06 | 2018-07-18-16-37-39_2_engine_failure_with_emr_traj | development | faulty | engine | 114.064 | yes | yes | yes | 1.0 | no | no | no | reasoning | no_failure_found | 10 | 39.2 | No control fault found: attitude lags setpoint steps by about 1 s; low-battery warning and |
+| flight-07 | 2018-07-30-16-29-45_engine_failure_with_emr_traj | validation | faulty | engine | 123.149 | yes | yes | yes | 1.0 | no | no | no | reasoning | no_failure_found | 10 | 56.0 | No control fault shown; roll tracks setpoint with ~1 s lag; start-up battery and sensor wa |
+| flight-08 | 2018-07-30-16-39-00_1_engine_failure | development | faulty | engine | 116.791 | yes | no | yes | 1.0 | no | no | no | reasoning | cause_unknown | 14 | 57.5 | Control fault likely: attitude/state estimates jump and lag setpoints after a sensor-healt |
+| flight-09 | 2018-07-30-16-39-00_2_engine_failure | validation | faulty | engine | 91.598 | yes | no | yes | 1.0 | no | no | no | reasoning | cause_unknown | 11 | 80.6 | Pitch loop on UAV-09 does not track its setpoint, while roll follows with lag; cause not i |
+| flight-10 | 2018-07-30-16-39-00_3_no_failure | development | healthy |  | None |  |  |  |  |  |  |  | flag | cause_unknown | 17 | 93.3 | No clear control fault found; startup sensor and battery warnings plus estimator-like jump |
+| flight-11 | 2018-07-30-17-10-45_engine_failure_with_emr_traj | validation | faulty | engine | 117.172 | yes | no | yes | 1.0 | no | no | yes |  | cause_unknown | 14 | 56.7 | No control-loop fault found; low-voltage and sensor warnings at 0.9 s precede a throttle d |
+| flight-12 | 2018-07-30-17-20-01_engine_failure_with_emr_traj | development | faulty | engine | 87.681 | yes | yes | yes | 1.0 | no | no | no | reasoning | cause_unknown | 10 | 68.5 | No clear control fault found; pitch setpoint is inverted against attitude, and sensor/batt |
+| flight-13 | 2018-07-30-17-36-35_engine_failure_with_emr_traj | validation | faulty | engine | 133.43 | yes | yes | yes | 1.0 | no | no | no | reasoning | cause_unknown | 10 | 58.6 | Roll tracks large setpoint swings with a fixed lag; velocity and yaw estimates jump; low-v |
+| flight-14 | 2018-07-30-17-46-31_engine_failure_with_emr_traj | development | faulty | engine | 90.36 | yes | yes | yes | 1.0 | no | no | no | reasoning | no_failure_found | 9 | 61.0 | No control fault found: roll and pitch follow commanded maneuvers with about 1 s lag; yaw  |
+| flight-15 | 2018-09-11-11-56-30_engine_failure | validation | faulty | engine | 103.573 | yes | yes | yes | 1.0 | no | no | no | reasoning | cause_unknown | 10 | 42.0 | Pitch axis does not follow its setpoint (inverted, lagged response) while roll tracks; sen |
+| flight-16 | 2018-09-11-14-16-55_no_failure | development | healthy |  | None |  |  |  |  |  |  |  |  | cause_unknown | 11 | 73.9 | Roll tracking failed at start-up and at 9.7-13.3 s; the attitude response lags the setpoin |
+| flight-17 | 2018-09-11-14-22-07_1_engine_failure | validation | faulty | engine | 104.854 | yes | no | yes | 1.0 | no | no | no | reasoning | cause_unknown | 10 | 74.2 | No clear control fault: pitch and yaw mismatches look like convention or lag; sensor-healt |
+| flight-18 | 2018-09-11-14-22-07_2_engine_failure | validation | faulty | engine | 49.89 | yes | no | yes | 1.0 | no | no | yes |  | cause_unknown | 9 | 68.2 | Roll and pitch lagged commands from t=0; low-voltage and sensor-health errors at 1.249 s;  |
+| flight-19 | 2018-09-11-14-41-38_no_failure | development | healthy |  | None |  |  |  |  |  |  |  |  | no_failure_found | 10 | 67.5 | No control-loop fault found; roll lags large setpoint swings by about 1 s, start-up warnin |
+| flight-20 | 2018-09-11-14-41-51_elevator_failure | validation | faulty | elevator | 117.883 | yes | yes | yes | 1.0 | no | yes | yes |  | cause_unknown | 12 | 98.7 | Pitch axis did not follow its setpoint; fault area is pitch control or estimate, cause not |
+| flight-21 | 2018-09-11-14-52-54_left_aileron__right_aileron__failure | development | faulty | aileron | 105.251 | yes | no | yes | 1.0 | no | no | no | reasoning | cause_unknown | 10 | 64.8 | Pitch response is inverted against its setpoint from the start, while airspeed reads 0 all |
+| flight-22 | 2018-09-11-15-05-11_1_elevator_failure | validation | faulty | elevator | 63.476 | yes | no | yes | 1.0 | no | no | no | reasoning | cause_unknown | 10 | 40.6 | No actuator fault seen; roll tracking errors are a ~1 s delay in attitude feedback, with s |
+| flight-23 | 2018-09-11-15-05-11_2_no_failure | development | healthy |  | None |  |  |  |  |  |  |  | flag | cause_unknown | 10 | 74.8 | Pitch control stopped following its setpoint late in the flight while throttle rose and al |
+| flight-24 | 2018-09-11-15-06-34_1_rudder_right_failure | validation | faulty | rudder | 55.515 | yes | yes | yes | 1.0 | no | no | no | reasoning | cause_unknown | 11 | 74.5 | Pitch responded opposite to its command early on; ch[3] jumped to 1900 us at 55.238 s and  |
+| flight-25 | 2018-09-11-15-06-34_2_rudder_right_failure | development | faulty | rudder | 51.974 | yes | yes | yes | 1.0 | no | no | yes |  | cause_unknown | 11 | 79.4 | Control fault: output ch[3] saturated at 1900 from t=52.1 s; pitch tracking failed, also e |
+| flight-26 | 2018-09-11-15-06-34_3_rudder_left_failure | development | faulty | rudder | 60.115 | no | no | yes | 1.0 | no | no | no | evidence generation | cause_unknown | 10 | 77.5 | Control fault at t≈60 s: actuator ch[3] output dropped to 1100 us and stayed there; pitch  |
+| flight-27 | 2018-09-11-17-27-13_1_rudder_zero__left_aileron_failure | development | faulty | aileron,rudder | 116.321 | yes | yes | yes | 1.0 | yes | no | yes |  | cause_unknown | 15 | 89.4 | Roll loop lagged its setpoint from about 125 s; actuator-side cause not separable from the |
+| flight-28 | 2018-09-11-17-27-13_2_both_ailerons_failure | validation | faulty | aileron | 65.771 | yes | no | yes | 1.0 | yes | no | yes |  | cause_unknown | 15 | 98.0 | Roll control degraded from ~t=61 s; roll actuators 4/5 froze at 1500 us from 65.9 s; cause |
+| flight-29 | 2018-09-11-17-55-30_1_right_aileron_failure | validation | faulty | aileron | 111.922 | no | no | yes | 1.0 | no | no | yes |  | cause_unknown | 12 | 45.8 | No clear control-loop failure; start-up warnings and dead airspeed/yaw-rate channels point |
+| flight-30 | 2018-09-11-17-55-30_2_left_aileron_failure | validation | faulty | aileron | 49.98 | yes | no | yes | 1.0 | no | no | no | reasoning | cause_unknown | 15 | 81.9 | Actuator output ch[4] froze at 1500 us from t=49.7 s while its twin ch[5] kept moving. |
+| flight-31 | 2018-10-05-14-34-20_1_no_failure | development | healthy |  | None |  |  |  |  |  |  |  |  | cause_unknown | 9 | 54.0 | No clear control fault; roll lags setpoint by about 1 s, and a start-up sensor-health erro |
+| flight-32 | 2018-10-05-14-34-20_2_right_aileron_failure_with_emr_traj | development | faulty | aileron | 152.199 | no | no | yes | 1.0 | no | no | yes |  | cause_unknown | 13 | 79.7 | Longitudinal control fault: pitch moves opposite its setpoint twice, with airspeed reading |
+| flight-33 | 2018-10-05-14-37-22_1_no_failure | development | healthy |  | None |  |  |  |  |  |  |  |  | cause_unknown | 15 | 86.5 | Roll setpoint flips between about ±44 deg and attitude follows late; sensor-health error a |
+| flight-34 | 2018-10-05-14-37-22_2_right_aileron_failure | validation | faulty | aileron | 73.379 | yes | yes | yes | 1.0 | no | no | yes |  | cause_unknown | 11 | 69.1 | Pitch loop diverged from setpoint at t=0.765 s, before the warnings; roll tracks only with |
+| flight-35 | 2018-10-05-14-37-22_3_left_aileron_failure | development | faulty | aileron | 72.401 | yes | no | yes | 1.0 | no | no | yes |  | cause_unknown | 11 | 46.8 | No attitude-control fault found; airspeed is dead and a sensor-health error was logged at  |
+| flight-36 | 2018-10-05-15-52-12_1_no_failure | development | healthy |  | None |  |  |  |  |  |  |  |  | cause_unknown | 10 | 39.2 | Roll tracking was poor in the first 18 s; no single control-fault onset or location is ide |
+| flight-37 | 2018-10-05-15-52-12_2_no_failure | development | healthy |  | None |  |  |  |  |  |  |  |  | cause_unknown | 11 | 49.3 | Roll/pitch diverge from setpoint at start and near 39–43 s, but the aircraft follows its s |
+| flight-38 | 2018-10-05-15-52-12_3_engine_failure_with_emr_traj | validation | faulty | engine | 49.133 | yes | yes | yes | 1.0 | yes | no | yes |  | cause_unknown | 9 | 42.0 | Roll and yaw tracked poorly, with roll lagging its setpoint about 1 s; cause not separable |
+| flight-39 | 2018-10-05-15-55-10_engine_failure_with_emr_traj | validation | faulty | engine | 100.133 | yes | yes | yes | 1.0 | no | no | no | reasoning | cause_unknown | 11 | 79.7 | Heading estimate disagrees with setpoint and velocity from t=38 s; roll/pitch loop tracks  |
+| flight-40 | 2018-10-05-16-04-46_engine_failure_with_emr_traj | development | faulty | engine | 76.195 | yes | no | yes | 1.0 | yes | yes | yes |  | cause_unknown | 11 | 66.9 | Throttle commanded to 0% at t=76.07 s, then altitude loss; roll control tracked normally,  |
+| flight-41 | 2018-10-18-11-03-57_engine_failure_with_emr_traj | development | faulty | engine | 104.246 | yes | yes | yes | 1.0 | yes | yes | yes |  | cause_unknown | 10 | 78.1 | Throttle fell to 0 at t=104 s, then altitude dropped and pitch stopped tracking; cause not |
+| flight-42 | 2018-10-18-11-04-00_engine_failure_with_emr_traj | development | faulty | engine | 111.165 | yes | yes | yes | 1.0 | yes | yes | yes |  | cause_unknown | 11 | 81.2 | Throttle dropped to 0% late in the flight and the aircraft descended; cause of the cut is  |
+| flight-43 | 2018-10-18-11-04-08_1_engine_failure_with_emr_traj | validation | faulty | engine | 100.36 | no | no | yes | 1.0 | no | no | yes |  | cause_unknown | 14 | 87.7 | Sensor-health error at start, inverted pitch loop all flight, and throttle held at 0 from  |
+| flight-44 | 2018-10-18-11-04-08_2_engine_failure_with_emr_traj | validation | faulty | engine | 98.274 | yes | no | yes | 1.0 | no | yes | yes |  | cause_unknown | 11 | 85.4 | Pitch diverged from setpoint at 1.197 s, 99.572 s and 111.163 s; roll tracked normally in  |
+| flight-45 | 2018-10-18-11-04-35_engine_failure_with_emr_traj | development | faulty | engine | 101.302 | yes | yes | yes | 1.0 | yes | yes | yes |  | cause_unknown | 11 | 123.7 | Throttle commanded to 0 at t=101.254 s, then pitch moved opposite its setpoint and altitud |
+| flight-46 | 2018-10-18-11-06-06_engine_failure_with_emr_traj | validation | faulty | engine | 102.517 | yes | yes | yes | 1.0 | yes | no | yes |  | cause_unknown | 21 | 90.7 | Throttle dropped to 0% at 102 s and the aircraft lost 30 m of altitude; pitch and yaw are  |
+| flight-47 | 2018-10-18-11-08-24_no_failure | development | healthy |  | None |  |  |  |  |  |  |  |  | cause_unknown | 10 | 48.0 | No clear control fault: pitch 'divergence' is sign/lag mismatch; low-voltage and sensor-he |
