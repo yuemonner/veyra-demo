@@ -110,8 +110,13 @@ export default function Workspace({ d }: { d: Any }) {
         <span className={`${w.status} ${done ? w.statusDone : i >= 0 ? w.statusLive : ""}`}><i />{status}</span>
       </header>
 
-      <div className={w.claim}>
-        <b>{Math.round(rc.timing.total_s)} seconds</b> to surface the decisive SOC inconsistency. <b>{Math.round(run.run_seconds / 60)} minutes</b> for the full AI investigation, with {toolsAll} engineering tool calls.
+      <div className={w.hero}>
+        <div className={w.heroMain}>
+          <b>{Math.round(rc.timing.total_s)} s</b>
+          <span>to surface the decisive SOC inconsistency, from raw logs, without seeing the vehicle</span>
+        </div>
+        <div className={w.heroSide}><b>{Math.round(run.run_seconds / 60)} min</b><span>full AI investigation, {toolsAll} engineering tool calls</span></div>
+        <div className={`${w.heroSide} ${w.heroThem}`}><b>≈ 2 days</b><span>the manufacturer, with its battery supplier</span></div>
       </div>
 
       {/* One slim strip for the case and the run, so the agent's work keeps the screen. */}
@@ -191,6 +196,7 @@ export default function Workspace({ d }: { d: Any }) {
             <ul className={w.findings}>
               {shown.map((f: Any) => (
                 <li key={f.title} className={w["f_" + f.kind] || ""}>
+                  {f.method && <span className={`${w.chip} ${f.method === "system" ? w.chipSys : w.chipPhys}`}>{f.method === "system" ? "System-level" : "Physics"}</span>}
                   <b>{f.title}</b>{f.badge && <span className={w.badge}>{f.badge}</span>}
                   <p>{f.text}</p>
                 </li>))}
@@ -216,6 +222,24 @@ export default function Workspace({ d }: { d: Any }) {
             <div className={w.benchThem}><b>≈ 2 days</b><span>{rows[rows.length - 1]?.label || "the manufacturer"}, with its battery supplier</span></div>
           </div>
           {rc?.outcome && <p className={w.confirmed}><b>Confirmed afterwards by the manufacturer:</b> SOC drift after a long time without a full charge. The check Veyra put first is where it was found.</p>}
+        </section>
+      )}
+
+      {run.methods && (
+        <section className={w.methods}>
+          <p className={w.kicker}>How Veyra investigates a machine it has never seen</p>
+          <h2>No one went to the vehicle. Veyra rebuilt what it did, then held every explanation to physics.</h2>
+          <div className={w.two}>
+            <div className={w.col}>
+              <h3><span className={`${w.chip} ${w.chipSys}`}>System-level investigation</span>What the vehicle actually did</h3>
+              <ol>{run.methods.system.map((m: Any) => <li key={m.title}><b>{m.title}</b><p>{m.text}</p></li>)}</ol>
+            </div>
+            <div className={w.col}>
+              <h3><span className={`${w.chip} ${w.chipPhys}`}>Physics reasoning</span>What physics allows</h3>
+              <ol>{run.methods.physics.map((m: Any) => <li key={m.title}><b>{m.title}{m.badge && <span className={w.badge}>{m.badge}</span>}</b><p>{m.text}</p></li>)}</ol>
+            </div>
+          </div>
+          <p className={w.methodsResult}>{run.methods.result}</p>
         </section>
       )}
 

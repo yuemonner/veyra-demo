@@ -43,30 +43,35 @@
     "after": "cc_3",
     "badge": "found in 16 s",
     "kind": "key",
+    "method": "physics",
     "text": "Displayed charge fell from 47 % to 7 % in 40 seconds while only 0.08 Ah flowed.",
     "title": "The battery was not empty. The SOC estimate was wrong."
    },
    {
     "after": "cc_9",
     "kind": "context",
+    "method": "system",
     "text": "No drive request anywhere in the record. The battery protection cut high voltage: a protective response, not the cause.",
     "title": "Parked, not driving"
    },
    {
     "after": "cc_9",
     "kind": "safety",
+    "method": "system",
     "text": "After the protective shutdown the weakest cell went lower than at the first trip. Hold before any further restart.",
     "title": "High voltage switched on 5 more times"
    },
    {
     "after": "cc_10",
     "kind": "open",
+    "method": "physics",
     "text": "SOC estimate drifted, usable capacity low, or the current sensor under-reads.",
     "title": "Three explanations still possible"
    },
    {
     "after": "cc_27",
     "kind": "ruled",
+    "method": "physics",
     "text": "A test of the agent's own prediction found no load bypassing the current sensor.",
     "title": "Hidden load weakened"
    }
@@ -76,6 +81,50 @@
    "B": "usable capacity low",
    "C1": "current sensor under-reads",
    "C2": "load bypassing the current sensor"
+  },
+  "methods": {
+   "physics": [
+    {
+     "badge": "16 s",
+     "text": "The displayed charge fell 40 points in 40 seconds while only 0.08 Ah flowed. A real drop of that size needs tens of ampere-hours. The battery was not emptied; its estimate was corrected.",
+     "title": "Counted the charge"
+    },
+    {
+     "text": "The weakest cell runs a constant 0.92 Ah behind the strongest, about 7.6 minutes at this load. It explains when the protection tripped, about 2 % of the shortfall, not why.",
+     "title": "Weighed the weakest cell against the pack"
+    },
+    {
+     "text": "Lost capacity, a sensor reading low, a hidden load, a harness or contactor fault: each would leave a different trace. The record weakens sensing and contactor faults; three causes remain.",
+     "title": "Asked what each cause would require"
+    },
+    {
+     "text": "No chemistry, no voltage-to-charge curve, no cell count. Where the physics needs them, Veyra says so instead of guessing, and names the check that would settle it.",
+     "title": "Reasoned without a datasheet"
+    }
+   ],
+   "result": "The shortfall is in the charge estimate, not the battery: the cause the manufacturer confirmed after about two days with its supplier.",
+   "system": [
+    {
+     "text": "Reported: the vehicle could not drive. Recorded: no drive request at all, the vehicle was parked. The real question became why a parked vehicle reached a protective shutdown.",
+     "title": "Checked the complaint against the record"
+    },
+    {
+     "text": "8 state changes in 5.5 s, in order, from fault level 3 to the contactors opening. Current kept flowing after the DC/DC switched off, so another load was drawing it.",
+     "title": "Rebuilt the shutdown across BMS, VCU, DC/DC and contactors"
+    },
+    {
+     "text": "No specification was given. The three protection levels triggered at about 2.9, 2.7, 2.5 V on the weakest cell.",
+     "title": "Inferred the protection thresholds from timing"
+    },
+    {
+     "text": "High voltage was switched back on 5 times after the shutdown, each time with the weakest cell already below the level-2 voltage. That became a safety hold.",
+     "title": "Followed every restart"
+    },
+    {
+     "text": "Copies of the same signal were not counted twice, and a voltage field that never changes with the contactors was set aside as not measuring what its name says.",
+     "title": "Decided which signals to trust"
+    }
+   ]
   },
   "mode": "agent",
   "report": {
