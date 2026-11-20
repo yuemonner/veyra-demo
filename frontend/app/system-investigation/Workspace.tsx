@@ -22,6 +22,18 @@ const LABEL: Record<string, string> = {
   inquiry_compute: "Ran a calculation", inquiry_predict: "Wrote down a prediction to test", inquiry_test: "Tested its prediction",
   inquiry_distinguishable: "Marked what the data cannot separate", search: "Searched the event log", submit_report: "Wrote the report",
 };
+// What each calculation the agent asked for does, in plain words.
+const CALC: Record<string, string> = {
+  integrate: "Counted the charge that flowed", capacity: "Estimated the usable capacity", crosscheck: "Cross-checked two signals",
+  unexplained_changes: "Looked for changes the current cannot explain", step_response: "Measured the voltage response to load steps",
+  topology: "Checked the pack's series count", compare_windows: "Compared before and after the incident", rate: "Measured a rate of change",
+  transitions: "Listed the state changes", departure: "Found where a signal left its normal range",
+};
+const label = (t: Tool) => {
+  if (t.tool === "submit_report" && /returned/.test(t.title)) return "Report sent back by Veyra's checks for correction";
+  if (t.tool === "inquiry_compute") { const op = /^Computed (\w+)/.exec(t.title)?.[1]; if (op && CALC[op]) return CALC[op]; }
+  return LABEL[t.tool] || t.title;
+};
 const METHOD: Record<string, string> = { system: "System-level method", physics: "Battery physics" };
 
 function viewFor(t: Tool, prev: View): View {
@@ -163,7 +175,7 @@ export default function Workspace({ d }: { d: Any }) {
                   <li key={k} data-i={k} className={`${w.tool} ${k === i ? w.toolNow : ""}`}>
                     <button onClick={() => setOpen(isOpen ? null : t.id)} aria-expanded={isOpen}>
                       <span className={w.tick} aria-hidden>{k === i && playing ? "" : "✓"}</span>
-                      <span className={w.toolLabel}>{t.tool === "submit_report" && /returned/.test(t.title) ? "Report sent back by Veyra's checks for correction" : LABEL[t.tool] || t.title}</span>
+                      <span className={w.toolLabel}>{label(t)}</span>
                       {t.method && METHOD[t.method] && <span className={`${w.chip} ${t.method === "system" ? w.chipSys : w.chipPhys}`}>{METHOD[t.method]}</span>}
                     </button>
                     {isOpen && <div className={w.detail}><b>{t.title}</b>{t.summary && <p>{t.summary}</p>}</div>}
